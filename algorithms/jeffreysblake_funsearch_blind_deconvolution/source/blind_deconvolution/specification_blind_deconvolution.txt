@@ -1,0 +1,177 @@
+# Copyright 2023 DeepMind Technologies Limited
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+
+"""FunSearch specification for blind deconvolution convergence criteria."""
+
+import numpy as np
+from scipy import signal
+from typing import Dict, Tuple
+
+
+def generate_test_image(size: int = 64) -> np.ndarray:
+    """Generate a synthetic test image with clear features."""
+    x, y = np.meshgrid(np.linspace(-1, 1, size), np.linspace(-1, 1, size))
+    
+    image = np.zeros((size, size))
+    image += 0.5 * np.exp(-(x**2 + y**2) / 0.2)
+    image += 0.3 * np.sin(8 * np.pi * x) * np.exp(-y**2 / 0.1)
+    image += 0.2 * np.sin(8 * np.pi * y) * np.exp(-x**2 / 0.1)
+    
+    image[size//4, size//4] += 0.8
+    image[3*size//4, 3*size//4] += 0.6
+    
+    return np.clip(image, 0, 1)
+
+
+def generate_blur_kernel(kernel_type: str, size: int = 15) -> np.ndarray:
+    """Generate different types of blur kernels."""
+    if kernel_type == "gaussian":
+        sigma = size / 6
+        kernel = np.zeros((size, size))
+        center = size // 2
+        for i in range(size):
+            for j in range(size):
+                kernel[i, j] = np.exp(-((i - center)**2 + (j - center)**2) / (2 * sigma**2))
+        return kernel / np.sum(kernel)
+    
+    elif kernel_type == "motion":
+        kernel = np.zeros((size, size))
+        center = size // 2
+        length = size // 2
+        for i in range(length):
+            kernel[center, center - length//2 + i] = 1
+        return kernel / np.sum(kernel)
+    
+    return kernel / np.sum(kernel)
+
+
+def lucy_richardson_iteration(current_estimate: np.ndarray, 
+                            observed_image: np.ndarray,
+                            psf: np.ndarray) -> np.ndarray:
+    """Single Lucy-Richardson iteration."""
+    convolved = signal.convolve2d(current_estimate, psf, mode='same', boundary='symm')
+    convolved = np.maximum(convolved, 1e-10)
+    ratio = observed_image / convolved
+    psf_flipped = np.flipud(np.fliplr(psf))
+    correction = signal.convolve2d(ratio, psf_flipped, mode='same', boundary='symm')
+    return current_estimate * correction
+
+
+def compute_psnr(image1: np.ndarray, image2: np.ndarray) -> float:
+    """Compute Peak Signal-to-Noise Ratio between two images."""
+    mse = np.mean((image1 - image2) ** 2)
+    if mse == 0:
+        return float('inf')
+    return 20 * np.log10(1.0 / np.sqrt(mse))
+
+
+def compute_image_gradient_norm(image: np.ndarray) -> float:
+    """Compute the L2 norm of the image gradient."""
+    grad_x = np.gradient(image, axis=1)
+    grad_y = np.gradient(image, axis=0)
+    return np.sqrt(np.mean(grad_x**2 + grad_y**2))
+
+
+def compute_residual_norm(current: np.ndarray, previous: np.ndarray) -> float:
+    """Compute normalized change between iterations."""
+    diff = np.abs(current - previous)
+    return np.mean(diff) / (np.mean(np.abs(current)) + 1e-10)
+
+
+@funsearch.run
+def evaluate(test_cases: Dict[str, Dict]) -> float:
+    """Evaluate the convergence criteria across multiple test cases.
+    
+    Args:
+        test_cases: Dictionary of test scenarios with ground truth images,
+                   blur kernels, and observed (blurred) images.
+    
+    Returns:
+        Composite score based on quality, efficiency, and stability.
+    """
+    total_score = 0.0
+    num_cases = 0
+    
+    for case_name, case_data in test_cases.items():
+        ground_truth = case_data['ground_truth']
+        observed = case_data['observed']
+        psf = case_data['psf']
+        
+        # Run Lucy-Richardson with evolved stopping criteria
+        deconvolved, iterations_used, _ = run_lucy_richardson_with_stopping(
+            observed, psf, ground_truth, max_iterations=100
+        )
+        
+        # Quality metric (PSNR)
+        psnr = compute_psnr(ground_truth, deconvolved)
+        quality_score = min(psnr / 30.0, 1.0)  # Normalize, cap at 30dB
+        
+        # Efficiency metric (fewer iterations is better)
+        efficiency_score = max(0, 1.0 - iterations_used / 100.0)
+        
+        # Stability metric (penalize extreme iteration counts)
+        stability_penalty = 0.1 if iterations_used < 5 or iterations_used > 80 else 0.0
+        
+        # Composite score for this case
+        case_score = 0.6 * quality_score + 0.3 * efficiency_score - stability_penalty
+        total_score += max(case_score, 0.0)
+        num_cases += 1
+    
+    return total_score / num_cases if num_cases > 0 else 0.0
+
+
+def run_lucy_richardson_with_stopping(
+    observed_image: np.ndarray,
+    psf: np.ndarray, 
+    ground_truth: np.ndarray,
+    max_iterations: int = 100
+) -> Tuple[np.ndarray, int, float]:
+    """Run Lucy-Richardson with evolved stopping criteria."""
+    current_estimate = observed_image.copy()
+    
+    for iteration in range(max_iterations):
+        previous_estimate = current_estimate.copy()
+        current_estimate = lucy_richardson_iteration(current_estimate, observed_image, psf)
+        
+        # Use evolved stopping criteria
+        if should_stop(current_estimate, previous_estimate, iteration, psf, observed_image):
+            final_psnr = compute_psnr(ground_truth, current_estimate)
+            return current_estimate, iteration + 1, final_psnr
+    
+    # Max iterations reached
+    final_psnr = compute_psnr(ground_truth, current_estimate)
+    return current_estimate, max_iterations, final_psnr
+
+
+@funsearch.evolve
+def should_stop(current_image: np.ndarray, 
+               previous_image: np.ndarray, 
+               iteration: int,
+               blur_kernel: np.ndarray, 
+               observed_image: np.ndarray) -> bool:
+    """Evolved stopping criteria for Lucy-Richardson deconvolution.
+    
+    Args:
+        current_image: Current estimate of the deconvolved image
+        previous_image: Previous iteration's estimate
+        iteration: Current iteration number (0-indexed)
+        blur_kernel: The point spread function used for deconvolution
+        observed_image: The original blurred/observed image
+        
+    Returns:
+        True if algorithm should stop, False to continue iterating.
+    """
+    # Trivial initial implementation - stop after fixed iterations
+    return iteration >= 50
