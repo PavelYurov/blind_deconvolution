@@ -25,7 +25,7 @@ class Processing:
     '''
     
     def __init__(self, images_folder='images', blurred_folder='blurred', 
-                 restored_folder='restored', data_path='data', color=False):
+                 restored_folder='restored', data_path='data', color=False, kernel_dir='kernels'):
         '''
             Инициализация фреймворка
 
@@ -46,9 +46,10 @@ class Processing:
         self.amount_of_blurred = 1
         self.optimizer = HyperparameterOptimizer(self)
         self.analyzer = ParetoFrontAnalyzer(self)
+        self.kernel_dir = Path(kernel_dir)
         
         for folder in [self.folder_path, self.folder_path_blurred, 
-                    self.folder_path_restored, self.data_path]:
+                    self.folder_path_restored, self.data_path, self.kernel_dir ]:
             folder.mkdir(parents=True, exist_ok=True)
 
     def changescale(self, color: bool):
