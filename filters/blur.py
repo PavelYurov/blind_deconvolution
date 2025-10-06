@@ -3,6 +3,9 @@ import numpy as np
 from typing import Callable, Optional
 from .base import FilterBase
 
+from scipy.interpolate import BSpline, make_interp_spline
+from mpl_toolkits.mplot3d import Axes3D
+
 class DefocusBlur(FilterBase):
     """
     Фильтр размытия вне фокуса, имитирующий эффект расфокусировки камеры.
@@ -124,3 +127,118 @@ class MotionBlur(FilterBase):
     def filter(self, image: np.ndarray) -> np.ndarray:
         """Применение размытия в движении к изображению."""
         return cv.filter2D(image, -1, self.generate_kernel())
+    
+
+class BSpline_blur(FilterBase):
+
+    def __init__(self,shape_points, intensity_points, output_size=(15, 15), shape_degree=3, intensity_degree=2, n_samples=1000):
+        """
+        Создает PSF используя два B-spline: для формы и для интенсивности.
+        Применяет их, как фильтр
+        
+        Parameters:
+        -----------
+        shape_points : array-like, shape (n, 2)
+            Точки, задающие форму кривой [x, y]
+        intensity_points : array-like, shape (m, 2)
+            Точки, задающие интенсивность вдоль кривой [param, intensity]
+            где param - параметр вдоль кривой (0..1)
+        output_size : tuple, (width, height)
+            Размер выходной матрицы PSF
+        shape_degree : int
+            Степень B-spline для формы
+        intensity_degree : int
+            Степень B-spline для интенсивности
+        n_samples : int
+            Количество точек для дискретизации кривой
+        """
+        super().__init__(1, 'blur')
+
+        self.shape_points = shape_points
+        self.intensity_points = intensity_points
+        self.output_size = output_size
+        self.shape_degree = shape_degree
+        self.intensity_degree = intensity_degree
+        self.n_samples = n_samples
+
+
+    def filter(self, image):
+        kernel = self.create_dual_bspline_psf()
+        res = cv.filter2D(src=image,ddepth=-1,kernel=kernel)
+        return res
+    
+    def discription(self) -> str:
+        return f"|Bspline_motion_"
+    
+    def create_dual_bspline_psf(self):
+        """
+        Создает PSF используя два B-spline: для формы и для интенсивности.
+        
+        Returns:
+        --------
+        psf : ndarray
+            Нормализованная матрица PSF
+        shape_spline : BSpline
+            B-spline для формы кривой
+        intensity_spline : BSpline
+            B-spline для интенсивности
+        sampled_points : ndarray
+            Дискретизированные точки кривой с интенсивностями
+        """
+        
+        shape_points = np.array(self.shape_points)
+        intensity_points = np.array(self.intensity_points)
+        
+        # 1. Создаем B-spline для формы кривой
+        t_shape = np.linspace(0, 1, len(shape_points))
+        shape_spline_x = make_interp_spline(t_shape, shape_points[:, 0], k=self.shape_degree)
+        shape_spline_y = make_interp_spline(t_shape, shape_points[:, 1], k=self.shape_degree)
+        
+        # 2. Создаем B-spline для интенсивности
+        t_intensity = np.linspace(0, 1, len(intensity_points))
+        intensity_spline = make_interp_spline(t_intensity, intensity_points[:, 1], k=self.intensity_degree)
+        
+        # 3. Дискретизируем кривую с интенсивностями
+        t_samples = np.linspace(0, 1, self.n_samples)
+        x_samples = shape_spline_x(t_samples)
+        y_samples = shape_spline_y(t_samples)
+        intensity_samples = intensity_spline(t_samples)
+        
+        # Убеждаемся, что интенсивности неотрицательные
+        intensity_samples = np.maximum(intensity_samples, 0)
+        
+        sampled_points = np.column_stack([x_samples, y_samples, intensity_samples])
+        
+        # 4. Проецируем на матрицу
+        width, height = self.output_size
+        
+        # Находим границы для нормализации координат
+        x_min, x_max = x_samples.min(), x_samples.max()
+        y_min, y_max = y_samples.min(), y_samples.max()
+        
+        # Масштабируем координаты к диапазону [0, size-1]
+        x_scaled = (x_samples - x_min) / (x_max - x_min) * (width - 1)
+        y_scaled = (y_samples - y_min) / (y_max - y_min) * (height - 1)
+        
+        # Создаем пустую PSF матрицу
+        psf = np.zeros(self.output_size)
+        
+        # Распределяем интенсивности по матрице (простая бининг)
+        for i in range(len(x_scaled)):
+            x_idx = int(round(x_scaled[i]))
+            y_idx = int(round(y_scaled[i]))
+            
+            # Проверяем границы
+            if 0 <= x_idx < width and 0 <= y_idx < height:
+                psf[y_idx, x_idx] += intensity_samples[i]
+        
+        # # 5. Применяем гауссово размытие для сглаживания
+        # from scipy.ndimage import gaussian_filter
+        # psf = gaussian_filter(psf, sigma=0.7)
+        
+        # 6. Нормализуем PSF (сумма = 1)
+        psf = np.maximum(psf, 0)  # Убеждаемся в неотрицательности
+        if np.sum(psf) > 0:
+            psf = psf / np.sum(psf)
+        
+        return psf
