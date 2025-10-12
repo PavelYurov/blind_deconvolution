@@ -18,6 +18,8 @@ import math
 import warnings
 import os as os
 from IPython.display import display
+import logging
+import json
 
 
 class ProcessingExtension(ABC):
@@ -27,6 +29,7 @@ class ProcessingExtension(ABC):
     
     def __init__(self, processing_instance):
         self.processing = processing_instance
+        self.save_folder = 'parametrs'
     
     @abstractmethod
     def execute(self, *args, **kwargs):
@@ -74,43 +77,22 @@ class HyperparameterOptimizer(ProcessingExtension):
             '''
             alg_name = algorithm_processor.get_name()
             
-            for img_obj in self.processing.images:
-                self._optimize_and_process_single_image(
-                    img_obj, algorithm_processor, param_ranges, 
-                    n_trials, metric, timeout, alg_name, method, logs, optimization_kwargs
+            best_params = self._optimize_with_optuna(
+                    algorithm_processor, param_ranges, n_trials, metric, timeout, method, logs, optimization_kwargs
                 )
+            for img_obj in self.processing.images:
+                original_image = img_obj.get_original_image()
+                blurred_image = img_obj.get_blurred_image()
+                if blurred_image is None:
+                    blurred_image = original_image
 
-    def _optimize_and_process_single_image(self, img_obj, algorithm_processor, 
-                                        param_ranges, n_trials, metric, 
-                                        timeout, alg_name, method, logs, optimization_kwargs):
-        '''
-        Оптимизация и обработка одного изображения
-        '''
-        original_image = img_obj.get_original_image()
-        blurred_image = img_obj.get_blurred_image()
-        
-        if blurred_image is None:
-            blurred_image = original_image
+                self._process_with_optimized_params(
+                        img_obj, algorithm_processor, best_params, 
+                        blurred_image, original_image, alg_name
+                    )
+            self.save_to_json(best_params,alg_name)
             
-        if blurred_image is None:
-            print(f"Pass: Unable to load image {img_obj.get_original()}")
-            return
-        
-        print(f"Oprimizig hyperparameters for {Path(img_obj.get_original()).name}")
-        
-        best_params = self._optimize_with_optuna(
-                algorithm_processor, param_ranges, blurred_image, 
-                original_image, n_trials, metric, timeout, method, logs, optimization_kwargs
-            )
-        
-        self._process_with_optimized_params(
-                img_obj, algorithm_processor, best_params, 
-                blurred_image, original_image, alg_name
-            )
-
-    def _optimize_with_optuna(self, algorithm_processor, param_ranges, 
-                                blurred_image, original_image, n_trials, 
-                                metric, timeout, method, logs, optimization_kwargs):
+    def _optimize_with_optuna(self, algorithm_processor, param_ranges, n_trials, metric, timeout, method, logs, optimization_kwargs):
         '''
         Оптимизация гиперпараметров с помощью Optuna
         '''
@@ -126,27 +108,41 @@ class HyperparameterOptimizer(ProcessingExtension):
                     params[param_name] = trial.suggest_categorical(param_name, [min_val, max_val]) #по идее это работать не будет, если только не поменять на что-то умное
             
             algorithm_processor.change_param(params)
-            
-            try:
-                test_restored, _ = algorithm_processor.process(blurred_image)
-                original_prepared = self._prepare_image_for_metric(original_image)
-                restored_prepared = self._prepare_image_for_metric(test_restored)
+            score = 0
+            for img_obj in self.processing.images:
 
-                if np.max(test_restored) < 1e-6:
-                    print("WARNING: Restored image is almost zero!")
-                    return -float('inf')
-                if metric.upper() == 'SSIM':
-                    score = metrics.SSIM(original_prepared, restored_prepared)
-                elif metric.upper() == 'SHARPNESS':
-                    score = metrics.Sharpness(restored_prepared)
-                else:  # PSNR по умолчанию
-                    score = metrics.PSNR(original_prepared, restored_prepared)
-                return score
-                
-            except Exception as e:
-                print(f"Error while testing parameters {params}: {e}")
-                return -float('inf')
+                original_image = img_obj.get_original_image()
+                blurred_image = img_obj.get_blurred_image()
+                if blurred_image is None:
+                    blurred_image = original_image
+
+                try:
+                    test_restored, _ = algorithm_processor.process(blurred_image)
+                    original_prepared = self._prepare_image_for_metric(original_image)
+                    restored_prepared = self._prepare_image_for_metric(test_restored)
+
+                    if np.max(test_restored) < 1e-6:
+                        print("WARNING: Restored image is almost zero!")
+                        score += 0
+                    if metric.upper() == 'SSIM':
+                        score += metrics.SSIM(original_prepared, restored_prepared)
+                    elif metric.upper() == 'SHARPNESS':
+                        score += metrics.Sharpness(restored_prepared)
+                    else:  # PSNR по умолчанию
+                        score += metrics.PSNR(original_prepared, restored_prepared)
+                    
+                    
+                except Exception as e:
+                    print(f"Error while testing parameters {params}: {e}")
+                    score +=0
+            
+            #пусть будет среднее...
+            #потом можно будет переделать на что-то умное, я не знаю на что
+            score = score / len(self.processing.images)
+            return score
         
+        if not logs:
+            optuna.logging.set_verbosity(optuna.logging.WARNING)
         study = optuna.create_study(
             direction="maximize",
             sampler=optuna.samplers.TPESampler(seed=42),  # Tree-structured Parzen Estimator
@@ -161,6 +157,129 @@ class HyperparameterOptimizer(ProcessingExtension):
         print(f"   Number of tests: {len(study.trials)}")
         
         return study.best_params
+
+    def save_to_json(self, best_params, alg_name):
+        """
+        сохраняет параметры в .json
+        """
+        os.makedirs(self.save_folder, exist_ok=True)
+        filename = alg_name + '.json'
+        file_path = os.path.join(self.save_folder,filename)
+        
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(best_params, f, ensure_ascii=False, indent=4)
+
+
+    # def execute(self, algorithm_processor: base.DeconvolutionAlgorithm, 
+    #             param_ranges: dict, n_trials: int = 50, 
+    #             metric: str = 'PSNR', timeout: int = 3600,
+    #             method: OptimizationMethod = OptimizationMethod.TPE,
+    #             logs: bool = True,
+    #             **optimization_kwargs):
+    #         '''
+    #         Оптимизация гиперпараметров с использованием Optuna
+            
+    #         Аргументы:
+    #             - algorithm_processor: метод восстановления изображения
+    #             - param_ranges: словарь с диапазонами параметров {param: (min, max)}
+    #             - n_trials: количество испытаний
+    #             - metric: метрика для оптимизации ('PSNR', 'SSIM', 'Sharpness')
+    #             - timeout: максимальное время оптимизации в секундах
+    #             - method: метод оптимизации (TPE, Random, GP, GA)
+    #             - logs: выводить логи или нет
+    #             - optimization_kwargs: дополнительные параметры для оптимизатора
+    #         '''
+    #         alg_name = algorithm_processor.get_name()
+            
+    #         for img_obj in self.processing.images:
+    #             self._optimize_and_process_single_image(
+    #                 img_obj, algorithm_processor, param_ranges, 
+    #                 n_trials, metric, timeout, alg_name, method, logs, optimization_kwargs
+    #             )
+
+    # def _optimize_and_process_single_image(self, img_obj, algorithm_processor, 
+    #                                     param_ranges, n_trials, metric, 
+    #                                     timeout, alg_name, method, logs, optimization_kwargs):
+    #     '''
+    #     Оптимизация и обработка одного изображения
+    #     '''
+    #     original_image = img_obj.get_original_image()
+    #     blurred_image = img_obj.get_blurred_image()
+        
+    #     if blurred_image is None:
+    #         blurred_image = original_image
+            
+    #     if blurred_image is None:
+    #         print(f"Pass: Unable to load image {img_obj.get_original()}")
+    #         return
+        
+    #     print(f"Oprimizig hyperparameters for {Path(img_obj.get_original()).name}")
+        
+    #     best_params = self._optimize_with_optuna(
+    #             algorithm_processor, param_ranges, blurred_image, 
+    #             original_image, n_trials, metric, timeout, method, logs, optimization_kwargs
+    #         )
+        
+    #     self._process_with_optimized_params(
+    #             img_obj, algorithm_processor, best_params, 
+    #             blurred_image, original_image, alg_name
+    #         )
+
+    # def _optimize_with_optuna(self, algorithm_processor, param_ranges, 
+    #                             blurred_image, original_image, n_trials, 
+    #                             metric, timeout, method, logs, optimization_kwargs):
+    #     '''
+    #     Оптимизация гиперпараметров с помощью Optuna
+    #     '''
+        
+    #     def objective(trial):
+    #         params = {}
+    #         for param_name, (min_val, max_val) in param_ranges.items():
+    #             if isinstance(min_val, int) and isinstance(max_val, int):
+    #                 params[param_name] = trial.suggest_int(param_name, min_val, max_val)
+    #             elif isinstance(min_val, float) or isinstance(max_val, float):
+    #                 params[param_name] = trial.suggest_float(param_name, min_val, max_val)
+    #             else:
+    #                 params[param_name] = trial.suggest_categorical(param_name, [min_val, max_val]) #по идее это работать не будет, если только не поменять на что-то умное
+            
+    #         algorithm_processor.change_param(params)
+            
+    #         try:
+    #             test_restored, _ = algorithm_processor.process(blurred_image)
+    #             original_prepared = self._prepare_image_for_metric(original_image)
+    #             restored_prepared = self._prepare_image_for_metric(test_restored)
+
+    #             if np.max(test_restored) < 1e-6:
+    #                 print("WARNING: Restored image is almost zero!")
+    #                 return -float('inf')
+    #             if metric.upper() == 'SSIM':
+    #                 score = metrics.SSIM(original_prepared, restored_prepared)
+    #             elif metric.upper() == 'SHARPNESS':
+    #                 score = metrics.Sharpness(restored_prepared)
+    #             else:  # PSNR по умолчанию
+    #                 score = metrics.PSNR(original_prepared, restored_prepared)
+    #             return score
+                
+    #         except Exception as e:
+    #             print(f"Error while testing parameters {params}: {e}")
+    #             return -float('inf')
+        
+    #     if not logs:
+    #         optuna.logging.set_verbosity(optuna.logging.WARNING)
+    #     study = optuna.create_study(
+    #         direction="maximize",
+    #         sampler=optuna.samplers.TPESampler(seed=42),  # Tree-structured Parzen Estimator
+    #         pruner=optuna.pruners.MedianPruner()  # Prunning для ранней остановки
+    #     )
+        
+    #     study.optimize(objective, n_trials=n_trials, timeout=timeout, show_progress_bar=logs)
+        
+    #     print(f"Optimization completed:")
+    #     print(f"   Best {metric}: {study.best_value:.4f}")
+    #     print(f"   Best params: {study.best_params}")
+    #     print(f"   Number of tests: {len(study.trials)}")
+        
+    #     return study.best_params
 
 
     def _prepare_image_for_metric(self, image):

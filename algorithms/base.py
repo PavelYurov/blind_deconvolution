@@ -1,6 +1,7 @@
 import abc
 import numpy as np
 from typing import Any
+import json
 
 class DeconvolutionAlgorithm(abc.ABC):
     """
@@ -66,3 +67,7 @@ class DeconvolutionAlgorithm(abc.ABC):
         '''
         return self.timer
     
+    def import_param_from_file(self, file):
+        with open(file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        self.change_param(data)

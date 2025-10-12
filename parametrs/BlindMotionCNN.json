@@ -1,0 +1,15 @@
+{
+    "angle_model_path": null,
+    "length_model_path": null,
+    "noise": 0.16445845403801215,
+    "psf_size": 55,
+    "inference_size": [
+        640,
+        480
+    ],
+    "fft_size": [
+        224,
+        224
+    ],
+    "angle_top_k": 1
+}
