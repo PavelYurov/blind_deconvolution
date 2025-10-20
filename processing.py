@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import math
 import pandas as pd
 from pathlib import Path
+import json
 
 import utils
 import filters.base as filter
@@ -25,7 +26,7 @@ class Processing:
     '''
     
     def __init__(self, images_folder='images', blurred_folder='blurred', 
-                 restored_folder='restored', data_path='data', color=False, kernel_dir='kernels'):
+                 restored_folder='restored', data_path='data', color=False, kernel_dir='kernels', dataset_path = 'dataset'):
         '''
             Инициализация фреймворка
 
@@ -36,6 +37,7 @@ class Processing:
             -folder_path_restored: директория с восстановленными изображениями
             -images: массив связей изображений с их смазанными и восстановленными версиями
             -data_path: директория, куда сохранять анализ данных
+            -dataset_path: директория, куда сохраняются сшифки метаданных датасетов
         '''
         self.color = color
         self.folder_path = Path(images_folder)
@@ -47,9 +49,10 @@ class Processing:
         self.optimizer = HyperparameterOptimizer(self)
         self.analyzer = ParetoFrontAnalyzer(self)
         self.kernel_dir = Path(kernel_dir)
+        self.dataset_path = Path(dataset_path)
         
         for folder in [self.folder_path, self.folder_path_blurred, 
-                    self.folder_path_restored, self.data_path, self.kernel_dir ]:
+                    self.folder_path_restored, self.data_path, self.kernel_dir, self.dataset_path ]:
             folder.mkdir(parents=True, exist_ok=True)
 
     def changescale(self, color: bool):
@@ -473,6 +476,106 @@ class Processing:
         self.images = np.append(self.images, img_obj)
         return img_obj
 
+    def save_bind_state(self, file_path = None):
+        """
+        пусть сохраняет images полностью
+        ФАЙЛ - JSON!!!
+        """
+        if file_path is None:
+            file_path = os.path.join(self.dataset_path, 'dataset.json')
+        data = dict()
+        counter = 1
+        self.save_filter()
+
+        for img in self.images:
+            data[f'{counter}'] = {}
+
+            original_path = img.get_original()
+            
+            restored_kernels = img.get_kernels()    #(bl_p , alg_p)
+            original_kernels = img.get_original_kernels() #bl_p
+            blurred_ssim = img.get_blurred_SSIM() #bl_p
+            blurred_psnr = img.get_blurred_PSNR() #bl_p
+            filters = img.get_filters() #bl_p
+            algorithms = img.get_algorithm() #array
+            restored_psnr = img.get_PSNR() #(bl_p,alg_p)
+            restored_ssim = img.get_SSIM() #(bl_p,alg_p)
+            is_color = img.get_color() #Bool
+
+            restored_path = img.get_restored() #(bl_p,alg_p)
+
+            for blurred_path in img.get_blurred_array():
+                tmp_dict = dict()
+                tmp_dict['original_path'] = original_path
+                tmp_dict['blurred_path'] = blurred_path
+                tmp_dict['original_kernel'] = original_kernels[blurred_path]
+                tmp_dict['filters'] = filters[blurred_path]
+                tmp_dict['blurred_psnr'] = blurred_psnr[blurred_path]
+                tmp_dict['blurred_ssim'] = blurred_ssim[blurred_path]
+                tmp_dict['is_color'] = is_color
+                tmp_dict['restored_paths'] = dict()
+                tmp_dict['algorithm'] = algorithms.tolist()
+                tmp_dict['kernel_paths'] = dict()
+                tmp_dict['psnr'] = dict()
+                tmp_dict['ssim'] = dict()
+
+
+                for alg in algorithms:
+                    tmp_dict['restored_paths'][alg] = restored_path[(blurred_path,alg)]
+                    tmp_dict['kernel_paths'][alg] = restored_kernels[(blurred_path,alg)]
+                    tmp_dict['psnr'][alg] = restored_psnr[(blurred_path,alg)]
+                    tmp_dict['ssim'][alg] = restored_ssim[(blurred_path,alg)]
+                
+                data[f'{counter}'] = tmp_dict
+                counter+=1
+
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+        pass
+
+    def load_bind_state(self, bind_path):
+        with open(bind_path, 'r', encoding='utf-8') as f:
+            data_global = json.load(f)
+        
+        for i in data_global.keys():
+            
+            data = data_global[i]
+
+            original_path = data['original_path']
+            blurred_path = data['blurred_path']
+            original_kernels = {blurred_path: data['original_kernel']}
+            filters = data['filters']
+            blurred_psnr = {blurred_path: data['blurred_psnr']}
+            blurred_ssim = {blurred_path: data['blurred_ssim']}
+            is_color = data['is_color']
+            restored_paths = dict()
+            algorithms = np.array(data['algorithm'])
+            kernel_paths = dict()
+            psnr = dict()
+            ssim = dict()
+
+            tmp_image = utils.Image(original_path,is_color)
+
+            for alg in algorithms:
+                restored_paths[(blurred_path,alg)] = data['restored_paths'][alg]
+                kernel_paths[(blurred_path,alg)] = data['kernel_paths'][alg]
+                psnr[(blurred_path,alg)] = data['psnr'][alg]
+                ssim[(blurred_path,alg)] = data['ssim'][alg]
+
+            tmp_image.set_blurred(blurred_path)
+            tmp_image.set_blurred_PSNR(blurred_psnr)
+            tmp_image.set_blurred_SSIM(blurred_ssim)
+            tmp_image.set_current_filter(filters)
+            tmp_image.set_original_kernels(original_kernels)
+
+            tmp_image.set_restored(restored_paths)
+            tmp_image.set_algorithm(algorithms)
+            tmp_image.set_PSNR(psnr)
+            tmp_image.set_SSIM(ssim)
+            tmp_image.set_kernels(kernel_paths)
+
+            self.images = np.append(self.images, tmp_image)
+
     def filter(self, filter_processor: filter.FilterBase):
         '''
         Примерние фильтра ко всем изображениям
@@ -587,19 +690,20 @@ class Processing:
         '''
         return self.amount_of_blurred
     
-    def process(self, algorithm_processor: base.DeconvolutionAlgorithm):
+    def process(self, algorithm_processor: base.DeconvolutionAlgorithm, metadata = False):
         '''
         Восстановление всех изображений
         
         Аргументы:
             -algorithm_processor: метод восстановления изображения
+            -metadata: сохранять метаданные или нет
         '''
         alg_name = algorithm_processor.get_name()
         
         for img_obj in self.images:
-            self._process_single_image(img_obj, algorithm_processor, alg_name)
+            self._process_single_image(img_obj, algorithm_processor, alg_name, metadata = metadata)
         
-    def _process_single_image(self, img_obj, algorithm_processor, alg_name):
+    def _process_single_image(self, img_obj, algorithm_processor, alg_name, metadata=False):
         '''
         Восстановление одного изображения
         '''        
@@ -632,7 +736,7 @@ class Processing:
         original_image = np.atleast_3d(original_image)
         restored_image = np.atleast_3d(restored_image)
         self._calculate_and_save_metrics(img_obj, original_image, restored_image, 
-                                   restored_path, kernel_path, alg_name)
+                                   restored_path, kernel_path, alg_name, algorithm_processor,metadata=metadata)
     
     def _generate_output_paths(self, img_obj, alg_name):
         '''
@@ -658,7 +762,7 @@ class Processing:
         return restored_path, kernel_path
     
     def _calculate_and_save_metrics(self, img_obj, original_image, restored_image, 
-                              restored_path, kernel_path, alg_name):
+                              restored_path, kernel_path, alg_name, processor, metadata = False):
         '''
         Расчет метрик и обновление данных изображения
         '''
@@ -681,6 +785,29 @@ class Processing:
         img_obj.add_algorithm(alg_name)
         img_obj.add_restored(str(restored_path), blurred_ref, alg_name)
         img_obj.add_kernel(str(kernel_path), blurred_ref, alg_name)
+
+        if metadata:
+            metadata_path = os.path.splitext(restored_path)[0] + '.json'
+
+            data = dict()
+            data['original'] = img_obj.get_original()
+            blurred_path = img_obj.get_blurred()
+            data['blurred'] = blurred_path
+            data['filter'] = img_obj.get_current_filter()
+            data['blurred kernel'] = img_obj.get_original_kernels()[blurred_path]
+            data['blurred psnr'] = img_obj.get_blurred_PSNR()[blurred_path]
+            data['blurred ssim'] = img_obj.get_blurred_SSIM()[blurred_path]
+            data['algorithm'] = alg_name
+            data['restored'] = str(restored_path)
+            data['restored kernel'] = str(kernel_path)
+            data['restored psnr'] = psnr_val
+            data['restored ssim'] = ssim_val
+            data['algorithm parametrs'] = processor.get_param()
+            print(data)
+            with open(metadata_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=4)
+
+
         
         print(f"Restored: {Path(restored_path).name} (PSNR: {psnr_val:.2f}, SSIM: {ssim_val:.4f})")
             

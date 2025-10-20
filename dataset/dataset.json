@@ -1,0 +1,50 @@
+{
+    "1": {
+        "original_path": "images\\3096.png",
+        "blurred_path": "dataset_blurred\\3096_1.png",
+        "original_kernel": "dataset_blurred\\kernel_3096_1.png",
+        "filters": "|defocus_gaussian_distribution_2_61|gaussiannoise_1",
+        "blurred_psnr": 46.869597609197974,
+        "blurred_ssim": 0.9840710413312497,
+        "is_color": false,
+        "restored_paths": {
+            "BlindMotionCNN": "restored\\3096_1_BlindMotionCNN.png"
+        },
+        "algorithm": [
+            "BlindMotionCNN"
+        ],
+        "kernel_paths": {
+            "BlindMotionCNN": "restored\\3096_1_BlindMotionCNN_kernel.png"
+        },
+        "psnr": {
+            "BlindMotionCNN": 10.806403985485833
+        },
+        "ssim": {
+            "BlindMotionCNN": NaN
+        }
+    },
+    "2": {
+        "original_path": "images\\fly.jpg",
+        "blurred_path": "dataset_blurred\\fly_1.jpg",
+        "original_kernel": "dataset_blurred\\kernel_fly_1.jpg",
+        "filters": "|defocus_gaussian_distribution_2_61|gaussiannoise_1",
+        "blurred_psnr": 46.88625650862265,
+        "blurred_ssim": 0.9892948968800919,
+        "is_color": false,
+        "restored_paths": {
+            "BlindMotionCNN": "restored\\fly_1_BlindMotionCNN.jpg"
+        },
+        "algorithm": [
+            "BlindMotionCNN"
+        ],
+        "kernel_paths": {
+            "BlindMotionCNN": "restored\\fly_1_BlindMotionCNN_kernel.jpg"
+        },
+        "psnr": {
+            "BlindMotionCNN": 22.394586579949287
+        },
+        "ssim": {
+            "BlindMotionCNN": NaN
+        }
+    }
+}
