@@ -1,4 +1,4 @@
-﻿# utils.py (Versione 2.0 - Aggiornata con blur gaussiano)
+# utils.py (Versione 2.0 - Aggiornata con blur gaussiano)
 
 import numpy as np
 import cv2

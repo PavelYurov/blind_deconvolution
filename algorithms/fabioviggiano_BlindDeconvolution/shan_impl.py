@@ -1,4 +1,4 @@
-﻿# shan.py (Versione 2.1 - con iperparametro configurabile)
+# shan.py (Versione 2.1 - con iperparametro configurabile)
 import numpy as np
 import cv2
 try:

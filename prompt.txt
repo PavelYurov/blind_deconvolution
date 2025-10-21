@@ -1,6 +1,6 @@
 # Python
 
-https://github.com/gpl27/deblur
+https://github.com/jhell96/Deep-Blind-Deblur
 
 1) Изучи репозиторий и выбери название алгоритма, с которым встроить его во фреймворк.
 
@@ -10,15 +10,18 @@ https://github.com/gpl27/deblur
 
 4) Проверь, что он работает на изображении img = cv.imread("images/<выбери любую картинку>.png",cv.IMREAD_GRAYSCALE). Можно редактировать код в source если он вызывает ошибки.
 
-# Matlab
+5) Оставь в algorithms/<repo_author>_<repo_name>/SOURCE_URL.txt ссылку на репозиторий
 
-https://github.com/Gandor26/Blind-Deconvolution-through-a-Single-Image/
+# Other
+
+https://github.com/lisiyaoATbnu/low_rank_kernel
 
 1) Изучи репозиторий и выбери название алгоритма, с которым встроить его во фреймворк.
 
 2) Склонируй его в algorithms/<repo_author>_<repo_name>/source и удали все git метаданные, чтобы папка source была обычной папкой с кодом.
 
-3) Реализуй алгоритм в algorithms/<repo_author>_<repo_name>/__init__.py переписав его на Python.
-По надобности можно создавать рядом скрипты <скрипт>.py и импортить через from .<скрипт> import ... . Класс алгоритма назвать <RepoAuthor><RepoName>(DeconvolutionAlgorithm)
+3) Реализуй алгоритм в algorithms/<repo_author>_<repo_name>/__init__.py переписав его на Python. По надобности можно создавать рядом скрипты <скрипт>.py и импортить через from .<скрипт> import ... . Класс алгоритма назвать <RepoAuthor><RepoName>(DeconvolutionAlgorithm)
 
 4) Проверь, что он работает на изображении img = cv.imread("images/<выбери любую картинку>.png",cv.IMREAD_GRAYSCALE)
+
+5) Оставь в algorithms/<repo_author>_<repo_name>/SOURCE_URL.txt ссылку на репозиторий
