@@ -5,7 +5,7 @@ from random import sample
 from .base import FilterBase
 from scipy.signal import lfilter, butter, sosfilt
 
-from .colored_noise import powerlaw_psd_gaussian
+from .colored_noise import powerlaw_psd_gaussian, pink_noise_2d
 
 class GaussianNoise(FilterBase):
     """
@@ -303,3 +303,45 @@ class ColoredNoise(FilterBase):
         noisy_img = np.clip(noisy_img, 0, 255).astype(np.uint8)
 
         return noisy_img
+
+
+class Pink_Noise(FilterBase):
+    """
+        
+    """
+    def __init__(self,noise_level: float = 0.2):
+        """
+
+        """
+        self.noise_level = noise_level
+        super().__init__(1, 'noise')
+
+    def discription(self) -> str:
+        return f"|pinknoise_{self.noise_level}"
+
+    def filter(self, img):
+        noise = pink_noise_2d(img.shape, 2)*self.noise_level
+        res = np.clip(img + noise, 0.0, 255.0).astype(np.int16)
+        return res
+        
+        
+class Brown_Noise(FilterBase):
+    """
+        
+    """
+    def __init__(self,noise_level: float = 0.2):
+        """
+
+        """
+        self.noise_level = noise_level
+        super().__init__(1, 'noise')
+
+    def discription(self) -> str:
+        return f"|brownnoise_{self.noise_level}"
+
+    def filter(self, img):
+        noise = pink_noise_2d(img.shape, 4)*self.noise_level
+        res = np.clip(img + noise, 0.0, 255.0).astype(np.int16)
+        return res
+
+        

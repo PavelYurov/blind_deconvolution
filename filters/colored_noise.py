@@ -2,9 +2,10 @@
 
 from typing import Union, Iterable, Optional
 from numpy import sqrt, newaxis, integer
-from numpy.fft import irfft, rfftfreq
+from numpy.fft import irfft, rfftfreq, irfft2
 from numpy.random import default_rng, Generator, RandomState
 from numpy import sum as npsum
+import numpy as np
 
 
 def powerlaw_psd_gaussian(
@@ -87,7 +88,7 @@ def powerlaw_psd_gaussian(
     # Calculate Frequencies (we asume a sample rate of one)
     # Use fft functions for real output (-> hermitian spectrum)
     f = rfftfreq(samples) # type: ignore # mypy 1.5.1 has problems here 
-    
+    print(f)
     # Validate / normalise fmin
     if 0 <= fmin <= 0.5:
         fmin = max(fmin, 1./samples) # Low frequency cutoff
@@ -153,3 +154,49 @@ def _get_normal_distribution(random_state: Optional[Union[int, Generator, Random
             "numpy.random.Randomstate"
         )
     return normal_dist
+
+def pink_noise_2d(shape, alpha=1.0):
+    """
+    Generate 2D pink noise using frequency domain method.
+    
+    Parameters:
+    - shape: Tuple (height, width) of the noise field
+    - alpha: Exponent for 1/f^alpha noise (1.0 for pink noise)
+    
+    Returns:
+    - 2D array of pink noise
+    """
+    height, width = shape
+    
+    # Generate white noise
+    white_noise = np.random.randn(height, width)
+    
+    # Fourier transform
+    white_fft = np.fft.fft2(white_noise)
+    
+    # Create frequency grids
+    freqs_y = np.fft.fftfreq(height)
+    freqs_x = np.fft.fftfreq(width)
+    freq_mesh = np.meshgrid(freqs_y, freqs_x, indexing='ij')
+    
+    # Calculate radial frequencies
+    radial_freq = np.sqrt(freq_mesh[0]**2 + freq_mesh[1]**2)
+    
+    # Shift frequencies to handle negative frequencies properly
+    radial_freq_shifted = np.fft.fftshift(radial_freq)
+    white_fft_shifted = np.fft.fftshift(white_fft)
+    
+    # Avoid division by zero at DC component
+    with np.errstate(divide='ignore', invalid='ignore'):
+        # Apply 1/f^alpha filter (divide by f for 2D amplitude)
+        scaling = np.where(radial_freq_shifted == 0, 1.0, radial_freq_shifted**(-alpha/2))
+        pink_fft_shifted = white_fft_shifted * scaling
+    
+    # Shift back and inverse FFT
+    pink_fft = np.fft.ifftshift(pink_fft_shifted)
+    pink_noise = np.real(np.fft.ifft2(pink_fft))
+    
+    # Normalize to unit variance
+    pink_noise = pink_noise / np.std(pink_noise)*255.0
+    
+    return pink_noise
