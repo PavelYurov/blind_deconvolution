@@ -243,12 +243,13 @@ class Processing:
     def histogram_equalization(self,view_histogram=False, inplace=True):
         for img_obj in self.images:
             current_image = img_obj.get_blurred_image()
-            filtered_image = self._histogram_equalization_one(current_image,view_histogram)
+            filtered_image, mapping_data = self._histogram_equalization_one(current_image,view_histogram)
             if inplace:
                 original_filename = Path(img_obj.get_blurred()).name
                 new_path = self.folder_path_blurred / original_filename
                 cv.imwrite(str(new_path), filtered_image)
                 img_obj.set_blurred(str(new_path))
+                img_obj.set_mapping_data(mapping_data)
             else:
                 #я хз, что делать
                 pass
@@ -267,6 +268,19 @@ class Processing:
                 new_image[i,j] = round((self._cdf(cdx,image[i,j])- cdx_min)*255/(pixels-1))
         new_image = new_image.astype(np.int16)
 
+        forward_lut = np.zeros(256, dtype=np.float32)
+        for intensity in range(256):
+            cdf_value = self._cdf(cdx, intensity)
+            forward_lut[intensity] = round((cdf_value - cdx_min) * 255 / (pixels - 1))
+        
+        mapping_data = {
+            'forward_lut': forward_lut,
+            'cdx_min': cdx_min,
+            'pixels': pixels,
+            'original_cdx': cdx,
+            'max_original_intensity': np.max(image)
+        }
+
         if (view_histogram):
             x = np.arange(256)
 
@@ -277,7 +291,7 @@ class Processing:
             plt.grid(alpha=0.3)
             plt.show()
 
-        return new_image
+        return new_image, mapping_data
     
     def _get_cdx(self, image):
         arr = [0]*256
@@ -295,6 +309,104 @@ class Processing:
             if(cdx[i]!=0):
                 return cdx[i]
         return 0
+    
+    def inverse_histogram_equalization(self,view_histogram=False, inplace=True):
+        for img_obj in self.images:
+            current_image = img_obj.get_blurred_image()
+            filtered_image = self._inverse_histogram_equalization_one(current_image,img_obj.get_mapping_data(),view_histogram)
+            if inplace:
+                original_filename = Path(img_obj.get_blurred()).name
+                new_path = self.folder_path_blurred / original_filename
+                cv.imwrite(str(new_path), filtered_image)
+                img_obj.set_blurred(str(new_path))
+            else:
+                
+                pass
+        
+    def _inverse_histogram_equalization_one(self, image, mapping_data ,view_histogram):
+
+        forward_lut = mapping_data['forward_lut']
+        cdx_min = mapping_data['cdx_min']
+        original_cdx = mapping_data['original_cdx']
+        pixels = mapping_data['pixels']
+        max_original = mapping_data['max_original_intensity']
+
+        inverse_lut = np.zeros(256, dtype=np.float32)
+        
+        # Для каждого выходного значения (после выравнивания) находим входное значение
+        for output_val in range(256):
+            # Ищем все входные значения, которые отображаются в этот output_val
+            possible_inputs = np.where(np.abs(forward_lut - output_val) < 0.5)[0]
+            if len(possible_inputs) > 0:
+                # Берем среднее из возможных входных значений
+                inverse_lut[output_val] = np.mean(possible_inputs)
+            else:
+                # Если нет точного соответствия, используем интерполяцию
+                if output_val > 0:
+                    # Находим ближайшие значения
+                    idx_above = np.where(forward_lut > output_val)[0]
+                    idx_below = np.where(forward_lut < output_val)[0]
+                    
+                    if len(idx_above) > 0 and len(idx_below) > 0:
+                        above_val = idx_above[0]
+                        below_val = idx_below[-1]
+                        
+                        # Линейная интерполяция
+                        ratio = (output_val - forward_lut[below_val]) / (forward_lut[above_val] - forward_lut[below_val])
+                        inverse_lut[output_val] = below_val + ratio * (above_val - below_val)
+                    else:
+                        inverse_lut[output_val] = output_val
+                else:
+                    inverse_lut[output_val] = 0
+        
+        # Ограничиваем значения диапазоном оригинального изображения
+        inverse_lut = np.clip(inverse_lut, 0, max_original)
+        
+        # Применяем обратное преобразование
+        restored_image = inverse_lut[image].astype(np.int16)
+        
+        cdx = self._get_cdx(image)
+
+        if (view_histogram):
+            x = np.arange(256)
+
+            cdx2 = self._get_cdx(restored_image)
+            plt.figure(figsize=(12, 6))
+            plt.bar(x, cdx, alpha=0.5, color='blue')
+            plt.bar(x, cdx2, alpha=0.5, color='red')
+            plt.grid(alpha=0.3)
+            plt.show()
+
+        return restored_image
+
+    def _inverse_histogram_equation(self, equalized_image, mapping_data):
+        """Обратное преобразование через решение уравнения"""
+        forward_lut = mapping_data['forward_lut']
+        cdx_min = mapping_data['cdx_min']
+        pixels = mapping_data['pixels']
+        
+        # Создаем обратную LUT решая уравнение: output = (CDF(input) - cdx_min) * 255 / (pixels - 1)
+        inverse_lut = np.zeros(256, dtype=np.float32)
+        
+        for output_val in range(256):
+            # Решаем уравнение: output_val = (CDF(input) - cdx_min) * 255 / (pixels - 1)
+            # => CDF(input) = (output_val * (pixels - 1) / 255) + cdx_min
+            target_cdf = (output_val * (pixels - 1) / 255) + cdx_min
+            
+            # Ищем входное значение, для которого CDF ближе всего к target_cdf
+            # Для этого нам нужен доступ к оригинальной CDF
+            original_cdf = np.cumsum(mapping_data['original_cdx'])
+            
+            # Находим ближайшее значение в оригинальной CDF
+            cdf_diff = np.abs(original_cdf - target_cdf)
+            best_input = np.argmin(cdf_diff)
+            
+            inverse_lut[output_val] = best_input
+        
+        # Применяем обратное преобразование
+        restored_image = inverse_lut[equalized_image].astype(np.int16)
+        
+        return restored_image
 
     def get_metrics(self):
         '''

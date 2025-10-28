@@ -48,6 +48,13 @@ class Image:
         self.blurred_psnr = {}
         self.blurred_ssim = {}
         self.tag = {}
+        self.mapping_data = {}
+
+    def set_mapping_data(self, mapping_data):
+        self.mapping_data = mapping_data
+
+    def get_mapping_data(self):
+        return self.mapping_data
 
     def add_tag(self, tag, blurred_path):
         self.tag[blurred_path] = tag
