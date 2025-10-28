@@ -240,18 +240,22 @@ class Processing:
         except Exception as e:
             pass
 
-    def histogram_equalization(self, inplace=True):
+    def histogram_equalization(self,view_histogram=False, inplace=True):
         for img_obj in self.images:
             current_image = img_obj.get_blurred_image()
-            filtered_image = self._histogram_equalization_one(current_image)
-            original_filename = Path(img_obj.get_blurred()).name
-            new_path = self.folder_path_blurred / original_filename
-            cv.imwrite(str(new_path), filtered_image)
-            img_obj.set_blurred(str(new_path))
+            filtered_image = self._histogram_equalization_one(current_image,view_histogram)
+            if inplace:
+                original_filename = Path(img_obj.get_blurred()).name
+                new_path = self.folder_path_blurred / original_filename
+                cv.imwrite(str(new_path), filtered_image)
+                img_obj.set_blurred(str(new_path))
+            else:
+                #я хз, что делать
+                pass
 
         pass
 
-    def _histogram_equalization_one(self,image):
+    def _histogram_equalization_one(self,image,view_histogram):
         cdx = self._get_cdx(image)
         cdx_min = self._get_min_cdx(cdx)
         # display(image)
@@ -260,15 +264,18 @@ class Processing:
         pixels = h*w
         for i in range(0,h):
             for j in range(0,w):
-                new_image[i,j] = round((self._cdf(cdx,image[i,j] - cdx_min))*255/(pixels-1))
+                new_image[i,j] = round((self._cdf(cdx,image[i,j])- cdx_min)*255/(pixels-1))
         new_image = new_image.astype(np.int16)
 
-        cdx2 = self._get_cdx(new_image)
-        plt.figure(figsize=(12, 6))
-        plt.hist(cdx, bins=256, range=(0, 256), alpha=0.5, label='Массив 1', color='blue')
-        plt.hist(cdx2, bins=256, range=(0, 256), alpha=0.5, label='Массив 2', color='red')
-        plt.grid(alpha=0.3)
-        plt.show()
+        if (view_histogram):
+            x = np.arange(256)
+
+            cdx2 = self._get_cdx(new_image)
+            plt.figure(figsize=(12, 6))
+            plt.bar(x, cdx, alpha=0.5, color='blue')
+            plt.bar(x, cdx2, alpha=0.5, color='red')
+            plt.grid(alpha=0.3)
+            plt.show()
 
         return new_image
     
@@ -286,7 +293,7 @@ class Processing:
     def _get_min_cdx(self, cdx):
         for i in range(1,255):
             if(cdx[i]!=0):
-                return i
+                return cdx[i]
         return 0
 
     def get_metrics(self):
