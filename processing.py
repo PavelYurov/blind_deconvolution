@@ -170,9 +170,8 @@ class Processing:
 
     def _plot_restored_image(self, img_obj, blurred_path, alg_name, restored_psnr,
                             restored_ssim, restored_paths, axes, line, col):
-        '''
-        Отрисовка одного восстановленного изображения
-        '''
+        
+        # Отрисовка одного восстановленного изображения
 
         try:
             restored_path = restored_paths.get((str(blurred_path), str(alg_name)))
@@ -188,11 +187,11 @@ class Processing:
         except Exception as e:
             pass
 
-    def _plot_kernels_line(self, img_obj, blurred_path, alg_arr, original_kernels,
+    '''def _plot_kernels_line(self, img_obj, blurred_path, alg_arr, original_kernels,
                         kernels, axes, line, kernel_intencity_scale,kernel_size):
-        '''
-        Отрисовка строки с ядрами
-        '''
+        
+        # Отрисовка строки с ядрами
+        
         axes[line, 0].axis('off')
         
         original_kernel_path = original_kernels.get(str(blurred_path))
@@ -214,7 +213,7 @@ class Processing:
 
             if original_kernel is not None:
                 axes[line, 1].imshow(np.clip(cv.cvtColor(original_kernel, cv.COLOR_BGR2RGB) * 
-                                        kernel_intencity_scale, 0, 255).astype(np.uint8))
+                                        kernel_intencity_scale, 0, 255).astype(np.uint8), cmap='gray')
                 axes[line, 1].set_title("original kernel", fontsize=10)
                 axes[line, 1].axis('off')
         
@@ -227,7 +226,7 @@ class Processing:
 
     def _plot_restored_kernel(self, img_obj, blurred_path, alg_name, kernels,
                             axes, line, col, kernel_intencity_scale):
-        '''Отрисовка одного восстановленного ядра'''
+        # Отрисовка одного восстановленного ядра
         try:
             kernel_path = kernels.get((str(blurred_path), str(alg_name)))
             if kernel_path:
@@ -238,7 +237,126 @@ class Processing:
                                                 kernel_intencity_scale, 0, 255).astype(np.uint8))
                     axes[line, col].set_title(f"{alg_name} kernel", fontsize=10)
         except Exception as e:
+            pass'''
+
+#насрано
+    # def _plot_restored_kernel(self, img_obj, blurred_path, alg_name, kernels,
+    #                     axes, line, col, kernel_intencity_scale):
+    #     '''Отрисовка одного восстановленного ядра с сохранением пропорций'''
+    #     try:
+    #         kernel_path = kernels.get((str(blurred_path), str(alg_name)))
+    #         if kernel_path:
+    #             kernel = cv.imread(str(kernel_path), cv.IMREAD_GRAYSCALE)
+    #             if kernel is not None:
+    #                 axes[line, col].imshow(kernel, cmap='gray')
+    #                 axes[line, col].set_title(f"{alg_name} kernel", fontsize=10)
+    #                 # Устанавливаем равный аспект, чтобы сохранить пропорции
+    #                 axes[line, col].set_aspect('equal', adjustable='box')
+    #     except Exception as e:
+    #         pass
+
+    # def _plot_kernels_line(self, img_obj, blurred_path, alg_arr, original_kernels,
+    #                     kernels, axes, line, kernel_intencity_scale, kernel_size):
+    #     '''
+    #     Отрисовка строки с ядрами с сохранением их оригинальных пропорций.
+    #     '''
+    #     axes[line, 0].axis('off')
+        
+    #     original_kernel_path = original_kernels.get(str(blurred_path))
+    #     if original_kernel_path:
+    #         # Читаем ядро в градациях серого
+    #         original_kernel = cv.imread(str(original_kernel_path), cv.IMREAD_GRAYSCALE)
+            
+    #         if original_kernel is not None:
+    #             axes[line, 1].imshow(original_kernel, cmap='gray')
+    #             axes[line, 1].set_title("original kernel", fontsize=10)
+    #             # Устанавливаем равный аспект, чтобы сохранить пропорции
+    #             axes[line, 1].set_aspect('equal', adjustable='box')
+    #             axes[line, 1].axis('off')
+        
+    #     for col, alg_name in enumerate(alg_arr, 2):
+    #         axes[line, col].axis('off')
+    #         self._plot_restored_kernel(img_obj, blurred_path, alg_name, kernels, 
+    #                                 axes, line, col, kernel_intencity_scale)
+        
+    #     return line + 1
+
+    def _crop_kernel_image(self, kernel_image: np.ndarray, padding: int = 10) -> np.ndarray:
+        """
+        Обрезает изображение ядра до его содержимого с добавлением отступа.
+        """
+        if kernel_image is None or kernel_image.size == 0:
+            return kernel_image
+
+        # Находим координаты всех не-нулевых пикселей
+        coords = cv.findNonZero(kernel_image)
+        if coords is None:
+            return kernel_image # Возвращаем как есть, если ядро пустое
+
+        # Получаем рамку вокруг них
+        x, y, w, h = cv.boundingRect(coords)
+        
+        # Получаем размеры исходного изображения
+        img_h, img_w = kernel_image.shape[:2]
+
+        # Применяем отступ, но не выходим за границы изображения
+        start_x = max(0, x - padding)
+        start_y = max(0, y - padding)
+        end_x = min(img_w, x + w + padding)
+        end_y = min(img_h, y + h + padding)
+
+        # Обрезаем изображение и возвращаем
+        cropped_kernel = kernel_image[start_y:end_y, start_x:end_x]
+
+        return cropped_kernel
+    
+    def _plot_kernels_line(self, img_obj, blurred_path, alg_arr, original_kernels,
+                    kernels, axes, line, kernel_intencity_scale, kernel_size):
+        '''
+        Отрисовка строки с ядрами с сохранением их оригинальных пропорций и обрезкой.
+        '''
+        axes[line, 0].axis('off')
+        
+        original_kernel_path = original_kernels.get(str(blurred_path))
+        if original_kernel_path:
+            original_kernel = cv.imread(str(original_kernel_path), cv.IMREAD_GRAYSCALE)
+            
+            if original_kernel is not None:
+                # --- ИЗМЕНЕНИЕ: Обрезаем ядро перед отображением ---
+                cropped_kernel = self._crop_kernel_image(original_kernel)
+
+                if cropped_kernel is not None and cropped_kernel.size > 0:
+                    axes[line, 1].imshow(cropped_kernel, cmap='gray')
+                    axes[line, 1].set_title("original kernel", fontsize=10)
+                    axes[line, 1].set_aspect('equal', adjustable='box')
+                    axes[line, 1].axis('off')
+        
+        for col, alg_name in enumerate(alg_arr, 2):
+            axes[line, col].axis('off')
+            self._plot_restored_kernel(img_obj, blurred_path, alg_name, kernels, 
+                                    axes, line, col, kernel_intencity_scale)
+        
+        return line + 1
+
+    def _plot_restored_kernel(self, img_obj, blurred_path, alg_name, kernels,
+                        axes, line, col, kernel_intencity_scale):
+        '''Отрисовка одного восстановленного ядра с сохранением пропорций и обрезкой'''
+        try:
+            kernel_path = kernels.get((str(blurred_path), str(alg_name)))
+            if kernel_path:
+                kernel = cv.imread(str(kernel_path), cv.IMREAD_GRAYSCALE)
+                if kernel is not None:
+                    # --- ИЗМЕНЕНИЕ: Обрезаем ядро перед отображением ---
+                    cropped_kernel = self._crop_kernel_image(kernel)
+
+                    if cropped_kernel is not None and cropped_kernel.size > 0:
+                        axes[line, col].imshow(cropped_kernel, cmap='gray')
+                        axes[line, col].set_title(f"{alg_name} kernel", fontsize=10)
+                        axes[line, col].set_aspect('equal', adjustable='box')
+        except Exception as e:
             pass
+
+
 
     def histogram_equalization(self,view_histogram=False, inplace=True):
         for img_obj in self.images:
@@ -262,16 +380,20 @@ class Processing:
         # display(image)
         h,w = np.shape(image)
         new_image = image.copy()
+        image_tmp = image.copy().astype(np.int16)
         pixels = h*w
         for i in range(0,h):
             for j in range(0,w):
-                new_image[i,j] = round((self._cdf(cdx,image[i,j])- cdx_min)*255/(pixels-1))
+                try:
+                    new_image[i,j] = round((self._cdf(cdx,image_tmp[i,j])- cdx_min)*255/(pixels-cdx_min))
+                except:
+                    print(f'{image[i,j]} {cdx[255]} {np.sum(cdx[0:(image_tmp[i,j]+1)])} {self._cdf(cdx,image[i,j])} {(self._cdf(cdx,image[i,j])- cdx_min)/(pixels-cdx_min)*255}')
         new_image = new_image.astype(np.int16)
 
         forward_lut = np.zeros(256, dtype=np.float32)
         for intensity in range(256):
             cdf_value = self._cdf(cdx, intensity)
-            forward_lut[intensity] = round((cdf_value - cdx_min) * 255 / (pixels - 1))
+            forward_lut[intensity] = round((cdf_value - cdx_min) * 255 / (pixels - cdx_min))
         
         mapping_data = {
             'forward_lut': forward_lut,
@@ -302,10 +424,10 @@ class Processing:
         return arr
 
     def _cdf(self, cdx, x):
-        return np.sum(cdx[0:x])
+        return np.sum(cdx[0:x+1])
     
     def _get_min_cdx(self, cdx):
-        for i in range(1,255):
+        for i in range(0,255):
             if(cdx[i]!=0):
                 return cdx[i]
         return 0
@@ -313,10 +435,25 @@ class Processing:
     def inverse_histogram_equalization(self,view_histogram=False, inplace=True):
         for img_obj in self.images:
             current_image = img_obj.get_blurred_image()
+            original_image = img_obj.get_original_image()
             filtered_image = self._inverse_histogram_equalization_one(current_image,img_obj.get_mapping_data(),view_histogram)
             if inplace:
                 original_filename = Path(img_obj.get_blurred()).name
                 new_path = self.folder_path_blurred / original_filename
+
+                try:
+                    psnr_val = metrics.PSNR(original_image, filtered_image)
+                except:
+                    psnr_val = math.nan
+                
+                try:
+                    ssim_val = metrics.SSIM(original_image, filtered_image)
+                except:
+                    ssim_val = math.nan
+                
+                img_obj.add_blurred_PSNR(psnr_val, str(new_path))
+                img_obj.add_blurred_SSIM(ssim_val, str(new_path))
+
                 cv.imwrite(str(new_path), filtered_image)
                 img_obj.set_blurred(str(new_path))
             else:
@@ -391,7 +528,7 @@ class Processing:
         for output_val in range(256):
             # Решаем уравнение: output_val = (CDF(input) - cdx_min) * 255 / (pixels - 1)
             # => CDF(input) = (output_val * (pixels - 1) / 255) + cdx_min
-            target_cdf = (output_val * (pixels - 1) / 255) + cdx_min
+            target_cdf = (output_val * (pixels - cdx_min) / 255) + cdx_min
             
             # Ищем входное значение, для которого CDF ближе всего к target_cdf
             # Для этого нам нужен доступ к оригинальной CDF
@@ -816,6 +953,7 @@ class Processing:
             filtered_kernel = kernel_image
         cv.imwrite(str(new_kernel_path), filtered_kernel)
         img_obj.add_original_kernel(str(new_kernel_path), str(new_path))
+
 
     def _generate_unique_file_path(self, directory, filename):
         '''
