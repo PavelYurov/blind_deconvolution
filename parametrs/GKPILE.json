@@ -1,0 +1,13 @@
+{
+    "kernel_size": 31,
+    "num_iterations": 1062,
+    "reg_noise_std": 0.00951207163345817,
+    "learning_rate": 0.07346740023932911,
+    "weight_lr": 0.060066519177605145,
+    "milestone1": 1312,
+    "milestone2": 3155,
+    "milestone3": 4116,
+    "mse_switch": 880,
+    "models_dir": null,
+    "device": null
+}

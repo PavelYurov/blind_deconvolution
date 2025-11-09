@@ -17,7 +17,7 @@ def PSNR(original: np.ndarray, restored: np.ndarray) -> float:
     return peak_signal_noise_ratio(original, restored)
 
 
-def SSIM(original: np.ndarray, restored: np.ndarray) -> float:
+def SSIM(original: np.ndarray, restored: np.ndarray, data_range=None) -> float:
     """
     Вычисляет индекс структурного сходства (SSIM) между изображениями.
 
@@ -28,7 +28,7 @@ def SSIM(original: np.ndarray, restored: np.ndarray) -> float:
     Возвращает:
         Значение SSIM в диапазоне от 0 до 1
     """
-    return structural_similarity(original, restored)
+    return structural_similarity(original, restored, data_range=data_range)
 
 
 def calculate_sml(image: np.ndarray) -> float:

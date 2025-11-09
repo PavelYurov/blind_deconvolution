@@ -1,8 +1,8 @@
 {
     "angle_model_path": null,
     "length_model_path": null,
-    "noise": 0.4680567653086691,
-    "psf_size": 21,
+    "noise": 0.0343723939496212,
+    "psf_size": 10,
     "inference_size": [
         640,
         480
@@ -11,5 +11,5 @@
         224,
         224
     ],
-    "angle_top_k": 5
+    "angle_top_k": 4
 }

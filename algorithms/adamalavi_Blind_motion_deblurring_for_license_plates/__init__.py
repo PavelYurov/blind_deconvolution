@@ -9,6 +9,7 @@ from typing import Any, Dict, Iterable, Tuple
 
 import cv2
 import numpy as np
+from IPython.display import display
 
 from ..base import DeconvolutionAlgorithm
 
@@ -189,14 +190,16 @@ class AdamalaviBlindMotionDeblurringForLicensePlates(DeconvolutionAlgorithm):
 
     def _create_fft(self, image: Array2D) -> Array2D:
         image = image.astype(np.float32, copy=False)
+        if np.max(image) > 1.0:
+            image = image / 255.0
         f = np.fft.fft2(image)
         fshift = np.fft.fftshift(f)
         spectrum = 20 * np.log(np.abs(fshift) + 1e-8)
         spectrum = np.asarray(spectrum, dtype=np.float32)
-        spectrum -= spectrum.min()
-        max_val = spectrum.max()
-        if max_val > 0:
-            spectrum = spectrum * (255.0 / max_val)
+        # spectrum -= spectrum.min()
+        # max_val = spectrum.max()
+        # if max_val > 0:
+        #     spectrum = spectrum * (255.0 / max_val)
         return spectrum
 
     def _run_wiener(self, image: Array2D, length: float, angle_deg: float) -> Tuple[Array2D, Array2D]:
@@ -211,11 +214,13 @@ class AdamalaviBlindMotionDeblurringForLicensePlates(DeconvolutionAlgorithm):
         half = psf_size // 2
         affine[:, 2] = (half, half) - np.dot(affine[:, :2], ((psf_length - 1) * 0.5, 0))
         psf = cv2.warpAffine(psf, affine, (psf_size, psf_size), flags=cv2.INTER_CUBIC)
-
+        
         working = image.astype(np.float32, copy=False)
+        if np.max(working) > 1.0:
+            working = working / 255.0
         gray_dft = cv2.dft(working, flags=cv2.DFT_COMPLEX_OUTPUT)
-        psf /= psf.sum() + 1e-8
-
+        psf /= psf.sum() #+ 1e-8
+        
         psf_canvas = np.zeros_like(working, dtype=np.float32)
         h, w = working.shape[:2]
         psf_canvas[: min(psf_size, h), : min(psf_size, w)] = psf[: min(psf_size, h), : min(psf_size, w)]
@@ -227,6 +232,10 @@ class AdamalaviBlindMotionDeblurringForLicensePlates(DeconvolutionAlgorithm):
         restored = cv2.idft(result_dft, flags=cv2.DFT_SCALE | cv2.DFT_REAL_OUTPUT)
         restored = np.roll(restored, -psf_size // 2, axis=0)
         restored = np.roll(restored, -psf_size // 2, axis=1)
+        
+        # display(psf)
+        # print(np.max(psf))
+
         return restored, psf
 
     def process(self, image: Array2D) -> Tuple[Array2D, Array2D]:
@@ -244,6 +253,8 @@ class AdamalaviBlindMotionDeblurringForLicensePlates(DeconvolutionAlgorithm):
         self._last_kernel = kernel
         self._last_angle = angle_value
         self._last_length = length_value
+        print('angle: ', angle_value)
+        print('length: ', length_value)
 
         restored_resized = restored_resized.astype(np.float32, copy=False)
         min_val = float(restored_resized.min()) if restored_resized.size else 0.0
@@ -267,7 +278,11 @@ class AdamalaviBlindMotionDeblurringForLicensePlates(DeconvolutionAlgorithm):
         if image.ndim == 3 and image.shape[2] != 1:
             restored_out = np.repeat(restored_out[..., None], image.shape[2], axis=2)
 
-        return restored_out, kernel
+        # display(kernel*255.0*255.0)
+        # print(np.max(kernel*255.0*255.0))
+        # print(kernel.shape)
+
+        return restored_out, np.clip(kernel*255.0*255.0,0,1.0)
 
     def get_kernel(self) -> Array2D | None:
         return self._last_kernel

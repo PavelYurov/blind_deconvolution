@@ -910,12 +910,12 @@ class Processing:
             new_path = self.folder_path_blurred / original_filename
         
         try:
-            psnr_val = metrics.PSNR(current_image, filtered_image)
+            psnr_val = metrics.PSNR(img_obj.get_original_image(), filtered_image)
         except:
             psnr_val = math.nan
         
         try:
-            ssim_val = metrics.SSIM(current_image, filtered_image)
+            ssim_val = metrics.SSIM(img_obj.get_original_image(), filtered_image)
         except:
             ssim_val = math.nan
         

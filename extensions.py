@@ -125,7 +125,7 @@ class HyperparameterOptimizer(ProcessingExtension):
                         print("WARNING: Restored image is almost zero!")
                         score += 0
                     if metric.upper() == 'SSIM':
-                        score += metrics.SSIM(original_prepared, restored_prepared)
+                        score += metrics.SSIM(original_prepared, restored_prepared,data_range=1.0)
                     elif metric.upper() == 'SHARPNESS':
                         score += metrics.Sharpness(restored_prepared)
                     else:  # PSNR по умолчанию
@@ -286,17 +286,21 @@ class HyperparameterOptimizer(ProcessingExtension):
         """
         Подготовка изображения для расчета метрик с нормализацией
         """
-        image = np.array(image, dtype=np.float32)
+        image = np.array(image.copy(), dtype=np.float32)
+
         
         # Нормализуем в диапазон [0, 1] если нужно
         if image.max() > 1.0:
             image = image / 255.0
         
-        # Обеспечиваем 3 канала для цветных изображений
-        if len(image.shape) == 2:
-            image = np.stack([image] * 3, axis=-1)
-        elif image.shape[2] == 1:
-            image = np.repeat(image, 3, axis=2)
+        # # Обеспечиваем 3 канала для цветных изображений
+        # if len(image.shape) == 2:
+        #     image = np.stack([image] * 3, axis=-1)
+        # elif image.shape[2] == 1:
+        #     image = np.repeat(image, 3, axis=2)
+
+        if len(image.shape) == 3:
+            image = np.dot(image[...,:3], [1.0, 0.0, 0.0])
         
         image = np.clip(image, 0.0, 1.0)
         
@@ -361,7 +365,6 @@ class HyperparameterOptimizer(ProcessingExtension):
         '''
         original_prepared = self._prepare_image_for_metric(original_image)
         restored_prepared = self._prepare_image_for_metric(restored_image)
-        
         try:
             psnr_val = metrics.PSNR(original_prepared, restored_prepared)
         except Exception as e:
@@ -369,7 +372,7 @@ class HyperparameterOptimizer(ProcessingExtension):
             psnr_val = math.nan
         
         try:
-            ssim_val = metrics.SSIM(original_prepared, restored_prepared)
+            ssim_val = metrics.SSIM(original_prepared, restored_prepared,data_range=1.0)
         except Exception as e:
             print(f"Error calculating SSIM: {e}")
             ssim_val = math.nan

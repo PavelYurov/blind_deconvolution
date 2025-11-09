@@ -50,13 +50,13 @@ class Image:
         self.tag = {}
         self.mapping_data = {}
 
-        self.predenoised_path = None
-        self.predenoised_kernels_path = {}
-        self.predenoised_psnr = {}
-        self.predenoised_ssim = {}
-        self.predenoised_array = np.array([])
-        self.predenoised_filters = {}
-        self.current_predenoised_filter = None
+        # self.predenoised_path = None
+        # self.predenoised_kernels_path = {}
+        # self.predenoised_psnr = {}
+        # self.predenoised_ssim = {}
+        # self.predenoised_array = np.array([])
+        # self.predenoised_filters = {}
+        # self.current_predenoised_filter = None
 
 
 
@@ -84,14 +84,14 @@ class Image:
     def add_blurred_PSNR(self, psnr, blurred_path):
         self.blurred_psnr[blurred_path] = psnr
 
-    def set_predenoised_PSNR(self, psnr):
-        self.predenoised_psnr = psnr
+    # def set_predenoised_PSNR(self, psnr):
+    #     self.predenoised_psnr = psnr
 
-    def get_predenoised_PSNR(self):
-        return self.predenoised_psnr.copy()
+    # def get_predenoised_PSNR(self):
+    #     return self.predenoised_psnr.copy()
 
-    def add_predenoised_PSNR(self, psnr, blurred_path):
-        self.predenoised_psnr[blurred_path] = psnr
+    # def add_predenoised_PSNR(self, psnr, blurred_path):
+    #     self.predenoised_psnr[blurred_path] = psnr
 
     def set_blurred_SSIM(self, ssim):
         self.blurred_ssim = ssim
@@ -102,14 +102,14 @@ class Image:
     def add_blurred_SSIM(self, ssim, blurred_path):
         self.blurred_ssim[blurred_path] = ssim
     
-    def set_predenoised_SSIM(self, ssim):
-        self.predenoised_ssim = ssim
+    # def set_predenoised_SSIM(self, ssim):
+    #     self.predenoised_ssim = ssim
 
-    def get_predenoised_SSIM(self):
-        return self.predenoised_ssim.copy()
+    # def get_predenoised_SSIM(self):
+    #     return self.predenoised_ssim.copy()
 
-    def add_predenoisedSSIM(self, ssim, blurred_path):
-        self.predenoised_ssim[blurred_path] = ssim
+    # def add_predenoisedSSIM(self, ssim, blurred_path):
+    #     self.predenoised_ssim[blurred_path] = ssim
 
 
     def get_original_kernels(self):
@@ -121,14 +121,14 @@ class Image:
     def add_original_kernel(self, kernel, blur_path):
         self.original_kernels_path[blur_path] = kernel
     
-    def get_predenoised_kernels(self):
-        return self.predenoised_kernels_path.copy()
+    # def get_predenoised_kernels(self):
+    #     return self.predenoised_kernels_path.copy()
 
-    def set_predenoised_kernels(self, kernels):
-        self.predenoised_kernels_path = kernels
+    # def set_predenoised_kernels(self, kernels):
+    #     self.predenoised_kernels_path = kernels
 
-    def add_predenoised_kernel(self, kernel, blur_path):
-        self.predenoised_kernels_path[blur_path] = kernel
+    # def add_predenoised_kernel(self, kernel, blur_path):
+    #     self.predenoised_kernels_path[blur_path] = kernel
 
     def get_kernels(self):
         return self.kernel_paths.copy()
@@ -145,9 +145,9 @@ class Image:
             self.filters[self.blurred_path] = self.current_filter
             self.blurred_array = np.append(self.blurred_array, self.blurred_path)
         
-        if self.predenoised_path is not None:
-            self.predenoised_filters[self.predenoised_path] = self.current_predenoised_filter
-            self.predenoised_array = np.append(self.predenoised_array, self.predenoised_path)
+        # if self.predenoised_path is not None:
+        #     self.predenoised_filters[self.predenoised_path] = self.current_predenoised_filter
+        #     self.predenoised_array = np.append(self.predenoised_array, self.predenoised_path)
 
         # else:
         # self.blurred_array = np.append(self.blurred_array,self.original_path)
@@ -159,8 +159,8 @@ class Image:
 
         self.current_filter = None
         self.blurred_path = None
-        self.current_predenoised_filter = None
-        self.predenoised_path = None
+        # self.current_predenoised_filter = None
+        # self.predenoised_path = None
 
     def load(self, index):
         if index >= self.get_len_filter():
@@ -169,8 +169,8 @@ class Image:
                 print("index out of bounds, load empty")
                 self.current_filter = None
                 self.blurred_path = None
-                self.current_predenoised_filter = None
-                self.predenoised_path = None
+                # self.current_predenoised_filter = None
+                # self.predenoised_path = None
                 return
         if self.current_filter is not None:
             print(
@@ -179,10 +179,10 @@ class Image:
             )
 
         self.blurred_path = self.blurred_array[index]
-        try:
-            self.predenoised_path = self.predenoised_array[index]
-        except:
-            self.predenoised_path = None
+        # try:
+        #     self.predenoised_path = self.predenoised_array[index]
+        # except:
+        #     self.predenoised_path = None
         if self.blurred_path is not None:
             self.current_filter = self.filters[self.blurred_path]
         else:
@@ -190,15 +190,15 @@ class Image:
         # self.filters = np.delete(self.filters,index,0)
         self.blurred_array = np.delete(self.blurred_array, index, 0)
 
-        if self.predenoised_path is not None:
-            self.current_predenoised_filter = self.predenoised_filters[self.predenoised_path]
-        else:
-            self.current_predenoised_filter = None
+        # if self.predenoised_path is not None:
+        #     self.current_predenoised_filter = self.predenoised_filters[self.predenoised_path]
+        # else:
+        #     self.current_predenoised_filter = None
         # self.filters = np.delete(self.filters,index,0)
-        try:
-            self.predenoised_array = np.delete(self.predenoised_array, index, 0)
-        except:
-            pass
+        # try:
+        #     self.predenoised_array = np.delete(self.predenoised_array, index, 0)
+        # except:
+        #     pass
 
     def get_len_filter(self):
         if len(self.filters) != len(self.blurred_array):
@@ -217,11 +217,11 @@ class Image:
     def set_blurred_array(self, array):
         self.blurred_array = array
 
-    def get_predenoised_array(self):
-        return self.predenoised_array.copy()
+    # def get_predenoised_array(self):
+    #     return self.predenoised_array.copy()
 
-    def set_predenoised_array(self, array):
-        self.predenoised_array = array
+    # def set_predenoised_array(self, array):
+    #     self.predenoised_array = array
 
     def get_filters(self):
         return self.filters.copy()
@@ -229,11 +229,11 @@ class Image:
     def set_filters(self, filters):
         self.filters = filters
 
-    def get_predenoised_filters(self):
-        return self.predenoised_filters.copy()
+    # def get_predenoised_filters(self):
+    #     return self.predenoised_filters.copy()
 
-    def set_predenoised_filters(self, filters):
-        self.predenoised_filters = filters
+    # def set_predenoised_filters(self, filters):
+    #     self.predenoised_filters = filters
 
     def set_current_filter(self, filter_str):
         self.current_filter = filter_str
@@ -241,11 +241,11 @@ class Image:
     def get_current_filter(self):
         return self.current_filter
     
-    def set_current_predenoised_filter(self, filter_str):
-        self.current_predenoised_filter = filter_str
+    # def set_current_predenoised_filter(self, filter_str):
+    #     self.current_predenoised_filter = filter_str
 
-    def get_current_predenoised_filter(self):
-        return self.current_predenoised_filter
+    # def get_current_predenoised_filter(self):
+    #     return self.current_predenoised_filter
 
     def add_to_current_filter(self, filter_str):
         if self.current_filter is None:
@@ -253,11 +253,11 @@ class Image:
         else:
             self.current_filter = f"{self.current_filter}{filter_str}"
 
-    def add_to_current_predenoised_filter(self, filter_str):
-        if self.current_predenoised_filter is None:
-            self.current_predenoised_filter = filter_str
-        else:
-            self.current_predenoised_filter = f"{self.current_predenoised_filter}{filter_str}"
+    # def add_to_current_predenoised_filter(self, filter_str):
+    #     if self.current_predenoised_filter is None:
+    #         self.current_predenoised_filter = filter_str
+    #     else:
+    #         self.current_predenoised_filter = f"{self.current_predenoised_filter}{filter_str}"
 
     def set_original(self, original_path) -> None:
         self.original_path = original_path
@@ -265,8 +265,8 @@ class Image:
     def set_blurred(self, blurred_path) -> None:
         self.blurred_path = blurred_path
 
-    def set_predenoised(self, blurred_path) -> None:
-        self.predenoised_path = blurred_path
+    # def set_predenoised(self, blurred_path) -> None:
+    #     self.predenoised_path = blurred_path
 
     def set_restored(self, restored_paths) -> None:
         self.restored_paths = restored_paths
@@ -281,8 +281,8 @@ class Image:
     def get_blurred(self) -> str:
         return self.blurred_path
 
-    def get_predenoised(self) -> str:
-        return self.predenoised_path
+    # def get_predenoised(self) -> str:
+    #     return self.predenoised_path
 
     def get_restored(self) -> str:
         return (
@@ -359,27 +359,27 @@ class Image:
             )
         return res
     
-    def get_predenoised_image(self) -> Optional[np.ndarray]:
-        if self.predenoised_path is None:
-            return None
-        return cv.imread(
-            self.predenoised_path, cv.IMREAD_COLOR if self.is_color else cv.IMREAD_GRAYSCALE
-        )
+    # def get_predenoised_image(self) -> Optional[np.ndarray]:
+    #     if self.predenoised_path is None:
+    #         return None
+    #     return cv.imread(
+    #         self.predenoised_path, cv.IMREAD_COLOR if self.is_color else cv.IMREAD_GRAYSCALE
+    #     )
 
-    def get_all_predenoised_images(self):
-        res = [
-            cv.imread(path, cv.IMREAD_COLOR if self.is_color else cv.IMREAD_GRAYSCALE)
-            for path in self.predenoised_array
-        ]
-        if self.predenoised_path is not None:
-            res = np.append(
-                res,
-                cv.imread(
-                    self.predenoised_path,
-                    cv.IMREAD_COLOR if self.is_color else cv.IMREAD_GRAYSCALE,
-                ),
-            )
-        return res
+    # def get_all_predenoised_images(self):
+    #     res = [
+    #         cv.imread(path, cv.IMREAD_COLOR if self.is_color else cv.IMREAD_GRAYSCALE)
+    #         for path in self.predenoised_array
+    #     ]
+    #     if self.predenoised_path is not None:
+    #         res = np.append(
+    #             res,
+    #             cv.imread(
+    #                 self.predenoised_path,
+    #                 cv.IMREAD_COLOR if self.is_color else cv.IMREAD_GRAYSCALE,
+    #             ),
+    #         )
+    #     return res
 
     def get_all_filters(self):
         res = self.filters.copy()
@@ -387,11 +387,11 @@ class Image:
             res = np.append(res, self.current_filter)
         return res
     
-    def get_all_predenoised_filters(self):
-        res = self.predenoised_filters.copy()
-        if self.current_predenoised_filter is not None:
-            res = np.append(res, self.current_predenoised_filter)
-        return res
+    # def get_all_predenoised_filters(self):
+    #     res = self.predenoised_filters.copy()
+    #     if self.current_predenoised_filter is not None:
+    #         res = np.append(res, self.current_predenoised_filter)
+    #     return res
 
     # def get_restored_image(self) -> List[np.ndarray]:
     #     return np.array([
