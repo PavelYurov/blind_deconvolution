@@ -843,8 +843,61 @@ class Processing:
         img_obj.add_to_current_filter(blur_filename)
         img_obj.add_original_kernel(str(kernel_image_path), str(filtered_filename))
 
-        
-        
+    def show_line(self, window_scale: float = 1.0, fontsize:int = 8):
+        """
+        self.show но в строчку
+        window_scale - регулирует размер окна
+        """
+        for img in self.images:
+            self._show_line_single_image(img,window_scale,fontsize)
+
+    def _show_line_single_image(self, img, window_scale:float=1.0, fontsize:int = 8):
+        alg_array = img.get_algorithm()
+        w = len(alg_array)
+        w = 2*w + 3
+        fig, axes = plt.subplots(1, w, figsize=(5 * max(window_scale,0.1), 5 * w * max(window_scale,0.1)))
+
+        blurred_path = img.get_blurred()
+        psnr_array = img.get_PSNR()
+        ssim_array = img.get_SSIM()
+        kernel_restored_array = img.get_kernels()
+        restored_array = img.get_restored()
+
+        axes[0].imshow(self._read_image_from_file(img.get_original()), cmap='gray')
+        axes[0].axis('off')
+
+        axes[1].imshow(self._read_image_from_file(blurred_path), cmap='gray')
+        axes[1].set_title(
+            f"PSNR: {img.get_blurred_PSNR().get(str(blurred_path),math.nan):.4f}\nSSIM: {img.get_blurred_SSIM().get(str(blurred_path),math.nan):.4f}",
+            fontsize=fontsize)
+        axes[1].axis('off')
+
+        axes[2].imshow(self._read_image_from_file(img.get_original_kernels().get(str(blurred_path), None)), cmap='gray')
+        axes[2].axis('off')
+
+        for idx, alg_one in enumerate(alg_array):
+            axes[3+idx].imshow(self._read_image_from_file(
+                restored_array.get((str(blurred_path),str(alg_one)),None)),
+                  cmap='gray')
+            axes[3+idx].set_title(
+            f"PSNR: {psnr_array.get((str(blurred_path),str(alg_one)),math.nan):.4f}\nSSIM: {ssim_array.get((str(blurred_path),str(alg_one)),math.nan):.4f}",
+            fontsize=fontsize)
+            axes[3+idx].axis('off')
+
+            axes[4+idx].imshow(self._read_image_from_file(
+                kernel_restored_array.get((str(blurred_path),str(alg_one)),None)),
+                cmap='gray')
+            axes[4+idx].axis('off')
+        plt.show()
+    
+    def _read_image_from_file(self,path):
+        if os.path.exists(path):
+            # image = mpimg.imread(path)
+            image = cv.imread(path,cv.IMREAD_GRAYSCALE)
+        else:
+            print(f"  - ПРЕДУПРЕЖДЕНИЕ: Файл не найден, будет показана заглушка: {path}")
+            image = np.zeros((100, 100), dtype=np.uint8) # Черный квадрат-заглушка
+        return image
 
     def filter(self, filter_processor: filter.FilterBase):
         '''
@@ -959,7 +1012,7 @@ class Processing:
         '''
         return self.amount_of_blurred
     
-    def process(self, algorithm_processor: base.DeconvolutionAlgorithm, metadata = False):
+    def process(self, algorithm_processor: base.DeconvolutionAlgorithm, metadata = False, unique_path=True):
         '''
         Восстановление всех изображений
         
@@ -970,9 +1023,9 @@ class Processing:
         alg_name = algorithm_processor.get_name()
         
         for img_obj in self.images:
-            self._process_single_image(img_obj, algorithm_processor, alg_name, metadata = metadata)
+            self._process_single_image(img_obj, algorithm_processor, alg_name, metadata = metadata, unique_path=unique_path)
         
-    def _process_single_image(self, img_obj, algorithm_processor, alg_name, metadata=False):
+    def _process_single_image(self, img_obj, algorithm_processor, alg_name, metadata=False, unique_path=True):
         '''
         Восстановление одного изображения
         '''        
@@ -992,7 +1045,7 @@ class Processing:
             print(f"Restore error {img_obj.get_original()}: {e}")
             return
         
-        restored_path, kernel_path = self._generate_output_paths(img_obj, alg_name)
+        restored_path, kernel_path = self._generate_output_paths(img_obj, alg_name, unique_path=unique_path)
         
         try:
             cv.imwrite(str(restored_path), restored_image)
@@ -1007,7 +1060,7 @@ class Processing:
         self._calculate_and_save_metrics(img_obj, original_image, restored_image, 
                                    restored_path, kernel_path, alg_name, algorithm_processor,metadata=metadata)
     
-    def _generate_output_paths(self, img_obj, alg_name):
+    def _generate_output_paths(self, img_obj, alg_name, unique_path=True):
         '''
         Генерация уникальных путей для сохранения результатов
         '''
@@ -1018,15 +1071,22 @@ class Processing:
         
         base_name = base_path.stem
         
-        restored_path = self._generate_unique_file_path(
-            self.folder_path_restored, 
-            f"{base_name}_{alg_name}{base_path.suffix}"
-        )
-        
-        kernel_path = self._generate_unique_file_path(
-            self.folder_path_restored,
-            f"{base_name}_{alg_name}_kernel{base_path.suffix}"
-        )
+        if unique_path:
+            restored_path = self._generate_unique_file_path(
+                self.folder_path_restored, 
+                f"{base_name}_{alg_name}{base_path.suffix}"
+            )
+            
+            kernel_path = self._generate_unique_file_path(
+                self.folder_path_restored,
+                f"{base_name}_{alg_name}_kernel{base_path.suffix}"
+            )
+        else:
+            restored_path =self.folder_path_restored / f"{base_name}_{alg_name}{base_path.suffix}"
+            
+            # kernel_path = self.folder_path_restored / f"{base_name}_{alg_name}_kernel{base_path.suffix}"
+            
+            kernel_path = self.kernel_dir / f"{base_name}_{alg_name}_kernel{base_path.suffix}"
         
         return restored_path, kernel_path
     
@@ -1389,9 +1449,50 @@ def merge(frame1: Processing, frame2: Processing)->Processing:
          frame_res.images = np.append(frame1.images.copy(),frame2.images.copy())
          return frame_res
 
-def show_from_table(table_path, alg_name)->None:
+def show_from_table(table_path, alg_name, window_scale:float = 1.0)->None:
+    """
+    выводит сетку из смазанных и восстановленных изображений, их ядер
+    table_path - путь к .csv файлу. таблица, по которой строить сетку
+    alg_name - имя алгоритма, для которого строить сетку
+    window_scale -  регулирует размер окна
+    """
     df = pd.read_csv(table_path)
-    for line in df.iloc:
-        pass
+    h, w = df.shape
+    fig, axes = plt.subplots(4, h, figsize=(5 * h * max(window_scale,0.1), 18*max(window_scale,0.1)))
+    axes = np.atleast_2d(axes)
+    for idx, line in enumerate(df.iloc):
+        paths = {
+            "Original": line['blurred'],
+            "Restored": line[alg_name],
+            "Estimated Kernel": line[f'kernel_{alg_name}'],
+            "Ground Truth Kernel": line['kernel blur']
+        }
+        images = {}
+        
+        for title, path in paths.items():
+            if os.path.exists(path):
+                images[title] = mpimg.imread(path)
+            else:
+                print(f"  - ПРЕДУПРЕЖДЕНИЕ: Файл не найден, будет показана заглушка: {path}")
+                images[title] = np.zeros((100, 100), dtype=np.uint8) # Черный квадрат-заглушка
+        # Ряд 0: Искаженные
+        axes[0, idx].imshow(images["Original"], cmap='gray')
+
+        # Ряд 1: Восстановленные
+        axes[1, idx].imshow(images["Restored"], cmap='gray')
+        
+        # Ряд 2: Ядро по мнению модели
+        axes[2, idx].imshow(images["Estimated Kernel"], cmap='gray')
+
+        # Ряд 3: Настоящее ядро
+        axes[3, idx].imshow(images["Ground Truth Kernel"], cmap='gray')
+        for row in range(4):
+            axes[row, idx].axis('off')
+    fig.suptitle(f"Сравнение результатов восстановления изображений ({alg_name})", fontsize=20, y=0.97)
+    plt.tight_layout(rect=[0, 0, 1, 0.95]) # Корректируем расположение, чтобы главный заголовок не наезжал на картинки
+    plt.show()
+        
+
+        
 
 
