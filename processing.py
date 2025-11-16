@@ -3,6 +3,7 @@ import os
 import glob
 import cv2 as cv
 import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 import math
 import pandas as pd
 from pathlib import Path
@@ -107,7 +108,6 @@ class Processing:
             line = self._plot_single_image(img_obj, alg_arr, axes, line, kernel_intencity_scale,kernel_size)
             img_obj.load(img_obj.get_len_filter() - 1)
 
-        # plt.suptitle("ANALYTICS", y=1.02, fontsize=14 * size)
         plt.suptitle(" ", y=1.02, fontsize=14 * size)
         plt.tight_layout()
         plt.show()
@@ -187,100 +187,6 @@ class Processing:
         except Exception as e:
             pass
 
-    '''def _plot_kernels_line(self, img_obj, blurred_path, alg_arr, original_kernels,
-                        kernels, axes, line, kernel_intencity_scale,kernel_size):
-        
-        # Отрисовка строки с ядрами
-        
-        axes[line, 0].axis('off')
-        
-        original_kernel_path = original_kernels.get(str(blurred_path))
-        if original_kernel_path:
-            original_kernel = cv.imread(str(original_kernel_path), 
-                                    cv.IMREAD_COLOR if img_obj.get_color() else cv.IMREAD_GRAYSCALE)
-            
-            if img_obj.get_color():
-                h,w,_ = original_kernel.shape
-            else:
-                h,w = original_kernel.shape
-            
-            new_k = round(h/2*(1.0-kernel_size))
-            new_w = round(w/2*(1.0-kernel_size))
-            if img_obj.get_color():
-                original_kernel = original_kernel[new_k:-new_k-1,new_w:-new_w-1,:]
-            else:
-                original_kernel = original_kernel[new_k:-new_k-1,new_w:-new_w-1]
-
-            if original_kernel is not None:
-                axes[line, 1].imshow(np.clip(cv.cvtColor(original_kernel, cv.COLOR_BGR2RGB) * 
-                                        kernel_intencity_scale, 0, 255).astype(np.uint8), cmap='gray')
-                axes[line, 1].set_title("original kernel", fontsize=10)
-                axes[line, 1].axis('off')
-        
-        for col, alg_name in enumerate(alg_arr, 2):
-            axes[line, col].axis('off')
-            self._plot_restored_kernel(img_obj, blurred_path, alg_name, kernels, 
-                                    axes, line, col, kernel_intencity_scale)
-        
-        return line + 1
-
-    def _plot_restored_kernel(self, img_obj, blurred_path, alg_name, kernels,
-                            axes, line, col, kernel_intencity_scale):
-        # Отрисовка одного восстановленного ядра
-        try:
-            kernel_path = kernels.get((str(blurred_path), str(alg_name)))
-            if kernel_path:
-                kernel = cv.imread(str(kernel_path), 
-                                cv.IMREAD_COLOR if img_obj.get_color() else cv.IMREAD_GRAYSCALE)
-                if kernel is not None:
-                    axes[line, col].imshow(np.clip(cv.cvtColor(kernel, cv.COLOR_BGR2RGB) * 
-                                                kernel_intencity_scale, 0, 255).astype(np.uint8))
-                    axes[line, col].set_title(f"{alg_name} kernel", fontsize=10)
-        except Exception as e:
-            pass'''
-
-#насрано
-    # def _plot_restored_kernel(self, img_obj, blurred_path, alg_name, kernels,
-    #                     axes, line, col, kernel_intencity_scale):
-    #     '''Отрисовка одного восстановленного ядра с сохранением пропорций'''
-    #     try:
-    #         kernel_path = kernels.get((str(blurred_path), str(alg_name)))
-    #         if kernel_path:
-    #             kernel = cv.imread(str(kernel_path), cv.IMREAD_GRAYSCALE)
-    #             if kernel is not None:
-    #                 axes[line, col].imshow(kernel, cmap='gray')
-    #                 axes[line, col].set_title(f"{alg_name} kernel", fontsize=10)
-    #                 # Устанавливаем равный аспект, чтобы сохранить пропорции
-    #                 axes[line, col].set_aspect('equal', adjustable='box')
-    #     except Exception as e:
-    #         pass
-
-    # def _plot_kernels_line(self, img_obj, blurred_path, alg_arr, original_kernels,
-    #                     kernels, axes, line, kernel_intencity_scale, kernel_size):
-    #     '''
-    #     Отрисовка строки с ядрами с сохранением их оригинальных пропорций.
-    #     '''
-    #     axes[line, 0].axis('off')
-        
-    #     original_kernel_path = original_kernels.get(str(blurred_path))
-    #     if original_kernel_path:
-    #         # Читаем ядро в градациях серого
-    #         original_kernel = cv.imread(str(original_kernel_path), cv.IMREAD_GRAYSCALE)
-            
-    #         if original_kernel is not None:
-    #             axes[line, 1].imshow(original_kernel, cmap='gray')
-    #             axes[line, 1].set_title("original kernel", fontsize=10)
-    #             # Устанавливаем равный аспект, чтобы сохранить пропорции
-    #             axes[line, 1].set_aspect('equal', adjustable='box')
-    #             axes[line, 1].axis('off')
-        
-    #     for col, alg_name in enumerate(alg_arr, 2):
-    #         axes[line, col].axis('off')
-    #         self._plot_restored_kernel(img_obj, blurred_path, alg_name, kernels, 
-    #                                 axes, line, col, kernel_intencity_scale)
-        
-    #     return line + 1
-
     def _crop_kernel_image(self, kernel_image: np.ndarray, padding: int = 10) -> np.ndarray:
         """
         Обрезает изображение ядра до его содержимого с добавлением отступа.
@@ -356,8 +262,6 @@ class Processing:
         except Exception as e:
             pass
 
-
-
     def histogram_equalization(self,view_histogram=False, inplace=True):
         for img_obj in self.images:
             current_image = img_obj.get_blurred_image()
@@ -369,7 +273,8 @@ class Processing:
                 img_obj.set_blurred(str(new_path))
                 img_obj.set_mapping_data(mapping_data)
             else:
-                #я хз, что делать
+                #не доделано
+                #должно быть выравнивание гистограмм с сохранением в другой файл
                 pass
 
         pass
@@ -377,7 +282,6 @@ class Processing:
     def _histogram_equalization_one(self,image,view_histogram):
         cdx = self._get_cdx(image)
         cdx_min = self._get_min_cdx(cdx)
-        # display(image)
         h,w = np.shape(image)
         new_image = image.copy()
         image_tmp = image.copy().astype(np.int16)
@@ -470,25 +374,19 @@ class Processing:
 
         inverse_lut = np.zeros(256, dtype=np.float32)
         
-        # Для каждого выходного значения (после выравнивания) находим входное значение
         for output_val in range(256):
-            # Ищем все входные значения, которые отображаются в этот output_val
             possible_inputs = np.where(np.abs(forward_lut - output_val) < 0.5)[0]
             if len(possible_inputs) > 0:
-                # Берем среднее из возможных входных значений
                 inverse_lut[output_val] = np.mean(possible_inputs)
             else:
-                # Если нет точного соответствия, используем интерполяцию
                 if output_val > 0:
-                    # Находим ближайшие значения
                     idx_above = np.where(forward_lut > output_val)[0]
                     idx_below = np.where(forward_lut < output_val)[0]
                     
                     if len(idx_above) > 0 and len(idx_below) > 0:
                         above_val = idx_above[0]
                         below_val = idx_below[-1]
-                        
-                        # Линейная интерполяция
+
                         ratio = (output_val - forward_lut[below_val]) / (forward_lut[above_val] - forward_lut[below_val])
                         inverse_lut[output_val] = below_val + ratio * (above_val - below_val)
                     else:
@@ -496,10 +394,9 @@ class Processing:
                 else:
                     inverse_lut[output_val] = 0
         
-        # Ограничиваем значения диапазоном оригинального изображения
+
         inverse_lut = np.clip(inverse_lut, 0, max_original)
-        
-        # Применяем обратное преобразование
+
         restored_image = inverse_lut[image].astype(np.int16)
         
         cdx = self._get_cdx(image)
@@ -522,50 +419,81 @@ class Processing:
         cdx_min = mapping_data['cdx_min']
         pixels = mapping_data['pixels']
         
-        # Создаем обратную LUT решая уравнение: output = (CDF(input) - cdx_min) * 255 / (pixels - 1)
         inverse_lut = np.zeros(256, dtype=np.float32)
         
         for output_val in range(256):
-            # Решаем уравнение: output_val = (CDF(input) - cdx_min) * 255 / (pixels - 1)
-            # => CDF(input) = (output_val * (pixels - 1) / 255) + cdx_min
             target_cdf = (output_val * (pixels - cdx_min) / 255) + cdx_min
-            
-            # Ищем входное значение, для которого CDF ближе всего к target_cdf
-            # Для этого нам нужен доступ к оригинальной CDF
+
             original_cdf = np.cumsum(mapping_data['original_cdx'])
-            
-            # Находим ближайшее значение в оригинальной CDF
+
             cdf_diff = np.abs(original_cdf - target_cdf)
             best_input = np.argmin(cdf_diff)
             
             inverse_lut[output_val] = best_input
-        
-        # Применяем обратное преобразование
+
         restored_image = inverse_lut[equalized_image].astype(np.int16)
         
         return restored_image
 
-    def get_metrics(self):
+    def get_table(self, table_path, display_table=False):
         '''
         Получение метрик в структурированном виде
         '''
-        metrics_data = []
-        for img_obj in self.images:
-            psnr_values = img_obj.get_PSNR()
-            ssim_values = img_obj.get_SSIM()
+        data = {}
+        data = self._collect_data(data) 
+        self._save_data_to_csv(data,table_path, display_table)
+
+    def _collect_data(self, data): #_collect_analysis_data надо поменять на это
+        """
+        собирает и сохраняет информацию для общего анализа
+        выдает 1 таблицу с метриками, ядрами и ссылками на изображениями
+        """
+        for img in self.images:
+            original_image = img.get_original()
+            img.save_filter()
+
+            blurred_kernel_array = img.get_original_kernels()
+            blurred_psnr_array = img.get_blurred_PSNR()
+            blurred_ssim_array = img.get_blurred_SSIM()
+
+            algorithm_kernel = img.get_kernels()
+            algorithm_restored_image = img.get_restored()
+            algorithm_restored_psnr = img.get_PSNR()
+            algorithm_restored_ssim = img.get_SSIM()
             
-            for key, psnr_val in psnr_values.items():
-                ssim_val = ssim_values.get(key, math.nan)
-                blurred_path, alg_name = key
-                metrics_data.append({
-                    'image': img_obj.get_original(),
-                    'blurred': blurred_path,
-                    'algorithm': alg_name,
-                    'psnr': psnr_val,
-                    'ssim': ssim_val
-                })
-        
-        return pd.DataFrame(metrics_data)
+            
+            #линия за линией
+            for blurred_image in img.get_blurred_array(): #подразумеваем, что она точно существует
+                data.setdefault('original', []).append(original_image)
+                data.setdefault('kernel blur', []).append(blurred_kernel_array.get(str(blurred_image), 'missing'))
+                data.setdefault('blurred', []).append(blurred_image)
+
+                data.setdefault('blurred psnr', []).append(blurred_psnr_array.get(str(blurred_image), math.nan))
+                data.setdefault('blurred ssim', []).append(blurred_ssim_array.get(str(blurred_image), math.nan))
+                for algorithm_name in img.get_algorithm():
+                    data.setdefault(f"kernel_{algorithm_name}", []).append(
+                        algorithm_kernel.get((str(blurred_image), str(algorithm_name)), 'missing')
+                    )
+                    data.setdefault(algorithm_name, []).append(
+                        algorithm_restored_image.get((str(blurred_image), str(algorithm_name)), 'missing')
+                    )
+                    data.setdefault(f"psnr_{algorithm_name}", []).append(
+                        algorithm_restored_psnr.get((str(blurred_image), str(algorithm_name)), math.nan)
+                    )
+                    data.setdefault(f"ssim_{algorithm_name}", []).append(
+                        algorithm_restored_ssim.get((str(blurred_image), str(algorithm_name)), math.nan)
+                    )
+        return data
+
+    def _save_data_to_csv(self,data, path, display_table=False):
+        """
+        сохраняет словарь в csv файл
+        display: bool - выводит сохраненный датафрейм
+        """
+        df_data = pd.DataFrame(data)
+        if display_table:
+            display(df_data)
+        df_data.to_csv(path, index=False)
 
     def clear_input(self):
         '''
@@ -881,6 +809,43 @@ class Processing:
 
             self.images = np.append(self.images, tmp_image)
 
+    def custom_filter(self, kernel_image_path, kernel_npy_path):
+        '''
+        Примерние созданного фильтра ко всем оригинальным изображениям
+        '''
+        for img_obj in self.images:
+            self._apply_single_custom_filter(img_obj,kernel_image_path, kernel_npy_path)
+
+    def _apply_single_custom_filter(self, img_obj,kernel_image_path, kernel_npy_path):
+        current_image = img_obj.get_original_image()
+        kernel = np.load(kernel_npy_path)
+        if current_image is None:
+            raise Exception("Не удалось загрузить изображение")
+        filtered_image = cv.filter2D(current_image, -1, kernel)
+        original_filename = Path(img_obj.get_original()).stem
+        blur_filename = Path(kernel_image_path).stem
+        filtered_filename =  self.folder_path_blurred / f"{original_filename}_{blur_filename}.png"
+
+        try:
+            psnr_val = metrics.PSNR(current_image, filtered_image)
+        except:
+            psnr_val = math.nan
+        
+        try:
+            ssim_val = metrics.SSIM(current_image, filtered_image)
+        except:
+            ssim_val = math.nan
+
+        img_obj.add_blurred_PSNR(psnr_val, str(filtered_filename))
+        img_obj.add_blurred_SSIM(ssim_val, str(filtered_filename))
+        cv.imwrite(str(filtered_filename), filtered_image)
+        img_obj.set_blurred(str(filtered_filename))
+        img_obj.add_to_current_filter(blur_filename)
+        img_obj.add_original_kernel(str(kernel_image_path), str(filtered_filename))
+
+        
+        
+
     def filter(self, filter_processor: filter.FilterBase):
         '''
         Примерние фильтра ко всем изображениям
@@ -940,7 +905,6 @@ class Processing:
             h, w = kernel_image.shape[:2]
             kernel_image[h//2, w//2] = 255
             
-            # new_kernel_path = self.folder_path_blurred / f"kernel_{original_filename}"
             new_kernel_path = self._generate_unique_file_path(self.folder_path_blurred, f"kernel_{original_filename}")
         else:
             kernel_image = cv.imread(str(kernel_path), 
@@ -953,7 +917,6 @@ class Processing:
             filtered_kernel = kernel_image
         cv.imwrite(str(new_kernel_path), filtered_kernel)
         img_obj.add_original_kernel(str(new_kernel_path), str(new_path))
-
 
     def _generate_unique_file_path(self, directory, filename):
         '''
@@ -1116,17 +1079,6 @@ class Processing:
 
         
         print(f"Restored: {Path(restored_path).name} (PSNR: {psnr_val:.2f}, SSIM: {ssim_val:.4f})")
-            
-    def param_process(self, algorithm_processor: base.DeconvolutionAlgorithm, param: dict):
-        '''
-        Восстановление всех изображений с заданными гиперпараметрами, гиперпараметр остается заданным
-        
-        Аргументы:
-            -algorithm_processor: метод восстановления изображения
-            -param: гиперпараметр метода
-        '''
-        algorithm_processor.change_param(param)
-        return self.process(algorithm_processor)
 
     def full_process(self, filters: list, methods: list, size: float = 0.75, kernel_intencity_scale = 10.0):
         '''
@@ -1421,7 +1373,25 @@ class Processing:
     def pareto(self):
         return self.analyzer.execute()
     
-     
-        
+
+
+def merge(frame1: Processing, frame2: Processing)->Processing:
+         """
+        объединяет массивы обработанных изображений
+         """
+         frame_res = Processing(images_folder=frame1.folder_path,
+                                blurred_folder=frame1.folder_path_blurred,
+                                restored_folder=frame1.folder_path_restored,
+                                data_path=frame1.data_path,
+                                color=frame1.color,
+                                kernel_dir=frame1.kernel_dir,
+                                dataset_path = frame1.dataset_path)
+         frame_res.images = np.append(frame1.images.copy(),frame2.images.copy())
+         return frame_res
+
+def show_from_table(table_path, alg_name)->None:
+    df = pd.read_csv(table_path)
+    for line in df.iloc:
+        pass
 
 

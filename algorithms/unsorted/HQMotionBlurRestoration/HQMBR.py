@@ -1,6 +1,6 @@
 import time
 import numpy as np
-from ..base import DeconvolutionAlgorithm
+from ...base import DeconvolutionAlgorithm
 
 from .convolve import create_line_psf
 from .deblur import computeLocalPrior, updatePsi, computeL, updatef, save_mask_as_image
@@ -87,6 +87,7 @@ class HQMBR(DeconvolutionAlgorithm):
             iterations += 1
         
         # L = L*255.0
+        print(np.mean(L))
         L = np.round(L).astype(np.int16)
         output_kernel = np.round(output_kernel*255.0).astype(np.int16)
         # print(np.max(output_kernel))

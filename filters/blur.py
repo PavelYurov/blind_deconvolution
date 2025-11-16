@@ -242,3 +242,29 @@ class BSpline_blur(FilterBase):
             psf = psf / np.sum(psf)
         
         return psf
+    
+
+class Kernel_convolution(FilterBase):
+    param = None
+    def __init__(self, npy_file_path) -> None:
+        """
+        задает произвольный фильтр, сохраненный в .npy файл
+        Parameters:
+        npy_file_path - путь до .npy файла с ядром
+        """
+        self.npy_file_path = npy_file_path
+        super().__init__(1, 'custom_kernel')
+
+    def get_type(self):
+        return self.type
+
+    def generate_kernel(self) -> np.ndarray:
+        return np.load(self.npy_file_path)
+
+    def discription(self):
+        return f"|custom_kelner_"
+
+    def filter(self, image: np.ndarray) -> np.ndarray:
+        kernel = np.load(self.npy_file_path)
+        blurred = cv.filter2D(image, -1, kernel)
+        return blurred
