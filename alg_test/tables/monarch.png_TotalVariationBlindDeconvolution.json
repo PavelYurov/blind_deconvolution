@@ -1,0 +1,194 @@
+{
+    "1": {
+        "original_path": "alg_test\\original\\monarch.png",
+        "blurred_path": "alg_test\\blurred\\monarch_convolved_kernel.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\convolved_kernel.png",
+        "filters": "convolved_kernel",
+        "blurred_psnr": 18.511465966455592,
+        "blurred_ssim": 0.6050156756427703,
+        "is_color": false,
+        "restored_paths": {
+            "TotalVariationBlindDeconvolution": "alg_test\\restored\\monarch_convolved_kernel_TotalVariationBlindDeconvolution.png"
+        },
+        "algorithm": [
+            "TotalVariationBlindDeconvolution"
+        ],
+        "kernel_paths": {
+            "TotalVariationBlindDeconvolution": "alg_test\\restored_kernel\\monarch_convolved_kernel_TotalVariationBlindDeconvolution_kernel.png"
+        },
+        "psnr": {
+            "TotalVariationBlindDeconvolution": 4.329274575296921
+        },
+        "ssim": {
+            "TotalVariationBlindDeconvolution": NaN
+        }
+    },
+    "2": {
+        "original_path": "alg_test\\original\\monarch.png",
+        "blurred_path": "alg_test\\blurred\\monarch_defocusdisk.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\defocusdisk.png",
+        "filters": "defocusdisk",
+        "blurred_psnr": 24.764344546452826,
+        "blurred_ssim": 0.8493457546934172,
+        "is_color": false,
+        "restored_paths": {
+            "TotalVariationBlindDeconvolution": "alg_test\\restored\\monarch_defocusdisk_TotalVariationBlindDeconvolution.png"
+        },
+        "algorithm": [
+            "TotalVariationBlindDeconvolution"
+        ],
+        "kernel_paths": {
+            "TotalVariationBlindDeconvolution": "alg_test\\restored_kernel\\monarch_defocusdisk_TotalVariationBlindDeconvolution_kernel.png"
+        },
+        "psnr": {
+            "TotalVariationBlindDeconvolution": 4.330198177877003
+        },
+        "ssim": {
+            "TotalVariationBlindDeconvolution": NaN
+        }
+    },
+    "3": {
+        "original_path": "alg_test\\original\\monarch.png",
+        "blurred_path": "alg_test\\blurred\\monarch_defocusgaussian.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\defocusgaussian.png",
+        "filters": "defocusgaussian",
+        "blurred_psnr": 25.596576193119258,
+        "blurred_ssim": 0.8740085606307991,
+        "is_color": false,
+        "restored_paths": {
+            "TotalVariationBlindDeconvolution": "alg_test\\restored\\monarch_defocusgaussian_TotalVariationBlindDeconvolution.png"
+        },
+        "algorithm": [
+            "TotalVariationBlindDeconvolution"
+        ],
+        "kernel_paths": {
+            "TotalVariationBlindDeconvolution": "alg_test\\restored_kernel\\monarch_defocusgaussian_TotalVariationBlindDeconvolution_kernel.png"
+        },
+        "psnr": {
+            "TotalVariationBlindDeconvolution": 4.330178826910042
+        },
+        "ssim": {
+            "TotalVariationBlindDeconvolution": NaN
+        }
+    },
+    "4": {
+        "original_path": "alg_test\\original\\monarch.png",
+        "blurred_path": "alg_test\\blurred\\monarch_defocusring.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\defocusring.png",
+        "filters": "defocusring",
+        "blurred_psnr": 21.716100756727315,
+        "blurred_ssim": 0.7322688413111544,
+        "is_color": false,
+        "restored_paths": {
+            "TotalVariationBlindDeconvolution": "alg_test\\restored\\monarch_defocusring_TotalVariationBlindDeconvolution.png"
+        },
+        "algorithm": [
+            "TotalVariationBlindDeconvolution"
+        ],
+        "kernel_paths": {
+            "TotalVariationBlindDeconvolution": "alg_test\\restored_kernel\\monarch_defocusring_TotalVariationBlindDeconvolution_kernel.png"
+        },
+        "psnr": {
+            "TotalVariationBlindDeconvolution": 4.329952670285987
+        },
+        "ssim": {
+            "TotalVariationBlindDeconvolution": NaN
+        }
+    },
+    "5": {
+        "original_path": "alg_test\\original\\monarch.png",
+        "blurred_path": "alg_test\\blurred\\monarch_motionbsplinesimplecurve.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\motionbsplinesimplecurve.png",
+        "filters": "motionbsplinesimplecurve",
+        "blurred_psnr": 19.086116497259958,
+        "blurred_ssim": 0.6321471019636133,
+        "is_color": false,
+        "restored_paths": {
+            "TotalVariationBlindDeconvolution": "alg_test\\restored\\monarch_motionbsplinesimplecurve_TotalVariationBlindDeconvolution.png"
+        },
+        "algorithm": [
+            "TotalVariationBlindDeconvolution"
+        ],
+        "kernel_paths": {
+            "TotalVariationBlindDeconvolution": "alg_test\\restored_kernel\\monarch_motionbsplinesimplecurve_TotalVariationBlindDeconvolution_kernel.png"
+        },
+        "psnr": {
+            "TotalVariationBlindDeconvolution": 4.329398150486528
+        },
+        "ssim": {
+            "TotalVariationBlindDeconvolution": NaN
+        }
+    },
+    "6": {
+        "original_path": "alg_test\\original\\monarch.png",
+        "blurred_path": "alg_test\\blurred\\monarch_motionlinearexp.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\motionlinearexp.png",
+        "filters": "motionlinearexp",
+        "blurred_psnr": 22.6347527210102,
+        "blurred_ssim": 0.8001886904416133,
+        "is_color": false,
+        "restored_paths": {
+            "TotalVariationBlindDeconvolution": "alg_test\\restored\\monarch_motionlinearexp_TotalVariationBlindDeconvolution.png"
+        },
+        "algorithm": [
+            "TotalVariationBlindDeconvolution"
+        ],
+        "kernel_paths": {
+            "TotalVariationBlindDeconvolution": "alg_test\\restored_kernel\\monarch_motionlinearexp_TotalVariationBlindDeconvolution_kernel.png"
+        },
+        "psnr": {
+            "TotalVariationBlindDeconvolution": 4.32984262596558
+        },
+        "ssim": {
+            "TotalVariationBlindDeconvolution": NaN
+        }
+    },
+    "7": {
+        "original_path": "alg_test\\original\\monarch.png",
+        "blurred_path": "alg_test\\blurred\\monarch_motionlinearuniform.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\motionlinearuniform.png",
+        "filters": "motionlinearuniform",
+        "blurred_psnr": 20.03799431493105,
+        "blurred_ssim": 0.6979171300940948,
+        "is_color": false,
+        "restored_paths": {
+            "TotalVariationBlindDeconvolution": "alg_test\\restored\\monarch_motionlinearuniform_TotalVariationBlindDeconvolution.png"
+        },
+        "algorithm": [
+            "TotalVariationBlindDeconvolution"
+        ],
+        "kernel_paths": {
+            "TotalVariationBlindDeconvolution": "alg_test\\restored_kernel\\monarch_motionlinearuniform_TotalVariationBlindDeconvolution_kernel.png"
+        },
+        "psnr": {
+            "TotalVariationBlindDeconvolution": 4.329811538106656
+        },
+        "ssim": {
+            "TotalVariationBlindDeconvolution": NaN
+        }
+    },
+    "8": {
+        "original_path": "alg_test\\original\\monarch.png",
+        "blurred_path": "alg_test\\blurred\\monarch_stretched_gaussian_kernel.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\stretched_gaussian_kernel.png",
+        "filters": "stretched_gaussian_kernel",
+        "blurred_psnr": 20.432966192591117,
+        "blurred_ssim": 0.7036482097836125,
+        "is_color": false,
+        "restored_paths": {
+            "TotalVariationBlindDeconvolution": "alg_test\\restored\\monarch_stretched_gaussian_kernel_TotalVariationBlindDeconvolution.png"
+        },
+        "algorithm": [
+            "TotalVariationBlindDeconvolution"
+        ],
+        "kernel_paths": {
+            "TotalVariationBlindDeconvolution": "alg_test\\restored_kernel\\monarch_stretched_gaussian_kernel_TotalVariationBlindDeconvolution_kernel.png"
+        },
+        "psnr": {
+            "TotalVariationBlindDeconvolution": 4.329617840569956
+        },
+        "ssim": {
+            "TotalVariationBlindDeconvolution": NaN
+        }
+    }
+}

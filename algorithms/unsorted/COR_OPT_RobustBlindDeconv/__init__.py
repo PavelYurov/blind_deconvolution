@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional, Tuple
 import numpy as np
 from scipy.signal import fftconvolve, correlate2d
 
-from ..base import DeconvolutionAlgorithm
+from ...base import DeconvolutionAlgorithm
 
 Array2D = np.ndarray
 

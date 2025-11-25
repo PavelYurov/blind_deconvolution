@@ -1,0 +1,3 @@
+original,kernel blur,blurred,blurred psnr,blurred ssim,kernel_HQMBR,HQMBR,psnr_HQMBR,ssim_HQMBR
+alg_test\original\airplane.png,alg_test\ground_truth_filters\convolved_kernel.png,alg_test\blurred\airplane_convolved_kernel.png,25.985003415695584,0.8835403153503018,alg_test\restored_kernel\airplane_convolved_kernel_HQMBR_kernel.png,alg_test\restored\airplane_convolved_kernel_HQMBR.png,6.509777958684935,
+alg_test\original\airplane.png,alg_test\ground_truth_filters\defocusdisk.png,alg_test\blurred\airplane_defocusdisk.png,32.570606355129435,0.948352878724055,alg_test\restored_kernel\airplane_defocusdisk_HQMBR_kernel.png,alg_test\restored\airplane_defocusdisk_HQMBR.png,6.509777958684935,

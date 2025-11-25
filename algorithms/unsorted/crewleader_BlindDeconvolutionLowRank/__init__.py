@@ -1,270 +1,245 @@
-from __future__ import annotations
-
-import sys
-from pathlib import Path
-from time import time
-from typing import Any, Dict, Optional, Tuple
-
+import os
+import cv2
 import numpy as np
-from scipy.signal import fftconvolve
+import matlab.engine
 
-from ..base import DeconvolutionAlgorithm
+from algorithms.base import DeconvolutionAlgorithm
 
-Array2D = np.ndarray
-
-SOURCE_ROOT = Path(__file__).resolve().parent / "source"
-if str(SOURCE_ROOT) not in sys.path:
-    sys.path.insert(0, str(SOURCE_ROOT))
-
-
-def _gaussian_kernel(size: int, sigma: float) -> Array2D:
-    ax = np.linspace(-(size // 2), size // 2, size)
-    xx, yy = np.meshgrid(ax, ax)
-    kernel = np.exp(-(xx ** 2 + yy ** 2) / (2.0 * sigma ** 2))
-    kernel = np.clip(kernel, 0.0, None)
-    total = float(kernel.sum())
-    if total <= 0.0:
-        return np.full((size, size), 1.0 / (size * size), dtype=np.float64)
-    return kernel / total
-
-
-def _flip_kernel(kernel: Array2D) -> Array2D:
-    return np.flip(kernel, axis=(0, 1))
-
-
-def _laplacian(arr: Array2D) -> Array2D:
-    return (
-        -4.0 * arr
-        + np.roll(arr, 1, axis=0)
-        + np.roll(arr, -1, axis=0)
-        + np.roll(arr, 1, axis=1)
-        + np.roll(arr, -1, axis=1)
-    )
-
-
-def _project_kernel(kernel: Array2D) -> Array2D:
-    kernel = np.clip(kernel, 0.0, None)
-    total = float(kernel.sum())
-    if total <= 0.0:
-        side = kernel.shape[0]
-        return np.full_like(kernel, 1.0 / (side * side))
-    return kernel / total
-
-
-def _compute_residual(sharp: Array2D, kernel: Array2D, observed: Array2D) -> Array2D:
-    return fftconvolve(sharp, kernel, mode="same") - observed
-
-
-def _robust_weight(residual: Array2D, epsilon: float) -> Array2D:
-    return residual / np.maximum(np.sqrt(residual * residual + epsilon), epsilon)
-
-
-def _extract_center(arr: Array2D, shape: Tuple[int, int]) -> Array2D:
-    target_h, target_w = shape
-    center_h = arr.shape[0] // 2
-    center_w = arr.shape[1] // 2
-    half_h = target_h // 2
-    half_w = target_w // 2
-    top = max(center_h - half_h, 0)
-    left = max(center_w - half_w, 0)
-    return arr[top : top + target_h, left : left + target_w]
-
-
-def _low_rank_project(image: Array2D, rank: Optional[int], shrinkage: float) -> Array2D:
-    u, s, vt = np.linalg.svd(image, full_matrices=False)
-    if shrinkage > 0.0:
-        s = np.maximum(s - shrinkage, 0.0)
-    if rank is not None and 0 < rank < len(s):
-        s[rank:] = 0.0
-    return (u * s) @ vt
-
-
-def _update_sharp(
-    sharp: Array2D,
-    kernel: Array2D,
-    observed: Array2D,
-    step_size: float,
-    epsilon: float,
-    tv_weight: float,
-    rank: Optional[int],
-    shrinkage: float,
-) -> Array2D:
-    residual = _compute_residual(sharp, kernel, observed)
-    weight = _robust_weight(residual, epsilon)
-    grad_data = fftconvolve(weight, _flip_kernel(kernel), mode="same")
-    grad_tv = tv_weight * _laplacian(sharp)
-    updated = sharp - step_size * (grad_data + grad_tv)
-    updated = _low_rank_project(updated, rank, shrinkage)
-    return np.clip(updated, 0.0, 1.0)
-
-
-def _update_kernel(
-    sharp: Array2D,
-    kernel: Array2D,
-    observed: Array2D,
-    step_size: float,
-    epsilon: float,
-    smooth_weight: float,
-    kernel_size: int,
-) -> Array2D:
-    residual = _compute_residual(sharp, kernel, observed)
-    weight = _robust_weight(residual, epsilon)
-    grad_full = fftconvolve(weight, _flip_kernel(sharp), mode="same")
-    grad_data = _extract_center(grad_full, kernel.shape)
-    grad_smooth = smooth_weight * _laplacian(kernel)
-    updated = kernel - step_size * (grad_data + grad_smooth)
-    return _project_kernel(updated)
-
-
-def _resize_kernel(kernel: Array2D, kernel_size: int) -> Array2D:
-    if kernel.shape == (kernel_size, kernel_size):
-        return kernel
-    resized = np.zeros((kernel_size, kernel_size), dtype=np.float64)
-    kh, kw = kernel.shape
-    half_h = kernel_size // 2
-    half_w = kernel_size // 2
-    center_h = kh // 2
-    center_w = kw // 2
-    top = max(center_h - half_h, 0)
-    left = max(center_w - half_w, 0)
-    crop = kernel[top : top + kernel_size, left : left + kernel_size]
-    resized[: crop.shape[0], : crop.shape[1]] = crop
-    return _project_kernel(resized)
-
-
-def _ensure_odd(value: int) -> int:
-    return int(value) | 1
+SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "source")
 
 
 class CrewleaderBlindDeconvolutionLowRank(DeconvolutionAlgorithm):
-    """Low-rank blind deconvolution via alternating minimisation (Python port)."""
-
     def __init__(
         self,
-        kernel_size: int = 17,
-        iterations: int = 15,
-        image_step: float = 0.3,
-        kernel_step: float = 0.05,
-        epsilon: float = 1e-4,
-        tv_weight: float = 0.002,
-        kernel_smooth: float = 5e-4,
-        low_rank: Optional[int] = 40,
-        shrinkage: float = 0.01,
-        init_sigma: Optional[float] = None,
-    ) -> None:
-        super().__init__('LowRankBlindDeconvolution')
-        self.kernel_size = _ensure_odd(kernel_size)
-        self.iterations = max(1, int(iterations))
-        self.image_step = float(image_step)
-        self.kernel_step = float(kernel_step)
-        self.epsilon = float(epsilon)
-        self.tv_weight = float(tv_weight)
-        self.kernel_smooth = float(kernel_smooth)
-        self.low_rank = None if low_rank is None else max(1, int(low_rank))
-        self.shrinkage = float(shrinkage)
-        self.init_sigma = float(init_sigma) if init_sigma is not None else None
-        self._last_kernel: Optional[Array2D] = None
-        self._last_output: Optional[Array2D] = None
+        # параметры, как в function_static_scene.m
+        psize_y: int = 31,
+        psize_x: int = 31,
+        gamma: float = 0.6,
+        p: float = 0.0,
+        beta: float = 1.0 / 320.0,
+        thr_e: float = 1.0 / 1500.0,
+        num_try: int = 120,
+        base_psf: int = 1,
+        resize_step: float = 2 ** 0.5,
+        alpha_multiplier: float = 2.0,
+        min_alpha: float = 0.123,
+        num_scale: int | None = None,
+        lambda_: float | None = None,
+        delta: float | None = None,
+        transform_type: str = "projective",
+    ):
+        self._eng = matlab.engine.start_matlab()
+        self._eng.addpath(self._eng.genpath(SOURCE_PATH), nargout=0)
+        self._eng.cd(os.path.join(SOURCE_PATH, "code"), nargout=0)
 
-    def change_param(self, param: Dict[str, Any]):
-        if not isinstance(param, dict):
-            return super().change_param(param)
-        if 'kernel_size' in param and param['kernel_size'] is not None:
-            self.kernel_size = _ensure_odd(param['kernel_size'])
-        if 'iterations' in param and param['iterations'] is not None:
-            self.iterations = max(1, int(param['iterations']))
-        if 'image_step' in param and param['image_step'] is not None:
-            self.image_step = float(param['image_step'])
-        if 'kernel_step' in param and param['kernel_step'] is not None:
-            self.kernel_step = float(param['kernel_step'])
-        if 'epsilon' in param and param['epsilon'] is not None:
-            self.epsilon = float(param['epsilon'])
-        if 'tv_weight' in param and param['tv_weight'] is not None:
-            self.tv_weight = float(param['tv_weight'])
-        if 'kernel_smooth' in param and param['kernel_smooth'] is not None:
-            self.kernel_smooth = float(param['kernel_smooth'])
-        if 'low_rank' in param:
-            value = param['low_rank']
-            self.low_rank = None if value is None else max(1, int(value))
-        if 'shrinkage' in param and param['shrinkage'] is not None:
-            self.shrinkage = float(param['shrinkage'])
-        if 'init_sigma' in param:
-            value = param['init_sigma']
-            self.init_sigma = None if value is None else float(value)
-        return super().change_param(param)
+        # те же значения по умолчанию, что в MATLAB
+        self.psize_y = int(psize_y)
+        self.psize_x = int(psize_x)
+        self.gamma = float(gamma)
+        self.p = float(p)
+        self.beta = float(beta)
+        self.thr_e = float(thr_e)
+        self.num_try = int(num_try)
+        self.base_psf = int(base_psf)
+        self.resize_step = float(resize_step)
+        self.alpha_multiplier = float(alpha_multiplier)
+        self.min_alpha = float(min_alpha)
+        self.num_scale = (
+            int(num_scale) if num_scale is not None else None
+        )  # если None, даём MATLAB посчитать
+        # lambda и delta в коде привязаны к gamma
+        self.lambda_ = float(lambda_) if lambda_ is not None else (0.088 ** 2 * self.gamma)
+        self.delta = float(delta) if delta is not None else (0.04 * self.gamma)
+        self.transform_type = str(transform_type)
 
-    def get_param(self):
-        return [
-            ('kernel_size', self.kernel_size),
-            ('iterations', self.iterations),
-            ('image_step', self.image_step),
-            ('kernel_step', self.kernel_step),
-            ('epsilon', self.epsilon),
-            ('tv_weight', self.tv_weight),
-            ('kernel_smooth', self.kernel_smooth),
-            ('low_rank', self.low_rank),
-            ('shrinkage', self.shrinkage),
-            ('init_sigma', self.init_sigma),
-            ('last_kernel_shape', None if self._last_kernel is None else self._last_kernel.shape),
-            ('last_output_shape', None if self._last_output is None else self._last_output.shape),
-        ]
+    def change_param(self, param: dict):
+        if "psize_y" in param:
+            self.psize_y = int(param["psize_y"])
+        if "psize_x" in param:
+            self.psize_x = int(param["psize_x"])
+        if "gamma" in param:
+            self.gamma = float(param["gamma"])
+        if "p" in param:
+            self.p = float(param["p"])
+        if "beta" in param:
+            self.beta = float(param["beta"])
+        if "thr_e" in param:
+            self.thr_e = float(param["thr_e"])
+        if "num_try" in param:
+            self.num_try = int(param["num_try"])
+        if "base_psf" in param:
+            self.base_psf = int(param["base_psf"])
+        if "resize_step" in param:
+            self.resize_step = float(param["resize_step"])
+        if "alpha_multiplier" in param:
+            self.alpha_multiplier = float(param["alpha_multiplier"])
+        if "min_alpha" in param:
+            self.min_alpha = float(param["min_alpha"])
+        if "num_scale" in param:
+            self.num_scale = int(param["num_scale"])
+        if "lambda" in param:
+            self.lambda_ = float(param["lambda"])
+        if "delta" in param:
+            self.delta = float(param["delta"])
+        if "transform_type" in param:
+            self.transform_type = str(param["transform_type"])
 
-    def process(self, image: Array2D) -> Tuple[Array2D, Array2D]:
-        if image is None:
-            raise ValueError('Input image is None.')
+    def get_param(self) -> dict:
+        return {
+            "psize_y": self.psize_y,
+            "psize_x": self.psize_x,
+            "gamma": self.gamma,
+            "p": self.p,
+            "beta": self.beta,
+            "thr_e": self.thr_e,
+            "num_try": self.num_try,
+            "base_psf": self.base_psf,
+            "resize_step": self.resize_step,
+            "alpha_multiplier": self.alpha_multiplier,
+            "min_alpha": self.min_alpha,
+            "num_scale": self.num_scale,
+            "lambda": self.lambda_,
+            "delta": self.delta,
+            "transform_type": self.transform_type,
+        }
 
-        arr = np.asarray(image)
-        if arr.ndim == 3:
-            arr = arr[..., 0]
-        if arr.ndim != 2:
-            raise ValueError('Expected a 2D grayscale image.')
+    def process(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """
+        image: ожидается BGR uint8, как в остальных обёртках.
+        Возвращает (результат, ядро смаза).
+        """
 
-        original_dtype = arr.dtype
-        float_img = arr.astype(np.float64, copy=False)
-        if float_img.max() > 1.5:
-            float_img = float_img / 255.0
-        float_img = np.clip(float_img, 0.0, 1.0)
-
-        sharp = float_img.copy()
-        sigma = self.init_sigma if self.init_sigma is not None else max(1.0, self.kernel_size / 6.0)
-        kernel = _gaussian_kernel(self.kernel_size, sigma)
-
-        start = time()
-        for _ in range(self.iterations):
-            sharp = _update_sharp(
-                sharp,
-                kernel,
-                float_img,
-                self.image_step,
-                self.epsilon,
-                self.tv_weight,
-                self.low_rank,
-                self.shrinkage,
-            )
-            kernel = _update_kernel(
-                sharp,
-                kernel,
-                float_img,
-                self.kernel_step,
-                self.epsilon,
-                self.kernel_smooth,
-                self.kernel_size,
-            )
-            kernel = _resize_kernel(kernel, self.kernel_size)
-        self.timer = time() - start
-
-        restored = sharp
-        if np.issubdtype(original_dtype, np.integer):
-            restored = np.clip(restored * 255.0, 0, 255).round().astype(original_dtype)
+        # приведение к форматам
+        if image.ndim == 3 and image.shape[2] == 3:
+            image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         else:
-            restored = restored.astype(original_dtype, copy=False)
+            image_gray = image
 
-        self._last_kernel = kernel
-        self._last_output = restored
-        return restored, kernel
+        image_gray = image_gray.astype(np.float64) / 255.0
 
-    def get_kernel(self) -> Array2D | None:
-        return None if self._last_kernel is None else self._last_kernel.copy()
+        # в MATLAB: y_py — входное изображение
+        I_mat = matlab.double(image_gray.tolist())
+        self._eng.workspace["y_py"] = I_mat
 
+        # передаём гиперпараметры
+        self._eng.workspace["psize_y"] = float(self.psize_y)
+        self._eng.workspace["psize_x"] = float(self.psize_x)
+        self._eng.workspace["gamma_param"] = float(self.gamma)
+        self._eng.workspace["p_param"] = float(self.p)
+        self._eng.workspace["beta_param"] = float(self.beta)
+        self._eng.workspace["thr_e_param"] = float(self.thr_e)
+        self._eng.workspace["num_try_param"] = float(self.num_try)
+        self._eng.workspace["base_psf_param"] = float(self.base_psf)
+        self._eng.workspace["resize_step_param"] = float(self.resize_step)
+        self._eng.workspace["alpha_mult_param"] = float(self.alpha_multiplier)
+        self._eng.workspace["min_alpha_param"] = float(self.min_alpha)
+        self._eng.workspace["lambda_param"] = float(self.lambda_)
+        self._eng.workspace["delta_param"] = float(self.delta)
+        self._eng.workspace["transform_type_param"] = self.transform_type
 
-__all__ = ['CrewleaderBlindDeconvolutionLowRank']
+        # num_scale: либо берём из Python, либо вычисляем как в function_static_scene
+        if self.num_scale is not None:
+            self._eng.workspace["num_scale_param"] = float(self.num_scale)
+            self._eng.eval("params.num_scale = num_scale_param;", nargout=0)
+        else:
+            self._eng.eval(
+                "params.psize_y = psize_y; "
+                "params.psize_x = psize_x; "
+                "params.resize_step = resize_step_param; "
+                "params.num_scale = floor(log(min([params.psize_y params.psize_x])/3)/log(params.resize_step));",
+                nargout=0,
+            )
+
+        # формируем структуру params (аналогично function_static_scene.m)
+        self._eng.eval(
+            "params.psize_y = psize_y;"
+            "params.psize_x = psize_x;"
+            "params.gamma = gamma_param;"
+            "params.p = p_param;"
+            "params.beta = beta_param;"
+            "params.thr_e = thr_e_param;"
+            "params.num_try = num_try_param;"
+            "params.base_psf = base_psf_param;"
+            "params.resize_step = resize_step_param;"
+            "params.alpha_multiplier = alpha_mult_param;"
+            "params.min_alpha = min_alpha_param;"
+            "params.display = 0;"
+            "params.lambda = lambda_param;"
+            "params.delta = delta_param;"
+            "params.transform_type = transform_type_param;",
+            nargout=0,
+        )
+
+        # ------------------ ВАЖНО ------------------
+        # Здесь нужен MATLAB-код, который работает с ОДНИМ изображением:
+        # можно:
+        #   - написать отдельный .m-скрипт/функцию (например, single_image_interface.m),
+        #   - или адаптировать часть логики из function_multi_image_deblurring.m.
+        #
+        # Ниже — простой «каркас» на основе solve_image_irls / solve_psf_constrained:
+        self._eng.eval(
+            """
+            y = y_py;
+            % начальное ядро — равномерное окно нужного размера
+            psize_y_loc = params.psize_y;
+            psize_x_loc = params.psize_x;
+            K0 = ones(psize_y_loc, psize_x_loc);
+            K0 = K0 / sum(K0(:));
+
+            [vsize_y, vsize_x] = size(y);
+            fsize_y = vsize_y + psize_y_loc - 1;
+            fsize_x = vsize_x + psize_x_loc - 1;
+
+            % область видимости, как в function_multi_image_deblurring
+            varea = true(vsize_y, vsize_x);
+            varea = padarray(varea, [psize_y_loc-1, psize_x_loc-1], false, 'post');
+
+            % начальное «резкое» изображение — просто y, дополненное до свёрточного размера
+            x = padarray(y, [psize_y_loc-1, psize_x_loc-1], 'replicate', 'post');
+
+            lowrank_img = x;                % упрощение: low-rank ~= текущее x
+            sparsity_img = false(size(x));  % пока без разрежной компоненты
+
+            alpha = params.min_alpha;
+            for it = 1:params.num_try
+                % шаг по x (solve_image_irls есть в исходном коде)
+                x = solve_image_irls(x, K0, y, lowrank_img, sparsity_img, ...
+                                     params.gamma, alpha, params.p, ...
+                                     200, 1e-6, params.thr_e);
+
+                % шаг по ядру
+                K0 = solve_psf_constrained(K0, y, x, params.beta, varea);
+
+                % простой спад alpha, как в оригинальном коде
+                alpha = max(params.min_alpha, alpha * exp(-log(2)/params.num_try));
+            end
+
+            x_py = x;
+            k_py = K0;
+            """,
+            nargout=0,
+        )
+
+        x_mat = self._eng.workspace["x_py"]
+        k_mat = self._eng.workspace["k_py"]
+
+        x_np = np.array(x_mat, dtype=np.float64)
+        x_np = np.clip(x_np, 0.0, 1.0)
+        x_uint8 = (x_np * 255.0).astype(np.uint8)
+
+        # x — одно канал, приводим к BGR
+        if x_uint8.ndim == 2:
+            x_bgr = cv2.cvtColor(x_uint8, cv2.COLOR_GRAY2BGR)
+        else:
+            x_rgb = x_uint8
+            x_bgr = cv2.cvtColor(x_rgb, cv2.COLOR_RGB2BGR)
+
+        kernel = np.array(k_mat, dtype=np.float64)
+
+        return x_bgr, kernel
+
+    def __del__(self):
+        try:
+            self._eng.quit()
+        except Exception:
+            pass

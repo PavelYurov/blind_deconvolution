@@ -1,273 +1,156 @@
-from __future__ import annotations
+import os
+from typing import Tuple
 
-import sys
-from pathlib import Path
-from time import time
-from typing import Any, Dict, Optional, Tuple
-
+import cv2
 import numpy as np
+import matlab.engine
 
-from ..base import DeconvolutionAlgorithm
+from algorithms.base import DeconvolutionAlgorithm
 
-Array2D = np.ndarray
-
-SOURCE_ROOT = Path(__file__).resolve().parent / "source"
-if str(SOURCE_ROOT) not in sys.path:
-    sys.path.insert(0, str(SOURCE_ROOT))
-
-
-def _normalize(arr: Array2D) -> Array2D:
-    norm_val = float(np.linalg.norm(arr))
-    if norm_val <= 1e-12:
-        return arr
-    return arr / norm_val
-
-
-def _orth_proj(u: Array2D, v: Array2D) -> Array2D:
-    denom = float(np.sum(u * u))
-    if denom <= 1e-12:
-        return v
-    return v - float(np.sum(u * v)) * u / denom
-
-
-def _multi_conv(a: np.ndarray, b: np.ndarray, adj: Optional[str] = None) -> np.ndarray:
-    if a.ndim == 2:
-        a = a[..., np.newaxis]
-    if b.ndim == 2:
-        b = b[..., np.newaxis]
-    fft_shape = a.shape[:2]
-    a_hat = np.fft.fft2(a, axes=(0, 1))
-    b_hat = np.fft.fft2(b, s=fft_shape, axes=(0, 1))
-    if adj == 'adj-left':
-        a_hat = np.conj(a_hat)
-    elif adj == 'adj-right':
-        b_hat = np.conj(b_hat)
-    elif adj == 'adj-both':
-        a_hat = np.conj(a_hat)
-        b_hat = np.conj(b_hat)
-    if a_hat.shape[2] == 1 and b_hat.shape[2] > 1:
-        a_hat = np.repeat(a_hat, b_hat.shape[2], axis=2)
-    if b_hat.shape[2] == 1 and a_hat.shape[2] > 1:
-        b_hat = np.repeat(b_hat, a_hat.shape[2], axis=2)
-    result_hat = a_hat * b_hat
-    return np.real(np.fft.ifft2(result_hat, axes=(0, 1)))
-
-
-def _project_kernel(kernel: Array2D) -> Array2D:
-    kernel = np.clip(kernel, 0.0, None)
-    total = float(kernel.sum())
-    if total <= 0.0:
-        side = kernel.shape[0]
-        return np.full_like(kernel, 1.0 / (side * side))
-    return kernel / total
-
-
-def _extract_patches(image: Array2D, patch_size: int, count: int, rng: np.random.Generator) -> np.ndarray:
-    h, w = image.shape
-    if h < patch_size or w < patch_size:
-        pad_h = max(0, patch_size - h)
-        pad_w = max(0, patch_size - w)
-        image = np.pad(image, ((0, pad_h), (0, pad_w)), mode='edge')
-        h, w = image.shape
-    patches = np.zeros((patch_size, patch_size, count), dtype=np.float64)
-    for i in range(count):
-        top = 0 if h == patch_size else int(rng.integers(0, h - patch_size + 1))
-        left = 0 if w == patch_size else int(rng.integers(0, w - patch_size + 1))
-        patches[:, :, i] = image[top : top + patch_size, left : left + patch_size]
-    patches -= patches.mean(axis=(0, 1), keepdims=True)
-    return patches
-
-
-def _wiener_deconv(image: Array2D, kernel: Array2D, reg: float) -> Array2D:
-    kernel = _project_kernel(kernel)
-    kh, kw = kernel.shape
-    pad_kernel = np.zeros_like(image)
-    pad_kernel[:kh, :kw] = kernel
-    pad_kernel = np.roll(pad_kernel, -kh // 2, axis=0)
-    pad_kernel = np.roll(pad_kernel, -kw // 2, axis=1)
-    image_fft = np.fft.fft2(image)
-    kernel_fft = np.fft.fft2(pad_kernel)
-    denom = np.abs(kernel_fft) ** 2 + reg
-    restored_fft = image_fft * np.conj(kernel_fft) / denom
-    restored = np.real(np.fft.ifft2(restored_fft))
-    return np.clip(restored, 0.0, 1.0)
-
-
-class _HuberObjective:
-    def __init__(self, y: np.ndarray, mu: float) -> None:
-        self.y = y
-        self.mu = float(mu)
-        self.shape = y.shape[:2]
-        self.count = y.shape[2]
-        self.normalizer = 1.0 / (self.shape[0] * self.shape[1] * self.count)
-
-    def oracle(self, z: Array2D) -> Tuple[float, Array2D]:
-        conv = _multi_conv(self.y, z)
-        abs_conv = np.abs(conv)
-        mu_val = self.mu
-        huber_val = np.where(
-            abs_conv >= mu_val,
-            abs_conv,
-            (mu_val / 2.0) + (conv ** 2) / (2.0 * mu_val),
-        )
-        fval = self.normalizer * float(np.sum(huber_val))
-        grad_arg = np.where(abs_conv >= mu_val, np.sign(conv), conv / mu_val)
-        grad = self.normalizer * np.sum(_multi_conv(self.y, grad_arg, adj='adj-left'), axis=2)
-        return fval, grad
-
-
-def _linesearch(objective: _HuberObjective, z: Array2D, fval: float, grad: Array2D, tau: float) -> Tuple[Array2D, float]:
-    beta = 0.8
-    eta = 1e-3
-    tau = max(tau, 1e-12) * 2.0
-    grad_norm_sq = float(np.sum(grad * grad))
-    if grad_norm_sq <= 1e-20:
-        return z, tau
-    tau_threshold = 1e-12
-    while True:
-        candidate = _normalize(z - tau * grad)
-        cand_val = objective.oracle(candidate)[0]
-        if cand_val <= fval - eta * tau * grad_norm_sq or tau <= tau_threshold:
-            return candidate, max(tau, tau_threshold)
-        tau *= beta
-
-
-def _grad_descent(objective: _HuberObjective, opts: Dict[str, Any]) -> Array2D:
-    z = np.array(opts['Z_init'], dtype=np.float64)
-    tau = float(opts.get('tau', 1e-2))
-    max_iter = int(opts.get('MaxIter', 200))
-    use_linesearch = bool(opts.get('islinesearch', True))
-    line_tau = float(opts.get('line_tau', 0.1))
-    for _ in range(max_iter):
-        fval, grad = objective.oracle(z)
-        grad = _orth_proj(z, grad)
-        grad_norm = float(np.linalg.norm(grad))
-        if grad_norm > 1e2:
-            grad = grad * (1e2 / grad_norm)
-        if use_linesearch:
-            z, line_tau = _linesearch(objective, z, fval, grad, line_tau)
-        else:
-            z = _normalize(z - tau * grad)
-    return z
-
+SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "source")
 
 class Qingqu06MCSBD(DeconvolutionAlgorithm):
-    """Python port of the MCS-BD Riemannian gradient method (simplified)."""
+	def __init__(
+		self,
+		kernel_size: Tuple[int, int] = (10, 10),
+		mu: float = 1e-2,
+		tau: float = 1e-2,
+		max_iter: int = 200,
+		use_linesearch: bool = True,
+		use_rounding: bool = False,
+	):
+		self._eng = matlab.engine.start_matlab()
+		self._eng.addpath(self._eng.genpath(SOURCE_PATH), nargout=0)
+		self._eng.cd(SOURCE_PATH, nargout=0)
 
-    def __init__(
-        self,
-        kernel_size: int = 17,
-        iterations: int = 200,
-        mu: float = 1e-2,
-        step_size: float = 1e-2,
-        line_search: bool = True,
-        num_patches: int = 64,
-        regularization: float = 1e-3,
-        random_state: Optional[int] = 0,
-    ) -> None:
-        super().__init__('MCSBlindDeconvolution')
-        self.kernel_size = int(kernel_size)
-        self.iterations = int(iterations)
-        self.mu = float(mu)
-        self.step_size = float(step_size)
-        self.line_search = bool(line_search)
-        self.num_patches = max(1, int(num_patches))
-        self.regularization = float(regularization)
-        self.random_state = random_state
-        self._last_kernel: Optional[Array2D] = None
-        self._last_output: Optional[Array2D] = None
+		self.kernel_height, self.kernel_width = int(kernel_size[0]), int(kernel_size[1])
+		self.mu = float(mu)
+		self.tau = float(tau)
+		self.max_iter = int(max_iter)
+		self.use_linesearch = bool(use_linesearch)
+		self.use_rounding = bool(use_rounding)
 
-    def change_param(self, param: Dict[str, Any]):
-        if not isinstance(param, dict):
-            return super().change_param(param)
-        if 'kernel_size' in param and param['kernel_size'] is not None:
-            self.kernel_size = int(param['kernel_size'])
-        if 'iterations' in param and param['iterations'] is not None:
-            self.iterations = int(param['iterations'])
-        if 'mu' in param and param['mu'] is not None:
-            self.mu = float(param['mu'])
-        if 'step_size' in param and param['step_size'] is not None:
-            self.step_size = float(param['step_size'])
-        if 'line_search' in param and param['line_search'] is not None:
-            self.line_search = bool(param['line_search'])
-        if 'num_patches' in param and param['num_patches'] is not None:
-            self.num_patches = max(1, int(param['num_patches']))
-        if 'regularization' in param and param['regularization'] is not None:
-            self.regularization = float(param['regularization'])
-        if 'random_state' in param:
-            self.random_state = None if param['random_state'] is None else int(param['random_state'])
-        return super().change_param(param)
+	def change_param(self, param: dict):
+		if "kernel_height" in param:
+			self.kernel_height = int(param["kernel_height"])
+		if "kernel_width" in param:
+			self.kernel_width = int(param["kernel_width"])
+		if "kernel_size" in param and isinstance(param["kernel_size"], (list, tuple)):
+			kh, kw = param["kernel_size"]
+			self.kernel_height = int(kh)
+			self.kernel_width = int(kw)
 
-    def get_param(self):
-        return [
-            ('kernel_size', self.kernel_size),
-            ('iterations', self.iterations),
-            ('mu', self.mu),
-            ('step_size', self.step_size),
-            ('line_search', self.line_search),
-            ('num_patches', self.num_patches),
-            ('regularization', self.regularization),
-            ('random_state', self.random_state),
-            ('last_kernel_shape', None if self._last_kernel is None else self._last_kernel.shape),
-            ('last_output_shape', None if self._last_output is None else self._last_output.shape),
-        ]
+		if "mu" in param:
+			self.mu = float(param["mu"])
+		if "tau" in param:
+			self.tau = float(param["tau"])
+		if "max_iter" in param:
+			self.max_iter = int(param["max_iter"])
+		if "use_linesearch" in param:
+			self.use_linesearch = bool(param["use_linesearch"])
+		if "use_rounding" in param:
+			self.use_rounding = bool(param["use_rounding"])
 
-    def process(self, image: Array2D) -> Tuple[Array2D, Array2D]:
-        if image is None:
-            raise ValueError('Input image is None.')
-        arr = np.asarray(image)
-        if arr.ndim == 3:
-            arr = arr[..., 0]
-        if arr.ndim != 2:
-            raise ValueError('Expected a 2D grayscale image.')
+	def get_param(self) -> dict:
+		return {
+			"kernel_height": self.kernel_height,
+			"kernel_width": self.kernel_width,
+			"kernel_size": (self.kernel_height, self.kernel_width),
+			"mu": self.mu,
+			"tau": self.tau,
+			"max_iter": self.max_iter,
+			"use_linesearch": self.use_linesearch,
+			"use_rounding": self.use_rounding,
+		}
 
-        original_dtype = arr.dtype
-        float_img = arr.astype(np.float64, copy=False)
-        if float_img.max() > 1.5:
-            float_img = float_img / 255.0
-        float_img = np.clip(float_img, 0.0, 1.0)
+	def process(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+		"""
+		image: BGR uint8
+		Возвращает (изображение-плейсхолдер, оцененное ядро размытия).
+		"""
 
-        rng = np.random.default_rng(self.random_state)
-        patch_size = max(3, self.kernel_size | 1)
-        patches = _extract_patches(float_img, patch_size, self.num_patches, rng)
+		if image.ndim == 3:
+			gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+		else:
+			gray = image
 
-        fft_patches = np.fft.fft2(patches, axes=(0, 1))
-        power_spectrum = np.sum(np.abs(fft_patches) ** 2, axis=2)
-        power_spectrum = power_spectrum / (patch_size ** 2 * patches.shape[2])
-        V = np.power(power_spectrum + 1e-8, -0.5)
-        Y_p = np.fft.ifft2(fft_patches * V[..., np.newaxis], axes=(0, 1))
-        Y_p = np.real(Y_p)
+		gray = gray.astype(np.float64) / 255.0
 
-        Z_init = rng.normal(size=(patch_size, patch_size))
-        Z_init = _normalize(Z_init)
-        opts = {
-            'Z_init': Z_init,
-            'tau': self.step_size,
-            'MaxIter': self.iterations,
-            'islinesearch': self.line_search,
-            'line_tau': 0.1,
-        }
-        objective = _HuberObjective(Y_p, self.mu)
+		if gray.shape != (self.kernel_height, self.kernel_width):
+			gray_small = cv2.resize(
+				gray,
+				(self.kernel_width, self.kernel_height),
+				interpolation=cv2.INTER_AREA,
+			)
+		else:
+			gray_small = gray
+			
+		Y_np = gray_small.reshape(self.kernel_height, self.kernel_width, 1)
+		Y_mat = matlab.double(Y_np.tolist())
+		self._eng.workspace["Y"] = Y_mat
 
-        start = time()
-        Z_est = _grad_descent(objective, opts)
-        kernel_precond = np.real(np.fft.ifft2(V * np.fft.fft2(Z_est)))
-        kernel_est = _project_kernel(kernel_precond)
+		self._eng.workspace["mu"] = float(self.mu)
+		self._eng.workspace["tau"] = float(self.tau)
+		self._eng.workspace["MaxIter"] = float(self.max_iter)
+		self._eng.workspace["use_linesearch"] = bool(self.use_linesearch)
+		self._eng.workspace["use_rounding"] = bool(self.use_rounding)
 
-        restored = _wiener_deconv(float_img, kernel_est, self.regularization)
-        self.timer = time() - start
+		self._eng.eval(
+			"""
+[n1,n2,p] = size(Y);
 
-        if np.issubdtype(original_dtype, np.integer):
-            output = np.clip(restored * 255.0, 0, 255).round().astype(original_dtype)
-        else:
-            output = restored.astype(original_dtype, copy=False)
+% Предобработка данных (как в test_2D.m)
+V = (1/(n1*n2*p) * sum(abs(fft2(Y)).^2, 3)).^(-1/2);
+Y_p = ifft2(bsxfun(@times, fft2(Y), V));
 
-        self._last_kernel = kernel_est
-        self._last_output = output
-        return output, kernel_est
+% Выбор функции потерь (берём Huber, как в примере)
+f = func_huber_2D(Y_p, mu);
 
-    def get_kernel(self) -> Array2D | None:
-        return None if self._last_kernel is None else self._last_kernel.copy()
+% Настройка опций оптимизации
+opts = struct();
+opts.islinesearch = logical(use_linesearch);
+opts.isprint = false;
+opts.tol = 1e-10;
+opts.tau = tau;
+opts.MaxIter = MaxIter;
+opts.rounding = logical(use_rounding);
+opts.NumReinit = 1;
+opts.truth = false;
 
+Z_init = randn(n1, n2);
+opts.Z_init = Z_init / norm(Z_init(:));
 
-__all__ = ['Qingqu06MCSBD']
+% Фаза 1: Riemannian gradient descent
+[Z_r, F_val, Err] = grad_descent_2D(f, opts);
+
+% Фаза 2: rounding (опционально)
+if opts.rounding
+	opts_r = struct();
+	opts_r.MaxIter = 200;
+	R = Z_r;
+	f_l1 = func_l1_2D(Y_p);
+	Z = rounding_2D(f_l1, R, opts_r);
+else
+	Z = Z_r;
+end
+
+% Восстановление ядра (preconditioned Z)
+precond_Z = real(ifft2(V .* fft2(Z)));
+			""",
+			nargout=0,
+		)
+
+		precond_Z_mat = self._eng.workspace["precond_Z"]
+		kernel = np.array(precond_Z_mat, dtype=np.float64)
+
+		kernel = np.maximum(kernel, 0.0)
+		s = kernel.sum()
+		if s > 0:
+			kernel /= s
+
+		restored = image.copy()
+
+		return restored, kernel
+
+	def __del__(self):
+		self._eng.quit()

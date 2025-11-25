@@ -1,0 +1,194 @@
+{
+    "1": {
+        "original_path": "alg_test\\original\\airplane.png",
+        "blurred_path": "alg_test\\blurred\\airplane_convolved_kernel.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\convolved_kernel.png",
+        "filters": "convolved_kernel",
+        "blurred_psnr": 25.985003415695584,
+        "blurred_ssim": 0.8835403153503018,
+        "is_color": false,
+        "restored_paths": {
+            "RobustBlindDeconv": "alg_test\\restored\\airplane_convolved_kernel_RobustBlindDeconv.png"
+        },
+        "algorithm": [
+            "RobustBlindDeconv"
+        ],
+        "kernel_paths": {
+            "RobustBlindDeconv": "alg_test\\restored_kernel\\airplane_convolved_kernel_RobustBlindDeconv_kernel.png"
+        },
+        "psnr": {
+            "RobustBlindDeconv": 13.565274987116538
+        },
+        "ssim": {
+            "RobustBlindDeconv": NaN
+        }
+    },
+    "2": {
+        "original_path": "alg_test\\original\\airplane.png",
+        "blurred_path": "alg_test\\blurred\\airplane_defocusdisk.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\defocusdisk.png",
+        "filters": "defocusdisk",
+        "blurred_psnr": 32.570606355129435,
+        "blurred_ssim": 0.948352878724055,
+        "is_color": false,
+        "restored_paths": {
+            "RobustBlindDeconv": "alg_test\\restored\\airplane_defocusdisk_RobustBlindDeconv.png"
+        },
+        "algorithm": [
+            "RobustBlindDeconv"
+        ],
+        "kernel_paths": {
+            "RobustBlindDeconv": "alg_test\\restored_kernel\\airplane_defocusdisk_RobustBlindDeconv_kernel.png"
+        },
+        "psnr": {
+            "RobustBlindDeconv": 13.298177215904246
+        },
+        "ssim": {
+            "RobustBlindDeconv": NaN
+        }
+    },
+    "3": {
+        "original_path": "alg_test\\original\\airplane.png",
+        "blurred_path": "alg_test\\blurred\\airplane_defocusgaussian.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\defocusgaussian.png",
+        "filters": "defocusgaussian",
+        "blurred_psnr": 33.383421415023456,
+        "blurred_ssim": 0.9559291822227306,
+        "is_color": false,
+        "restored_paths": {
+            "RobustBlindDeconv": "alg_test\\restored\\airplane_defocusgaussian_RobustBlindDeconv.png"
+        },
+        "algorithm": [
+            "RobustBlindDeconv"
+        ],
+        "kernel_paths": {
+            "RobustBlindDeconv": "alg_test\\restored_kernel\\airplane_defocusgaussian_RobustBlindDeconv_kernel.png"
+        },
+        "psnr": {
+            "RobustBlindDeconv": 13.252422750249409
+        },
+        "ssim": {
+            "RobustBlindDeconv": NaN
+        }
+    },
+    "4": {
+        "original_path": "alg_test\\original\\airplane.png",
+        "blurred_path": "alg_test\\blurred\\airplane_defocusring.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\defocusring.png",
+        "filters": "defocusring",
+        "blurred_psnr": 30.055102490741568,
+        "blurred_ssim": 0.9203933237738084,
+        "is_color": false,
+        "restored_paths": {
+            "RobustBlindDeconv": "alg_test\\restored\\airplane_defocusring_RobustBlindDeconv.png"
+        },
+        "algorithm": [
+            "RobustBlindDeconv"
+        ],
+        "kernel_paths": {
+            "RobustBlindDeconv": "alg_test\\restored_kernel\\airplane_defocusring_RobustBlindDeconv_kernel.png"
+        },
+        "psnr": {
+            "RobustBlindDeconv": 13.422120535174745
+        },
+        "ssim": {
+            "RobustBlindDeconv": NaN
+        }
+    },
+    "5": {
+        "original_path": "alg_test\\original\\airplane.png",
+        "blurred_path": "alg_test\\blurred\\airplane_motionbsplinesimplecurve.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\motionbsplinesimplecurve.png",
+        "filters": "motionbsplinesimplecurve",
+        "blurred_psnr": 26.46186429938238,
+        "blurred_ssim": 0.8855307365158887,
+        "is_color": false,
+        "restored_paths": {
+            "RobustBlindDeconv": "alg_test\\restored\\airplane_motionbsplinesimplecurve_RobustBlindDeconv.png"
+        },
+        "algorithm": [
+            "RobustBlindDeconv"
+        ],
+        "kernel_paths": {
+            "RobustBlindDeconv": "alg_test\\restored_kernel\\airplane_motionbsplinesimplecurve_RobustBlindDeconv_kernel.png"
+        },
+        "psnr": {
+            "RobustBlindDeconv": 13.340762431614701
+        },
+        "ssim": {
+            "RobustBlindDeconv": NaN
+        }
+    },
+    "6": {
+        "original_path": "alg_test\\original\\airplane.png",
+        "blurred_path": "alg_test\\blurred\\airplane_motionlinearexp.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\motionlinearexp.png",
+        "filters": "motionlinearexp",
+        "blurred_psnr": 30.28335745556857,
+        "blurred_ssim": 0.9312849418114386,
+        "is_color": false,
+        "restored_paths": {
+            "RobustBlindDeconv": "alg_test\\restored\\airplane_motionlinearexp_RobustBlindDeconv.png"
+        },
+        "algorithm": [
+            "RobustBlindDeconv"
+        ],
+        "kernel_paths": {
+            "RobustBlindDeconv": "alg_test\\restored_kernel\\airplane_motionlinearexp_RobustBlindDeconv_kernel.png"
+        },
+        "psnr": {
+            "RobustBlindDeconv": 13.38749635917903
+        },
+        "ssim": {
+            "RobustBlindDeconv": NaN
+        }
+    },
+    "7": {
+        "original_path": "alg_test\\original\\airplane.png",
+        "blurred_path": "alg_test\\blurred\\airplane_motionlinearuniform.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\motionlinearuniform.png",
+        "filters": "motionlinearuniform",
+        "blurred_psnr": 28.155176453753995,
+        "blurred_ssim": 0.9156365242118195,
+        "is_color": false,
+        "restored_paths": {
+            "RobustBlindDeconv": "alg_test\\restored\\airplane_motionlinearuniform_RobustBlindDeconv.png"
+        },
+        "algorithm": [
+            "RobustBlindDeconv"
+        ],
+        "kernel_paths": {
+            "RobustBlindDeconv": "alg_test\\restored_kernel\\airplane_motionlinearuniform_RobustBlindDeconv_kernel.png"
+        },
+        "psnr": {
+            "RobustBlindDeconv": 13.352583629331104
+        },
+        "ssim": {
+            "RobustBlindDeconv": NaN
+        }
+    },
+    "8": {
+        "original_path": "alg_test\\original\\airplane.png",
+        "blurred_path": "alg_test\\blurred\\airplane_stretched_gaussian_kernel.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\stretched_gaussian_kernel.png",
+        "filters": "stretched_gaussian_kernel",
+        "blurred_psnr": 28.91749231341713,
+        "blurred_ssim": 0.9161679714554399,
+        "is_color": false,
+        "restored_paths": {
+            "RobustBlindDeconv": "alg_test\\restored\\airplane_stretched_gaussian_kernel_RobustBlindDeconv.png"
+        },
+        "algorithm": [
+            "RobustBlindDeconv"
+        ],
+        "kernel_paths": {
+            "RobustBlindDeconv": "alg_test\\restored_kernel\\airplane_stretched_gaussian_kernel_RobustBlindDeconv_kernel.png"
+        },
+        "psnr": {
+            "RobustBlindDeconv": 13.395784592702178
+        },
+        "ssim": {
+            "RobustBlindDeconv": NaN
+        }
+    }
+}
