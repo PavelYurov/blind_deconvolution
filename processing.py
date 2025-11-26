@@ -1039,11 +1039,11 @@ class Processing:
             print(f"Pass: Unable to load image for {img_obj.get_original()}")
             return
     
-        try:
-            restored_image, kernel = algorithm_processor.process(blurred_image)
-        except Exception as e:
-            print(f"Restore error {img_obj.get_original()}: {e}")
-            return
+        # try:
+        restored_image, kernel = algorithm_processor.process(blurred_image)
+        # except Exception as e:
+        #     print(f"Restore error {img_obj.get_original()}: {e}")
+        #     return
         
         restored_path, kernel_path = self._generate_output_paths(img_obj, alg_name, unique_path=unique_path)
         
@@ -1085,7 +1085,7 @@ class Processing:
             restored_path =self.folder_path_restored / f"{base_name}_{alg_name}{base_path.suffix}"
             
             # kernel_path = self.folder_path_restored / f"{base_name}_{alg_name}_kernel{base_path.suffix}"
-            
+
             kernel_path = self.kernel_dir / f"{base_name}_{alg_name}_kernel{base_path.suffix}"
         
         return restored_path, kernel_path
@@ -1095,6 +1095,8 @@ class Processing:
         '''
         Расчет метрик и обновление данных изображения
         '''
+        original_image = self._prepare_image_for_metric(original_image)
+        restored_image = self._prepare_image_for_metric(restored_image)
         try:
             psnr_val = metrics.PSNR(original_image, restored_image)
         except Exception as e:
@@ -1102,7 +1104,7 @@ class Processing:
             psnr_val = math.nan
         
         try:
-            ssim_val = metrics.SSIM(original_image, restored_image)
+            ssim_val = metrics.SSIM(original_image, restored_image,data_range=1.0)
         except Exception as e:
             print(f"SSIM calculation error: {e}")
             ssim_val = math.nan
@@ -1136,9 +1138,26 @@ class Processing:
             with open(metadata_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
 
+        print(f"Restored: {Path(restored_path).name} (PSNR: {psnr_val:.2f}, SSIM: {ssim_val:.4f})")
+
+    def _prepare_image_for_metric(self, image):
+        """
+        Подготовка изображения для расчета метрик с нормализацией
+        """
+        image = np.array(image.copy(), dtype=np.float32)
 
         
-        print(f"Restored: {Path(restored_path).name} (PSNR: {psnr_val:.2f}, SSIM: {ssim_val:.4f})")
+        # Нормализуем в диапазон [0, 1] если нужно
+        if image.max() > 1.0:
+            image = image / 255.0
+
+        if len(image.shape) == 3:
+            # image = np.dot(image[...,:3], [1.0, 0.0, 0.0])
+            image = image.mean(axis=2)
+        
+        image = np.clip(image, 0.0, 1.0)
+        
+        return image
 
     def full_process(self, filters: list, methods: list, size: float = 0.75, kernel_intencity_scale = 10.0):
         '''

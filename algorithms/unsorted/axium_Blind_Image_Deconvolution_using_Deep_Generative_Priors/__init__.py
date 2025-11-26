@@ -10,11 +10,11 @@ from typing import Any, Dict, Tuple
 import cv2
 import numpy as np
 
-from ..base import DeconvolutionAlgorithm
+from ...base import DeconvolutionAlgorithm
 
 
 # SOURCE_ROOT = Path(__file__).resolve().parent / 'source'
-SOURCE_ROOT = Path('.source')
+SOURCE_ROOT = Path('source')
 
 KERAS_BACKEND_ENV = 'KERAS_BACKEND'
 
@@ -104,19 +104,19 @@ class AxiumBlindImageDeconvolutionUsingDeepGenerativePriors(DeconvolutionAlgorit
         except ImportError as exc:  # pragma: no cover - dependency missing
             raise ImportError('TensorFlow 2.17+ is required for AxiumBlindImageDeconvolutionUsingDeepGenerativePriors.') from exc
 
-        from source.generators.CelebAGenerator import CelebAGenerator
-        from source.generators.MotionBlurGenerator import MotionBlur
+        from .source.generators.CelebAGenerator import CelebAGenerator
+        from .source.generators.MotionBlurGenerator import MotionBlur
 
         image_gen = CelebAGenerator()
-        image_gen.weights_path = str(SOURCE_ROOT / 'model weights' / 'celeba.h5')
-        # image_gen.weights_path = str('source' / 'model weights' / 'celeba.h5')
+        # image_gen.weights_path = str(SOURCE_ROOT / 'model weights' / 'celeba.h5')
+        image_gen.weights_path = str(Path('source') / 'model weights' / 'celeba.h5')
 
         image_gen.GenerateModel()
         image_gen.LoadWeights()
 
         blur_gen = MotionBlur()
-        blur_gen.weights_path = str(SOURCE_ROOT / 'model weights' / 'motionblur.h5')
-        # blur_gen.weights_path = str('source' / 'model weights' / 'motionblur.h5')
+        # blur_gen.weights_path = str(SOURCE_ROOT / 'model weights' / 'motionblur.h5')
+        blur_gen.weights_path = str(Path('source') / 'model weights' / 'motionblur.h5')
 
         blur_gen.GenerateModel()
         blur_gen.LoadWeights()

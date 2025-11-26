@@ -64,8 +64,8 @@ class PoissonNoise(FilterBase):
         Аргументы:
             param: Интенсивность шума (от 0.0 до 1.0)
         """
-        if param <= 0 or param > 1.0:
-            raise ValueError("Интенсивность должна быть в диапазоне (0.0, 1.0]")
+        # if param <= 0 or param > 1.0:
+        #     raise ValueError("Интенсивность должна быть в диапазоне (0.0, 1.0]")
         super().__init__(param, 'noise')
         self.param = param
 
@@ -82,7 +82,8 @@ class PoissonNoise(FilterBase):
         Возвращает:
             Зашумленное изображение (той же формы и типа, что и входное)
         """
-        noisy = image + np.random.poisson(image / 255.0 * self.param) / self.param*255.0
+        # noisy = image + np.round(np.random.poisson(image * self.param))
+        noisy = image + np.sqrt(image) * np.random.normal(0, 1, image.shape) * self.param
         return np.clip(noisy, 0, 255).astype(image.dtype)
     
 class SaltAndPepperNoise(FilterBase):

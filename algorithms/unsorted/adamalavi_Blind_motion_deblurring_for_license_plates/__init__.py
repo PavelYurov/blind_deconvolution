@@ -11,7 +11,7 @@ import cv2
 import numpy as np
 from IPython.display import display
 
-from ..base import DeconvolutionAlgorithm
+from ...base import DeconvolutionAlgorithm
 
 Array2D = np.ndarray
 

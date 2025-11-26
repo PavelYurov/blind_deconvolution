@@ -5,7 +5,7 @@ from typing import Any, Dict, Tuple
 
 import numpy as np
 
-from ..base import DeconvolutionAlgorithm
+from ...base import DeconvolutionAlgorithm
 
 from .source.run import update_gamma, update_qx, update_theta
 

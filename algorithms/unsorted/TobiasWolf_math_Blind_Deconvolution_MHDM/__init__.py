@@ -5,7 +5,7 @@ from typing import Any, Dict, Iterable, Optional, Sequence, Tuple
 
 import numpy as np
 
-from ..base import DeconvolutionAlgorithm
+from ...base import DeconvolutionAlgorithm
 
 Array2D = np.ndarray
 KernelSpec = Tuple[int, int]

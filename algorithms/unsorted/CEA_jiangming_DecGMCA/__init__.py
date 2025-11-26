@@ -5,7 +5,7 @@ from typing import Any, Optional, Tuple
 
 import numpy as np
 
-from ..base import DeconvolutionAlgorithm
+from ...base import DeconvolutionAlgorithm
 from .source.pyDecGMCA.algoDecG import DecGMCA
 
 Array2D = np.ndarray

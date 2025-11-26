@@ -115,3 +115,21 @@ class Wavelet(FilterBase):
         sigma_est = estimate_sigma(image, channel_axis=-1, average_sigmas=True)
         denoised_image = denoise_wavelet(image,method=self.method,mode=self.mode,rescale_sigma=self.rescale_sigma, sigma=sigma_est)*255
         return np.clip(denoised_image,0.0,255.0).astype(image.dtype)
+    
+class BilateralFilter(FilterBase):
+    pass
+
+class TV_bregman(FilterBase):
+    pass
+
+class TV_Chambolle(FilterBase):
+    pass
+
+class WienerFilter(FilterBase):
+    pass
+
+
+
+
+
+

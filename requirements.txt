@@ -44,3 +44,4 @@ torchvision
 tqdm
 visdom
 wget
+pypher

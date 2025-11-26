@@ -118,6 +118,7 @@ kernels/
 parametrs/
 results/
 dataset_blurred/
+alg_test/
 
 # Прочие файлы
 benchmark_generation.ipynb
