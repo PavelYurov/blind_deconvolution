@@ -1,230 +1,208 @@
-from __future__ import annotations
-
-from time import time
-from typing import Any, Dict, Iterable, Tuple, Union
-
+import os
+import cv2
 import numpy as np
-from skimage.restoration import richardson_lucy, wiener
+import matlab.engine
+from typing import Literal
 
-from ..base import DeconvolutionAlgorithm
+from algorithms.base import DeconvolutionAlgorithm
 
-KernelSpec = Union[int, Tuple[int, int], Iterable[int]]
+SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "source")
 
-
-def _normalize_kernel_shape(spec: KernelSpec) -> Tuple[int, int]:
-    if isinstance(spec, int):
-        if spec <= 0:
-            raise ValueError("Kernel size must be positive.")
-        return (spec, spec)
-
-    try:
-        values = tuple(int(v) for v in spec)  # type: ignore[arg-type]
-    except TypeError as exc:  # pragma: no cover - invalid types
-        raise ValueError("Unsupported kernel size specification.") from exc
-
-    if len(values) == 0:
-        raise ValueError("Kernel size can not be empty.")
-    if len(values) == 1:
-        return _normalize_kernel_shape(values[0])
-
-    h, w = values[:2]
-    if h <= 0 or w <= 0:
-        raise ValueError("Kernel dimensions must be positive.")
-    return (h, w)
-
-
-def _gaussian_kernel(shape: Tuple[int, int], sigma: float) -> np.ndarray:
-    if sigma <= 0:
-        raise ValueError("Gaussian sigma must be positive.")
-
-    h, w = shape
-    y = np.arange(h, dtype=np.float32) - (h - 1) / 2.0
-    x = np.arange(w, dtype=np.float32) - (w - 1) / 2.0
-    yy, xx = np.meshgrid(y, x, indexing="ij")
-    kernel = np.exp(-(xx**2 + yy**2) / (2.0 * float(sigma) ** 2))
-    kernel_sum = float(kernel.sum())
-    if kernel_sum == 0.0:
-        raise ValueError("Gaussian kernel sum can not be zero.")
-    kernel /= kernel_sum
-    return kernel.astype(np.float32, copy=False)
-
-
-def _prepare_image(image: np.ndarray) -> Tuple[np.ndarray, np.dtype, float]:
-    if image.ndim not in (2, 3):
-        raise ValueError("Expected a grayscale or RGB image array.")
-
-    original_dtype = image.dtype
-    working = image.astype(np.float32, copy=False)
-    scale = 255.0 if working.max(initial=0.0) > 1.5 else 1.0
-    if scale != 1.0:
-        working /= scale
-    working = np.clip(working, 0.0, 1.0)
-    return working, original_dtype, scale
-
-
-def _restore_dtype(image: np.ndarray, dtype: np.dtype, scale: float) -> np.ndarray:
-    clipped = np.clip(image, 0.0, 1.0)
-    if np.issubdtype(dtype, np.integer):
-        restored = (clipped * scale).round().astype(dtype)
-    else:
-        restored = clipped.astype(dtype, copy=False)
-    return restored
+KERNEL_PLACEHOLDER = np.array([[0.0]])
 
 
 class MuhammadhamzaazharImageEnhancementFilters(DeconvolutionAlgorithm):
-    """Wiener deconvolution with a Gaussian point spread function."""
+	def __init__(
+		self,
+		method: Literal["blind", "lucy", "wiener"] = "blind",
+		# общие параметры для гауссовского ядра
+		psf_size: int = 7,
+		psf_sigma: float = 10.0,
+		# Lucy-Richardson
+		lucy_iterations: int = 10,
+		lucy_noise_variance: float = 0.001,
+		# Wiener
+		wiener_psf_size: int = 5,
+		wiener_psf_sigma: float = 10.0,
+		wiener_noise_variance: float = 0.01,
+	):
+		self._eng = matlab.engine.start_matlab()
+		self._eng.addpath(self._eng.genpath(SOURCE_PATH), nargout=0)
+		self._eng.cd(SOURCE_PATH, nargout=0)
 
-    def __init__(
-        self,
-        kernel_size: KernelSpec = 5,
-        sigma: float = 1.5,
-        balance: float = 0.01,
-        clip: bool = True,
-    ) -> None:
-        super().__init__("WienerFilter")
-        self.kernel_shape = _normalize_kernel_shape(kernel_size)
-        self.sigma = float(sigma)
-        self.balance = float(balance)
-        self.clip = bool(clip)
-        self._psf_cache: np.ndarray | None = None
+		self.method = method
 
-    def change_param(self, param: Dict[str, Any]):
-        if not isinstance(param, dict):
-            return super().change_param(param)
+		self.psf_size = int(psf_size)
+		self.psf_sigma = float(psf_sigma)
 
-        if "kernel_size" in param and param["kernel_size"] is not None:
-            self.kernel_shape = _normalize_kernel_shape(param["kernel_size"])
-            self._psf_cache = None
-        if "kernel_shape" in param and param["kernel_shape"] is not None:
-            self.kernel_shape = _normalize_kernel_shape(param["kernel_shape"])
-            self._psf_cache = None
-        if "sigma" in param and param["sigma"] is not None:
-            self.sigma = float(param["sigma"])
-            self._psf_cache = None
-        if "balance" in param and param["balance"] is not None:
-            self.balance = float(param["balance"])
-        if "clip" in param and param["clip"] is not None:
-            self.clip = bool(param["clip"])
+		self.lucy_iterations = int(lucy_iterations)
+		self.lucy_noise_variance = float(lucy_noise_variance)
 
-        return super().change_param(param)
+		self.wiener_psf_size = int(wiener_psf_size)
+		self.wiener_psf_sigma = float(wiener_psf_sigma)
+		self.wiener_noise_variance = float(wiener_noise_variance)
 
-    def _psf(self) -> np.ndarray:
-        if self._psf_cache is None:
-            self._psf_cache = _gaussian_kernel(self.kernel_shape, self.sigma)
-        return self._psf_cache
+	def change_param(self, param):
+		if "method" in param:
+			self.method = param["method"]
 
-    def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        working, dtype, scale = _prepare_image(np.asarray(image))
-        psf = self._psf()
+		if "psf_size" in param:
+			self.psf_size = int(param["psf_size"])
 
-        start = time()
-        if working.ndim == 2:
-            restored = wiener(working, psf, balance=self.balance, clip=self.clip)
-        else:
-            channels = [
-                wiener(working[..., c], psf, balance=self.balance, clip=self.clip)
-                for c in range(working.shape[2])
-            ]
-            restored = np.stack(channels, axis=2)
-        self.timer = time() - start
+		if "psf_sigma" in param:
+			self.psf_sigma = float(param["psf_sigma"])
 
-        restored = restored.astype(np.float32, copy=False)
-        output = _restore_dtype(restored, dtype, scale)
-        return output, psf.copy()
+		if "lucy_iterations" in param:
+			self.lucy_iterations = int(param["lucy_iterations"])
 
-    def get_param(self):
-        return [
-            ("kernel_shape", self.kernel_shape),
-            ("sigma", self.sigma),
-            ("balance", self.balance),
-            ("clip", self.clip),
-        ]
+		if "lucy_noise_variance" in param:
+			self.lucy_noise_variance = float(param["lucy_noise_variance"])
 
+		if "wiener_psf_size" in param:
+			self.wiener_psf_size = int(param["wiener_psf_size"])
 
-class MuhammadhamzaazharImageEnhancementFiltersRichardsonLucy(DeconvolutionAlgorithm):
-    """Richardson-Lucy deconvolution with a Gaussian point spread function."""
+		if "wiener_psf_sigma" in param:
+			self.wiener_psf_sigma = float(param["wiener_psf_sigma"])
 
-    def __init__(
-        self,
-        kernel_size: KernelSpec = 5,
-        sigma: float = 1.5,
-        iterations: int = 20,
-        clip: bool = True,
-        filter_epsilon: float = 1e-7,
-    ) -> None:
-        super().__init__("RichardsonLucy")
-        self.kernel_shape = _normalize_kernel_shape(kernel_size)
-        self.sigma = float(sigma)
-        self.iterations = int(iterations)
-        self.clip = bool(clip)
-        self.filter_epsilon = float(filter_epsilon)
-        self._psf_cache: np.ndarray | None = None
+		if "wiener_noise_variance" in param:
+			self.wiener_noise_variance = float(param["wiener_noise_variance"])
 
-    def change_param(self, param: Dict[str, Any]):
-        if not isinstance(param, dict):
-            return super().change_param(param)
+	def get_param(self):
+		return {
+			"method": self.method,
+			"psf_size": self.psf_size,
+			"psf_sigma": self.psf_sigma,
+			"lucy_iterations": self.lucy_iterations,
+			"lucy_noise_variance": self.lucy_noise_variance,
+			"wiener_psf_size": self.wiener_psf_size,
+			"wiener_psf_sigma": self.wiener_psf_sigma,
+			"wiener_noise_variance": self.wiener_noise_variance,
+		}
 
-        if "kernel_size" in param and param["kernel_size"] is not None:
-            self.kernel_shape = _normalize_kernel_shape(param["kernel_size"])
-            self._psf_cache = None
-        if "kernel_shape" in param and param["kernel_shape"] is not None:
-            self.kernel_shape = _normalize_kernel_shape(param["kernel_shape"])
-            self._psf_cache = None
-        if "sigma" in param and param["sigma"] is not None:
-            self.sigma = float(param["sigma"])
-            self._psf_cache = None
-        if "iterations" in param and param["iterations"] is not None:
-            self.iterations = int(param["iterations"])
-        if "clip" in param and param["clip"] is not None:
-            self.clip = bool(param["clip"])
-        if "filter_epsilon" in param and param["filter_epsilon"] is not None:
-            self.filter_epsilon = float(param["filter_epsilon"])
+	def _prepare_image_gray(self, image: np.ndarray) -> np.ndarray:
+		if image.ndim == 3:
+			image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+		image = image.astype(np.float64) / 255.0
+		return image
 
-        return super().change_param(param)
+	def process(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+		"""
+		image: cv2.COLOR_BGR2RGB извне, но здесь приводим к градациям серого.
+		Возвращает (восстановленное BGR, PSF/ядро).
+		"""
+		if self.method == "blind":
+			return self._process_blind(image)
+		elif self.method == "lucy":
+			return self._process_lucy(image)
+		elif self.method == "wiener":
+			return self._process_wiener(image)
+		else:
+			raise ValueError("Wrrong method: ",self.method)
 
-    def _psf(self) -> np.ndarray:
-        if self._psf_cache is None:
-            self._psf_cache = _gaussian_kernel(self.kernel_shape, self.sigma)
-        return self._psf_cache
+	def _process_blind(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+		# В исходном Blind Deconvolution.m:
+		# PSF = fspecial("gaussian", 7, 10);
+		image_gray = self._prepare_image_gray(image)
 
-    def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        working, dtype, scale = _prepare_image(np.asarray(image))
-        psf = self._psf()
+		I_mat = matlab.double(image_gray.tolist())
+		self._eng.workspace["I"] = I_mat
+		self._eng.workspace["psf_size"] = float(self.psf_size)
+		self._eng.workspace["psf_sigma"] = float(self.psf_sigma)
 
-        start = time()
-        if working.ndim == 2:
-            restored = richardson_lucy(
-                working,
-                psf,
-                self.iterations,
-                clip=self.clip,
-                filter_epsilon=self.filter_epsilon,
-            )
-        else:
-            channels = [
-                richardson_lucy(
-                    working[..., c],
-                    psf,
-                    self.iterations,
-                    clip=self.clip,
-                    filter_epsilon=self.filter_epsilon,
-                )
-                for c in range(working.shape[2])
-            ]
-            restored = np.stack(channels, axis=2)
-        self.timer = time() - start
+		# создаём начальный гауссовский PSF
+		self._eng.eval(
+			"PSF = fspecial('gaussian', [psf_size psf_size], psf_sigma);",
+			nargout=0,
+		)
 
-        restored = restored.astype(np.float32, copy=False)
-        output = _restore_dtype(restored, dtype, scale)
-        return output, psf.copy()
+		# используем deconvblind как в примере warrenzha, но с нашим PSF
+		self._eng.eval("[J, PSF_rec] = deconvblind(I, PSF);", nargout=0)
 
-    def get_param(self):
-        return [
-            ("kernel_shape", self.kernel_shape),
-            ("sigma", self.sigma),
-            ("iterations", self.iterations),
-            ("clip", self.clip),
-            ("filter_epsilon", self.filter_epsilon),
-        ]
+		J_mat = self._eng.workspace["J"]
+		PSF_rec_mat = self._eng.workspace["PSF_rec"]
 
-__all__ = ["MuhammadhamzaazharImageEnhancementFilters", "MuhammadhamzaazharImageEnhancementFiltersRichardsonLucy"]
+		J_np = np.array(J_mat, dtype=np.float64)
+		J_np = np.clip(J_np, 0.0, 1.0)
+		J_uint8 = (J_np * 255.0).astype(np.uint8)
+
+		# приведение к BGR
+		J_rgb = cv2.cvtColor(J_uint8, cv2.COLOR_GRAY2RGB)
+		J_bgr = cv2.cvtColor(J_rgb, cv2.COLOR_RGB2BGR)
+
+		kernel = np.array(PSF_rec_mat, dtype=np.float64)
+
+		return J_bgr, kernel
+
+	def _process_lucy(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+		# В исходном Lucy Richardson.m:
+		# PSF = fspecial("gaussian", 5, 5);
+		# BlurredNoisy = imnoise(Blurred, "gaussian", 0, V);
+		# luc1 = deconvlucy(BlurredNoisy, PSF, 10);
+		image_gray = self._prepare_image_gray(image)
+
+		I_mat = matlab.double(image_gray.tolist())
+		self._eng.workspace["I"] = I_mat
+
+		self._eng.workspace["psf_size"] = float(self.psf_size)
+		self._eng.workspace["psf_sigma"] = float(self.psf_sigma)
+		self._eng.workspace["V"] = float(self.lucy_noise_variance)
+		self._eng.workspace["NUMIT"] = float(self.lucy_iterations)
+
+		self._eng.eval(
+			"PSF = fspecial('gaussian', [psf_size psf_size], psf_sigma);",
+			nargout=0,
+		)
+		self._eng.eval("Blurred = imfilter(I, PSF, 'symmetric', 'conv');", nargout=0)
+		self._eng.eval("BlurredNoisy = imnoise(Blurred, 'gaussian', 0, V);", nargout=0)
+		self._eng.eval("luc1 = deconvlucy(BlurredNoisy, PSF, NUMIT);", nargout=0)
+
+		luc_mat = self._eng.workspace["luc1"]
+		luc_np = np.array(luc_mat, dtype=np.float64)
+		luc_np = np.clip(luc_np, 0.0, 1.0)
+		luc_uint8 = (luc_np * 255.0).astype(np.uint8)
+
+		luc_rgb = cv2.cvtColor(luc_uint8, cv2.COLOR_GRAY2RGB)
+		luc_bgr = cv2.cvtColor(luc_rgb, cv2.COLOR_RGB2BGR)
+
+		return luc_bgr, KERNEL_PLACEHOLDER
+
+	def _process_wiener(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+		# В исходном Weiner.m используется FFT и явная формула.
+		# Здесь — укороченная версия, повторяющая структуру.
+		image_gray = self._prepare_image_gray(image)
+
+		I_mat = matlab.double(image_gray.tolist())
+		self._eng.workspace["originalImage"] = I_mat
+
+		self._eng.workspace["psf_size"] = float(self.wiener_psf_size)
+		self._eng.workspace["psf_sigma"] = float(self.wiener_psf_sigma)
+		self._eng.workspace["noise_var"] = float(self.wiener_noise_variance)
+
+		self._eng.eval(
+			"h = fspecial('gaussian', [psf_size psf_size], psf_sigma);",
+			nargout=0,
+		)
+		self._eng.eval(
+			"im_blurred = imfilter(originalImage, h, 'conv', 'symmetric');",
+			nargout=0,
+		)
+		self._eng.eval(
+			"im_blur = imnoise(im_blurred, 'gaussian', 0, noise_var);",
+			nargout=0,
+		)
+
+		# Используем встроенный wiener2 как приближение
+		self._eng.eval("restoredImage = deconvwnr(im_blur, h);", nargout=0)
+
+		restored_mat = self._eng.workspace["restoredImage"]
+		restored_np = np.array(restored_mat, dtype=np.float64)
+		restored_np = np.clip(restored_np, 0.0, 1.0)
+		restored_uint8 = (restored_np * 255.0).astype(np.uint8)
+
+		restored_rgb = cv2.cvtColor(restored_uint8, cv2.COLOR_GRAY2RGB)
+		restored_bgr = cv2.cvtColor(restored_rgb, cv2.COLOR_RGB2BGR)
+
+		return restored_bgr, KERNEL_PLACEHOLDER
+
+	def __del__(self):
+		self._eng.quit()

@@ -1,0 +1,194 @@
+{
+    "1": {
+        "original_path": "alg_test\\original\\lenna.png",
+        "blurred_path": "alg_test\\blurred\\lenna_convolved_kernel.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\convolved_kernel.png",
+        "filters": "convolved_kernel",
+        "blurred_psnr": 20.823176396520132,
+        "blurred_ssim": 0.5485270914324397,
+        "is_color": false,
+        "restored_paths": {
+            "LowRankBlindDeconvolution": "alg_test\\restored\\lenna_convolved_kernel_LowRankBlindDeconvolution.png"
+        },
+        "algorithm": [
+            "LowRankBlindDeconvolution"
+        ],
+        "kernel_paths": {
+            "LowRankBlindDeconvolution": "alg_test\\restored_kernel\\lenna_convolved_kernel_LowRankBlindDeconvolution_kernel.png"
+        },
+        "psnr": {
+            "LowRankBlindDeconvolution": 14.902961543643933
+        },
+        "ssim": {
+            "LowRankBlindDeconvolution": NaN
+        }
+    },
+    "2": {
+        "original_path": "alg_test\\original\\lenna.png",
+        "blurred_path": "alg_test\\blurred\\lenna_defocusdisk.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\defocusdisk.png",
+        "filters": "defocusdisk",
+        "blurred_psnr": 27.316651198591376,
+        "blurred_ssim": 0.7632817594865444,
+        "is_color": false,
+        "restored_paths": {
+            "LowRankBlindDeconvolution": "alg_test\\restored\\lenna_defocusdisk_LowRankBlindDeconvolution.png"
+        },
+        "algorithm": [
+            "LowRankBlindDeconvolution"
+        ],
+        "kernel_paths": {
+            "LowRankBlindDeconvolution": "alg_test\\restored_kernel\\lenna_defocusdisk_LowRankBlindDeconvolution_kernel.png"
+        },
+        "psnr": {
+            "LowRankBlindDeconvolution": 14.752002963097992
+        },
+        "ssim": {
+            "LowRankBlindDeconvolution": NaN
+        }
+    },
+    "3": {
+        "original_path": "alg_test\\original\\lenna.png",
+        "blurred_path": "alg_test\\blurred\\lenna_defocusgaussian.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\defocusgaussian.png",
+        "filters": "defocusgaussian",
+        "blurred_psnr": 28.140852021950373,
+        "blurred_ssim": 0.7946713101152851,
+        "is_color": false,
+        "restored_paths": {
+            "LowRankBlindDeconvolution": "alg_test\\restored\\lenna_defocusgaussian_LowRankBlindDeconvolution.png"
+        },
+        "algorithm": [
+            "LowRankBlindDeconvolution"
+        ],
+        "kernel_paths": {
+            "LowRankBlindDeconvolution": "alg_test\\restored_kernel\\lenna_defocusgaussian_LowRankBlindDeconvolution_kernel.png"
+        },
+        "psnr": {
+            "LowRankBlindDeconvolution": 14.826261743867198
+        },
+        "ssim": {
+            "LowRankBlindDeconvolution": NaN
+        }
+    },
+    "4": {
+        "original_path": "alg_test\\original\\lenna.png",
+        "blurred_path": "alg_test\\blurred\\lenna_defocusring.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\defocusring.png",
+        "filters": "defocusring",
+        "blurred_psnr": 24.606641192398712,
+        "blurred_ssim": 0.6492125491610778,
+        "is_color": false,
+        "restored_paths": {
+            "LowRankBlindDeconvolution": "alg_test\\restored\\lenna_defocusring_LowRankBlindDeconvolution.png"
+        },
+        "algorithm": [
+            "LowRankBlindDeconvolution"
+        ],
+        "kernel_paths": {
+            "LowRankBlindDeconvolution": "alg_test\\restored_kernel\\lenna_defocusring_LowRankBlindDeconvolution_kernel.png"
+        },
+        "psnr": {
+            "LowRankBlindDeconvolution": 15.327073259417789
+        },
+        "ssim": {
+            "LowRankBlindDeconvolution": NaN
+        }
+    },
+    "5": {
+        "original_path": "alg_test\\original\\lenna.png",
+        "blurred_path": "alg_test\\blurred\\lenna_motionbsplinesimplecurve.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\motionbsplinesimplecurve.png",
+        "filters": "motionbsplinesimplecurve",
+        "blurred_psnr": 21.5603931640557,
+        "blurred_ssim": 0.5810982381228439,
+        "is_color": false,
+        "restored_paths": {
+            "LowRankBlindDeconvolution": "alg_test\\restored\\lenna_motionbsplinesimplecurve_LowRankBlindDeconvolution.png"
+        },
+        "algorithm": [
+            "LowRankBlindDeconvolution"
+        ],
+        "kernel_paths": {
+            "LowRankBlindDeconvolution": "alg_test\\restored_kernel\\lenna_motionbsplinesimplecurve_LowRankBlindDeconvolution_kernel.png"
+        },
+        "psnr": {
+            "LowRankBlindDeconvolution": 14.688075075836737
+        },
+        "ssim": {
+            "LowRankBlindDeconvolution": NaN
+        }
+    },
+    "6": {
+        "original_path": "alg_test\\original\\lenna.png",
+        "blurred_path": "alg_test\\blurred\\lenna_motionlinearexp.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\motionlinearexp.png",
+        "filters": "motionlinearexp",
+        "blurred_psnr": 25.24568836266244,
+        "blurred_ssim": 0.7268787977929133,
+        "is_color": false,
+        "restored_paths": {
+            "LowRankBlindDeconvolution": "alg_test\\restored\\lenna_motionlinearexp_LowRankBlindDeconvolution.png"
+        },
+        "algorithm": [
+            "LowRankBlindDeconvolution"
+        ],
+        "kernel_paths": {
+            "LowRankBlindDeconvolution": "alg_test\\restored_kernel\\lenna_motionlinearexp_LowRankBlindDeconvolution_kernel.png"
+        },
+        "psnr": {
+            "LowRankBlindDeconvolution": 15.325152486594478
+        },
+        "ssim": {
+            "LowRankBlindDeconvolution": NaN
+        }
+    },
+    "7": {
+        "original_path": "alg_test\\original\\lenna.png",
+        "blurred_path": "alg_test\\blurred\\lenna_motionlinearuniform.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\motionlinearuniform.png",
+        "filters": "motionlinearuniform",
+        "blurred_psnr": 22.691644568047977,
+        "blurred_ssim": 0.6505452391871285,
+        "is_color": false,
+        "restored_paths": {
+            "LowRankBlindDeconvolution": "alg_test\\restored\\lenna_motionlinearuniform_LowRankBlindDeconvolution.png"
+        },
+        "algorithm": [
+            "LowRankBlindDeconvolution"
+        ],
+        "kernel_paths": {
+            "LowRankBlindDeconvolution": "alg_test\\restored_kernel\\lenna_motionlinearuniform_LowRankBlindDeconvolution_kernel.png"
+        },
+        "psnr": {
+            "LowRankBlindDeconvolution": 15.015563920839002
+        },
+        "ssim": {
+            "LowRankBlindDeconvolution": NaN
+        }
+    },
+    "8": {
+        "original_path": "alg_test\\original\\lenna.png",
+        "blurred_path": "alg_test\\blurred\\lenna_stretched_gaussian_kernel.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\stretched_gaussian_kernel.png",
+        "filters": "stretched_gaussian_kernel",
+        "blurred_psnr": 23.265406020803336,
+        "blurred_ssim": 0.6324673657196942,
+        "is_color": false,
+        "restored_paths": {
+            "LowRankBlindDeconvolution": "alg_test\\restored\\lenna_stretched_gaussian_kernel_LowRankBlindDeconvolution.png"
+        },
+        "algorithm": [
+            "LowRankBlindDeconvolution"
+        ],
+        "kernel_paths": {
+            "LowRankBlindDeconvolution": "alg_test\\restored_kernel\\lenna_stretched_gaussian_kernel_LowRankBlindDeconvolution_kernel.png"
+        },
+        "psnr": {
+            "LowRankBlindDeconvolution": 15.713760786324345
+        },
+        "ssim": {
+            "LowRankBlindDeconvolution": NaN
+        }
+    }
+}
