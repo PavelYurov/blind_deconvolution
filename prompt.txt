@@ -1,7 +1,11 @@
-Изучи, как работает algorithms\unsorted\TobiasWolf_math_Blind_Deconvolution_MHDM\source и напиши обёртку алгоритма для __init__.py, который я сам вставлю. По возможности надо также забрать ядро смаза из алгоритма и сделать возможность выбора гиперпараметров, которые принимает MATLAB!
+Изучи, как работает algorithms\unsorted\mujib2020_Non_blind_and_Blind_Deconvolution_under_Poisson_noise\source и напиши обёртку алгоритма для __init__.py, который я сам вставлю. По возможности надо также забрать ядро смаза из алгоритма и сделать возможность выбора гиперпараметров, которые принимает MATLAB!
 
 Образцы смотри в:
 algorithms\unsorted\zalteck_BCDTV\__init__.py
 algorithms\unsorted\warrenzha_blind_deconvolution\__init__.py 
 algorithms\unsorted\vipgugr_BCDSAR\__init__.py 
 algorithms\unsorted\lisiyaoATbnu_low_rank_kernel\__init__.py 
+
+Реализуй обёртку для алгоритма DeconvolutionAlgorithm в algorithms\unsorted\ys_koshelev_nla_deblur\__init__.py с помощью исходного кода из source/ .Изучи как устроен алгоритм и вызывай его через import. Сделай максимальный упор на сохранение изначальной структуры исходников!
+
+Проверь, что он работает на изображении img = cv.imread("images_dataset/original/<выбери любую картинку>.png",cv.IMREAD_GRAYSCALE). Исправь код обёртки, если выдаёт ошибку. На выходе должно получится восстановленное изображение и ядро смаза.
