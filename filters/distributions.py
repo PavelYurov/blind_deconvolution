@@ -5,86 +5,75 @@ from scipy.interpolate import splev, splprep
 import cv2
 
 
-def generate_multivariate_normal_kernel(ksize: int, cov: list, **kwargs) -> np.ndarray:
+def generate_multivariate_normal_kernel(ksize: int, cov: list) -> np.ndarray:
     """
     Генерирует 2D-ядро на основе многомерного нормального (гауссова) распределения.
     
     Форма, размер и поворот ядра полностью определяются матрицей ковариации.
+
+    Аргументы:
+        ksize (int): Размер выходного ядра (должен быть нечетным)
+        cov (list): Матрица ковариации
+
+    Возвращает:
+        Нормализованное 2D ядро размытия.
     """
+
     center = ksize // 2
     x, y = np.meshgrid(np.arange(ksize) - center, np.arange(ksize) - center)
-    
-    # Упаковываем координаты в формат, понятный для scipy
+
     pos = np.dstack((x, y))
-    
-    # Создаем объект двумерного нормального распределения
+
     rv = multivariate_normal(mean=[0, 0], cov=cov)
-    
-    # Вычисляем функцию плотности вероятности (PDF) для каждой точки нашей сетки
+
     kernel = rv.pdf(pos)
-    
-    # Нормализуем ядро
+
     if kernel.sum() > 0:
         return kernel / kernel.sum()
     return kernel
 
-def generate_bspline_motion_kernel(ksize: int, points: list, thickness: int = 3, **kwargs) -> np.ndarray:
+
+def generate_bspline_motion_kernel(ksize: int, points: list, thickness: int = 3) -> np.ndarray:
     """
     Генерирует ядро размытия в движении по кривой, заданной B-сплайном.
 
     Аргументы:
-        ksize (int): Размер выходного ядра (должен быть нечетным).
+        ksize (int): Размер выходного ядра (должен быть нечетным)
         points (list): Список контрольных точек [(x1, y1), (x2, y2), ...],
-                       заданных относительно центра ядра (0,0).
-        thickness (int): Толщина кривой в пикселях.
-        **kwargs: Дополнительные аргументы для совместимости.
+                       заданных относительно центра ядра (0,0)
+        thickness (int): Толщина кривой в пикселях
 
     Возвращает:
         Нормализованное 2D ядро размытия.
     """
     if ksize % 2 == 0:
-        ksize += 1  # Убедимся, что размер нечетный
+        ksize += 1
 
     center = ksize // 2
     kernel = np.zeros((ksize, ksize), dtype=np.float32)
 
-    # 1. Подготовка контрольных точек
-    # Транспонируем и преобразуем в numpy-массив
     points_np = np.array(points).T
-    
-    # 2. Вычисление B-сплайна
-    # splprep находит параметрическое представление сплайна
-    # k=3 означает кубический сплайн, наиболее распространенный
-    # s=0 означает, что кривая должна пройти точно через все точки
     tck, u = splprep(points_np, s=0, k=min(3, len(points) - 1))
-    
-    # 3. "Прорисовка" кривой в ядре
-    # Генерируем 1000 точек вдоль кривой для гладкости
     u_new = np.linspace(u.min(), u.max(), 1000)
     x_coords, y_coords = splev(u_new, tck)
-    
-    # Переводим относительные координаты в абсолютные индексы массива
-    # и округляем, чтобы "закрасить" пиксели
+
     x_abs = np.round(x_coords + center).astype(int)
     y_abs = np.round(y_coords + center).astype(int)
-    
-    # Убираем дубликаты и выходы за границы
+
     valid_indices = (x_abs >= 0) & (x_abs < ksize) & (y_abs >= 0) & (y_abs < ksize)
     unique_pixels = np.unique(np.vstack((y_abs[valid_indices], x_abs[valid_indices])).T, axis=0)
-    
-    # Заполняем ядро
+
     for y, x in unique_pixels:
         kernel[y, x] = 1.0
 
-    # 4. Применение толщины и нормализация
     if thickness > 1:
-        # Убедимся, что толщина нечетная
         thickness = thickness if thickness % 2 == 1 else thickness + 1
         kernel = cv2.GaussianBlur(kernel, (thickness, thickness), 0)
 
     if kernel.sum() > 0:
         return kernel / kernel.sum()
     return kernel
+
 
 def gaussian_distribution(x: np.ndarray, std: float) -> np.ndarray:
     """

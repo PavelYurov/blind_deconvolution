@@ -1,6 +1,6 @@
 import cv2 as cv
 import numpy as np
-from typing import Callable, Optional
+from typing import Callable, Optional, Tuple
 from .base import FilterBase
 
 from scipy.interpolate import BSpline, make_interp_spline
@@ -26,9 +26,9 @@ class DefocusBlur(FilterBase):
         Инициализация фильтра размытия вне фокуса.
         
         Аргументы:
-            psf: Функция, принимающая (radius, param) и возвращающая значения ядра
-            param: Параметр контроля интенсивности размытия
-            kernel_size: Опциональный фиксированный размер ядра (должен быть нечетным если указан)
+            psf (Callable): Функция, принимающая (radius, param) и возвращающая значения ядра
+            param (float): Параметр контроля интенсивности размытия
+            kernel_size (Optional[int]): Опциональный фиксированный размер ядра (должен быть нечетным если указан)
         """
         self.psf = psf
         self.param = param
@@ -36,6 +36,7 @@ class DefocusBlur(FilterBase):
         super().__init__(param, 'blur')
 
     def discription(self) -> str:
+        """Возвращает название способа смаза и его параметры в файловой системе."""
         return f"|defocus_{self.psf.__name__}_{self.param}_{self.kernel_size}"
 
     def generate_kernel(self) -> np.ndarray:
@@ -57,13 +58,14 @@ class DefocusBlur(FilterBase):
         Применение размытия вне фокуса к изображению.
         
         Аргументы:
-            image: Входное изображение для размытия
+            image (narray): Входное изображение для размытия
             
         Возвращает:
             Размытое изображение
         """
         return cv.filter2D(image, -1, self.generate_kernel())
-    
+
+
 class MotionBlur(FilterBase):
     """
     Фильтр размытия в движении, имитирующий линейное движение камеры.
@@ -86,10 +88,10 @@ class MotionBlur(FilterBase):
         Инициализация фильтра размытия в движении.
         
         Аргументы:
-            psf: Функция (x, param) -> значения ядра, где x - 1D массив координат
-            param: Параметр для PSF-функции
-            angle: Угол направления размытия (в градусах)
-            kernel_length: Длина размытия (нечетное число)
+            psf (Callable): Функция (x, param) -> значения ядра, где x - 1D массив координат
+            param (float): Параметр для PSF-функции
+            angle (float): Угол направления размытия (в градусах)
+            kernel_length (Optional[int]): Длина размытия (нечетное число)
         """
         self.psf = psf
         self.param = param
@@ -98,6 +100,7 @@ class MotionBlur(FilterBase):
         super().__init__(param, 'blur')
 
     def discription(self) -> str:
+        """Возвращает название способа смаза и его параметры в файловой системе"""
         return f"|motion_{self.psf.__name__}_{self.param}_{self.angle}_{self.kernel_length}"
 
     def generate_kernel(self) -> np.ndarray:
@@ -121,7 +124,7 @@ class MotionBlur(FilterBase):
         return rotated_kernel / rotated_kernel.sum()
 
     def _calculate_kernel_length(self) -> int:
-        """Вычисление длины ядра на основе параметра размытия"""
+        """Вычисление длины ядра на основе параметра размытия."""
         return max(int(4 * self.param) | 1, 3) 
 
     def filter(self, image: np.ndarray) -> np.ndarray:
@@ -130,27 +133,37 @@ class MotionBlur(FilterBase):
     
 
 class BSpline_blur(FilterBase):
+    """
+    Фильтр размытия в движении, имитирующий криволинейное неравномерное движение.
 
-    def __init__(self,shape_points, intensity_points, output_size=(15, 15), shape_degree=3, intensity_degree=2, n_samples=1000):
+    Создает 2D B-spline.
+    
+    Аргументы:
+        shape_points (narray): Точки, задающие форму B-spline
+        intensity_points (narray): Точки, задающие интенсивность
+        output_size (tuple[int,int]): Размер выходной матрицы PSF
+        shape_degree (int): Степень B-spline
+        intensity_degree (int): Степень B-spline
+        n_samples (int): Количество точек для дискретизации кривой
+    """
+
+    def __init__(self,
+                 shape_points: np.ndarray,
+                 intensity_points: np.ndarray, 
+                 output_size: Tuple[int,int] = (15, 15), 
+                 shape_degree: int = 3, 
+                 intensity_degree: int = 2, 
+                 n_samples: int = 1000):
         """
-        Создает PSF используя два B-spline: для формы и для интенсивности.
-        Применяет их, как фильтр
+        Инициализация фильтра в криволинейном движении.
         
-        Parameters:
-        -----------
-        shape_points : array-like, shape (n, 2)
-            Точки, задающие форму кривой [x, y]
-        intensity_points : array-like, shape (m, 2)
-            Точки, задающие интенсивность вдоль кривой [param, intensity]
-            где param - параметр вдоль кривой (0..1)
-        output_size : tuple, (width, height)
-            Размер выходной матрицы PSF
-        shape_degree : int
-            Степень B-spline для формы
-        intensity_degree : int
-            Степень B-spline для интенсивности
-        n_samples : int
-            Количество точек для дискретизации кривой
+        Аргументы:
+            shape_points (narray): Точки, задающие форму кривой [x, y]
+            intensity_points (narray): Точки, задающие интенсивность вдоль кривой
+            output_size (tuple[int,int]): (width, height) Размер выходной матрицы PSF
+            shape_degree (int): Степень B-spline для формы
+            intensity_degree (int): Степень B-spline для интенсивности
+            n_samples (int): Количество точек для дискретизации кривой
         """
         super().__init__(1, 'blur')
 
@@ -162,82 +175,59 @@ class BSpline_blur(FilterBase):
         self.n_samples = n_samples
 
 
-    def filter(self, image):
+    def filter(self, image: np.ndarray) -> np.ndarray:
+        """Применение размытия к изображению."""
         kernel = self.create_dual_bspline_psf()
         res = cv.filter2D(src=image,ddepth=-1,kernel=kernel)
         return res
     
     def discription(self) -> str:
+        """Возвращает название способа смаза в файловой системе."""
         return f"|Bspline_motion_"
     
-    def create_dual_bspline_psf(self):
-        """
-        Создает PSF используя два B-spline: для формы и для интенсивности.
-        
-        Returns:
-        --------
-        psf : ndarray
-            Нормализованная матрица PSF
-        shape_spline : BSpline
-            B-spline для формы кривой
-        intensity_spline : BSpline
-            B-spline для интенсивности
-        sampled_points : ndarray
-            Дискретизированные точки кривой с интенсивностями
-        """
-        
+    def create_dual_bspline_psf(self) -> np.ndarray:
+        """Создает PSF используя два B-spline: для формы и для интенсивности."""
         shape_points = np.array(self.shape_points)
         intensity_points = np.array(self.intensity_points)
-        
-        # 1. Создаем B-spline для формы кривой
         t_shape = np.linspace(0, 1, len(shape_points))
-        shape_spline_x = make_interp_spline(t_shape, shape_points[:, 0], k=self.shape_degree)
-        shape_spline_y = make_interp_spline(t_shape, shape_points[:, 1], k=self.shape_degree)
+        shape_spline_x = make_interp_spline(
+                                        t_shape, 
+                                        shape_points[:, 0], 
+                                        k=self.shape_degree)
+        shape_spline_y = make_interp_spline(
+                                        t_shape, 
+                                        shape_points[:, 1], 
+                                        k=self.shape_degree)
         
-        # 2. Создаем B-spline для интенсивности
         t_intensity = np.linspace(0, 1, len(intensity_points))
-        intensity_spline = make_interp_spline(t_intensity, intensity_points[:, 1], k=self.intensity_degree)
+        intensity_spline = make_interp_spline(
+                                    t_intensity,
+                                    intensity_points[:, 1], 
+                                    k=self.intensity_degree)
         
-        # 3. Дискретизируем кривую с интенсивностями
         t_samples = np.linspace(0, 1, self.n_samples)
         x_samples = shape_spline_x(t_samples)
         y_samples = shape_spline_y(t_samples)
         intensity_samples = intensity_spline(t_samples)
         
-        # Убеждаемся, что интенсивности неотрицательные
         intensity_samples = np.maximum(intensity_samples, 0)
         
-        sampled_points = np.column_stack([x_samples, y_samples, intensity_samples])
-        
-        # 4. Проецируем на матрицу
         width, height = self.output_size
         
-        # Находим границы для нормализации координат
         x_min, x_max = x_samples.min(), x_samples.max()
         y_min, y_max = y_samples.min(), y_samples.max()
         
-        # Масштабируем координаты к диапазону [0, size-1]
         x_scaled = (x_samples - x_min) / (x_max - x_min) * (width - 1)
         y_scaled = (y_samples - y_min) / (y_max - y_min) * (height - 1)
         
-        # Создаем пустую PSF матрицу
         psf = np.zeros(self.output_size)
-        
-        # Распределяем интенсивности по матрице (простая бининг)
         for i in range(len(x_scaled)):
             x_idx = int(round(x_scaled[i]))
             y_idx = int(round(y_scaled[i]))
-            
-            # Проверяем границы
             if 0 <= x_idx < width and 0 <= y_idx < height:
                 psf[y_idx, x_idx] += intensity_samples[i]
-        
-        # # 5. Применяем гауссово размытие для сглаживания
-        # from scipy.ndimage import gaussian_filter
-        # psf = gaussian_filter(psf, sigma=0.7)
-        
-        # 6. Нормализуем PSF (сумма = 1)
-        psf = np.maximum(psf, 0)  # Убеждаемся в неотрицательности
+
+        psf = np.maximum(psf, 0)
         if np.sum(psf) > 0:
             psf = psf / np.sum(psf)
         
@@ -245,26 +235,31 @@ class BSpline_blur(FilterBase):
     
 
 class Kernel_convolution(FilterBase):
-    param = None
-    def __init__(self, npy_file_path) -> None:
+    """
+    Фильтр, значения матрицы которого сохранены .npy файле.
+
+    Загружает и применяет эту матрицу к изображению.
+
+    Аргументы:
+        npy_file_path (str): Путь до .npy файла с ядром
+    """
+
+    def __init__(self, npy_file_path: str) -> None:
         """
-        задает произвольный фильтр, сохраненный в .npy файл
-        Parameters:
-        npy_file_path - путь до .npy файла с ядром
+        Инициализация сохраненного фильтра.
+
+        Аргументы:
+            npy_file_path (str): Путь до .npy файла с ядром
         """
         self.npy_file_path = npy_file_path
         super().__init__(1, 'custom_kernel')
 
-    def get_type(self):
-        return self.type
-
-    def generate_kernel(self) -> np.ndarray:
-        return np.load(self.npy_file_path)
-
-    def discription(self):
+    def discription(self) -> str:
+        """Возвращает название способа смаза в файловой системею"""
         return f"|custom_kelner_"
 
     def filter(self, image: np.ndarray) -> np.ndarray:
+        "Применение фильтра к изображению"
         kernel = np.load(self.npy_file_path)
         blurred = cv.filter2D(image, -1, kernel)
         return blurred
