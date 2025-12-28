@@ -1,7 +1,0 @@
-Изучи, как работает algorithms\unsorted\TobiasWolf_math_Blind_Deconvolution_MHDM\source и напиши обёртку алгоритма для __init__.py, который я сам вставлю. По возможности надо также забрать ядро смаза из алгоритма и сделать возможность выбора гиперпараметров, которые принимает MATLAB!
-
-Образцы смотри в:
-algorithms\unsorted\zalteck_BCDTV\__init__.py
-algorithms\unsorted\warrenzha_blind_deconvolution\__init__.py 
-algorithms\unsorted\vipgugr_BCDSAR\__init__.py 
-algorithms\unsorted\lisiyaoATbnu_low_rank_kernel\__init__.py 
