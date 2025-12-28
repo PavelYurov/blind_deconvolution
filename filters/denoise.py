@@ -11,7 +11,16 @@ from .colored_noise import powerlaw_psd_gaussian, pink_noise_2d
 from skimage.restoration import denoise_nl_means, estimate_sigma, denoise_wavelet, denoise_bilateral, denoise_tv_bregman, denoise_tv_chambolle
 from scipy.ndimage import median_filter
 
+"""
+    над кодом работал:
+    Юров П.И.
+"""
+
 class LinearSmoothing(FilterBase):
+    """
+        над кодом работал:
+        Юров П.И.
+    """
     """
     Метод гауссова размытия для уменьшения шума.
 
@@ -40,6 +49,10 @@ class LinearSmoothing(FilterBase):
     
 
 class AnisotropicDiffusion(FilterBase):
+    """
+        над кодом работал:
+        Юров П.И.
+    """
     """
     Метод анизотропной диффузии для уменьшения шума на изображении.
 
@@ -87,6 +100,10 @@ class AnisotropicDiffusion(FilterBase):
 
 
 class NonLocalMeans(FilterBase):
+    """
+        над кодом работал:
+        Юров П.И.
+    """
     """
     Метод Non-Local Means (NLM) уменьшения шума на изображении.
 
@@ -136,6 +153,10 @@ class NonLocalMeans(FilterBase):
 
 class MedianFilter(FilterBase):
     """
+        над кодом работал:
+        Юров П.И.
+    """
+    """
     Метод медианной фильтрации для уменьшения шума на изображении.
 
     Аргументы:
@@ -162,6 +183,10 @@ class MedianFilter(FilterBase):
 
 
 class Wavelet(FilterBase):
+    """
+        над кодом работал:
+        Юров П.И.
+    """
     """
     Метод уменьшения шума на изображении с помощью вейвлетов.
 
@@ -216,6 +241,10 @@ class Wavelet(FilterBase):
 
 
 class BilateralFilter(FilterBase):
+    """
+        над кодом работал:
+        Юров П.И.
+    """
     """
     Метод билатерального преобразования для уменьшения шума на изображении.
 
@@ -272,6 +301,10 @@ class BilateralFilter(FilterBase):
 
 class TV_bregman(FilterBase):
     """
+        над кодом работал:
+        Юров П.И.
+    """
+    """
     Метод Total Variation с оптимизацией Брегмана.
 
     Аргументы:
@@ -316,6 +349,10 @@ class TV_bregman(FilterBase):
 
 
 class TV_Chambolle(FilterBase):
+    """
+        над кодом работал:
+        Юров П.И.
+    """
     """
     Метод Total Variation реализованный алгоритмом Шамболле.
 

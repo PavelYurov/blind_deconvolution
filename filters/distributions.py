@@ -4,8 +4,17 @@ from scipy.stats import multivariate_normal
 from scipy.interpolate import splev, splprep
 import cv2
 
+"""
+    над кодом работал:
+    Беззаборов А.А
+    Юров П.И.
+"""
 
 def generate_multivariate_normal_kernel(ksize: int, cov: list) -> np.ndarray:
+    """
+        над кодом работал:
+        Беззаборов А.А.
+    """
     """
     Генерирует 2D-ядро на основе многомерного нормального (гауссова) распределения.
     
@@ -32,8 +41,11 @@ def generate_multivariate_normal_kernel(ksize: int, cov: list) -> np.ndarray:
         return kernel / kernel.sum()
     return kernel
 
-
 def generate_bspline_motion_kernel(ksize: int, points: list, thickness: int = 3) -> np.ndarray:
+    """
+        над кодом работал:
+        Юров П.И.
+    """
     """
     Генерирует ядро размытия в движении по кривой, заданной B-сплайном.
 
@@ -74,8 +86,11 @@ def generate_bspline_motion_kernel(ksize: int, points: list, thickness: int = 3)
         return kernel / kernel.sum()
     return kernel
 
-
 def gaussian_distribution(x: np.ndarray, std: float) -> np.ndarray:
+    """
+        над кодом работал:
+        Беззаборов А.А.
+    """
     """
     Гауссовская функция распределения.
     
@@ -94,6 +109,10 @@ def gaussian_distribution(x: np.ndarray, std: float) -> np.ndarray:
 
 def uniform_distribution(x: np.ndarray, radius: float) -> np.ndarray:
     """
+        над кодом работал:
+        Беззаборов А.А.
+    """
+    """
     Равномерная функция распределения.
     
     Применение:
@@ -110,6 +129,10 @@ def uniform_distribution(x: np.ndarray, radius: float) -> np.ndarray:
     return (x <= radius).astype(float)
 
 def linear_decay_distribution(x: np.ndarray, radius: float) -> np.ndarray:
+    """
+        над кодом работал:
+        Беззаборов А.А.
+    """
     """
     Универсальная линейно убывающая функция распределения.
     
@@ -128,6 +151,10 @@ def linear_decay_distribution(x: np.ndarray, radius: float) -> np.ndarray:
 
 def ring_distribution(x: np.ndarray, radius: float) -> np.ndarray:
     """
+        над кодом работал:
+        Беззаборов А.А.
+    """
+    """
     Кольцевое распределение (специфично для размытия вне фокуса).
     
     Параметры:
@@ -140,6 +167,10 @@ def ring_distribution(x: np.ndarray, radius: float) -> np.ndarray:
     return np.exp(-(x - radius)**2 / (0.1 * radius**2))
 
 def exponential_decay_distribution(x: np.ndarray, scale: float) -> np.ndarray:
+    """
+        над кодом работал:
+        Беззаборов А.А.
+    """
     """
     Экспоненциально убывающее распределение (специфично для размытия в движении).
     

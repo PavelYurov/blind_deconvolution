@@ -5,6 +5,10 @@ from numpy.random import default_rng, Generator, RandomState
 from numpy import sum as npsum
 import numpy as np
 
+"""
+    над кодом работал:
+    Юров П.И.
+"""
 
 def powerlaw_psd_gaussian(
         exponent: float, 
@@ -12,6 +16,10 @@ def powerlaw_psd_gaussian(
         fmin: float = 0.0, 
         random_state: Optional[Union[int, Generator, RandomState]] = None
     ) -> np.ndarray:
+    """
+        над кодом работал:
+        Юров П.И.
+    """
     """
     Гауссов (1/f)**beta шум.
 
@@ -80,6 +88,10 @@ def powerlaw_psd_gaussian(
 
 
 def _get_normal_distribution(random_state: Optional[Union[int, Generator, RandomState]]):
+    """
+        над кодом работал:
+        Юров П.И.
+    """
     """Возвращает генератор случайных чисел с нормальным распределением"""
     normal_dist = None
     if isinstance(random_state, (integer, int)) or random_state is None:
@@ -97,6 +109,10 @@ def _get_normal_distribution(random_state: Optional[Union[int, Generator, Random
 
 def pink_noise_2d(shape: Tuple[int, int], 
                   alpha: float = 1.0):
+    """
+        над кодом работал:
+        Юров П.И.
+    """
     """
     Генерирует 2D 1/f^a шум.
     

@@ -21,8 +21,16 @@ from IPython.display import display
 import logging
 import json
 
+"""
+    над кодом работал:
+    Беззаборов А.А
+"""
 
 class ProcessingExtension(ABC):
+    """
+        над кодом работал:
+        Беззаборов А.А.
+    """
     '''
     Базовый класс для расширения функционала Processing
     '''
@@ -52,6 +60,10 @@ class OptimizationMethod(Enum):
     GA = "ga"  # Genetic Algorithm (Эволюционный алгоритм)
 
 class HyperparameterOptimizer(ProcessingExtension):
+    """
+        над кодом работал:
+        Беззаборов А.А.
+    """
     '''
     Класс для оптимизации гиперпараметров
     '''
@@ -389,6 +401,10 @@ class HyperparameterOptimizer(ProcessingExtension):
         
 
 class ParetoFrontAnalyzer(ProcessingExtension):
+    """
+        над кодом работал:
+        Беззаборов А.А.
+    """
     """
     Класс для анализа результатов с построением фронта Парето
     """

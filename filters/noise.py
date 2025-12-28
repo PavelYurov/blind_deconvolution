@@ -7,7 +7,16 @@ from scipy.signal import lfilter, butter, sosfilt
 
 from .colored_noise import powerlaw_psd_gaussian, pink_noise_2d
 
+"""
+    над кодом работал:
+    Юров П.И.
+"""
+
 class GaussianNoise(FilterBase):
+    """
+        над кодом работал:
+        Юров П.И.
+    """
     """
     Фильтр аддитивного гауссовского шума.
     
@@ -51,6 +60,10 @@ class GaussianNoise(FilterBase):
 
 class PoissonNoise(FilterBase):
     """
+        над кодом работал:
+        Юров П.И.
+    """
+    """
     Фильтр пуассоновского шума (шума дробления).
     
     Имитирует шум подсчета фотонов с пуассоновской статистикой.
@@ -91,6 +104,10 @@ class PoissonNoise(FilterBase):
 
 
 class SaltAndPepperNoise(FilterBase):
+    """
+        над кодом работал:
+        Юров П.И.
+    """
     """
     Фильтр импульсного шума (типа "соль-перец").
     
@@ -168,7 +185,10 @@ class SaltAndPepperNoise(FilterBase):
 
 
 class OldPhotoNoise(FilterBase):
-
+    """
+        над кодом работал:
+        Юров П.И.
+    """
     """
     Коричневый шум.
 
@@ -272,6 +292,10 @@ class OldPhotoNoise(FilterBase):
     
 class ColoredNoise(FilterBase):
     """
+        над кодом работал:
+        Юров П.И.
+    """
+    """
     Цветной шум (1/f)^beta.
 
     Аргументы:
@@ -312,6 +336,10 @@ class ColoredNoise(FilterBase):
 
 class Pink_Noise(FilterBase):
     """
+        над кодом работал:
+        Юров П.И.
+    """
+    """
     Розовый шум (1/f).
 
     Аргументы:
@@ -339,6 +367,10 @@ class Pink_Noise(FilterBase):
         
         
 class Brown_Noise(FilterBase):
+    """
+        над кодом работал:
+        Юров П.И.
+    """
     """
     Коричневый шум (1/f)^2.
 

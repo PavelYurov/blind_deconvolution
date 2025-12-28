@@ -2,7 +2,16 @@ import abc
 import numpy as np
 from typing import Any
 
+"""
+    над кодом работал:
+    Юров П.И.
+"""
+
 class FilterBase(abc.ABC):
+    """
+        над кодом работал:
+        Юров П.И.
+    """
     """
     Абстрактный базовый класс для фильтров изображений.
     

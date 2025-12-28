@@ -4,7 +4,16 @@ import numpy as np
 from typing import Union, Tuple
 from .base import FilterBase
 
+"""
+    над кодом работал:
+    Беззаборов П.И.
+"""
+
 class MeanBlur(FilterBase):
+    """
+        над кодом работал:
+        Беззаборов А.А.
+    """
     """
     Усредняющий (боксовый) фильтр размытия.
     
@@ -43,6 +52,10 @@ class MeanBlur(FilterBase):
 
 class MedianBlur(FilterBase):
     """
+        над кодом работал:
+        Беззаборов А.А.
+    """
+    """
     Медианный фильтр (эффективен против шума "соль-перец").
     
     Параметры:
@@ -71,6 +84,10 @@ class MedianBlur(FilterBase):
 
 
 class GaussianBlur(FilterBase):
+    """
+        над кодом работал:
+        Беззаборов А.А.
+    """
     """
     Гауссовский фильтр размытия.
     
@@ -109,6 +126,10 @@ class GaussianBlur(FilterBase):
 
 
 class BilateralFilter(FilterBase):
+    """
+        над кодом работал:
+        Беззаборов А.А.
+    """
     """
     Билатеральный фильтр (с сохранением границ).
     

@@ -20,7 +20,18 @@ from IPython.display import display
 from extensions import HyperparameterOptimizer
 from extensions import ParetoFrontAnalyzer
 
+"""
+    над кодом работал:
+    Юров П.И.
+    Беззаборов А.А
+"""
+
 class Processing:
+    """
+        над кодом работали:
+        Юров П.И.
+        Беззаборов А.А.
+    """
 
     '''
     Фреймворк для обработки изображений

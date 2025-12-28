@@ -3,9 +3,18 @@ import numpy as np
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 from typing import Callable, Optional, Tuple
 
+"""
+    над кодом работали:
+    Юров П.И.
+    Беззаборов А.А.
+"""
 
 def PSNR(original: np.ndarray, 
          restored: np.ndarray) -> float:
+    """
+        над кодом работал:
+        Юров П.И.
+    """
     """
     Вычисляет отношение пикового сигнала к шуму (PSNR) между изображениями.
 
@@ -24,6 +33,10 @@ def SSIM(original: np.ndarray,
          restored: np.ndarray, 
          data_range: Optional[float] = None) -> float:
     """
+        над кодом работал:
+        Юров П.И.
+    """
+    """
     Вычисляет индекс структурного сходства (SSIM) между изображениями.
 
     Аргументы:
@@ -39,6 +52,10 @@ def SSIM(original: np.ndarray,
 
 
 def calculate_sml(image: np.ndarray) -> float:
+    """
+        над кодом работал:
+        Беззаборов А.А.
+    """
     """
     Вычисляет Sum of Modified Laplacian (SML) для изображения.
     Мера общей резкости/количества краев.
@@ -62,6 +79,10 @@ def calculate_sml(image: np.ndarray) -> float:
 
 def Sharpness(image: np.ndarray):
     """
+        над кодом работал:
+        Юров П.И.
+    """
+    """
     Подсчет резкости через дисперсию Лапласа.
     Более высокое значение указывает на большую резкость.
 
@@ -74,6 +95,10 @@ def Sharpness(image: np.ndarray):
 
 def blur_complexity(original: np.ndarray, 
                     blurred: np.ndarray) -> float:
+    """
+        над кодом работал:
+        Беззаборов А.А.
+    """
     """
     Вычисляет нормированную меру сложности смаза [0, 1] на основе SML.
 
@@ -98,6 +123,10 @@ def blur_complexity(original: np.ndarray,
 def calculate_snr(signal: np.ndarray, 
                   noise: np.ndarray) -> float:
     """
+        над кодом работал:
+        Беззаборов А.А.
+    """
+    """
     Вычисляет отношение сигнал-шум (SNR) в dB.
 
     Аргументы:
@@ -118,6 +147,10 @@ def noise_complexity(signal: np.ndarray,
                      noise: np.ndarray, 
                      min_snr: float = 0.0, 
                      max_snr: float = 50.0) -> float:
+    """
+        над кодом работал:
+        Беззаборов А.А.
+    """
     """
     Вычисляет нормированную меру сложности шума [0, 1] на основе SNR.
 

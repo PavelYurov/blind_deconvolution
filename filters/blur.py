@@ -6,7 +6,17 @@ from .base import FilterBase
 from scipy.interpolate import BSpline, make_interp_spline
 from mpl_toolkits.mplot3d import Axes3D
 
+"""
+    над кодом работали:
+    Юров П.И.
+    Беззаборов А.А.
+"""
+
 class DefocusBlur(FilterBase):
+    """
+        над кодом работал:
+        Беззаборов А.А.
+    """
     """
     Фильтр размытия вне фокуса, имитирующий эффект расфокусировки камеры.
     
@@ -67,6 +77,10 @@ class DefocusBlur(FilterBase):
 
 
 class MotionBlur(FilterBase):
+    """
+        над кодом работал:
+        Беззаборов А.А.
+    """
     """
     Фильтр размытия в движении, имитирующий линейное движение камеры.
     
@@ -133,6 +147,10 @@ class MotionBlur(FilterBase):
     
 
 class BSpline_blur(FilterBase):
+    """
+        над кодом работал:
+        Юров П.И.
+    """
     """
     Фильтр размытия в движении, имитирующий криволинейное неравномерное движение.
 
@@ -235,6 +253,10 @@ class BSpline_blur(FilterBase):
     
 
 class Kernel_convolution(FilterBase):
+    """
+        над кодом работал:
+        Юров П.И.
+    """
     """
     Фильтр, значения матрицы которого сохранены .npy файле.
 
