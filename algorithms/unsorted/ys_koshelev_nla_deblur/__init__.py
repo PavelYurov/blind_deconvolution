@@ -14,21 +14,35 @@ class YsKoshelevNlaDeblur(DeconvolutionAlgorithm):
     обёртка лишь подготавливает данные и параметры и вызывает `blind_deconv`.
     """
 
-    def __init__(self, params: Dict[str, Any] | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        lambda_: float = 4e-3,
+        gamma: float = 2560.0,
+        sigma: float = 1.0,
+        beta_max: float = 2.0**3,
+        mu_max: float = 1e5,
+        wei_grad: float = 4e-3,
+        lambda_tv: float = 0.003,
+        lambda_l0: float = 1e-3,
+        kernel_size: int = 25,
+        num_iter: int = 50,
+        params: Dict[str, Any] | None = None,
+    ) -> None:
         super().__init__("ys_koshelev_nla_deblur")
 
         # Параметры по умолчанию взяты из apply.py
         self.params: Dict[str, Any] = {
-            "lambda_": 4e-3,
-            "gamma": 2560.0,
-            "sigma": 1.0,
-            "beta_max": 2.0**3,
-            "mu_max": 1e5,
-            "wei_grad": 4e-3,
-            "lambda_tv": 0.003,
-            "lambda_l0": 1e-3,
-            "kernel_size": 25,
-            "num_iter": 50,
+            "lambda_": lambda_,
+            "gamma": gamma,
+            "sigma": sigma,
+            "beta_max": beta_max,
+            "mu_max": mu_max,
+            "wei_grad": wei_grad,
+            "lambda_tv": lambda_tv,
+            "lambda_l0": lambda_l0,
+            "kernel_size": kernel_size,
+            "num_iter": num_iter,
         }
 
         if params is not None:
@@ -104,4 +118,3 @@ class YsKoshelevNlaDeblur(DeconvolutionAlgorithm):
 
 
 __all__ = ["YsKoshelevNlaDeblur"]
-
