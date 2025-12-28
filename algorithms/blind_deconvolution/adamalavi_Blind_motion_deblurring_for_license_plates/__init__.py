@@ -6,44 +6,41 @@ from importlib import import_module
 from pathlib import Path
 from time import time
 from typing import Any, Dict, Iterable, Tuple
+import tensorflow
 
 import cv2
 import numpy as np
 from IPython.display import display
 
-from ...base import DeconvolutionAlgorithm
-
-Array2D = np.ndarray
+from algorithms.base import DeconvolutionAlgorithm
 
 SOURCE_ROOT = Path(__file__).resolve().parent / 'source'
-
 
 def _ensure_path_on_syspath(path: Path) -> None:
     resolved = str(path)
     if resolved not in sys.path:
         sys.path.insert(0, resolved)
 
-
 def _as_tuple(value: Iterable[int] | Tuple[int, int] | int, default: Tuple[int, int]) -> Tuple[int, int]:
     if isinstance(value, Iterable) and not isinstance(value, (str, bytes)):
         seq = list(value)
+        
         if len(seq) >= 2:
             return int(seq[0]), int(seq[1])
+        
     if isinstance(value, tuple) and len(value) == 2:
         return int(value[0]), int(value[1])
+    
     scalar = int(value)
+    
     return (scalar, scalar) if scalar > 0 else default
-
 
 @dataclass
 class _ModelCache:
     angle_model: Any | None = None
     length_model: Any | None = None
 
-
 class AdamalaviBlindMotionDeblurringForLicensePlates(DeconvolutionAlgorithm):
-    """CNN-based motion PSF estimation with Wiener deblurring."""
-
     ANGLE_CLASSES = 180
     LENGTH_OUTPUTS = 1
 
@@ -72,7 +69,7 @@ class AdamalaviBlindMotionDeblurringForLicensePlates(DeconvolutionAlgorithm):
         self.angle_top_k = max(1, int(angle_top_k))
 
         self._models = _ModelCache()
-        self._last_kernel: Array2D | None = None
+        self._last_kernel: np.ndarray | None = None
         self._last_angle: float | None = None
         self._last_length: float | None = None
 
@@ -122,13 +119,6 @@ class AdamalaviBlindMotionDeblurringForLicensePlates(DeconvolutionAlgorithm):
         if self._models.angle_model is not None and self._models.length_model is not None:
             return
 
-        try:
-            import tensorflow  # noqa: F401  # ensure dependency is available
-        except ImportError as exc:
-            raise ImportError(
-                'TensorFlow is required for AdamalaviBlindMotionDeblurringForLicensePlates.'
-            ) from exc
-
         AngleVgg, LengthVgg = self._import_builders()
 
         fft_w, fft_h = int(self.fft_size[0]), int(self.fft_size[1])
@@ -144,12 +134,13 @@ class AdamalaviBlindMotionDeblurringForLicensePlates(DeconvolutionAlgorithm):
         if self._models.length_model is None:
             if not self.length_model_path.exists():
                 raise FileNotFoundError(f'Length model not found at {self.length_model_path!s}')
+            
             model = LengthVgg.build(fft_w, fft_h, 1, self.LENGTH_OUTPUTS)
             model.load_weights(str(self.length_model_path))
             model.trainable = False
             self._models.length_model = model
 
-    def _prepare_input(self, image: Array2D) -> Tuple[Array2D, np.dtype, Tuple[int, ...], Tuple[int, ...]]:
+    def _prepare_input(self, image: np.ndarray) -> Tuple[np.ndarray, np.dtype, Tuple[int, ...], Tuple[int, ...]]:
         original_dtype = image.dtype
         original_shape = image.shape
 
@@ -169,7 +160,7 @@ class AdamalaviBlindMotionDeblurringForLicensePlates(DeconvolutionAlgorithm):
         resized = cv2.resize(gray, (max(infer_w, 1), max(infer_h, 1)), interpolation=cv2.INTER_AREA)
         return resized, original_dtype, original_shape, grayscale_shape
 
-    def _predict_psf_parameters(self, fft_image: Array2D) -> Tuple[float, float]:
+    def _predict_psf_parameters(self, fft_image: np.ndarray) -> Tuple[float, float]:
         self._ensure_models()
 
         fft_resized = cv2.resize(
@@ -188,7 +179,7 @@ class AdamalaviBlindMotionDeblurringForLicensePlates(DeconvolutionAlgorithm):
         length_value = float(length_pred.reshape(-1)[0])
         return angle_value, length_value
 
-    def _create_fft(self, image: Array2D) -> Array2D:
+    def _create_fft(self, image: np.ndarray) -> np.ndarray:
         image = image.astype(np.float32, copy=False)
         if np.max(image) > 1.0:
             image = image / 255.0
@@ -202,7 +193,7 @@ class AdamalaviBlindMotionDeblurringForLicensePlates(DeconvolutionAlgorithm):
         #     spectrum = spectrum * (255.0 / max_val)
         return spectrum
 
-    def _run_wiener(self, image: Array2D, length: float, angle_deg: float) -> Tuple[Array2D, Array2D]:
+    def _run_wiener(self, image: np.ndarray, length: float, angle_deg: float) -> Tuple[np.ndarray, np.ndarray]:
         noise = max(1e-6, float(self.noise))
         psf_length = max(1, int(round(length)))
         psf_size = max(1, int(self.psf_size))
@@ -238,7 +229,7 @@ class AdamalaviBlindMotionDeblurringForLicensePlates(DeconvolutionAlgorithm):
 
         return restored, psf
 
-    def process(self, image: Array2D) -> Tuple[Array2D, Array2D]:
+    def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         print(self.angle_model_path)
         if image is None or image.size == 0:
             raise ValueError('Empty image provided to AdamalaviBlindMotionDeblurringForLicensePlates.')
@@ -284,8 +275,7 @@ class AdamalaviBlindMotionDeblurringForLicensePlates(DeconvolutionAlgorithm):
 
         return restored_out, np.clip(kernel*255.0*255.0,0,1.0)
 
-    def get_kernel(self) -> Array2D | None:
+    def get_kernel(self) -> np.ndarray | None:
         return self._last_kernel
-
 
 __all__ = ['AdamalaviBlindMotionDeblurringForLicensePlates']
