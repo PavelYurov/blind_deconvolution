@@ -10,18 +10,17 @@ SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "source")
 
 KERNEL_PLACEHOLDER = np.array([[0.0]])
 
-
 class MuhammadhamzaazharImageEnhancementFilters(DeconvolutionAlgorithm):
 	def __init__(
 		self,
 		method: Literal["blind", "lucy", "wiener"] = "blind",
-		# общие параметры для гауссовского ядра
+		
 		psf_size: int = 7,
 		psf_sigma: float = 10.0,
-		# Lucy-Richardson
+		
 		lucy_iterations: int = 10,
 		lucy_noise_variance: float = 0.001,
-		# Wiener
+		
 		wiener_psf_size: int = 5,
 		wiener_psf_sigma: float = 10.0,
 		wiener_noise_variance: float = 0.01,
@@ -86,10 +85,6 @@ class MuhammadhamzaazharImageEnhancementFilters(DeconvolutionAlgorithm):
 		return image
 
 	def process(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-		"""
-		image: cv2.COLOR_BGR2RGB извне, но здесь приводим к градациям серого.
-		Возвращает (восстановленное BGR, PSF/ядро).
-		"""
 		if self.method == "blind":
 			return self._process_blind(image)
 		elif self.method == "lucy":
@@ -100,8 +95,6 @@ class MuhammadhamzaazharImageEnhancementFilters(DeconvolutionAlgorithm):
 			raise ValueError("Wrrong method: ",self.method)
 
 	def _process_blind(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-		# В исходном Blind Deconvolution.m:
-		# PSF = fspecial("gaussian", 7, 10);
 		image_gray = self._prepare_image_gray(image)
 
 		I_mat = matlab.double(image_gray.tolist())
@@ -109,13 +102,11 @@ class MuhammadhamzaazharImageEnhancementFilters(DeconvolutionAlgorithm):
 		self._eng.workspace["psf_size"] = float(self.psf_size)
 		self._eng.workspace["psf_sigma"] = float(self.psf_sigma)
 
-		# создаём начальный гауссовский PSF
 		self._eng.eval(
 			"PSF = fspecial('gaussian', [psf_size psf_size], psf_sigma);",
 			nargout=0,
 		)
 
-		# используем deconvblind как в примере warrenzha, но с нашим PSF
 		self._eng.eval("[J, PSF_rec] = deconvblind(I, PSF);", nargout=0)
 
 		J_mat = self._eng.workspace["J"]
@@ -125,7 +116,6 @@ class MuhammadhamzaazharImageEnhancementFilters(DeconvolutionAlgorithm):
 		J_np = np.clip(J_np, 0.0, 1.0)
 		J_uint8 = (J_np * 255.0).astype(np.uint8)
 
-		# приведение к BGR
 		J_rgb = cv2.cvtColor(J_uint8, cv2.COLOR_GRAY2RGB)
 		J_bgr = cv2.cvtColor(J_rgb, cv2.COLOR_RGB2BGR)
 
@@ -134,10 +124,6 @@ class MuhammadhamzaazharImageEnhancementFilters(DeconvolutionAlgorithm):
 		return J_bgr, kernel
 
 	def _process_lucy(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-		# В исходном Lucy Richardson.m:
-		# PSF = fspecial("gaussian", 5, 5);
-		# BlurredNoisy = imnoise(Blurred, "gaussian", 0, V);
-		# luc1 = deconvlucy(BlurredNoisy, PSF, 10);
 		image_gray = self._prepare_image_gray(image)
 
 		I_mat = matlab.double(image_gray.tolist())
@@ -167,8 +153,6 @@ class MuhammadhamzaazharImageEnhancementFilters(DeconvolutionAlgorithm):
 		return luc_bgr, KERNEL_PLACEHOLDER
 
 	def _process_wiener(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-		# В исходном Weiner.m используется FFT и явная формула.
-		# Здесь — укороченная версия, повторяющая структуру.
 		image_gray = self._prepare_image_gray(image)
 
 		I_mat = matlab.double(image_gray.tolist())
@@ -191,7 +175,6 @@ class MuhammadhamzaazharImageEnhancementFilters(DeconvolutionAlgorithm):
 			nargout=0,
 		)
 
-		# Используем встроенный wiener2 как приближение
 		self._eng.eval("restoredImage = deconvwnr(im_blur, h);", nargout=0)
 
 		restored_mat = self._eng.workspace["restoredImage"]

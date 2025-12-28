@@ -98,13 +98,11 @@ class LisiyaoATbnuLowRankKernel(DeconvolutionAlgorithm):
 			"verbose": self.verbose,
 		}
 	def process(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-		# приводим к uint8 BGR
 		if image.ndim == 2:
 			image_bgr = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
 		else:
 			image_bgr = image
 
-		# алгоритм ожидает 2D, как в test.m: y = yc(:,:,1);
 		image_gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
 		image_gray = image_gray.astype(np.float64) / 255.0
 
@@ -112,7 +110,6 @@ class LisiyaoATbnuLowRankKernel(DeconvolutionAlgorithm):
 		self._eng.workspace["y_py"] = I_mat
 		self._eng.workspace["K_py"] = float(self.kernel_size)
 
-		# параметры, как вы их уже сформировали выше
 		self._eng.workspace["tx"] = float(self.tx)
 		self._eng.workspace["tau"] = float(self.tau)
 		self._eng.workspace["delta"] = float(self.delta)

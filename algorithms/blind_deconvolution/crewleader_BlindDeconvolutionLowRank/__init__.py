@@ -11,7 +11,6 @@ SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "source")
 class CrewleaderBlindDeconvolutionLowRank(DeconvolutionAlgorithm):
     def __init__(
         self,
-        # параметры, как в function_static_scene.m
         psize_y: int = 31,
         psize_x: int = 31,
         gamma: float = 0.6,
@@ -32,7 +31,6 @@ class CrewleaderBlindDeconvolutionLowRank(DeconvolutionAlgorithm):
         self._eng.addpath(self._eng.genpath(SOURCE_PATH), nargout=0)
         self._eng.cd(os.path.join(SOURCE_PATH, "code"), nargout=0)
 
-        # те же значения по умолчанию, что в MATLAB
         self.psize_y = int(psize_y)
         self.psize_x = int(psize_x)
         self.gamma = float(gamma)
@@ -46,8 +44,8 @@ class CrewleaderBlindDeconvolutionLowRank(DeconvolutionAlgorithm):
         self.min_alpha = float(min_alpha)
         self.num_scale = (
             int(num_scale) if num_scale is not None else None
-        )  # если None, даём MATLAB посчитать
-        # lambda и delta в коде привязаны к gamma
+        )
+        
         self.lambda_ = float(lambda_) if lambda_ is not None else (0.088 ** 2 * self.gamma)
         self.delta = float(delta) if delta is not None else (0.04 * self.gamma)
         self.transform_type = str(transform_type)
@@ -104,12 +102,6 @@ class CrewleaderBlindDeconvolutionLowRank(DeconvolutionAlgorithm):
         }
 
     def process(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        """
-        image: ожидается BGR uint8, как в остальных обёртках.
-        Возвращает (результат, ядро смаза).
-        """
-
-        # приведение к форматам
         if image.ndim == 3 and image.shape[2] == 3:
             image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         else:
@@ -117,11 +109,9 @@ class CrewleaderBlindDeconvolutionLowRank(DeconvolutionAlgorithm):
 
         image_gray = image_gray.astype(np.float64) / 255.0
 
-        # в MATLAB: y_py — входное изображение
         I_mat = matlab.double(image_gray.tolist())
         self._eng.workspace["y_py"] = I_mat
 
-        # передаём гиперпараметры
         self._eng.workspace["psize_y"] = float(self.psize_y)
         self._eng.workspace["psize_x"] = float(self.psize_x)
         self._eng.workspace["gamma_param"] = float(self.gamma)
@@ -137,7 +127,6 @@ class CrewleaderBlindDeconvolutionLowRank(DeconvolutionAlgorithm):
         self._eng.workspace["delta_param"] = float(self.delta)
         self._eng.workspace["transform_type_param"] = self.transform_type
 
-        # num_scale: либо берём из Python, либо вычисляем как в function_static_scene
         if self.num_scale is not None:
             self._eng.workspace["num_scale_param"] = float(self.num_scale)
             self._eng.eval("params.num_scale = num_scale_param;", nargout=0)
@@ -150,7 +139,6 @@ class CrewleaderBlindDeconvolutionLowRank(DeconvolutionAlgorithm):
                 nargout=0,
             )
 
-        # формируем структуру params (аналогично function_static_scene.m)
         self._eng.eval(
             "params.psize_y = psize_y;"
             "params.psize_x = psize_x;"
@@ -170,17 +158,10 @@ class CrewleaderBlindDeconvolutionLowRank(DeconvolutionAlgorithm):
             nargout=0,
         )
 
-        # ------------------ ВАЖНО ------------------
-        # Здесь нужен MATLAB-код, который работает с ОДНИМ изображением:
-        # можно:
-        #   - написать отдельный .m-скрипт/функцию (например, single_image_interface.m),
-        #   - или адаптировать часть логики из function_multi_image_deblurring.m.
-        #
-        # Ниже — простой «каркас» на основе solve_image_irls / solve_psf_constrained:
         self._eng.eval(
             """
             y = y_py;
-            % начальное ядро — равномерное окно нужного размера
+            
             psize_y_loc = params.psize_y;
             psize_x_loc = params.psize_x;
             K0 = ones(psize_y_loc, psize_x_loc);
@@ -190,15 +171,13 @@ class CrewleaderBlindDeconvolutionLowRank(DeconvolutionAlgorithm):
             fsize_y = vsize_y + psize_y_loc - 1;
             fsize_x = vsize_x + psize_x_loc - 1;
 
-            % область видимости, как в function_multi_image_deblurring
             varea = true(vsize_y, vsize_x);
             varea = padarray(varea, [psize_y_loc-1, psize_x_loc-1], false, 'post');
 
-            % начальное «резкое» изображение — просто y, дополненное до свёрточного размера
             x = padarray(y, [psize_y_loc-1, psize_x_loc-1], 'replicate', 'post');
 
-            lowrank_img = x;                % упрощение: low-rank ~= текущее x
-            sparsity_img = false(size(x));  % пока без разрежной компоненты
+            lowrank_img = x;
+            sparsity_img = false(size(x));
 
             alpha = params.min_alpha;
             for it = 1:params.num_try
@@ -207,10 +186,8 @@ class CrewleaderBlindDeconvolutionLowRank(DeconvolutionAlgorithm):
                                      params.gamma, alpha, params.p, ...
                                      200, 1e-6, params.thr_e);
 
-                % шаг по ядру
                 K0 = solve_psf_constrained(K0, y, x, params.beta, varea);
 
-                % простой спад alpha, как в оригинальном коде
                 alpha = max(params.min_alpha, alpha * exp(-log(2)/params.num_try));
             end
 
@@ -227,7 +204,6 @@ class CrewleaderBlindDeconvolutionLowRank(DeconvolutionAlgorithm):
         x_np = np.clip(x_np, 0.0, 1.0)
         x_uint8 = (x_np * 255.0).astype(np.uint8)
 
-        # x — одно канал, приводим к BGR
         if x_uint8.ndim == 2:
             x_bgr = cv2.cvtColor(x_uint8, cv2.COLOR_GRAY2BGR)
         else:
