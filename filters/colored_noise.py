@@ -1,80 +1,43 @@
-"""Generate colored noise."""
-
-from typing import Union, Iterable, Optional
+from typing import Union, Iterable, Optional, Tuple
 from numpy import sqrt, newaxis, integer
 from numpy.fft import irfft, rfftfreq, irfft2
 from numpy.random import default_rng, Generator, RandomState
 from numpy import sum as npsum
 import numpy as np
 
+"""
+    над кодом работал:
+    Юров П.И.
+"""
 
 def powerlaw_psd_gaussian(
         exponent: float, 
         size: Union[int, Iterable[int]], 
         fmin: float = 0.0, 
         random_state: Optional[Union[int, Generator, RandomState]] = None
-    ):
-    """Gaussian (1/f)**beta noise.
+    ) -> np.ndarray:
+    """
+        над кодом работал:
+        Юров П.И.
+    """
+    """
+    Гауссов (1/f)**beta шум.
 
-    Based on the algorithm in:
-    Timmer, J. and Koenig, M.:
-    On generating power law noise.
-    Astron. Astrophys. 300, 707-710 (1995)
+    Аргументы:
 
-    Normalised to unit variance
-
-    Parameters:
-    -----------
-
-    exponent : float
-        The power-spectrum of the generated noise is proportional to
-
+    exponent (float): Экспонента шума
         S(f) = (1 / f)**beta
-        flicker / pink noise:   exponent beta = 1
-        brown noise:            exponent beta = 2
+        розовый шум:    exponent beta = 1
+        коричневый шум: exponent beta = 2
+    shape (int or iterable): Размер выходной марицы
+    fmin (Optional[float]): Порог минимальной частоты от 0.0 до 0.5
+    random_state (Optional[Union[int, Generator, RandomState]]): \
+        Генератор случайных чисел
 
-        Furthermore, the autocorrelation decays proportional to lag**-gamma
-        with gamma = 1 - beta for 0 < beta < 1.
-        There may be finite-size issues for beta close to one.
-
-    shape : int or iterable
-        The output has the given shape, and the desired power spectrum in
-        the last coordinate. That is, the last dimension is taken as time,
-        and all other components are independent.
-
-    fmin : float, optional
-        Low-frequency cutoff.
-        Default: 0 corresponds to original paper. 
-        
-        The power-spectrum below fmin is flat. fmin is defined relative
-        to a unit sampling rate (see numpy's rfftfreq). For convenience,
-        the passed value is mapped to max(fmin, 1/samples) internally
-        since 1/samples is the lowest possible finite frequency in the
-        sample. The largest possible value is fmin = 0.5, the Nyquist
-        frequency. The output for this value is white noise.
-
-    random_state :  int, numpy.integer, numpy.random.Generator, numpy.random.RandomState, 
-                    optional
-        Optionally sets the state of NumPy's underlying random number generator.
-        Integer-compatible values or None are passed to np.random.default_rng.
-        np.random.RandomState or np.random.Generator are used directly.
-        Default: None.
-
-    Returns
-    -------
-    out : array
-        The samples.
-
-
-    Examples:
-    ---------
-
-    # generate 1/f noise == pink noise == flicker noise
-    >>> import colorednoise as cn
-    >>> y = cn.powerlaw_psd_gaussian(1, 5)
+    Возвращает:
+        матрицу шума
     """
     
-    # Make sure size is a list so we can iterate it and assign to it.
     if isinstance(size, (integer, int)):
         size = [size]
     elif isinstance(size, Iterable):
@@ -82,66 +45,54 @@ def powerlaw_psd_gaussian(
     else:
         raise ValueError("Size must be of type int or Iterable[int]")
     
-    # The number of samples in each time series
     samples = size[-1]
     
-    # Calculate Frequencies (we asume a sample rate of one)
-    # Use fft functions for real output (-> hermitian spectrum)
-    f = rfftfreq(samples) # type: ignore # mypy 1.5.1 has problems here 
-    print(f)
-    # Validate / normalise fmin
+    f = rfftfreq(samples)
     if 0 <= fmin <= 0.5:
-        fmin = max(fmin, 1./samples) # Low frequency cutoff
+        fmin = max(fmin, 1./samples)
     else:
         raise ValueError("fmin must be chosen between 0 and 0.5.")
     
-    # Build scaling factors for all frequencies
     s_scale = f    
-    ix   = npsum(s_scale < fmin)   # Index of the cutoff
+    ix   = npsum(s_scale < fmin)
     if ix and ix < len(s_scale):
         s_scale[:ix] = s_scale[ix]
     s_scale = s_scale**(-exponent/2.)
     
-    # Calculate theoretical output standard deviation from scaling
-    w      = s_scale[1:].copy()
-    w[-1] *= (1 + (samples % 2)) / 2. # correct f = +-0.5
+    w = s_scale[1:].copy()
+    w[-1] *= (1 + (samples % 2)) / 2.
     sigma = 2 * sqrt(npsum(w**2)) / samples
     
-    # Adjust size to generate one Fourier component per frequency
     size[-1] = len(f)
 
-    # Add empty dimension(s) to broadcast s_scale along last
-    # dimension of generated random power + phase (below)
     dims_to_add = len(size) - 1
     s_scale     = s_scale[(newaxis,) * dims_to_add + (Ellipsis,)]
     
-    # prepare random number generator
     normal_dist = _get_normal_distribution(random_state)
 
-    # Generate scaled random power + phase
     sr = normal_dist(scale=s_scale, size=size)
     si = normal_dist(scale=s_scale, size=size)
     
-    # If the signal length is even, frequencies +/- 0.5 are equal
-    # so the coefficient must be real.
     if not (samples % 2):
         si[..., -1] = 0
-        sr[..., -1] *= sqrt(2)    # Fix magnitude
+        sr[..., -1] *= sqrt(2)
     
-    # Regardless of signal length, the DC component must be real
     si[..., 0] = 0
-    sr[..., 0] *= sqrt(2)    # Fix magnitude
+    sr[..., 0] *= sqrt(2)
     
-    # Combine power + corrected phase to Fourier components
     s  = sr + 1J * si
-    
-    # Transform to real time series & scale to unit variance
+
     y = irfft(s, n=samples, axis=-1) / sigma
     
     return y
 
 
 def _get_normal_distribution(random_state: Optional[Union[int, Generator, RandomState]]):
+    """
+        над кодом работал:
+        Юров П.И.
+    """
+    """Возвращает генератор случайных чисел с нормальным распределением"""
     normal_dist = None
     if isinstance(random_state, (integer, int)) or random_state is None:
         random_state = default_rng(random_state)
@@ -155,48 +106,45 @@ def _get_normal_distribution(random_state: Optional[Union[int, Generator, Random
         )
     return normal_dist
 
-def pink_noise_2d(shape, alpha=1.0):
+
+def pink_noise_2d(shape: Tuple[int, int], 
+                  alpha: float = 1.0):
     """
-    Generate 2D pink noise using frequency domain method.
+        над кодом работал:
+        Юров П.И.
+    """
+    """
+    Генерирует 2D 1/f^a шум.
     
-    Parameters:
-    - shape: Tuple (height, width) of the noise field
-    - alpha: Exponent for 1/f^alpha noise (1.0 for pink noise)
+    Аргументы:
+        shape (Tuple[int, int]): Размер выходного массива шума
+        alpha (float): Экспонента 'a' 1/f^a шума
     
-    Returns:
-    - 2D array of pink noise
+    Возвращает:
+        Матрица шума
     """
     height, width = shape
     
-    # Generate white noise
     white_noise = np.random.randn(height, width)
-    
-    # Fourier transform
+
     white_fft = np.fft.fft2(white_noise)
-    
-    # Create frequency grids
+
     freqs_y = np.fft.fftfreq(height)
     freqs_x = np.fft.fftfreq(width)
     freq_mesh = np.meshgrid(freqs_y, freqs_x, indexing='ij')
-    
-    # Calculate radial frequencies
+
     radial_freq = np.sqrt(freq_mesh[0]**2 + freq_mesh[1]**2)
-    
-    # Shift frequencies to handle negative frequencies properly
+
     radial_freq_shifted = np.fft.fftshift(radial_freq)
     white_fft_shifted = np.fft.fftshift(white_fft)
     
-    # Avoid division by zero at DC component
     with np.errstate(divide='ignore', invalid='ignore'):
-        # Apply 1/f^alpha filter (divide by f for 2D amplitude)
         scaling = np.where(radial_freq_shifted == 0, 1.0, radial_freq_shifted**(-alpha/2))
         pink_fft_shifted = white_fft_shifted * scaling
     
-    # Shift back and inverse FFT
     pink_fft = np.fft.ifftshift(pink_fft_shifted)
     pink_noise = np.real(np.fft.ifft2(pink_fft))
     
-    # Normalize to unit variance
     pink_noise = pink_noise / np.std(pink_noise)*255.0
     
     return pink_noise
