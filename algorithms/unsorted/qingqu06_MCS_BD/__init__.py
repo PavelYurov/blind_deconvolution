@@ -64,10 +64,6 @@ class Qingqu06MCSBD(DeconvolutionAlgorithm):
 		}
 
 	def process(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-		"""
-		image: BGR uint8
-		Возвращает (изображение-плейсхолдер, оцененное ядро размытия).
-		"""
 
 		if image.ndim == 3:
 			gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)

@@ -11,14 +11,6 @@ SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "source")
 KERNEL_PLACEHOLDER = np.array([[0.0]], dtype=np.float64)
 
 class MaxMBImageRestorationWienerBlind(DeconvolutionAlgorithm):
-	"""
-	Обёртка над MATLAB-реализацией Максимилиано Барроса:
-	- режим 'blind' использует deconvblind с гауссовским PSF, как в MAIN.m;
-	- режим 'wiener_snr' использует wiener_filter_SNR с тем же PSF.
-
-	Возвращает восстановленное изображение и ядро смаза (PSF).
-	"""
-
 	def __init__(
 		self,
 		mode: Literal["blind", "wiener_snr"] = "blind",
