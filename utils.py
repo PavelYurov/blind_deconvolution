@@ -1,6 +1,6 @@
 import cv2 as cv
 import numpy as np
-from typing import Callable, Optional, Tuple, Dict
+from typing import Callable, Optional, Tuple, Dict, Any
 
 """
     над кодом работал:
@@ -31,6 +31,7 @@ class Image:
         current_filter (Optional(str)): Текущий фильтр
         blurred_psnr (Dict[str, float]): Значение PSNR для смазанных изображений
         blurred_ssim (Dict[str, float]): Значение SSIM для смазанных изображений
+        mapping_data
 
     Структура:
     основное изображение original_path - то, от чего начинается связь
@@ -76,12 +77,15 @@ class Image:
         self.current_filter = None
         self.blurred_psnr = {}
         self.blurred_ssim = {}
+        self.mapping_data = {}
 
-    # def set_mapping_data(self, mapping_data: ) -> None:
-    #     self.mapping_data = mapping_data
+    def set_mapping_data(self, mapping_data: Dict[str, Any]) -> None:
+        """Полностью переопределяет информацию об выравнивании гистограмм"""
+        self.mapping_data = mapping_data
 
-    # def get_mapping_data(self):
-    #     return self.mapping_data
+    def get_mapping_data(self) -> Dict[str, Any]:
+        """Возвращает информацию об выравнивании гистограмм"""
+        return self.mapping_data
 
     def set_blurred_PSNR(self, psnr: Dict[str, float])  -> None:
         """Полностью переопределяет psnr смазанных изображений"""
