@@ -20,18 +20,18 @@ class Image:
         original_path (str): Путь к исходному изображению
         blurred_path (Optional[str]): Путь к размытому изображению
         blurred_array (np.ndarray): Несколько вариантов одной размытого изображения
-        restored_paths (Dict[str, str]): Список путей к восстановленным изображениям
+        restored_paths (Dict[Tuple[str, str], str]): Список путей к восстановленным изображениям
         is_color (bool): Цветное или черно-белое изображение
-        psnr (Dict[str, float]): Значения PSNR для восстановленных изображений
-        ssim (Dict[str, float]): Значения SSIM для восстановленных изображений
+        psnr (Dict[Tuple[str, str], float]): Значения PSNR для восстановленных изображений
+        ssim (Dict[Tuple[str, str], float]): Значения SSIM для восстановленных изображений
         algorithm (np.ndarray): Названия использованных алгоритмов восстановления
         filters (Dict[str, str]): Названия использованных фильров зашумления
-        kernel_paths (Dict[str, str]): Путь к полученным psf
+        kernel_paths (Dict[Tuple[str, str], str]): Путь к полученным psf
         original_kernels_path (Dict[str, str]): Путь к изначальным psf
         current_filter (Optional(str)): Текущий фильтр
         blurred_psnr (Dict[str, float]): Значение PSNR для смазанных изображений
         blurred_ssim (Dict[str, float]): Значение SSIM для смазанных изображений
-        mapping_data
+        he_data (str): изображения до выравнивания гистограм, для его обращения
 
     Структура:
     основное изображение original_path - то, от чего начинается связь
@@ -77,15 +77,15 @@ class Image:
         self.current_filter = None
         self.blurred_psnr = {}
         self.blurred_ssim = {}
-        self.mapping_data = {}
+        self.he_data = None
 
-    def set_mapping_data(self, mapping_data: Dict[str, Any]) -> None:
+    def set_he_data(self, he_data: str) -> None:
         """Полностью переопределяет информацию об выравнивании гистограмм"""
-        self.mapping_data = mapping_data
+        self.he_data = he_data
 
-    def get_mapping_data(self) -> Dict[str, Any]:
+    def get_he_data(self) -> str:
         """Возвращает информацию об выравнивании гистограмм"""
-        return self.mapping_data
+        return self.he_data
 
     def set_blurred_PSNR(self, psnr: Dict[str, float])  -> None:
         """Полностью переопределяет psnr смазанных изображений"""
@@ -123,15 +123,18 @@ class Image:
         """Добавляет/переопределяет путь к ядру конкретного смазанного изображения"""
         self.original_kernels_path[blur_path] = kernel
 
-    def get_kernels(self) -> Dict[str, str]:
+    def get_kernels(self) -> Dict[Tuple[str, str], str]:
         """Возвращает список путей к ядрам восстановленных изображений"""
         return self.kernel_paths.copy()
 
-    def set_kernels(self, kernels: Dict[str, str]) -> None:
+    def set_kernels(self, kernels: Dict[Tuple[str, str], str]) -> None:
         """Полностью переопределяет пути к ядрам восстановленных изображений"""
         self.kernel_paths = kernels
 
-    def add_kernel(self, kernel, blur_path, alg_path) -> None:
+    def add_kernel(self, 
+                   kernel: str, 
+                   blur_path: str, 
+                   alg_path: str) -> None:
         """Добавляет/переопределяет путь к ядру конкретно заданного метода,
           примененного к конкретному смазанному изображению"""
         self.kernel_paths[(blur_path, alg_path)] = kernel
@@ -219,12 +222,18 @@ class Image:
         """Полностью переопределяет буфер смазанных изображений"""
         self.blurred_path = blurred_path
 
-    def set_restored(self, restored_paths: Dict[str, str]) -> None:
+    def set_restored(self, restored_paths: Dict[Tuple[str, str], str]) -> None:
         """Полностью переопределяет восстановленные изображения"""
         self.restored_paths = restored_paths
 
-    def add_restored(self, restored_paths: str, blur_path: str, alg_name: str) -> None:
-        """Добавляет/переопределяет путь восстановленного изображения определенным алгоритмом к определенному смазанному изображению"""
+    def add_restored(self, 
+                     restored_paths: str, 
+                     blur_path: str, 
+                     alg_name: str) -> None:
+        """
+        Добавляет/переопределяет путь восстановленного изображения
+        определенным алгоритмом к определенному смазанному изображению
+        """
         self.restored_paths[(blur_path, alg_name)] = restored_paths
 
     def get_original(self) -> str:
@@ -245,29 +254,29 @@ class Image:
         """Возвращает флаг цвета"""
         return self.is_color
 
-    def set_PSNR(self, psnr) -> None:
+    def set_PSNR(self, psnr: Dict[Tuple[str, str], str]) -> None:
         """Полностью переопределяет psnr восстановленных изображений"""
         self.psnr = psnr
 
-    def set_SSIM(self, ssim) -> None:
+    def set_SSIM(self, ssim: Dict[Tuple[str, str], str]) -> None:
         """Полностью переопределяет ssim восстановленных изображений"""
         self.ssim = ssim
 
-    def add_PSNR(self, psnr: float, blur_path, alg_name) -> None:
+    def add_PSNR(self, psnr: float, blur_path: str, alg_name: str) -> None:
         """Добавляет/переопределяет psnr конкретного восстановленного изображения"""
         self.psnr[(blur_path, alg_name)] = psnr
 
-    def add_SSIM(self, ssim: float, blur_path, alg_name) -> None:
+    def add_SSIM(self, ssim: float, blur_path: str, alg_name: str) -> None:
         """Добавляет/переопределяет ssim конкретного воссстановленного изображения"""
         self.ssim[(blur_path, alg_name)] = ssim
 
-    def get_PSNR(self) -> float:
+    def get_PSNR(self) -> Dict[Tuple[str, str], str]:
         """Возвращает список psnr восстановленных изображений"""
         return (
             self.psnr.copy()
         )
 
-    def get_SSIM(self) -> float:
+    def get_SSIM(self) -> Dict[Tuple[str, str], str]:
         """Возвращает список ssim восстановленных изображений"""
         return (
             self.ssim.copy()

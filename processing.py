@@ -1,3 +1,5 @@
+
+
 import numpy as np
 import os
 import glob
@@ -9,9 +11,10 @@ import pandas as pd
 from pathlib import Path
 import json
 from typing import Callable, Optional, Tuple, Dict, Any
+from skimage.exposure import equalize_hist, equalize_adapthist, histogram, match_histograms, cumulative_distribution
 
 import utils
-import filters.base as filter
+import filters.base as filters
 import metrics 
 import algorithms.base as base
 
@@ -24,7 +27,7 @@ from extensions import ParetoFrontAnalyzer
 """
     над кодом работал:
     Юров П.И.
-    Беззаборов А.А
+    Беззаборов А.А.
     Куропатов К.Л.
 """
 
@@ -175,9 +178,9 @@ class Processing:
                           blurred_path: str, 
                           original_image: np.ndarray, 
                           alg_arr: np.ndarray, 
-                          restored_psnr: Dict[(str, str), str], 
-                          restored_ssim: Dict[(str, str), str], 
-                          restored_paths: Dict[(str, str), str], 
+                          restored_psnr: Dict[Tuple[str, str], str], 
+                          restored_ssim: Dict[Tuple[str, str], str], 
+                          restored_paths: Dict[Tuple[str, str], str], 
                           blurred_psnr: Dict[str, float], 
                           blurred_ssim: Dict[str, float], 
                           axes: Any, 
@@ -213,9 +216,9 @@ class Processing:
                              img_obj: utils.Image, 
                              blurred_path: str, 
                              alg_name: str, 
-                             restored_psnr: Dict[(str, str), str], 
-                             restored_ssim: Dict[(str, str), str], 
-                             restored_paths: Dict[(str, str), str], 
+                             restored_psnr: Dict[Tuple[str, str], str], 
+                             restored_ssim: Dict[Tuple[str, str], str], 
+                             restored_paths: Dict[Tuple[str, str], str], 
                              axes: Any, 
                              line: int, 
                              col: int) -> None:
@@ -263,7 +266,7 @@ class Processing:
                            blurred_path: str, 
                            alg_arr: np.ndarray, 
                            original_kernels: Dict[str, str], 
-                           kernels: Dict[(str, str), str], 
+                           kernels: Dict[Tuple[str, str], str], 
                            axes: Any, 
                            line: int, 
                            kernel_intencity_scale: float, 
@@ -297,7 +300,7 @@ class Processing:
                               img_obj: utils.Image, 
                               blurred_path: str, 
                               alg_name: str, 
-                              kernels: Dict[(str, str), str],
+                              kernels: Dict[Tuple[str, str], str],
                               axes: Any, 
                               line: int, 
                               col: int, 
@@ -316,199 +319,133 @@ class Processing:
         except Exception as e:
             pass
 
+    def _float_img_to_int(self, image: np.ndarray) -> np.ndarray:
+        '''Переводит изображение из диапозона [0.0 1.0] в диапозон [0 255]'''
+        return np.clip(image*255.0, 0.0, 255.0).astype(np.int16)
+    
     def histogram_equalization(self, 
-                               view_histogram=False, 
-                               inplace=True) -> None:
+                               view_histogram: bool = False) -> None:
         '''Выполняет выравнивание гистограмм'''
         for img_obj in self.images:
             current_image = img_obj.get_blurred_image()
-            filtered_image, mapping_data = self._histogram_equalization_one(current_image, view_histogram)
-            if inplace:
-                original_filename = Path(img_obj.get_blurred()).name
-                new_path = self.folder_path_blurred / original_filename
-                cv.imwrite(str(new_path), filtered_image)
-                img_obj.set_blurred(str(new_path))
-                img_obj.set_mapping_data(mapping_data)
-            else:
-                #не доделано
-                #должно быть выравнивание гистограмм с сохранением в другой файл
-                pass
+            original_blurred_image = current_image.copy()
+            filtered_image = equalize_hist(current_image, nbins=256)
+            filtered_image = self._float_img_to_int(filtered_image)
+            
+            original_filename = Path(img_obj.get_blurred()).name
+            new_path = self.folder_path_blurred / f'hist_eq_orig_{str(original_filename)}'
 
-        pass
+            cv.imwrite(str(new_path), original_blurred_image)
+            cv.imwrite(str(img_obj.get_blurred()), filtered_image)
 
-    def _histogram_equalization_one(self, 
-                                    image: np.ndarray, 
-                                    view_histogram: bool) -> Tuple[np.ndarray, dict]:
-        '''Выравнивание гистограмм для одного изображения'''
-        cdx = self._get_cdx(image)
-        cdx_min = self._get_min_cdx(cdx)
-        h,w = np.shape(image)
-        new_image = image.copy()
-        image_tmp = image.copy().astype(np.int16)
-        pixels = h*w
-        for i in range(0,h):
-            for j in range(0,w):
-                try:
-                    new_image[i,j] = round((self._cdf(cdx,image_tmp[i,j])- cdx_min)*255/(pixels-cdx_min))
-                except:
-                    print(f'{image[i,j]}',
-                          f'{cdx[255]}', 
-                          f'{np.sum(cdx[0:(image_tmp[i,j]+1)])}', 
-                          f'{self._cdf(cdx,image[i,j])}', 
-                          f'{(self._cdf(cdx,image[i,j])- cdx_min)/(pixels-cdx_min)*255}')
-        new_image = new_image.astype(np.int16)
+            img_obj.set_he_data(new_path)
 
-        forward_lut = np.zeros(256, dtype=np.float32)
-        for intensity in range(256):
-            cdf_value = self._cdf(cdx, intensity)
-            forward_lut[intensity] = round((cdf_value - cdx_min) * 255 / (pixels - cdx_min))
-        
-        mapping_data = {
-            'forward_lut': forward_lut,
-            'cdx_min': cdx_min,
-            'pixels': pixels,
-            'original_cdx': cdx,
-            'max_original_intensity': np.max(image)
-        }
+            if (view_histogram):
+                hist1 = histogram(original_blurred_image)
+                hist2 = histogram(filtered_image)
+                plt.figure(figsize=(12, 6))
+                plt.bar(hist1[1], hist1[0], alpha=0.5, color='blue')
+                plt.bar(hist2[1], hist2[0], alpha=0.5, color='red')
+                plt.grid(alpha=0.3)
+                plt.show()
+                
+                cdf1 = cumulative_distribution(original_blurred_image)
+                cdf2 = cumulative_distribution(filtered_image)
+                plt.figure(figsize=(12, 6))
+                plt.plot(cdf1[0], cdf1[1], color='blue')
+                plt.plot(cdf2[0], cdf2[1], color='red')
+                plt.show()
 
-        if (view_histogram):
-            x = np.arange(256)
-            cdx2 = self._get_cdx(new_image)
-            plt.figure(figsize=(12, 6))
-            plt.bar(x, cdx, alpha=0.5, color='blue')
-            plt.bar(x, cdx2, alpha=0.5, color='red')
-            plt.grid(alpha=0.3)
-            plt.show()
-            #добавить график распределения
-        return new_image, mapping_data
-    
-    def _get_cdx(self, image: np.ndarray) -> np.ndarray:
-        '''Возвращает распределение цветов на изображении'''
-        arr = [0]*256
-        for i in image:
-            for j in i:
-                value = j
-                arr[value]+=1
-        return arr
-
-    def _cdf(self,
-              cdx: np.ndarray, 
-              x: int) -> int:
-        '''Возвращает распределение цветов'''
-        return np.sum(cdx[0:x+1])
-    
-    def _get_min_cdx(self, cdx: np.ndarray) -> int:
-        '''Возвращает минимальный цвет'''
-        for i in range(0,255):
-            if(cdx[i]!=0):
-                return cdx[i]
-        return 0
-    
-    def inverse_histogram_equalization(self, 
-                                       view_histogram: bool = False, 
-                                       inplace: bool = True) -> None:
-        '''Обращение выравнивания гистограмм'''
+    def histogram_equalization_CLAHE(self, 
+                               view_histogram: bool = False,
+                               clip_limit: float = 0.01) -> None:
+        '''Выполняет адаптивное выравнивание гистограмм с ограничением контрастности'''
         for img_obj in self.images:
             current_image = img_obj.get_blurred_image()
-            original_image = img_obj.get_original_image()
-            filtered_image = self._inverse_histogram_equalization_one(current_image,img_obj.get_mapping_data(),view_histogram)
-            if inplace:
-                original_filename = Path(img_obj.get_blurred()).name
-                new_path = self.folder_path_blurred / original_filename
+            original_blurred_image = current_image.copy()
+            filtered_image = equalize_adapthist(current_image, 
+                                                nbins=256, 
+                                                clip_limit=clip_limit)
+            filtered_image = self._float_img_to_int(filtered_image)
+            
+            original_filename = Path(img_obj.get_blurred()).name
+            new_path = self.folder_path_blurred / f'hist_eq_orig_{str(original_filename)}'
 
-                try:
-                    psnr_val = metrics.PSNR(original_image, filtered_image)
-                except:
-                    psnr_val = math.nan
+            cv.imwrite(str(new_path), original_blurred_image)
+            cv.imwrite(str(img_obj.get_blurred()), filtered_image)
+
+            img_obj.set_he_data(new_path)
+
+            if (view_histogram):
+                hist1 = histogram(original_blurred_image)
+                hist2 = histogram(filtered_image)
+                plt.figure(figsize=(12, 6))
+                plt.bar(hist1[1], hist1[0], alpha=0.5, color='blue')
+                plt.bar(hist2[1], hist2[0], alpha=0.5, color='red')
+                plt.grid(alpha=0.3)
+                plt.show()
                 
-                try:
-                    ssim_val = metrics.SSIM(original_image, filtered_image)
-                except:
-                    ssim_val = math.nan
+                cdf1 = cumulative_distribution(original_blurred_image)
+                cdf2 = cumulative_distribution(filtered_image)
+                plt.figure(figsize=(12, 6))
+                plt.plot(cdf1[0], cdf1[1], color='blue')
+                plt.plot(cdf2[0], cdf2[1], color='red')
+                plt.show()
+    
+    def inverse_histogram_equalization(self, 
+                                       view_histogram: bool = False) -> None:
+        '''Обращает выравнивание гистограмм'''
+        for img_obj in self.images:
+            current_image = img_obj.get_blurred_image()
+            blurred_path = img_obj.get_blurred()
+            restored_array = img_obj.get_restored()
+            original_blurred_image = cv.imread(img_obj.get_he_data(), 
+                                               cv.IMREAD_COLOR if img_obj.get_color() else cv.IMREAD_GRAYSCALE)
+            
+            filtered_image = self.inverse_histogram_equalization_one(current_image, 
+                                                                original_blurred_image, 
+                                                                view_histogram)
+            
+            cv.imwrite(str(img_obj.get_blurred()), filtered_image)
+
+            for alg_name in img_obj.get_algorithm():
+                current_image_path = restored_array[(blurred_path, alg_name)]
+                current_image = cv.imread(current_image_path, 
+                                          cv.IMREAD_COLOR if img_obj.get_color() else cv.IMREAD_GRAYSCALE)
                 
-                img_obj.add_blurred_PSNR(psnr_val, str(new_path))
-                img_obj.add_blurred_SSIM(ssim_val, str(new_path))
+                filtered_image = self.inverse_histogram_equalization_one(current_image, 
+                                                                         original_blurred_image, 
+                                                                         view_histogram)
+                cv.imwrite(str(current_image_path), filtered_image)
+            
+            
+    def inverse_histogram_equalization_one(self, 
+                                           current_image: np.ndarray, 
+                                           original_blurred_image: np.ndarray, 
+                                           view_histogram: bool = False) -> np.ndarray:
+        '''Выподняет обращение выравнивания для одного изображения'''
 
-                cv.imwrite(str(new_path), filtered_image)
-                img_obj.set_blurred(str(new_path))
-            else:
-                #доделать
-                pass
-        
-    def _inverse_histogram_equalization_one(self, 
-                                            image: np.ndarray, 
-                                            mapping_data: Dict[str, Any],
-                                            view_histogram: bool) -> np.ndarray:
-        '''обращение гистограмм для одного изображения'''
-        forward_lut = mapping_data['forward_lut']
-        cdx_min = mapping_data['cdx_min']
-        original_cdx = mapping_data['original_cdx']
-        pixels = mapping_data['pixels']
-        max_original = mapping_data['max_original_intensity']
-
-        inverse_lut = np.zeros(256, dtype=np.float32)
-        
-        for output_val in range(256):
-            possible_inputs = np.where(np.abs(forward_lut - output_val) < 0.5)[0]
-            if len(possible_inputs) > 0:
-                inverse_lut[output_val] = np.mean(possible_inputs)
-            else:
-                if output_val > 0:
-                    idx_above = np.where(forward_lut > output_val)[0]
-                    idx_below = np.where(forward_lut < output_val)[0]
-                    
-                    if len(idx_above) > 0 and len(idx_below) > 0:
-                        above_val = idx_above[0]
-                        below_val = idx_below[-1]
-
-                        ratio = (output_val - forward_lut[below_val]) / (forward_lut[above_val] - forward_lut[below_val])
-                        inverse_lut[output_val] = below_val + ratio * (above_val - below_val)
-                    else:
-                        inverse_lut[output_val] = output_val
-                else:
-                    inverse_lut[output_val] = 0
-        
-        inverse_lut = np.clip(inverse_lut, 0, max_original)
-
-        restored_image = inverse_lut[image].astype(np.int16)
-        
-        cdx = self._get_cdx(image)
+        filtered_image = match_histograms(image=current_image, 
+                                          reference=original_blurred_image)
 
         if (view_histogram):
-            x = np.arange(256)
-            cdx2 = self._get_cdx(restored_image)
+            hist1 = histogram(current_image)
+            hist2 = histogram(filtered_image)
             plt.figure(figsize=(12, 6))
-            plt.bar(x, cdx, alpha=0.5, color='blue')
-            plt.bar(x, cdx2, alpha=0.5, color='red')
+            plt.bar(hist1[1], hist1[0], alpha=0.5, color='blue')
+            plt.bar(hist2[1], hist2[0], alpha=0.5, color='red')
             plt.grid(alpha=0.3)
             plt.show()
-            #добавить распределение
-
-        return restored_image
-
-    def _inverse_histogram_equation(self,
-                                     equalized_image: np.ndarray, 
-                                     mapping_data: Dict[str, Any]) -> np.ndarray:
-        """Обратное преобразование через решение уравнения"""
-        forward_lut = mapping_data['forward_lut']
-        cdx_min = mapping_data['cdx_min']
-        pixels = mapping_data['pixels']
-        
-        inverse_lut = np.zeros(256, dtype=np.float32)
-        
-        for output_val in range(256):
-            target_cdf = (output_val * (pixels - cdx_min) / 255) + cdx_min
-
-            original_cdf = np.cumsum(mapping_data['original_cdx'])
-
-            cdf_diff = np.abs(original_cdf - target_cdf)
-            best_input = np.argmin(cdf_diff)
             
-            inverse_lut[output_val] = best_input
-
-        restored_image = inverse_lut[equalized_image].astype(np.int16)
+            cdf1 = cumulative_distribution(current_image)
+            cdf2 = cumulative_distribution(filtered_image)
+            plt.figure(figsize=(12, 6))
+            plt.plot(cdf1[0], cdf1[1], color='blue')
+            plt.plot(cdf2[0], cdf2[1], color='red')
         
-        return restored_image
+            plt.show()
+        return filtered_image
+
 
     def get_table(self,
                    table_path: Path, 
@@ -1008,7 +945,7 @@ class Processing:
             image = np.zeros((100, 100), dtype=np.uint8) # Черный квадрат-заглушка
         return image
 
-    def filter(self, filter_processor: filter.FilterBase) -> None:
+    def filter(self, filter_processor: filters.FilterBase) -> None:
         '''
         Примерние фильтра ко всем изображениям
         '''
@@ -1017,7 +954,7 @@ class Processing:
         
     def _apply_single_filter(self, 
                              img_obj: utils.Image, 
-                             filter_processor: filter.FilterBase) -> None:
+                             filter_processor: filters.FilterBase) -> None:
         '''
         Применение фильтра к одному изображению
         '''
@@ -1058,7 +995,7 @@ class Processing:
 
     def _process_kernel(self, 
                         img_obj: utils.Image, 
-                        filter_processor: filter.FilterBase, 
+                        filter_processor: filters.FilterBase, 
                         new_path: Path, 
                         original_filename: str) -> None:
         '''
