@@ -1,26 +1,32 @@
+"""
+Различные методы шумоподавления
+
+Содержит:
+    - Сглаживание по гауссу (расфокус, как денойзинг)
+    - Усредняющее сглаживание 
+    - Метод анизотропной диффузии
+    - Метод Non-Local Means (NLM)
+    - Метод медианной фильтрации
+    - Вейвлет преобразование
+    - Метод билатерального преобразования
+    - Метод Total Variation (две его реализации)
+
+Автор: Юров П.И. Беззаборов А.А.
+"""
 import numpy as np
 import random
-from typing import Callable, Optional, Tuple
+from typing import Callable, Optional, Tuple, Union
 from random import sample
 from .base import FilterBase
 from scipy.signal import lfilter, butter, sosfilt
 from medpy.filter.smoothing import anisotropic_diffusion
 import cv2 as cv
 
-from .colored_noise import powerlaw_psd_gaussian, pink_noise_2d
 from skimage.restoration import denoise_nl_means, estimate_sigma, denoise_wavelet, denoise_bilateral, denoise_tv_bregman, denoise_tv_chambolle
 from scipy.ndimage import median_filter
 
-"""
-    над кодом работал:
-    Юров П.И.
-"""
 
 class LinearSmoothing(FilterBase):
-    """
-        над кодом работал:
-        Юров П.И.
-    """
     """
     Метод гауссова размытия для уменьшения шума.
 
@@ -49,10 +55,6 @@ class LinearSmoothing(FilterBase):
     
 
 class AnisotropicDiffusion(FilterBase):
-    """
-        над кодом работал:
-        Юров П.И.
-    """
     """
     Метод анизотропной диффузии для уменьшения шума на изображении.
 
@@ -100,10 +102,6 @@ class AnisotropicDiffusion(FilterBase):
 
 
 class NonLocalMeans(FilterBase):
-    """
-        над кодом работал:
-        Юров П.И.
-    """
     """
     Метод Non-Local Means (NLM) уменьшения шума на изображении.
 
@@ -153,10 +151,6 @@ class NonLocalMeans(FilterBase):
 
 class MedianFilter(FilterBase):
     """
-        над кодом работал:
-        Юров П.И.
-    """
-    """
     Метод медианной фильтрации для уменьшения шума на изображении.
 
     Аргументы:
@@ -183,10 +177,6 @@ class MedianFilter(FilterBase):
 
 
 class Wavelet(FilterBase):
-    """
-        над кодом работал:
-        Юров П.И.
-    """
     """
     Метод уменьшения шума на изображении с помощью вейвлетов.
 
@@ -240,11 +230,7 @@ class Wavelet(FilterBase):
         return np.clip(denoised_image,0.0,255.0).astype(image.dtype)
 
 
-class BilateralFilter(FilterBase):
-    """
-        над кодом работал:
-        Юров П.И.
-    """
+class BilateralFilter_sk(FilterBase):
     """
     Метод билатерального преобразования для уменьшения шума на изображении.
 
@@ -293,17 +279,14 @@ class BilateralFilter(FilterBase):
                                             win_size=self.win_size,
                                             sigma_color=self.sigma_color,
                                             sigma_spatial=self.sigma_spatial,
-                                            bins=self.bins,mode=self.mode,
+                                            bins=self.bins,
+                                            mode=self.mode,
                                             cval=self.cval)
         denoised_image *= 255.0
         return np.clip(denoised_image,0.0,255.0).astype(image.dtype)
 
 
 class TV_bregman(FilterBase):
-    """
-        над кодом работал:
-        Юров П.И.
-    """
     """
     Метод Total Variation с оптимизацией Брегмана.
 
@@ -350,10 +333,6 @@ class TV_bregman(FilterBase):
 
 class TV_Chambolle(FilterBase):
     """
-        над кодом работал:
-        Юров П.И.
-    """
-    """
     Метод Total Variation реализованный алгоритмом Шамболле.
 
     Аргументы:
@@ -392,9 +371,150 @@ class TV_Chambolle(FilterBase):
         denoised_image *= 255
         return np.clip(denoised_image,0.0,255.0).astype(image.dtype)
 
-class WienerFilter(FilterBase): # в планах реализовать
-    pass
 
+class MeanBlur(FilterBase):
+    """
+    Усредняющий (боксовый) фильтр размытия.
+    
+    Параметры:
+        kernel_size (int): Размер усредняющего ядра (должен быть нечетным и положительным)
+    """
+
+    def __init__(self, kernel_size: int) -> None:
+        """
+        Усредняющий (боксовый) фильтр размытия.
+        
+        Параметры:
+            kernel_size (int): Размер усредняющего ядра (должен быть нечетным и положительным)
+        """
+        if kernel_size <= 0 or kernel_size % 2 == 0:
+            raise ValueError("Размер ядра должен быть положительным нечетным числом")
+        super().__init__(kernel_size, 'blur')
+        self.kernel_size = kernel_size
+
+    def discription(self) -> str:
+        """Выдает название смаза с параметром."""
+        return f"|meanblur_{self.kernel_size}"
+
+    def filter(self, image: np.ndarray) -> np.ndarray:
+        """
+        Применить усредняющее размытие к изображению.
+        
+        Аргументы:
+            img: Входное изображение (в градациях серого или цветное)
+            
+        Возвращает:
+            Размытое изображение
+        """
+        return cv.blur(image, (self.kernel_size, self.kernel_size))
+    
+
+class MedianBlur(FilterBase):
+
+    """
+    Медианный фильтр (эффективен против шума "соль-перец").
+    
+    Параметры:
+        kernel_size (int): Размер медианного ядра (должен быть нечетным и >=3)
+    """
+
+    def __init__(self, kernel_size: int) -> None:
+        """
+        Медианный фильтр (эффективен против шума "соль-перец").
+        
+        Параметры:
+            kernel_size (int): Размер медианного ядра (должен быть нечетным и >=3)
+        """
+        if kernel_size < 3 or kernel_size % 2 == 0:
+            raise ValueError("Размер ядра должен быть нечетным числом >=3")
+        super().__init__(kernel_size, 'blur')
+        self.kernel_size = kernel_size
+
+    def discription(self) -> str:
+        """Выдает название смаза с параметром."""
+        return f"|medianblur_{self.kernel_size}"
+
+    def filter(self, image: np.ndarray) -> np.ndarray:
+        """Применить медианное размытие к изображению."""
+        return cv.medianBlur(image, self.kernel_size)
+
+
+class GaussianBlur(FilterBase):
+
+    """
+    Гауссовский фильтр размытия.
+    
+    Параметры:
+        kernel_size (int): Размер гауссовского ядра (должен быть нечетным и положительным)
+        std (float): Стандартное отклонение (0 для автоматического расчета)
+    """
+
+    def __init__(self, params: Union[int, Tuple[int, float]]) -> None:
+        """
+        Гауссовский фильтр размытия.
+        
+        Параметры:
+            kernel_size (int): Размер гауссовского ядра (должен быть нечетным и положительным)
+            std (float): Стандартное отклонение (0 для автоматического расчета)
+        """
+        if isinstance(params, int):
+            kernel_size = params
+            std = 0
+        else:
+            kernel_size, std = params
+            
+        if kernel_size <= 0 or kernel_size % 2 == 0:
+            raise ValueError("Размер ядра должен быть положительным нечетным числом")
+        super().__init__(params, 'blur')
+        self.kernel_size = kernel_size
+        self.std = std
+
+    def discription(self) -> str:
+        """Выдает название смаза с параметром."""
+        return f"|gaussianblur_{self.kernel_size}_{self.std}"
+
+    def filter(self, img: np.ndarray) -> np.ndarray:
+        """Применить гауссовское размытие к изображению."""
+        return cv.GaussianBlur(img, (self.kernel_size, self.kernel_size), self.std)
+
+
+class BilateralFilter_cv(FilterBase):
+    """
+    Билатеральный фильтр (с сохранением границ).
+    
+    Параметры:
+        d (int): Диаметр окрестности пикселя
+        sigma_color (float): Сигма фильтр в цветовом пространстве
+        sigma_space (float): Сигма фильтр в координатном пространстве
+    """
+
+    def __init__(self, params: Union[int, Tuple[int, float, float]]):
+        """
+        Билатеральный фильтр (с сохранением границ).
+        
+        Параметры:
+            d (int): Диаметр окрестности пикселя
+            sigma_color (float): Сигма фильтр в цветовом пространстве
+            sigma_space (float): Сигма фильтр в координатном пространстве
+        """
+        if isinstance(params, int):
+            d = params
+            sigma_color = sigma_space = 75
+        else:
+            d, sigma_color, sigma_space = params
+            
+        super().__init__(params, 'blur')
+        self.d = d
+        self.sigma_color = sigma_color
+        self.sigma_space = sigma_space
+
+    def discription(self) -> str:
+        """Выдает название смаза с параметром."""
+        return f"|bilateralfilter_{self.d}_{self.sigma_color}_{self.sigma_space}"
+
+    def filter(self, img: np.ndarray) -> np.ndarray:
+        """Применение билатерального фильтра к изображению."""
+        return cv.bilateralFilter(img, self.d, self.sigma_color, self.sigma_space)
 
 
 

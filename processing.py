@@ -1,5 +1,17 @@
+"""
+Фреймворк для обработки изображений
+Основной интерфейс
 
+Содержит:
+    - Методы считывания изображений из директорий
+    - Методы применения фильтров смаза и шума к изображениям
+    - Методы применения алгоритмов восстановления к смазанным изображениям
+    - Автоматический посчет метрик для смазанных и восстановленных изображений
+    - Методы сохранения результатов, метрик в виде json и csv файлов
+    - Автоматическое отслеживание связей между изображениями
 
+Авторы: Юров П.И. Беззаборов А.А. Куропатов К.Л.
+"""
 import numpy as np
 import os
 import glob
@@ -24,20 +36,8 @@ from IPython.display import display
 from extensions import HyperparameterOptimizer
 from extensions import ParetoFrontAnalyzer
 
-"""
-    над кодом работал:
-    Юров П.И.
-    Беззаборов А.А.
-    Куропатов К.Л.
-"""
 
 class Processing:
-    """
-        над кодом работали:
-        Юров П.И.
-        Беззаборов А.А.
-        Куропатов К.Л.
-    """
 
     '''
     Фреймворк для обработки изображений
@@ -91,6 +91,10 @@ class Processing:
         '''
         self.color = color
 
+    def _imread(self, path: str, color: bool) -> Optional[np.ndarray]:
+        '''Загружает изображение соответствующего цветового формата'''
+        return cv.imread(path, cv.IMREAD_COLOR if color else cv.IMREAD_GRAYSCALE)
+
     def read_all(self) -> None:
         '''Загрузка всех изображений из директории'''
         for image_file in self.folder_path.iterdir():
@@ -104,8 +108,7 @@ class Processing:
 
     def _load_image(self, image_path: str) -> None:
         '''Внутренний метод загрузки изображения'''
-        image = cv.imread(str(image_path), 
-                         cv.IMREAD_COLOR if self.color else cv.IMREAD_GRAYSCALE)
+        image = self._imread(str(image_path), self.color)
         if image is not None:
             self.images = np.append(self.images, 
                                     utils.Image(
@@ -138,7 +141,7 @@ class Processing:
         
         for img_obj in self.images:
             line = self._plot_single_image(img_obj, alg_arr, axes, 
-                                           line, kernel_intencity_scale,kernel_size)
+                                           line, kernel_intencity_scale, kernel_size)
             img_obj.load(img_obj.get_len_filter() - 1)
 
         plt.suptitle(" ", y=1.02, fontsize=14 * size)
@@ -187,8 +190,7 @@ class Processing:
                           line: int, 
                           filters_name: Dict[str, str]) -> int:
         '''Отрисовка строки с изображениями'''
-        blurred_image = cv.imread(str(blurred_path), 
-                                cv.IMREAD_COLOR if img_obj.get_color() else cv.IMREAD_GRAYSCALE)
+        blurred_image = self._imread(str(blurred_path), img_obj.get_color())
         
         plt.subplots_adjust(hspace=0.5)
 
@@ -228,8 +230,7 @@ class Processing:
         try:
             restored_path = restored_paths.get((str(blurred_path), str(alg_name)))
             if restored_path:
-                restored_image = cv.imread(restored_path, 
-                                        cv.IMREAD_COLOR if img_obj.get_color() else cv.IMREAD_GRAYSCALE)
+                restored_image = self._imread(restored_path, img_obj.get_color())
                 if restored_image is not None:
                     psnr_val = restored_psnr.get((str(blurred_path), str(alg_name)), math.nan)
                     ssim_val = restored_ssim.get((str(blurred_path), str(alg_name)), math.nan)
@@ -357,8 +358,8 @@ class Processing:
                 plt.show()
 
     def histogram_equalization_CLAHE(self, 
-                               view_histogram: bool = False,
-                               clip_limit: float = 0.01) -> None:
+                                     view_histogram: bool = False, 
+                                     clip_limit: float = 0.01) -> None:
         '''Выполняет адаптивное выравнивание гистограмм с ограничением контрастности'''
         for img_obj in self.images:
             current_image = img_obj.get_blurred_image()
@@ -399,8 +400,7 @@ class Processing:
             current_image = img_obj.get_blurred_image()
             blurred_path = img_obj.get_blurred()
             restored_array = img_obj.get_restored()
-            original_blurred_image = cv.imread(img_obj.get_he_data(), 
-                                               cv.IMREAD_COLOR if img_obj.get_color() else cv.IMREAD_GRAYSCALE)
+            original_blurred_image = self._imread(img_obj.get_he_data(), img_obj.get_color())
             
             filtered_image = self.inverse_histogram_equalization_one(current_image, 
                                                                 original_blurred_image, 
@@ -410,15 +410,13 @@ class Processing:
 
             for alg_name in img_obj.get_algorithm():
                 current_image_path = restored_array[(blurred_path, alg_name)]
-                current_image = cv.imread(current_image_path, 
-                                          cv.IMREAD_COLOR if img_obj.get_color() else cv.IMREAD_GRAYSCALE)
+                current_image = self._imread(current_image_path, img_obj.get_color())
                 
                 filtered_image = self.inverse_histogram_equalization_one(current_image, 
                                                                          original_blurred_image, 
                                                                          view_histogram)
                 cv.imwrite(str(current_image_path), filtered_image)
-            
-            
+                     
     def inverse_histogram_equalization_one(self, 
                                            current_image: np.ndarray, 
                                            original_blurred_image: np.ndarray, 
@@ -445,7 +443,6 @@ class Processing:
         
             plt.show()
         return filtered_image
-
 
     def get_table(self,
                    table_path: Path, 
@@ -701,8 +698,8 @@ class Processing:
             missing = [p for p in [original_image_path, blurred_image_path] if p and not os.path.exists(p)]
             raise FileNotFoundError(f"Files not found: {missing}")
         
-        original = cv.imread(original_image_path, cv.IMREAD_COLOR if color else cv.IMREAD_GRAYSCALE)
-        blurred = cv.imread(blurred_image_path, cv.IMREAD_COLOR if color else cv.IMREAD_GRAYSCALE)
+        original = self._imread(original_image_path, color)
+        blurred = self._imread(blurred_image_path, color)
         
         if original is None:
             raise ValueError(f"Failed to load original image: {original_image_path}")
@@ -713,15 +710,7 @@ class Processing:
         img_obj.set_blurred(blurred_image_path)
         img_obj.set_current_filter(filter_description)
 
-        try:
-            psnr_blured = metrics.PSNR(original,blurred)
-        except:
-            psnr_blured = math.nan
-
-        try:
-            ssim_blured = metrics.SSIM(original,blurred)
-        except:
-            ssim_blured = math.nan
+        psnr_blured, ssim_blured = self._calculate_metrics(original, blurred)
 
         img_obj.add_blurred_PSNR(psnr_blured,blurred_image_path)
         img_obj.add_blurred_SSIM(ssim_blured,blurred_image_path)
@@ -865,15 +854,7 @@ class Processing:
         blur_filename = Path(kernel_image_path).stem
         filtered_filename =  self.folder_path_blurred / f"{original_filename}_{blur_filename}.png"
 
-        try:
-            psnr_val = metrics.PSNR(current_image, filtered_image)
-        except:
-            psnr_val = math.nan
-        
-        try:
-            ssim_val = metrics.SSIM(current_image, filtered_image)
-        except:
-            ssim_val = math.nan
+        psnr_val, ssim_val = self._calculate_metrics(current_image, filtered_image)
 
         img_obj.add_blurred_PSNR(psnr_val, str(filtered_filename))
         img_obj.add_blurred_SSIM(ssim_val, str(filtered_filename))
@@ -938,8 +919,7 @@ class Processing:
     def _read_image_from_file(self, path: Path) -> np.ndarray:
         '''Рисует изображение из файла'''
         if os.path.exists(path):
-            # image = mpimg.imread(path)
-            image = cv.imread(path,cv.IMREAD_GRAYSCALE)
+            image = cv.imread(path, cv.IMREAD_GRAYSCALE)
         else:
             print(f"  - ПРЕДУПРЕЖДЕНИЕ: Файл не найден, будет показана заглушка: {path}")
             image = np.zeros((100, 100), dtype=np.uint8) # Черный квадрат-заглушка
@@ -974,16 +954,8 @@ class Processing:
         else:
             original_filename = Path(img_obj.get_blurred()).name
             new_path = self.folder_path_blurred / original_filename
-        
-        try:
-            psnr_val = metrics.PSNR(img_obj.get_original_image(), filtered_image)
-        except:
-            psnr_val = math.nan
-        
-        try:
-            ssim_val = metrics.SSIM(img_obj.get_original_image(), filtered_image)
-        except:
-            ssim_val = math.nan
+
+        psnr_val, ssim_val = self._calculate_metrics(img_obj.get_original_image(), filtered_image)
         
         img_obj.add_blurred_PSNR(psnr_val, str(new_path))
         img_obj.add_blurred_SSIM(ssim_val, str(new_path))
@@ -1012,8 +984,7 @@ class Processing:
             
             new_kernel_path = self._generate_unique_file_path(self.folder_path_blurred, f"kernel_{original_filename}")
         else:
-            kernel_image = cv.imread(str(kernel_path), 
-                                cv.IMREAD_COLOR if img_obj.get_color() else cv.IMREAD_GRAYSCALE)
+            kernel_image = self._imread(str(kernel_path), img_obj.get_color())
             new_kernel_path = Path(kernel_path)
         
         if filter_processor.get_type() != 'noise':
@@ -1066,7 +1037,10 @@ class Processing:
         '''
         return self.amount_of_blurred
     
-    def process(self, algorithm_processor: base.DeconvolutionAlgorithm, metadata = False, unique_path=True):
+    def process(self, 
+                algorithm_processor: base.DeconvolutionAlgorithm, 
+                metadata: bool = False, 
+                unique_path: bool = True) -> None:
         '''
         Восстановление всех изображений
         
@@ -1077,9 +1051,18 @@ class Processing:
         alg_name = algorithm_processor.get_name()
         
         for img_obj in self.images:
-            self._process_single_image(img_obj, algorithm_processor, alg_name, metadata = metadata, unique_path=unique_path)
+            self._process_single_image(img_obj, 
+                                       algorithm_processor, 
+                                       alg_name, 
+                                       metadata = metadata, 
+                                       unique_path=unique_path)
         
-    def _process_single_image(self, img_obj, algorithm_processor, alg_name, metadata=False, unique_path=True):
+    def _process_single_image(self, 
+                              img_obj: utils.Image, 
+                              algorithm_processor: base.DeconvolutionAlgorithm, 
+                              alg_name: str, 
+                              metadata: bool = False, 
+                              unique_path: bool = True) -> None:
         '''
         Восстановление одного изображения
         '''        
@@ -1093,13 +1076,15 @@ class Processing:
             print(f"Pass: Unable to load image for {img_obj.get_original()}")
             return
     
-        # try:
-        restored_image, kernel = algorithm_processor.process(blurred_image)
-        # except Exception as e:
-        #     print(f"Restore error {img_obj.get_original()}: {e}")
-        #     return
+        try:
+            restored_image, kernel = algorithm_processor.process(blurred_image)
+        except Exception as e:
+            print(f"Restore error {img_obj.get_original()}: {e}")
+            return
         
-        restored_path, kernel_path = self._generate_output_paths(img_obj, alg_name, unique_path=unique_path)
+        restored_path, kernel_path = self._generate_output_paths(img_obj, 
+                                                                 alg_name, 
+                                                                 unique_path=unique_path)
         
         try:
             cv.imwrite(str(restored_path), restored_image)
@@ -1112,9 +1097,13 @@ class Processing:
         original_image = np.atleast_3d(original_image)
         restored_image = np.atleast_3d(restored_image)
         self._calculate_and_save_metrics(img_obj, original_image, restored_image, 
-                                   restored_path, kernel_path, alg_name, algorithm_processor,metadata=metadata)
+                                   restored_path, kernel_path, alg_name, 
+                                   algorithm_processor,metadata=metadata)
     
-    def _generate_output_paths(self, img_obj, alg_name, unique_path=True):
+    def _generate_output_paths(self, 
+                               img_obj: utils.Image, 
+                               alg_name: str, 
+                               unique_path: bool = True) -> Tuple[Path, Path]:
         '''
         Генерация уникальных путей для сохранения результатов
         '''
@@ -1137,31 +1126,27 @@ class Processing:
             )
         else:
             restored_path =self.folder_path_restored / f"{base_name}_{alg_name}{base_path.suffix}"
-            
-            # kernel_path = self.folder_path_restored / f"{base_name}_{alg_name}_kernel{base_path.suffix}"
 
             kernel_path = self.kernel_dir / f"{base_name}_{alg_name}_kernel{base_path.suffix}"
         
         return restored_path, kernel_path
     
-    def _calculate_and_save_metrics(self, img_obj, original_image, restored_image, 
-                              restored_path, kernel_path, alg_name, processor, metadata = False):
+    def _calculate_and_save_metrics(self, 
+                                    img_obj: utils.Image, 
+                                    original_image: np.ndarray, 
+                                    restored_image: np.ndarray, 
+                                    restored_path: Path, 
+                                    kernel_path: Path, 
+                                    alg_name: str, 
+                                    processor: base.DeconvolutionAlgorithm, 
+                                    metadata: bool = False) -> None:
         '''
         Расчет метрик и обновление данных изображения
         '''
         original_image = self._prepare_image_for_metric(original_image)
         restored_image = self._prepare_image_for_metric(restored_image)
-        try:
-            psnr_val = metrics.PSNR(original_image, restored_image)
-        except Exception as e:
-            print(f"PSNR calculation error: {e}")
-            psnr_val = math.nan
         
-        try:
-            ssim_val = metrics.SSIM(original_image, restored_image,data_range=1.0)
-        except Exception as e:
-            print(f"SSIM calculation error: {e}")
-            ssim_val = math.nan
+        psnr_val, ssim_val = self._calculate_metrics(original_image, restored_image, data_range=1.0)
         
         blurred_ref = img_obj.get_blurred()
         
@@ -1194,26 +1179,28 @@ class Processing:
 
         print(f"Restored: {Path(restored_path).name} (PSNR: {psnr_val:.2f}, SSIM: {ssim_val:.4f})")
 
-    def _prepare_image_for_metric(self, image):
+    def _prepare_image_for_metric(self, image: np.ndarray) -> np.ndarray:
         """
         Подготовка изображения для расчета метрик с нормализацией
+        Нормируем в диапазон [0, 1] если нужно
         """
         image = np.array(image.copy(), dtype=np.float32)
 
-        
-        # Нормализуем в диапазон [0, 1] если нужно
         if image.max() > 1.0:
             image = image / 255.0
 
         if len(image.shape) == 3:
-            # image = np.dot(image[...,:3], [1.0, 0.0, 0.0])
             image = image.mean(axis=2)
         
         image = np.clip(image, 0.0, 1.0)
-        
+
         return image
 
-    def full_process(self, filters: list, methods: list, size: float = 0.75, kernel_intencity_scale = 10.0):
+    def full_process(self, 
+                     filters: list, 
+                     methods: list, 
+                     size: float = 0.75, 
+                     kernel_intencity_scale: float = 10.0) -> None:
         '''
         Пайплайн применения фильтров с последующим восстановлением и анализов результатов
         
@@ -1225,9 +1212,16 @@ class Processing:
         '''
         data_dict, analysis_dicts = self._initialize_data_structures()
         for img_obj in self.images:
-            self._process_image_pipeline(img_obj, filters, methods, data_dict, analysis_dicts)
+            self._process_image_pipeline(img_obj, 
+                                         filters, 
+                                         methods, 
+                                         data_dict, 
+                                         analysis_dicts)
         
-        self._finalize_processing(data_dict, analysis_dicts, size, kernel_intencity_scale)
+        self._finalize_processing(data_dict, 
+                                  analysis_dicts, 
+                                  size, 
+                                  kernel_intencity_scale)
         
     def _initialize_data_structures(self):
         '''
@@ -1242,23 +1236,36 @@ class Processing:
         }
         return data_dict, analysis_dicts    
     
-    def _process_image_pipeline(self, img_obj, filters, methods, data_dict, analysis_dicts):
+    def _process_image_pipeline(self, 
+                                img_obj: utils.Image, 
+                                filters: list, 
+                                methods: list, 
+                                data_dict : dict, 
+                                analysis_dicts: dict) -> None:
         '''
         Полный пайплайн обработки для одного изображения
         '''
         self._apply_filter_chains(img_obj, filters)
         
-        self._apply_restoration_and_collect_data(img_obj, methods, data_dict, analysis_dicts)   
+        self._apply_restoration_and_collect_data(img_obj, 
+                                                 methods, 
+                                                 data_dict, 
+                                                 analysis_dicts)   
     
-    def _apply_filter_chains(self, img_obj, filters):
+    def _apply_filter_chains(self, 
+                             img_obj: utils.Image, 
+                             filters: list) -> None:
         '''
         Применение цепочек фильтров к изображению
         '''
         for filter_chain in filters:
-            self._apply_single_filter_chain(img_obj, filter_chain)
+            self._apply_single_filter_chain(img_obj, 
+                                            filter_chain)
             img_obj.save_filter()
 
-    def _apply_single_filter_chain(self, img_obj, filter_chain):
+    def _apply_single_filter_chain(self, 
+                                   img_obj: utils.Image, 
+                                   filter_chain: list) -> None:
         '''
         Применение одной цепочки фильтров
         '''
@@ -1271,16 +1278,24 @@ class Processing:
         if current_image is None:
             raise Exception("Failed to load image")
         
-        filtered_image = self._apply_filters_sequential(current_image, filter_chain, img_obj)
+        filtered_image = self._apply_filters_sequential(current_image, 
+                                                        filter_chain, 
+                                                        img_obj)
         
         new_path = self._generate_blurred_image_path(img_obj)
         cv.imwrite(new_path, filtered_image)
         
-        self._update_blurred_image_data(img_obj, original_image, filtered_image, new_path)
+        self._update_blurred_image_data(img_obj, 
+                                        original_image, 
+                                        filtered_image, 
+                                        new_path)
         
         self._process_kernel_chain(img_obj, filter_chain, new_path)
     
-    def _apply_filters_sequential(self, image, filter_chain, img_obj):
+    def _apply_filters_sequential(self, 
+                                  image: np.ndarray, 
+                                  filter_chain: list, 
+                                  img_obj: utils.Image) -> np.ndarray:
         '''
         Последовательное применение фильтров цепочки
         '''
@@ -1290,7 +1305,7 @@ class Processing:
             img_obj.add_to_current_filter(filter_processor.discription())
         return filtered_image
 
-    def _generate_blurred_image_path(self, img_obj):
+    def _generate_blurred_image_path(self, img_obj: utils.Image) -> Path:
         '''
         Генерация пути для размытого изображения
         '''
@@ -1301,21 +1316,25 @@ class Processing:
             original_filename = Path(img_obj.get_blurred()).name
             return self.folder_path_blurred / original_filename
     
-    def _update_blurred_image_data(self, img_obj, original_image, filtered_image, new_path):
+    def _update_blurred_image_data(self, 
+                                   img_obj: utils.Image, 
+                                   original_image: np.ndarray, 
+                                   filtered_image: np.ndarray, 
+                                   new_path: str) -> None:
         '''
         Обновление данных размытого изображения
         '''
-        try:
-            psnr_val = metrics.PSNR(original_image, filtered_image)
-            ssim_val = metrics.SSIM(original_image, filtered_image)
-        except:
-            psnr_val = ssim_val = math.nan
+
+        psnr_val, ssim_val = self._calculate_metrics(original_image, filtered_image)
         
         img_obj.add_blurred_PSNR(psnr_val, str(new_path))
         img_obj.add_blurred_SSIM(ssim_val, str(new_path))
         img_obj.set_blurred(str(new_path))
     
-    def _process_kernel_chain(self, img_obj, filter_chain, new_path):
+    def _process_kernel_chain(self, 
+                              img_obj: utils.Image, 
+                              filter_chain: list, 
+                              new_path: str) -> None:
         '''
         Обработка ядра для цепочки фильтров
         '''
@@ -1326,17 +1345,19 @@ class Processing:
             kernel_image = self._create_delta_kernel(img_obj)
             new_kernel_path = self.folder_path_blurred / f"kernel_{Path(new_path).name}"
         else:
-            kernel_image = cv.imread(str(kernel_path), 
-                                cv.IMREAD_COLOR if img_obj.get_color() else cv.IMREAD_GRAYSCALE)
+            kernel_image = self._imread(str(kernel_path), img_obj.get_color())
             new_kernel_path = Path(kernel_path)
         
         for filter_processor in filter_chain:
-            kernel_image = filter_processor.filter(kernel_image)
+            if filter_processor.get_type() != 'noise':
+                kernel_image = filter_processor.filter(kernel_image)
+            else:
+                kernel_image = kernel_image
         
         cv.imwrite(str(new_kernel_path), kernel_image)
         img_obj.add_original_kernel(str(new_kernel_path), str(new_path)) 
         
-    def _create_delta_kernel(self, img_obj):
+    def _create_delta_kernel(self, img_obj: utils.Image) -> np.ndarray:
         '''Создание дельта-функции (единичного импульса)'''
         kernel_image = img_obj.get_original_image().copy()
         kernel_image *= 0
@@ -1344,18 +1365,26 @@ class Processing:
         kernel_image[h//2, w//2] = 255
         return kernel_image   
     
-    def _apply_restoration_and_collect_data(self, img_obj, methods, data_dict, analysis_dicts):
+    def _apply_restoration_and_collect_data(self, 
+                                            img_obj: utils.Image, 
+                                            methods: list, 
+                                            data_dict: dict, 
+                                            analysis_dicts: dict) -> None:
         '''Восстановление изображений и сбор данных'''
         for blurred_path in img_obj.get_blurred_array():
-            blurred_image = cv.imread(str(blurred_path), 
-                                    cv.IMREAD_COLOR if img_obj.get_color() else cv.IMREAD_GRAYSCALE)
+            blurred_image = self._imread(str(blurred_path), img_obj.get_color())
             
             for algorithm in methods:
                 self._restore_single_image(img_obj, blurred_path, blurred_image, algorithm, data_dict)
             
             self._collect_analysis_data(img_obj, blurred_path, analysis_dicts)
             
-    def _restore_single_image(self, img_obj, blurred_path, blurred_image, algorithm, data_dict):
+    def _restore_single_image(self, 
+                              img_obj: utils.Image, 
+                              blurred_path: Path, 
+                              blurred_image: np.ndarray, 
+                              algorithm: base.DeconvolutionAlgorithm, 
+                              data_dict: dict) -> None:
         '''
         Восстановление одного изображения алгоритмом
         '''
@@ -1369,8 +1398,10 @@ class Processing:
             
             cv.imwrite(restored_path, restored_image)
             cv.imwrite(kernel_path, restored_kernel)
-            
-            psnr_val, ssim_val = self._calculate_restoration_metrics(original_image, restored_image)
+
+            restored_image = self._prepare_image_for_metric(restored_image)
+            original_image = self._prepare_image_for_metric(original_image)
+            psnr_val, ssim_val = self._calculate_metrics(original_image, restored_image, data_range=1.0)
             
             self._update_restoration_data(img_obj, blurred_path, alg_name, 
                                         restored_path, kernel_path, psnr_val, ssim_val)
@@ -1382,7 +1413,9 @@ class Processing:
         except Exception as e:
             print(f"Restore error {blurred_path} of {alg_name}: {e}")
     
-    def _generate_restoration_paths(self, blurred_path, alg_name):
+    def _generate_restoration_paths(self, 
+                                    blurred_path: Path, 
+                                    alg_name: str) -> tuple[str, str]:
         '''
         Генерация путей для восстановленных изображений и ядер
         '''
@@ -1400,18 +1433,30 @@ class Processing:
         )
         
         return str(restored_path), str(kernel_path)
-        
-    def _calculate_restoration_metrics(self, original_image, restored_image):
-        '''Расчет метрик восстановления'''
+  
+    def _calculate_metrics(self, 
+                           original_image: np.ndarray, 
+                           restored_image: np.ndarray,
+                           data_range: Optional[float] = None) -> tuple[float, float]:
+        '''Расчет метрик'''
         try:
             psnr_val = metrics.PSNR(original_image, restored_image)
-            ssim_val = metrics.SSIM(original_image, restored_image)
-            return psnr_val, ssim_val
         except:
-            return math.nan, math.nan  
+            psnr_val = math.nan
+        try:
+            ssim_val = metrics.SSIM(original_image, restored_image, data_range=data_range)
+        except:
+            ssim_val = math.nan 
+        return psnr_val, ssim_val 
     
-    def _update_restoration_data(self, img_obj, blurred_path, alg_name, 
-                           restored_path, kernel_path, psnr_val, ssim_val):
+    def _update_restoration_data(self, 
+                                 img_obj: utils.Image, 
+                                 blurred_path: Path, 
+                                 alg_name: str, 
+                                 restored_path: Path, 
+                                 kernel_path: Path, 
+                                 psnr_val: float, 
+                                 ssim_val: float) -> None:
         '''
         Обновление данных восстановления
         '''
@@ -1421,9 +1466,18 @@ class Processing:
         img_obj.add_restored(restored_path, blurred_path, alg_name)
         img_obj.add_kernel(kernel_path, blurred_path, alg_name)
 
-    def _collect_algorithm_data(self, data_dict, alg_name, algorithm, img_obj,
-                            blurred_path, restored_path, kernel_path,
-                            psnr_val, ssim_val, restored_image, blurred_image):
+    def _collect_algorithm_data(self, 
+                                data_dict: dict, 
+                                alg_name: str, 
+                                algorithm: base.DeconvolutionAlgorithm, 
+                                img_obj: utils.Image, 
+                                blurred_path: Path, 
+                                restored_path: Path, 
+                                kernel_path: Path, 
+                                psnr_val: float, 
+                                ssim_val: float, 
+                                restored_image: np.ndarray, 
+                                blurred_image: np.ndarray) -> None:
         '''
         Сбор данных для анализа алгоритмов
         '''
@@ -1448,8 +1502,11 @@ class Processing:
         
         for param_name, param_value in algorithm.get_param():
             alg_data[param_name] = np.append(alg_data.setdefault(param_name, []), param_value)
-            
-    def _collect_analysis_data(self, img_obj, blurred_path, analysis_dicts):
+ 
+    def _collect_analysis_data(self, 
+                               img_obj: utils.Image, 
+                               blurred_path: Path, 
+                               analysis_dicts: dict) -> None:
         '''
         Сбор данных для общего анализа
         '''
@@ -1486,7 +1543,11 @@ class Processing:
                 restored_ssim.get((str(blurred_path), str(alg_name)), math.nan)
             )
     
-    def _finalize_processing(self, data_dict, analysis_dicts, size, kernel_intencity_scale):
+    def _finalize_processing(self, 
+                             data_dict: dict, 
+                             analysis_dicts: dict, 
+                             size: float, 
+                             kernel_intencity_scale: float) -> None:
         '''
         Финальная обработка и визуализация результатов
         '''
@@ -1499,11 +1560,10 @@ class Processing:
         
         self.pareto()
 
-    
-    def process_hyperparameter_optimization(self, *args, **kwargs):
+    def process_hyperparameter_optimization(self, *args, **kwargs) -> Any:
         return self.optimizer.execute(*args, **kwargs)
     
-    def pareto(self):
+    def pareto(self) -> Any:
         return self.analyzer.execute()
     
 
@@ -1522,7 +1582,7 @@ def merge(frame1: Processing, frame2: Processing)->Processing:
          frame_res.images = np.append(frame1.images.copy(),frame2.images.copy())
          return frame_res
 
-def show_from_table(table_path, alg_name, window_scale:float = 1.0)->None:
+def show_from_table(table_path: Path, alg_name: str, window_scale: float = 1.0) -> None:
     """
     выводит сетку из смазанных и восстановленных изображений, их ядер
     table_path - путь к .csv файлу. таблица, по которой строить сетку
@@ -1531,7 +1591,8 @@ def show_from_table(table_path, alg_name, window_scale:float = 1.0)->None:
     """
     df = pd.read_csv(table_path)
     h, w = df.shape
-    fig, axes = plt.subplots(4, h, figsize=(5 * h * max(window_scale,0.1), 18*max(window_scale,0.1)))
+    fig, axes = plt.subplots(4, h, figsize=(5 * h * max(window_scale,0.1), 
+                                            18*max(window_scale,0.1)))
     axes = np.atleast_2d(axes)
     for idx, line in enumerate(df.iloc):
         paths = {
@@ -1546,23 +1607,19 @@ def show_from_table(table_path, alg_name, window_scale:float = 1.0)->None:
             if os.path.exists(path):
                 images[title] = mpimg.imread(path)
             else:
-                print(f"  - ПРЕДУПРЕЖДЕНИЕ: Файл не найден, будет показана заглушка: {path}")
+                print(f" Файл не найден: {path}")
                 images[title] = np.zeros((100, 100), dtype=np.uint8) # Черный квадрат-заглушка
-        # Ряд 0: Искаженные
         axes[0, idx].imshow(images["Original"], cmap='gray')
 
-        # Ряд 1: Восстановленные
         axes[1, idx].imshow(images["Restored"], cmap='gray')
-        
-        # Ряд 2: Ядро по мнению модели
+
         axes[2, idx].imshow(images["Estimated Kernel"], cmap='gray')
 
-        # Ряд 3: Настоящее ядро
         axes[3, idx].imshow(images["Ground Truth Kernel"], cmap='gray')
         for row in range(4):
             axes[row, idx].axis('off')
     fig.suptitle(f"Сравнение результатов восстановления изображений ({alg_name})", fontsize=20, y=0.97)
-    plt.tight_layout(rect=[0, 0, 1, 0.95]) # Корректируем расположение, чтобы главный заголовок не наезжал на картинки
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
     plt.show()
         
 

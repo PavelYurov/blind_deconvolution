@@ -1,3 +1,14 @@
+"""
+Различные фильтры шума
+
+Содержит:
+    - Гауссовский шум
+    - Шум пуассона
+    - Импульсный шум
+    - Цветные (розовый и коричневый) шумы
+
+Автор: Юров П.И.
+"""
 import numpy as np
 import random
 from typing import Tuple
@@ -5,18 +16,10 @@ from random import sample
 from .base import FilterBase
 from scipy.signal import lfilter, butter, sosfilt
 
-from .colored_noise import powerlaw_psd_gaussian, pink_noise_2d
+from .colored_noise import powerlaw_psd_gaussian, color_noise_2d
 
-"""
-    над кодом работал:
-    Юров П.И.
-"""
 
 class GaussianNoise(FilterBase):
-    """
-        над кодом работал:
-        Юров П.И.
-    """
     """
     Фильтр аддитивного гауссовского шума.
     
@@ -60,10 +63,6 @@ class GaussianNoise(FilterBase):
 
 class PoissonNoise(FilterBase):
     """
-        над кодом работал:
-        Юров П.И.
-    """
-    """
     Фильтр пуассоновского шума (шума дробления).
     
     Имитирует шум подсчета фотонов с пуассоновской статистикой.
@@ -104,10 +103,6 @@ class PoissonNoise(FilterBase):
 
 
 class SaltAndPepperNoise(FilterBase):
-    """
-        над кодом работал:
-        Юров П.И.
-    """
     """
     Фильтр импульсного шума (типа "соль-перец").
     
@@ -183,118 +178,8 @@ class SaltAndPepperNoise(FilterBase):
 
         return noisy
 
-
-class OldPhotoNoise(FilterBase):
-    """
-        над кодом работал:
-        Юров П.И.
-    """
-    """
-    Коричневый шум.
-
-    Аргументы:
-        strength (int): Сила шума (0-255)
-        f3dB (float): Частота среза экспоненциального фильтра (0-0.5)
-        fs (float): Псевдо-частота дискретизации (не критично для изображений)
-        apply_highpass (bool): Применять ли high-pass фильтр
-        highpass_cutoff (float): Cutoff частота для high-pass фильтра
-    """
-
-    def __init__(self, 
-                 strength: int = 30, 
-                 f3dB: float = 0.05, 
-                 fs: float = 1.0, 
-                 apply_highpass: bool = True, 
-                 highpass_cutoff: float = 0.01) -> None:
-        """
-        Инициализация.
-
-        Аргументы:
-            strength (int): Сила шума (0-255)
-            f3dB (float): Частота среза экспоненциального фильтра (0-0.5)
-            fs (float): Псевдо-частота дискретизации (не критично для изображений)
-            apply_highpass (bool): Применять ли high-pass фильтр
-            highpass_cutoff (float): Cutoff частота для high-pass фильтра
-        """
-        self.strength = strength
-        self.f3dB = f3dB
-        self.fs=fs
-        self.apply_highpass = apply_highpass
-        self.highpass_cutoff = highpass_cutoff
-        super().__init__(1, 'noise')
-
-    def discription(self) -> str:
-        """Выдает название шума в файловой системе с параметром."""
-        return f"|oldphotonoise_{self.strength}"
-
-    def find_alpha(self, 
-                   Fs: float, 
-                   f3dB: float) -> float:
-        """Вычислить альфу для экспоненциального фильтра."""
-        return (
-            np.sqrt(
-                np.power(np.cos(2 * np.pi * f3dB / Fs), 2)
-                - 4 * np.cos(2 * np.pi * f3dB / Fs)
-                + 3
-            )
-            + np.cos(2 * np.pi * f3dB / Fs)
-            - 1
-        )
-
-    def generate_2d_brownian_noise(self, 
-                                   shape: Tuple[int,int], 
-                                   alpha: float) -> np.ndarray:
-        """Создает 2D коричневый шум с фильтрацией по строкам и столбцам."""
-        x = np.random.normal(0, 1, shape)
-        b = [alpha]
-        a = [1, -(1 - alpha)]
-        for i in range(shape[0]):
-            x[i, :] = lfilter(b, a, x[i, :])
-        for j in range(shape[1]):
-            x[:, j] = lfilter(b, a, x[:, j])
-        
-        return x
-
-    def high_pass_filter_2d(self, 
-                            img: np.ndarray, 
-                            fs: float, 
-                            cutoff: float = 0.01) -> np.ndarray:
-        """Применяет 2D high-pass фильтр через Butterworth."""
-        sos = butter(2, cutoff, btype='highpass', fs=fs, output='sos')
-        filtered = np.copy(img)
-        for i in range(img.shape[0]):
-            filtered[i, :] = sosfilt(sos, img[i, :])
-        for j in range(img.shape[1]):
-            filtered[:, j] = sosfilt(sos, filtered[:, j])
-        return filtered
-
-    def filter(self, img):
-        """Применяет 2D Brownian шум к изображению."""
-        img = np.array(img, dtype=np.float32)
-
-        alpha = self.find_alpha(self.fs, self.f3dB)
-        brown_noise = self.generate_2d_brownian_noise(img.shape, alpha)
-
-        if self.apply_highpass:
-            brown_noise = self.high_pass_filter_2d(brown_noise, 
-                                                   self.fs, 
-                                                   cutoff=self.highpass_cutoff)
-
-        brown_noise -= brown_noise.min()
-        brown_noise /= (brown_noise.max() - brown_noise.min())
-        brown_noise = 2 * brown_noise - 1
-
-        noisy_img = img + self.strength * brown_noise
-
-        noisy_img = np.clip(noisy_img, 0, 255).astype(np.uint8)
-        return noisy_img
-
     
 class ColoredNoise(FilterBase):
-    """
-        над кодом работал:
-        Юров П.И.
-    """
     """
     Цветной шум (1/f)^beta.
 
@@ -324,7 +209,7 @@ class ColoredNoise(FilterBase):
         """Применет цветной шум к изображению."""
         assert img.ndim == 2, "Ожидается двумерное изображение (grayscale)."
         h, w = img.shape
-        pink_noise = powerlaw_psd_gaussian(exponent=self.beta, size=(h, w))
+        pink_noise = powerlaw_psd_gaussian(exponent=self.beta, size=[h, w])
 
         pink_noise = pink_noise / np.std(pink_noise)
         pink_noise = pink_noise * self.noise_level * 255.0
@@ -335,10 +220,6 @@ class ColoredNoise(FilterBase):
 
 
 class Pink_Noise(FilterBase):
-    """
-        над кодом работал:
-        Юров П.И.
-    """
     """
     Розовый шум (1/f).
 
@@ -361,16 +242,12 @@ class Pink_Noise(FilterBase):
 
     def filter(self, img):
         """Применет розовый шум к изображению."""
-        noise = pink_noise_2d(img.shape, 2)*self.noise_level
+        noise = color_noise_2d(img.shape, 1)*self.noise_level
         res = np.clip(img + noise, 0.0, 255.0).astype(np.int16)
         return res
         
         
 class Brown_Noise(FilterBase):
-    """
-        над кодом работал:
-        Юров П.И.
-    """
     """
     Коричневый шум (1/f)^2.
 
@@ -393,7 +270,7 @@ class Brown_Noise(FilterBase):
 
     def filter(self, img):
         """Применет коричневый шум к изображению."""
-        noise = pink_noise_2d(img.shape, 4)*self.noise_level
+        noise = color_noise_2d(img.shape, 2)*self.noise_level
         res = np.clip(img + noise, 0.0, 255.0).astype(np.int16)
         return res
 

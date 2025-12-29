@@ -1,14 +1,20 @@
+"""
+Методы генерации цветных шумов
+
+Содержит:
+    - Методы для генерации цветного шума
+
+Автор: Юров П.И.
+Оригинал: https://github.com/felixpatzelt/colorednoise/blob/master/colorednoise.py
+"""
+
 from typing import Union, Iterable, Optional, Tuple
 from numpy import sqrt, newaxis, integer
-from numpy.fft import irfft, rfftfreq, irfft2
+from numpy.fft import irfft, rfftfreq, irfft2, fft2, ifft2, fftshift, fftfreq, ifftshift
 from numpy.random import default_rng, Generator, RandomState
 from numpy import sum as npsum
 import numpy as np
 
-"""
-    над кодом работал:
-    Юров П.И.
-"""
 
 def powerlaw_psd_gaussian(
         exponent: float, 
@@ -16,10 +22,6 @@ def powerlaw_psd_gaussian(
         fmin: float = 0.0, 
         random_state: Optional[Union[int, Generator, RandomState]] = None
     ) -> np.ndarray:
-    """
-        над кодом работал:
-        Юров П.И.
-    """
     """
     Гауссов (1/f)**beta шум.
 
@@ -88,10 +90,6 @@ def powerlaw_psd_gaussian(
 
 
 def _get_normal_distribution(random_state: Optional[Union[int, Generator, RandomState]]):
-    """
-        над кодом работал:
-        Юров П.И.
-    """
     """Возвращает генератор случайных чисел с нормальным распределением"""
     normal_dist = None
     if isinstance(random_state, (integer, int)) or random_state is None:
@@ -107,12 +105,8 @@ def _get_normal_distribution(random_state: Optional[Union[int, Generator, Random
     return normal_dist
 
 
-def pink_noise_2d(shape: Tuple[int, int], 
+def color_noise_2d(shape: Tuple[int, int], 
                   alpha: float = 1.0):
-    """
-        над кодом работал:
-        Юров П.И.
-    """
     """
     Генерирует 2D 1/f^a шум.
     
@@ -127,23 +121,23 @@ def pink_noise_2d(shape: Tuple[int, int],
     
     white_noise = np.random.randn(height, width)
 
-    white_fft = np.fft.fft2(white_noise)
+    white_fft = fft2(white_noise)
 
-    freqs_y = np.fft.fftfreq(height)
-    freqs_x = np.fft.fftfreq(width)
+    freqs_y = fftfreq(height)
+    freqs_x = fftfreq(width)
     freq_mesh = np.meshgrid(freqs_y, freqs_x, indexing='ij')
 
     radial_freq = np.sqrt(freq_mesh[0]**2 + freq_mesh[1]**2)
 
-    radial_freq_shifted = np.fft.fftshift(radial_freq)
-    white_fft_shifted = np.fft.fftshift(white_fft)
+    radial_freq_shifted = fftshift(radial_freq)
+    white_fft_shifted = fftshift(white_fft)
     
     with np.errstate(divide='ignore', invalid='ignore'):
-        scaling = np.where(radial_freq_shifted == 0, 1.0, radial_freq_shifted**(-alpha/2))
+        scaling = np.where(radial_freq_shifted == 0, 1.0, radial_freq_shifted**(-alpha))
         pink_fft_shifted = white_fft_shifted * scaling
     
-    pink_fft = np.fft.ifftshift(pink_fft_shifted)
-    pink_noise = np.real(np.fft.ifft2(pink_fft))
+    pink_fft = ifftshift(pink_fft_shifted)
+    pink_noise = np.real(ifft2(pink_fft))
     
     pink_noise = pink_noise / np.std(pink_noise)*255.0
     
