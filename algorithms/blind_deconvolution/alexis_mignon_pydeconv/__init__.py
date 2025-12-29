@@ -1,3 +1,4 @@
+# https://github.com/alexis-mignon/pydeconv
 from __future__ import annotations
 
 import sys
@@ -10,9 +11,6 @@ import numpy as np
 from algorithms.base import DeconvolutionAlgorithm
 
 from .source.pydeconv import objective
-
-ArrayND = np.ndarray
-Array2D = np.ndarray
 
 
 def _ensure_odd(value: int) -> int:
@@ -30,7 +28,7 @@ def _coerce_kernel_size(kernel_size: int | tuple[int, int]) -> tuple[int, int]:
     return (_ensure_odd(kernel_size), _ensure_odd(kernel_size))
 
 
-def _prepare_image(image: ArrayND) -> tuple[ArrayND, np.dtype, tuple[int, ...]]:
+def _prepare_image(image: np.ndarray) -> tuple[np.ndarray, np.dtype, tuple[int, ...]]:
     original_dtype = image.dtype
     original_shape = image.shape
 
@@ -51,7 +49,7 @@ def _prepare_image(image: ArrayND) -> tuple[ArrayND, np.dtype, tuple[int, ...]]:
     return working, original_dtype, original_shape
 
 
-def _restore_dtype(image01: ArrayND, original_dtype: np.dtype, original_shape: tuple[int, ...]) -> ArrayND:
+def _restore_dtype(image01: np.ndarray, original_dtype: np.dtype, original_shape: tuple[int, ...]) -> np.ndarray:
     clipped = np.clip(image01, 0.0, 1.0)
     if np.issubdtype(original_dtype, np.integer):
         restored = (clipped * 255.0).round().astype(original_dtype)
@@ -64,14 +62,14 @@ def _restore_dtype(image01: ArrayND, original_dtype: np.dtype, original_shape: t
     return restored
 
 
-def _initial_kernel(size: tuple[int, int]) -> Array2D:
+def _initial_kernel(size: tuple[int, int]) -> np.ndarray:
     kx, ky = size
     kernel = np.zeros((kx, ky), dtype=np.float64)
     kernel[kx // 2, ky // 2] = 1.0
     return kernel
 
 
-def _normalise_kernel(kernel: Array2D) -> Array2D:
+def _normalise_kernel(kernel: np.ndarray) -> np.ndarray:
     kernel = np.clip(kernel.astype(np.float64, copy=False), 0.0, None)
     total = float(kernel.sum())
     if total <= 0:
@@ -108,7 +106,7 @@ class AlexisMignonPydeconv(DeconvolutionAlgorithm):
         self.t = float(t)
         self.method = str(method)
         self.verbose = bool(verbose)
-        self._last_kernel: Array2D | None = None
+        self._last_kernel: np.ndarray | None = None
 
     def change_param(self, param: Any):
         if not isinstance(param, dict):
@@ -153,7 +151,7 @@ class AlexisMignonPydeconv(DeconvolutionAlgorithm):
             ("verbose", self.verbose),
         ]
 
-    def process(self, image: ArrayND) -> tuple[ArrayND, Array2D]:
+    def process(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         working, original_dtype, original_shape = _prepare_image(image)
         if working.ndim == 3 and working.shape[2] == 4:
             working_rgb = working[..., :3]
@@ -204,7 +202,7 @@ class AlexisMignonPydeconv(DeconvolutionAlgorithm):
 
         return _restore_dtype(latent, original_dtype, original_shape), kernel
 
-    def get_kernel(self) -> Array2D | None:
+    def get_kernel(self) -> np.ndarray | None:
         return self._last_kernel
 
 

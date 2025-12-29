@@ -1,3 +1,6 @@
+# https://github.com/felixwempe/blind_deconvolution/
+from __future__ import annotations
+
 import os
 from typing import Any
 
@@ -7,6 +10,7 @@ import numpy as np
 
 from algorithms.base import DeconvolutionAlgorithm
 
+ALGORITHM_NAME = "felixwempe_blind_deconvolution"
 SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "source")
 
 
@@ -19,6 +23,7 @@ class FelixwempeBlindDeconvolution(DeconvolutionAlgorithm):
 		coeff_threshold: float = 0.0,
 		cvx_quiet: bool = True,
 	):
+		super().__init__(ALGORITHM_NAME)
 		self._eng = matlab.engine.start_matlab()
 		self._eng.addpath(self._eng.genpath(SOURCE_PATH), nargout=0)
 		self._eng.cd(SOURCE_PATH, nargout=0)
@@ -29,7 +34,10 @@ class FelixwempeBlindDeconvolution(DeconvolutionAlgorithm):
 		self.coeff_threshold = float(coeff_threshold)
 		self.cvx_quiet = bool(cvx_quiet)
 
-	def change_param(self, param: dict[str, Any]):
+	def change_param(self, param: Any):
+		if not isinstance(param, dict):
+			return
+
 		if "kernel_size" in param:
 			self.kernel_size = int(param["kernel_size"])
 		if "wavelet" in param:
@@ -41,14 +49,14 @@ class FelixwempeBlindDeconvolution(DeconvolutionAlgorithm):
 		if "cvx_quiet" in param:
 			self.cvx_quiet = bool(param["cvx_quiet"])
 
-	def get_param(self):
-		return {
-			"kernel_size": self.kernel_size,
-			"wavelet": self.wavelet,
-			"wavelet_level": self.wavelet_level,
-			"coeff_threshold": self.coeff_threshold,
-			"cvx_quiet": self.cvx_quiet,
-		}
+	def get_param(self) -> list[str, Any]:
+		return [
+			("kernel_size", self.kernel_size),
+			("wavelet", self.wavelet),
+			("wavelet_level", self.wavelet_level),
+			("coeff_threshold", self.coeff_threshold),
+			("cvx_quiet", self.cvx_quiet),
+		]
 
 	def process(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
 		if image.ndim == 2:
@@ -168,4 +176,3 @@ class FelixwempeBlindDeconvolution(DeconvolutionAlgorithm):
 			self._eng.quit()
 		except Exception:
 			pass
-

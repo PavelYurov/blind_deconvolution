@@ -1,3 +1,4 @@
+#https://github.com/luczeng/MotionBlur
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,19 +8,14 @@ from typing import Any, Dict, Iterable, Tuple
 import numpy as np
 import sys
 
-from ..base import DeconvolutionAlgorithm
+from algorithms.base import DeconvolutionAlgorithm
 
 _SOURCE_DIR = Path(__file__).resolve().parent / "source"
 if str(_SOURCE_DIR) not in sys.path:
     sys.path.insert(0, str(_SOURCE_DIR))
 
-# try:
-    from .source.motion_blur.libs.inverse_problems.wiener import Wiener
-    from .source.motion_blur.libs.forward_models.kernels.motion import motion_kernel
-# except ModuleNotFoundError as exc:  # pragma: no cover - import guard
-#     raise ModuleNotFoundError(
-#         "Could not import MotionBlur dependencies. Ensure the vendored repository is intact."
-#     ) from exc
+from .source.motion_blur.libs.inverse_problems.wiener import Wiener
+from .source.motion_blur.libs.forward_models.kernels.motion import motion_kernel
 
 
 def _normalize_image(image: np.ndarray) -> tuple[np.ndarray, float]:
@@ -37,8 +33,6 @@ def _normalize_image(image: np.ndarray) -> tuple[np.ndarray, float]:
 
 
 class LuczengMotionBlur(DeconvolutionAlgorithm):
-    """Wiener deconvolution using Luczeng's MotionBlur project."""
-
     def __init__(
         self,
         *,

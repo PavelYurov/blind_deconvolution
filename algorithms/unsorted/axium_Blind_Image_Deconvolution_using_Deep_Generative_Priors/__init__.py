@@ -1,5 +1,5 @@
+# https://github.com/axium/Blind-Image-Deconvolution-using-Deep-Generative-Priors
 from __future__ import annotations
-
 import os
 import sys
 import time
@@ -10,10 +10,9 @@ from typing import Any, Dict, Tuple
 import cv2
 import numpy as np
 
-from ...base import DeconvolutionAlgorithm
+from algorithms.base import DeconvolutionAlgorithm
 
 
-# SOURCE_ROOT = Path(__file__).resolve().parent / 'source'
 SOURCE_ROOT = Path('source')
 
 KERAS_BACKEND_ENV = 'KERAS_BACKEND'
@@ -34,8 +33,6 @@ class _ModelBundle:
 
 
 class AxiumBlindImageDeconvolutionUsingDeepGenerativePriors(DeconvolutionAlgorithm):
-    """Single-image variant of Algorithm 1 with pretrained generative priors."""
-
     def __init__(
         self,
         dataset: str = 'celeba',
@@ -108,14 +105,12 @@ class AxiumBlindImageDeconvolutionUsingDeepGenerativePriors(DeconvolutionAlgorit
         from .source.generators.MotionBlurGenerator import MotionBlur
 
         image_gen = CelebAGenerator()
-        # image_gen.weights_path = str(SOURCE_ROOT / 'model weights' / 'celeba.h5')
         image_gen.weights_path = str(Path('source') / 'model weights' / 'celeba.h5')
 
         image_gen.GenerateModel()
         image_gen.LoadWeights()
 
         blur_gen = MotionBlur()
-        # blur_gen.weights_path = str(SOURCE_ROOT / 'model weights' / 'motionblur.h5')
         blur_gen.weights_path = str(Path('source') / 'model weights' / 'motionblur.h5')
 
         blur_gen.GenerateModel()

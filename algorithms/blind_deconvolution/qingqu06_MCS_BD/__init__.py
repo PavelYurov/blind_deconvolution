@@ -1,5 +1,7 @@
+# https://github.com/qingqu06/MCS-BD
+from __future__ import annotations
 import os
-from typing import Tuple
+from typing import Any, Tuple
 
 import cv2
 import numpy as np
@@ -7,6 +9,7 @@ import matlab.engine
 
 from algorithms.base import DeconvolutionAlgorithm
 
+ALGORITHM_NAME = "qingqu06_MCS_BD"
 SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "source")
 
 class Qingqu06MCSBD(DeconvolutionAlgorithm):
@@ -19,6 +22,7 @@ class Qingqu06MCSBD(DeconvolutionAlgorithm):
 		use_linesearch: bool = True,
 		use_rounding: bool = False,
 	):
+		super().__init__(ALGORITHM_NAME)
 		self._eng = matlab.engine.start_matlab()
 		self._eng.addpath(self._eng.genpath(SOURCE_PATH), nargout=0)
 		self._eng.cd(SOURCE_PATH, nargout=0)
@@ -30,7 +34,10 @@ class Qingqu06MCSBD(DeconvolutionAlgorithm):
 		self.use_linesearch = bool(use_linesearch)
 		self.use_rounding = bool(use_rounding)
 
-	def change_param(self, param: dict):
+	def change_param(self, param: Any):
+		if not isinstance(param, dict):
+			return
+
 		if "kernel_height" in param:
 			self.kernel_height = int(param["kernel_height"])
 		if "kernel_width" in param:
@@ -51,17 +58,17 @@ class Qingqu06MCSBD(DeconvolutionAlgorithm):
 		if "use_rounding" in param:
 			self.use_rounding = bool(param["use_rounding"])
 
-	def get_param(self) -> dict:
-		return {
-			"kernel_height": self.kernel_height,
-			"kernel_width": self.kernel_width,
-			"kernel_size": (self.kernel_height, self.kernel_width),
-			"mu": self.mu,
-			"tau": self.tau,
-			"max_iter": self.max_iter,
-			"use_linesearch": self.use_linesearch,
-			"use_rounding": self.use_rounding,
-		}
+	def get_param(self) -> list[str, Any]:
+		return [
+			("kernel_height", self.kernel_height),
+			("kernel_width", self.kernel_width),
+			("kernel_size", (self.kernel_height, self.kernel_width)),
+			("mu", self.mu),
+			("tau", self.tau),
+			("max_iter", self.max_iter),
+			("use_linesearch", self.use_linesearch),
+			("use_rounding", self.use_rounding),
+		]
 
 	def process(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
 

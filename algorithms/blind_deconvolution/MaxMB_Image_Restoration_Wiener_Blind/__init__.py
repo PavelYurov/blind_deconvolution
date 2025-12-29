@@ -1,11 +1,16 @@
+# https://github.com/MaxMB/Image_Restoration_Wiener_Blind
+from __future__ import annotations
+
 import os
+from typing import Any, Literal
+
 import cv2
-import numpy as np
 import matlab.engine
-from typing import Literal
+import numpy as np
 
 from algorithms.base import DeconvolutionAlgorithm
 
+ALGORITHM_NAME = "MaxMB_Image_Restoration_Wiener_Blind"
 SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "source")
 
 KERNEL_PLACEHOLDER = np.array([[0.0]], dtype=np.float64)
@@ -19,6 +24,7 @@ class MaxMBImageRestorationWienerBlind(DeconvolutionAlgorithm):
 		snr: float = 10.0,
 		deconv_iter: int = 20,
 	):
+		super().__init__(ALGORITHM_NAME)
 		self._eng = matlab.engine.start_matlab()
 		self._eng.addpath(self._eng.genpath(SOURCE_PATH), nargout=0)
 		self._eng.cd(SOURCE_PATH, nargout=0)
@@ -29,7 +35,10 @@ class MaxMBImageRestorationWienerBlind(DeconvolutionAlgorithm):
 		self.snr = float(snr)
 		self.deconv_iter = int(deconv_iter)
 
-	def change_param(self, param):
+	def change_param(self, param: Any):
+		if not isinstance(param, dict):
+			return
+
 		if "mode" in param:
 			self.mode = param["mode"]
 
@@ -45,14 +54,14 @@ class MaxMBImageRestorationWienerBlind(DeconvolutionAlgorithm):
 		if "deconv_iter" in param:
 			self.deconv_iter = int(param["deconv_iter"])
 
-	def get_param(self):
-		return {
-			"mode": self.mode,
-			"psf_dim": self.psf_dim,
-			"psf_sigma": self.psf_sigma,
-			"snr": self.snr,
-			"deconv_iter": self.deconv_iter,
-		}
+	def get_param(self) -> list[str, Any]:
+		return [
+			("mode", self.mode),
+			("psf_dim", self.psf_dim),
+			("psf_sigma", self.psf_sigma),
+			("snr", self.snr),
+			("deconv_iter", self.deconv_iter),
+		]
 
 	def _prepare_image_gray(self, image: np.ndarray) -> np.ndarray:
 		if image.ndim == 3 and image.shape[2] == 3:

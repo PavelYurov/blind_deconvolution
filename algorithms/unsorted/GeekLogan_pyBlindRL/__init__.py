@@ -1,5 +1,5 @@
+# https://github.com/GeekLogan/pyBlindRL
 from __future__ import annotations
-
 from contextlib import contextmanager
 from time import time
 from typing import Any, Dict, Iterable, Tuple, Union
@@ -7,7 +7,7 @@ from typing import Any, Dict, Iterable, Tuple, Union
 import numpy as np
 import torch
 
-from ..base import DeconvolutionAlgorithm
+from algorithms.base import DeconvolutionAlgorithm
 
 try:
     from .source.src.pyBlindRL.commands import (
@@ -84,8 +84,6 @@ def _silence_tqdm():
 
 
 class GeekLoganPyBlindRL(DeconvolutionAlgorithm):
-    """Blind Richardson-Lucy deconvolution backed by the pyBlindRL project."""
-
     def __init__(
         self,
         kernel_shape: KernelShape = (1, 25, 25),

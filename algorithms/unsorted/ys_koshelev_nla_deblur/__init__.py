@@ -1,19 +1,17 @@
-from algorithms.base import DeconvolutionAlgorithm
-import numpy as np
+# https://github.com/ys-koshelev/nla_deblur
+from __future__ import annotations
+
 from typing import Any, Dict
+
+import numpy as np
+
+from algorithms.base import DeconvolutionAlgorithm
 from .source.deblur import blind_deconv
 from .source.latent_step import synth_kernel, im_normalize
 from .source.utils import whiten_background
 
 
 class YsKoshelevNlaDeblur(DeconvolutionAlgorithm):
-    """
-    Обёртка над реализацией алгоритма из папки source.
-
-    Структура исходников и сигнатуры функций в source/ остаются без изменений,
-    обёртка лишь подготавливает данные и параметры и вызывает `blind_deconv`.
-    """
-
     def __init__(
         self,
         *,
@@ -31,7 +29,6 @@ class YsKoshelevNlaDeblur(DeconvolutionAlgorithm):
     ) -> None:
         super().__init__("ys_koshelev_nla_deblur")
 
-        # Параметры по умолчанию взяты из apply.py
         self.params: Dict[str, Any] = {
             "lambda_": lambda_,
             "gamma": gamma,
@@ -48,11 +45,7 @@ class YsKoshelevNlaDeblur(DeconvolutionAlgorithm):
         if params is not None:
             self.change_param(params)
 
-    def change_param(self, param: Dict[str, Any]):
-        """
-        Обновление гиперпараметров алгоритма.
-        Ожидается словарь с ключами как в self.params.
-        """
+    def change_param(self, param: Any):
         if not isinstance(param, dict):
             return
         for key, value in param.items():
@@ -60,19 +53,9 @@ class YsKoshelevNlaDeblur(DeconvolutionAlgorithm):
                 self.params[key] = value
 
     def process(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        """
-        Запуск слепой деконволюции.
-
-        Аргументы:
-            image: размытое изображение (numpy массив, шкала 0..255 или 0..1).
-
-        Возвращает:
-            восстановленное изображение и оценённое ядро смаза.
-        """
         from time import time
 
         if image.ndim != 2:
-            # исходный код работает с одним каналом, поэтому при необходимости берём яркость
             image = image.astype(np.float32)
             image = image.mean(axis=2)
 
@@ -80,7 +63,6 @@ class YsKoshelevNlaDeblur(DeconvolutionAlgorithm):
         if img.max() > 1.0:
             img = img / 255.0
 
-        # в исходном apply.py используется обрезка полей изображения
         img_cropped = img[10:-15, 10:-5]
 
         p = self.params
@@ -109,11 +91,7 @@ class YsKoshelevNlaDeblur(DeconvolutionAlgorithm):
 
         return latent.astype(np.float32), kernel.astype(np.float32)
 
-    def get_param(self):
-        """
-        Возвращает список (имя, значение) для всех гиперпараметров,
-        как ожидает базовая инфраструктура проекта.
-        """
+    def get_param(self) -> list[str, Any]:
         return list(self.params.items())
 
 

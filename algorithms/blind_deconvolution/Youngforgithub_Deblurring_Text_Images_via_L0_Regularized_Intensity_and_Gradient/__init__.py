@@ -1,3 +1,4 @@
+# https://github.com/Youngforgithub/Deblurring-Text-Images-via-L0-Regularized-Intensity-and-Gradient
 import os
 from dataclasses import dataclass, asdict
 from typing import Any
@@ -12,7 +13,6 @@ SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "source")
 
 @dataclass
 class _Params:
-	# Kernel estimation
 	gamma_correct: float = 2.2
 	kernel_size: int = 35
 	lambda_pixel: float = 4e-3
@@ -20,7 +20,6 @@ class _Params:
 	xk_iter: int = 5
 	k_thresh: int = 20
 
-	# Non-blind deconvolution
 	lambda_tv: float = 2e-3
 	lambda_l0: float = 2e-4
 	weight_ring: float = 1.0

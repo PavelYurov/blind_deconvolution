@@ -1,3 +1,4 @@
+# https://github.com/ADY-YDA/Iterative-Blind-Image-Deconvolution/blob/main/Expectation-Maximization.ipynb
 from __future__ import annotations
 
 from time import time
@@ -6,12 +7,10 @@ from typing import Any, Optional, Tuple
 import numpy as np
 from scipy.signal import wiener
 
-from ..base import DeconvolutionAlgorithm
-
-Array2D = np.ndarray
+from algorithms.base import DeconvolutionAlgorithm
 
 
-def _prepare_image(image: Array2D) -> Tuple[Array2D, np.dtype, Optional[int]]:
+def _prepare_image(image: np.ndarray) -> Tuple[np.ndarray, np.dtype, Optional[int]]:
     original_dtype = image.dtype
     channels: Optional[int] = None
 
@@ -31,7 +30,7 @@ def _prepare_image(image: Array2D) -> Tuple[Array2D, np.dtype, Optional[int]]:
     return working, original_dtype, channels
 
 
-def _restore_dtype(restored: Array2D, original_dtype: np.dtype, channels: Optional[int]) -> Array2D:
+def _restore_dtype(restored: np.ndarray, original_dtype: np.dtype, channels: Optional[int]) -> np.ndarray:
     clipped = np.clip(restored, 0.0, 1.0)
 
     if np.issubdtype(original_dtype, np.integer):
@@ -45,7 +44,7 @@ def _restore_dtype(restored: Array2D, original_dtype: np.dtype, channels: Option
     return output
 
 
-def _covariance(image: Array2D) -> float:
+def _covariance(image: np.ndarray) -> float:
     shifted = np.roll(image, shift=1, axis=0)
     a = image.reshape(-1)
     b = shifted.reshape(-1)
@@ -55,7 +54,7 @@ def _covariance(image: Array2D) -> float:
     return float(cov)
 
 
-def _normalize_kernel(kernel: Array2D, eps: float) -> Array2D:
+def _normalize_kernel(kernel: np.ndarray, eps: float) -> np.ndarray:
     kernel = np.maximum(kernel, 0.0)
     total = float(kernel.sum())
     if total < eps:
@@ -63,7 +62,7 @@ def _normalize_kernel(kernel: Array2D, eps: float) -> Array2D:
     return kernel / total
 
 
-def _center_crop(array: Array2D, shape: Tuple[int, int]) -> Array2D:
+def _center_crop(array: np.ndarray, shape: Tuple[int, int]) -> np.ndarray:
     target_h, target_w = shape
     h, w = array.shape
 
@@ -88,12 +87,12 @@ def _center_crop(array: Array2D, shape: Tuple[int, int]) -> Array2D:
 
 
 def _estimate_psf(
-    observed: Array2D,
-    estimate: Array2D,
+    observed: np.ndarray,
+    estimate: np.ndarray,
     noise_ratio: float,
     filter_size: int,
     eps: float,
-) -> Array2D:
+) -> np.ndarray:
     size = observed.shape
     estimate_fft = np.fft.fft2(estimate, s=size)
 
@@ -121,7 +120,7 @@ def _estimate_psf(
     return H / sum_h
 
 
-def _psf_from_frequency(psf_fft: Array2D, kernel_shape: Tuple[int, int], eps: float) -> Array2D:
+def _psf_from_frequency(psf_fft: np.ndarray, kernel_shape: Tuple[int, int], eps: float) -> np.ndarray:
     psf = np.real(np.fft.ifft2(psf_fft))
     psf = np.fft.ifftshift(psf)
     psf = _normalize_kernel(psf, eps)
@@ -130,7 +129,7 @@ def _psf_from_frequency(psf_fft: Array2D, kernel_shape: Tuple[int, int], eps: fl
     return cropped
 
 
-def _stretch_to_unit(image: Array2D) -> Array2D:
+def _stretch_to_unit(image: np.ndarray) -> np.ndarray:
     min_val = float(image.min())
     max_val = float(image.max())
     if not np.isfinite(min_val) or not np.isfinite(max_val) or max_val - min_val < 1e-12:
@@ -162,7 +161,7 @@ class ADYYDAIterativeBlindImageDeconvolution(DeconvolutionAlgorithm):
             size = int(kernel_size)
             self.kernel_size = (size, size)
         self.relative_tolerance = float(relative_tolerance)
-        self._last_kernel: Optional[Array2D] = None
+        self._last_kernel: Optional[np.ndarray] = None
 
     def change_param(self, param: Any):
         if isinstance(param, dict):
@@ -187,7 +186,7 @@ class ADYYDAIterativeBlindImageDeconvolution(DeconvolutionAlgorithm):
         return super().change_param(param)
 
 
-    def process(self, image: Array2D) -> Tuple[Array2D, Array2D]:
+    def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         working, original_dtype, channels = _prepare_image(image)
         estimate = working.copy()
         eps = float(self.epsilon)

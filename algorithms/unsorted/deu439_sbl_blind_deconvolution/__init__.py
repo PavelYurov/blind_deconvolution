@@ -1,11 +1,11 @@
+# https://github.com/deu439/sbl-blind-deconvolution
 from __future__ import annotations
-
 from time import time
 from typing import Any, Dict, Tuple
 
 import numpy as np
 
-from ...base import DeconvolutionAlgorithm
+from algorithms.base import DeconvolutionAlgorithm
 
 from .source.run import update_gamma, update_qx, update_theta
 
@@ -22,7 +22,6 @@ def _init_kernel(radius: int, rng: np.random.Generator) -> np.ndarray:
 
 
 def _integrate_gradients(gx: np.ndarray, gy: np.ndarray) -> np.ndarray:
-    """Reconstruct an image whose gradients best match (gx, gy)."""
     gy_fft = np.fft.fft2(gy)
     gx_fft = np.fft.fft2(gx)
 
@@ -47,8 +46,6 @@ def _integrate_gradients(gx: np.ndarray, gy: np.ndarray) -> np.ndarray:
 
 
 class Deu439SblBlindDeconvolution(DeconvolutionAlgorithm):
-    """Variational Bayesian blind deconvolution inspired by the deu439 implementation."""
-
     def __init__(
         self,
         kernel_radius: int = 5,
@@ -118,12 +115,9 @@ class Deu439SblBlindDeconvolution(DeconvolutionAlgorithm):
             print('Iteration:', i)
             kernel = kernel + np.asarray(theta, dtype=np.float32)
 
-        # kernel = np.asarray(theta, dtype=np.float32)
         kernel = np.clip(kernel, 0.0, None)
         kernel_sum = float(kernel.sum())
         print(f'kernel_sum: {kernel_sum}')
-        # if kernel_sum > 0:
-        #     kernel /= kernel_sum
 
         restored = _integrate_gradients(mu[0], mu[1])
 

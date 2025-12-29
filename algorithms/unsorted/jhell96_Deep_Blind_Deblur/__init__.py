@@ -1,5 +1,5 @@
+# https://github.com/jhell96/Deep-Blind-Deblur
 from __future__ import annotations
-
 import sys
 from pathlib import Path
 from time import time
@@ -11,9 +11,7 @@ import functools
 from types import ModuleType
 import torch
 
-from ..base import DeconvolutionAlgorithm
-
-Array2D = np.ndarray
+from algorithms.base import DeconvolutionAlgorithm
 
 SOURCE_ROOT = Path(__file__).resolve().parent / "source"
 if str(SOURCE_ROOT) not in sys.path:
@@ -42,14 +40,14 @@ def _ensure_odd(value: int) -> int:
     return int(value) | 1
 
 
-def _to_tensor(image: Array2D) -> torch.Tensor:
+def _to_tensor(image: np.ndarray) -> torch.Tensor:
     normalized = (image * 2.0) - 1.0
     tensor = torch.from_numpy(normalized.astype(np.float32)).unsqueeze(0)
     tensor = tensor.repeat(3, 1, 1)
     return tensor.unsqueeze(0)
 
 
-def _to_image(tensor: torch.Tensor) -> Array2D:
+def _to_image(tensor: torch.Tensor) -> np.ndarray:
     array = tensor.squeeze(0).cpu().numpy()
     array = np.transpose(array, (1, 2, 0))
     array = (array + 1.0) / 2.0
@@ -58,8 +56,6 @@ def _to_image(tensor: torch.Tensor) -> Array2D:
 
 
 class Jhell96DeepBlindDeblur(DeconvolutionAlgorithm):
-    """Inference wrapper around the DeblurGAN generator."""
-
     def __init__(
         self,
         use_gpu: bool = False,
@@ -116,7 +112,7 @@ class Jhell96DeepBlindDeblur(DeconvolutionAlgorithm):
             ngf=64,
         )
 
-    def process(self, image: Array2D) -> Tuple[Array2D, Array2D]:
+    def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         if image is None:
             raise ValueError('Input image is None.')
         arr = np.asarray(image)
@@ -146,7 +142,7 @@ class Jhell96DeepBlindDeblur(DeconvolutionAlgorithm):
 
         return restored, None
 
-    def get_kernel(self) -> Array2D | None:
+    def get_kernel(self) -> np.ndarray | None:
         return None
 
 

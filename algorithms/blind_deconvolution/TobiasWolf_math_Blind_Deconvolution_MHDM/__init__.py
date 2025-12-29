@@ -1,5 +1,8 @@
+# https://github.com/TobiasWolf-math/Blind-Deconvolution-MHDM
+from __future__ import annotations
+
 import os
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -7,6 +10,7 @@ import matlab.engine
 
 from algorithms.base import DeconvolutionAlgorithm
 
+ALGORITHM_NAME = "TobiasWolf_math_Blind_Deconvolution_MHDM"
 SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "source")
 
 KernelSpec = Tuple[int, int]
@@ -21,13 +25,11 @@ class TobiasWolfMathBlindDeconvolutionMHDM(DeconvolutionAlgorithm):
 		s: float = 1e-1,
 		tol: float = 1e-10,
 		maxits: int = 30,
-		# если stopping == 0 → используем только maxits (как жёсткий лимит)
 		stopping: float = 0.0,
-		# опция для автоматического выбора stopping: stopping = tau * noise_level * sqrt(N)
 		tau: float = 1.001,
 		noise_level: Optional[float] = None,
 	):
-		super().__init__("MHDM")
+		super().__init__(ALGORITHM_NAME)
 
 		self._eng = matlab.engine.start_matlab()
 		self._eng.addpath(self._eng.genpath(SOURCE_PATH), nargout=0)
@@ -44,20 +46,19 @@ class TobiasWolfMathBlindDeconvolutionMHDM(DeconvolutionAlgorithm):
 		self.noise_level = None if noise_level is None else float(noise_level)
 
 	def _compute_stopping(self, image_gray: np.ndarray) -> float:
-		# если явно задан stopping > 0 — используем его как есть
 		if self.stopping > 0:
 			return self.stopping
 
-		# иначе, если задана оценка уровня шума — считаем как в статье: tau * delta
-		# где delta ~ ||noise||_2, а noise_level ~ sigma шума, тогда delta ~ sigma * sqrt(N)
 		if self.noise_level is not None and self.noise_level > 0:
 			N = image_gray.size
 			return self.tau * self.noise_level * np.sqrt(N)
 
-		# 0 → условие по невязке выключено, только maxits
 		return 0.0
 
-	def change_param(self, param: Dict[str, Any]):
+	def change_param(self, param: Any):
+		if not isinstance(param, dict):
+			return
+
 		if "lambda0" in param and param["lambda0"] is not None:
 			self.lambda0 = float(param["lambda0"])
 		if "mu0" in param and param["mu0"] is not None:
@@ -78,30 +79,20 @@ class TobiasWolfMathBlindDeconvolutionMHDM(DeconvolutionAlgorithm):
 			val = param["noise_level"]
 			self.noise_level = None if val is None else float(val)
 
-	def get_param(self):
-		return {
-			"lambda0": self.lambda0,
-			"mu0": self.mu0,
-			"r": self.r,
-			"s": self.s,
-			"tol": self.tol,
-			"maxits": self.maxits,
-			"stopping": self.stopping,
-			"tau": self.tau,
-			"noise_level": self.noise_level,
-		}
+	def get_param(self) -> list[str, Any]:
+		return [
+			("lambda0", self.lambda0),
+			("mu0", self.mu0),
+			("r", self.r),
+			("s", self.s),
+			("tol", self.tol),
+			("maxits", self.maxits),
+			("stopping", self.stopping),
+			("tau", self.tau),
+			("noise_level", self.noise_level),
+		]
 
 	def process(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-		"""
-		Возвращает (восстановленное_изображение_bgr, ядро_смаза).
-
-		Вызывает MATLAB‑функцию:
-		[u_end, k_end, ~, ~, ~] = blind_deconvolution_MHDM(f, f_four,
-			lambda0, mu0, r, s, tol, stopping, maxits, indices)
-		где indices строятся как в test_noisy.m.
-		"""
-
-		# приведение к 2D grayscale [0,1]
 		if image.ndim == 3 and image.shape[2] == 3:
 			image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 		else:
@@ -124,10 +115,6 @@ class TobiasWolfMathBlindDeconvolutionMHDM(DeconvolutionAlgorithm):
 		stopping_val = self._compute_stopping(image_gray)
 		self._eng.workspace["stopping_py"] = float(stopping_val)
 
-		# В MATLAB:
-		# - делаем FFT
-		# - строим indices как в test_noisy.m
-		# - запускаем blind_deconvolution_MHDM
 		self._eng.eval(
 			"""
 			f = f_py;

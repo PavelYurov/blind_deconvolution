@@ -1,8 +1,9 @@
-# from .source import ...
+# https://github.com/23ms410/Blind-Deconvolution
+from __future__ import annotations
 
-from ..base import DeconvolutionAlgorithm
+from algorithms.base import DeconvolutionAlgorithm
 
 class _23ms410BlindDeconvolution(DeconvolutionAlgorithm):
-	pass # ...
+	pass
 
-__all__ = ['_23ms410BlindDeconvolution']
+__all__ = ["_23ms410BlindDeconvolution"]

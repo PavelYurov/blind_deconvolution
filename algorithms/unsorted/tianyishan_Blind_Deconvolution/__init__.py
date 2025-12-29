@@ -1,5 +1,5 @@
+# https://github.com/tianyishan/Blind_Deconvolution
 from __future__ import annotations
-
 import math
 import time
 from dataclasses import dataclass
@@ -8,10 +8,7 @@ from typing import Any, Dict, List, Tuple
 import cv2
 import numpy as np
 
-from ..base import DeconvolutionAlgorithm
-
-
-Array2D = np.ndarray
+from algorithms.base import DeconvolutionAlgorithm
 
 
 @dataclass
@@ -29,7 +26,7 @@ class _CTFParams:
     kernel_size_multiplier: float
 
 
-def _is_gray_image(image: Array2D) -> bool:
+def _is_gray_image(image: np.ndarray) -> bool:
     if image.ndim == 2:
         return True
     if image.shape[2] == 1:
@@ -38,7 +35,7 @@ def _is_gray_image(image: Array2D) -> bool:
     return not (np.count_nonzero(cv2.absdiff(b, g)) or np.count_nonzero(cv2.absdiff(b, r)))
 
 
-def _ensure_three_channels(image: Array2D) -> Array2D:
+def _ensure_three_channels(image: np.ndarray) -> np.ndarray:
     if image.ndim == 2:
         return np.repeat(image[..., None], 3, axis=2)
     if image.shape[2] == 1:
@@ -46,11 +43,11 @@ def _ensure_three_channels(image: Array2D) -> Array2D:
     return image
 
 
-def _rotate_180(mat: Array2D) -> Array2D:
+def _rotate_180(mat: np.ndarray) -> np.ndarray:
     return np.flipud(np.fliplr(mat))
 
 
-def _conv2(image: Array2D, kernel: Array2D, mode: str) -> Array2D:
+def _conv2(image: np.ndarray, kernel: np.ndarray, mode: str) -> np.ndarray:
     if image.ndim == 3:
         channels = [
             _conv2(image[..., c], kernel, mode) for c in range(image.shape[2])
@@ -76,7 +73,7 @@ def _conv2(image: Array2D, kernel: Array2D, mode: str) -> Array2D:
     return filtered[start_y:end_y, start_x:end_x]
 
 
-def _grad_tv_cc(image: Array2D, channel_mode: int) -> Array2D:
+def _grad_tv_cc(image: np.ndarray, channel_mode: int) -> np.ndarray:
     if image.ndim == 2:
         working = image[..., None]
     else:
@@ -129,7 +126,7 @@ def _grad_tv_cc(image: Array2D, channel_mode: int) -> Array2D:
 
 
 def _build_pyramid(
-    image: Array2D,
+    image: np.ndarray,
     params: _BlindParams,
     ctf_params: _CTFParams,
 ) -> Dict[str, Any]:
@@ -168,7 +165,7 @@ def _build_pyramid(
         if mkpnext < smallest_scale:
             mkpnext = smallest_scale
 
-    fp: List[Array2D] = [None] * scales
+    fp: List[np.ndarray] = [None] * scales
     Mp: List[int] = [0] * scales
     Np: List[int] = [0] * scales
     MKp: List[int] = [0] * scales
@@ -221,13 +218,13 @@ def _build_pyramid(
 
 
 def _prida(
-    f: Array2D,
-    u: Array2D,
-    k: Array2D,
+    f: np.ndarray,
+    u: np.ndarray,
+    k: np.ndarray,
     lam: float,
     params: _BlindParams,
     channel_mode: int,
-) -> Tuple[Array2D, Array2D]:
+) -> Tuple[np.ndarray, np.ndarray]:
     nk = int(params.NK)
     mk = int(params.MK)
     niters = int(params.niters)
@@ -275,11 +272,11 @@ def _prida(
 
 
 def _coarse_to_fine(
-    image: Array2D,
+    image: np.ndarray,
     blind_params: _BlindParams,
     ctf_params: _CTFParams,
     channel_mode: int,
-) -> Tuple[Array2D, Array2D]:
+) -> Tuple[np.ndarray, np.ndarray]:
     MK = int(blind_params.MK)
     NK = int(blind_params.NK)
 
@@ -311,11 +308,11 @@ def _coarse_to_fine(
 
 
 def _blind_deconv(
-    image: Array2D,
+    image: np.ndarray,
     lam: float,
     params: _BlindParams,
     channel_mode: int,
-) -> Tuple[Array2D, Array2D]:
+) -> Tuple[np.ndarray, np.ndarray]:
     working = image.astype(np.float64).copy()
     if working.max() > 1.5:
         working /= 255.0
@@ -336,8 +333,6 @@ def _blind_deconv(
 
 
 class TianyishanBlindDeconvolutionDeconvolutionAlgorithm(DeconvolutionAlgorithm):
-    """Python translation of the PRIDA blind deconvolution algorithm."""
-
     def __init__(
         self,
         lam: float = 6e-4,
@@ -348,7 +343,7 @@ class TianyishanBlindDeconvolutionDeconvolutionAlgorithm(DeconvolutionAlgorithm)
         self.lam = float(lam)
         self.kernel_size = int(max(3, kernel_size | 1))
         self.iterations = int(max(1, iterations))
-        self._last_kernel: Array2D | None = None
+        self._last_kernel: np.ndarray | None = None
 
     def change_param(self, param: Dict[str, Any]):
         if isinstance(param, dict):
@@ -369,7 +364,7 @@ class TianyishanBlindDeconvolutionDeconvolutionAlgorithm(DeconvolutionAlgorithm)
             ('last_kernel_shape', None if self._last_kernel is None else self._last_kernel.shape),
         ]
 
-    def process(self, image: Array2D) -> Tuple[Array2D, Array2D]:
+    def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         if image is None or image.size == 0:
             raise ValueError('Empty image provided to PRIDA implementation.')
 

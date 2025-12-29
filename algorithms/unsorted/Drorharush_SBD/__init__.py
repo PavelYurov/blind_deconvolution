@@ -1,5 +1,5 @@
+# https://github.com/Drorharush/SBD
 from __future__ import annotations
-
 from dataclasses import dataclass
 from pathlib import Path
 from time import time
@@ -9,7 +9,7 @@ from .source.model import ActivationNet,LISTA
 
 import numpy as np
 
-from ..base import DeconvolutionAlgorithm
+from algorithms.base import DeconvolutionAlgorithm
 
 import torch
 
@@ -24,8 +24,6 @@ class SBDModelConfig:
 
 
 class DrorharushSBD(DeconvolutionAlgorithm):
-    """Neural sparse blind deconvolution (Drorharush/SBD)."""
-
     def __init__(
         self,
         model: Literal['lista', 'cnn'] = 'lista',
@@ -95,7 +93,6 @@ class DrorharushSBD(DeconvolutionAlgorithm):
             ('kernel_size', self.kernel_size),
         ]
 
-    # ------------------------------------------------------------------
     def _predict_activation(self, measurement):
         if self._net is None:
             self._net = self._load_network(SBD)

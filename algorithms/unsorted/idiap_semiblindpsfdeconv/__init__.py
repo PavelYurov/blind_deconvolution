@@ -1,5 +1,5 @@
+# https://github.com/idiap/semiblindpsfdeconv
 from __future__ import annotations
-
 import sys
 from pathlib import Path
 from time import time
@@ -7,9 +7,7 @@ from typing import Any, Dict, Tuple
 
 import numpy as np
 
-from ..base import DeconvolutionAlgorithm
-
-Array2D = np.ndarray
+from algorithms.base import DeconvolutionAlgorithm
 
 SOURCE_ROOT = Path(__file__).resolve().parent / "source"
 if str(SOURCE_ROOT) not in sys.path:
@@ -28,8 +26,6 @@ def _as_positive_int(value: Any, default: int) -> int:
 
 
 class IdiapSemiblindpsfdeconv(DeconvolutionAlgorithm):
-    """Simplified semi-blind RL-TV deconvolution wrapper."""
-
     def __init__(
         self,
         psf_size: int = 63,
@@ -46,12 +42,12 @@ class IdiapSemiblindpsfdeconv(DeconvolutionAlgorithm):
         self.iterations = int(iterations)
         self.regularization = float(regularization)
         self.normalize_input = bool(normalize_input)
-        self._last_kernel: Array2D | None = None
-        self._last_output: Array2D | None = None
+        self._last_kernel: np.ndarray | None = None
+        self._last_output: np.ndarray | None = None
 
-    def change_param(self, param: Dict[str, Any]):
+    def change_param(self, param: Any):
         if not isinstance(param, dict):
-            return super().change_param(param)
+            return
 
         if 'psf_size' in param:
             self.psf_size = _as_positive_int(param['psf_size'], self.psf_size)
@@ -66,7 +62,7 @@ class IdiapSemiblindpsfdeconv(DeconvolutionAlgorithm):
         if 'normalize_input' in param and param['normalize_input'] is not None:
             self.normalize_input = bool(param['normalize_input'])
 
-        return super().change_param(param)
+        return
 
     def get_param(self):
         return [
@@ -80,7 +76,7 @@ class IdiapSemiblindpsfdeconv(DeconvolutionAlgorithm):
             ('last_output_shape', None if self._last_output is None else self._last_output.shape),
         ]
 
-    def process(self, image: Array2D) -> Tuple[Array2D, Array2D]:
+    def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         if image is None:
             raise ValueError('Input image is None.')
 
@@ -120,7 +116,7 @@ class IdiapSemiblindpsfdeconv(DeconvolutionAlgorithm):
         self._last_output = restored_out
         return restored_out, kernel
 
-    def get_kernel(self) -> Array2D | None:
+    def get_kernel(self) -> np.ndarray | None:
         return self._last_kernel
 
 

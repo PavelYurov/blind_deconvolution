@@ -1,3 +1,4 @@
+# https://github.com/ceciledellavalle/BlindDeconvolution
 from __future__ import annotations
 
 from time import time
@@ -7,10 +8,8 @@ from collections.abc import Iterable
 
 import numpy as np
 
-from ...base import DeconvolutionAlgorithm
+from algorithms.base import DeconvolutionAlgorithm
 from .source.Codes.algoviolet import violetBD
-
-Array2D = np.ndarray
 
 
 def _ensure_odd(value: int) -> int:
@@ -20,7 +19,7 @@ def _ensure_odd(value: int) -> int:
     return size
 
 
-def _prepare_image(image: Array2D) -> Tuple[Array2D, np.dtype, Tuple[int, ...]]:
+def _prepare_image(image: np.ndarray) -> Tuple[np.ndarray, np.dtype, Tuple[int, ...]]:
     original_dtype = image.dtype
     original_shape = image.shape
 
@@ -44,7 +43,7 @@ def _prepare_image(image: Array2D) -> Tuple[Array2D, np.dtype, Tuple[int, ...]]:
     return working, original_dtype, original_shape
 
 
-def _restore_dtype(image: Array2D, original_dtype: np.dtype, original_shape: Tuple[int, ...]) -> Array2D:
+def _restore_dtype(image: np.ndarray, original_dtype: np.dtype, original_shape: Tuple[int, ...]) -> np.ndarray:
     clipped = np.clip(image, 0.0, 1.0)
 
     if np.issubdtype(original_dtype, np.integer):
@@ -62,7 +61,7 @@ def _restore_dtype(image: Array2D, original_dtype: np.dtype, original_shape: Tup
     return restored
 
 
-def _normalise_kernel(kernel: Array2D) -> Array2D:
+def _normalise_kernel(kernel: np.ndarray) -> np.ndarray:
     normalised = np.clip(kernel, 0.0, None)
     total = float(normalised.sum())
     if total <= 0:
@@ -93,7 +92,7 @@ class CeciledellavalleBlindDeconvolution(DeconvolutionAlgorithm):
         self.coeff_image = float(coeff_image)
         self.proj_simplex = bool(proj_simplex)
         self.verbose = bool(verbose)
-        self._last_kernel: Array2D | None = None
+        self._last_kernel: np.ndarray | None = None
 
     def _coerce_kernel_size(self, size: int | Tuple[int, int]) -> Tuple[int, int]:
         if isinstance(size, Iterable) and not isinstance(size, (str, bytes)):
@@ -104,7 +103,7 @@ class CeciledellavalleBlindDeconvolution(DeconvolutionAlgorithm):
         scalar = int(size)
         return (_ensure_odd(scalar), _ensure_odd(scalar))
 
-    def _initial_kernel(self) -> Array2D:
+    def _initial_kernel(self) -> np.ndarray:
         kx, ky = self.kernel_size
         kernel = np.zeros((kx, ky), dtype=np.float64)
         kernel[kx // 2, ky // 2] = 1.0
@@ -145,7 +144,7 @@ class CeciledellavalleBlindDeconvolution(DeconvolutionAlgorithm):
             ('verbose', self.verbose),
         ]
 
-    def process(self, image: Array2D) -> Tuple[Array2D, Array2D]:
+    def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         working, original_dtype, original_shape = _prepare_image(image)
         x_init = working.astype(np.float64, copy=True)
         kernel_init = self._initial_kernel()
@@ -172,7 +171,7 @@ class CeciledellavalleBlindDeconvolution(DeconvolutionAlgorithm):
 
         return _restore_dtype(restored, original_dtype, original_shape), kernel
 
-    def get_kernel(self) -> Array2D | None:
+    def get_kernel(self) -> np.ndarray | None:
         return self._last_kernel
 
 

@@ -1,3 +1,4 @@
+# https://github.com/ankitVP77/Blind-Motion-Deblurring-for-Legible-License-Plates-using-Deep-Learning
 from __future__ import annotations
 
 import sys
@@ -59,8 +60,6 @@ class AdamalaviBlindMotionDeblurringForLicensePlates(DeconvolutionAlgorithm):
         self.angle_model_path = Path(angle_model_path) if angle_model_path else self._source_root / 'pretrained_models' / 'angle_model.hdf5'
         self.length_model_path = Path(length_model_path) if length_model_path else self._source_root / 'pretrained_models' / 'length_model.hdf5'
 
-        # self.angle_model_path = Path('source\\pretrained_models\\angle_model.hdf5')
-        # self.length_model_path = Path('source\\pretrained_models\\length_model.hdf5')
 
         self.noise = float(noise)
         self.psf_size = int(psf_size)
@@ -187,10 +186,6 @@ class AdamalaviBlindMotionDeblurringForLicensePlates(DeconvolutionAlgorithm):
         fshift = np.fft.fftshift(f)
         spectrum = 20 * np.log(np.abs(fshift) + 1e-8)
         spectrum = np.asarray(spectrum, dtype=np.float32)
-        # spectrum -= spectrum.min()
-        # max_val = spectrum.max()
-        # if max_val > 0:
-        #     spectrum = spectrum * (255.0 / max_val)
         return spectrum
 
     def _run_wiener(self, image: np.ndarray, length: float, angle_deg: float) -> Tuple[np.ndarray, np.ndarray]:
@@ -224,8 +219,6 @@ class AdamalaviBlindMotionDeblurringForLicensePlates(DeconvolutionAlgorithm):
         restored = np.roll(restored, -psf_size // 2, axis=0)
         restored = np.roll(restored, -psf_size // 2, axis=1)
         
-        # display(psf)
-        # print(np.max(psf))
 
         return restored, psf
 
@@ -244,8 +237,6 @@ class AdamalaviBlindMotionDeblurringForLicensePlates(DeconvolutionAlgorithm):
         self._last_kernel = kernel
         self._last_angle = angle_value
         self._last_length = length_value
-        # print('angle: ', angle_value)
-        # print('length: ', length_value)
 
         restored_resized = restored_resized.astype(np.float32, copy=False)
         min_val = float(restored_resized.min()) if restored_resized.size else 0.0
@@ -269,9 +260,6 @@ class AdamalaviBlindMotionDeblurringForLicensePlates(DeconvolutionAlgorithm):
         if image.ndim == 3 and image.shape[2] != 1:
             restored_out = np.repeat(restored_out[..., None], image.shape[2], axis=2)
 
-        # display(kernel*255.0*255.0)
-        # print(np.max(kernel*255.0*255.0))
-        # print(kernel.shape)
 
         return restored_out, np.clip(kernel*255.0*255.0,0,1.0)
 

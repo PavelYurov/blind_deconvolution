@@ -1,12 +1,12 @@
+# https://github.com/Tmodrzyk/richardson-lucy-python
 from __future__ import annotations
-
 from time import time
 from typing import Any, Dict, Iterable, Tuple, Union
 
 import numpy as np
 import torch
 
-from ..base import DeconvolutionAlgorithm
+from algorithms.base import DeconvolutionAlgorithm
 
 from .source.src.algorithms.richardson_lucy import blind_richardson_lucy
 
@@ -37,8 +37,6 @@ def _normalize_kernel_size(spec: KernelSpec) -> Tuple[int, int]:
 
 
 class TmodrzykRichardsonLucyPython(DeconvolutionAlgorithm):
-    """Richardson-Lucy blind deconvolution (Tmodrzyk et al.)."""
-
     def __init__(
         self,
         kernel_size: KernelSpec = 15,

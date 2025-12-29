@@ -1,3 +1,4 @@
+# ??? 
 from __future__ import annotations
 
 import os
@@ -16,7 +17,7 @@ try:  # pragma: no cover - optional dependency
 except ImportError:  # pragma: no cover - optional dependency
     cv2 = None
 
-from ..base import DeconvolutionAlgorithm
+from algorithms.base import DeconvolutionAlgorithm
 from .source import convolve, deblur
 
 
@@ -28,7 +29,6 @@ def _ensure_results_dir(path: str) -> None:
 
 def _safe_write_image(path: str, image: np.ndarray, transform=None) -> None:
     _ensure_results_dir(path)
-    # cv2.imwrite silently fails if the directory is missing; keeping behaviour consistent
     if cv2 is None:
         return
     if image.dtype != np.uint8:

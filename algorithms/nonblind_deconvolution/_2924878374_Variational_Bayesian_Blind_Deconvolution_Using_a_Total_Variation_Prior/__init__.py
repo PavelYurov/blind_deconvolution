@@ -1,3 +1,4 @@
+# https://github.com/2924878374/Variational-Bayesian-Blind-Deconvolution-Using-a-Total-Variation-Prior
 from __future__ import annotations
 
 from time import time
@@ -9,7 +10,7 @@ from scipy.optimize import minimize
 from scipy.sparse import diags
 from scipy.sparse.linalg import LinearOperator, cg
 
-from ...base import DeconvolutionAlgorithm
+from algorithms.base import DeconvolutionAlgorithm
 
 KernelSpec = Union[int, Tuple[int, int], Iterable[int]]
 
@@ -155,8 +156,6 @@ def _conjugate_gradient(lin_op, rhs, x0, maxiter, tol):
 
 
 class TV1DeconvolutionAlgorithm(DeconvolutionAlgorithm):
-    """Total variation deconvolution with a fixed blur kernel."""
-
     def __init__(
         self,
         kernel_size: KernelSpec = (9, 9),
@@ -277,8 +276,6 @@ class TV1DeconvolutionAlgorithm(DeconvolutionAlgorithm):
 
 
 class TV2DeconvolutionAlgorithm(TV1DeconvolutionAlgorithm):
-    """Alternating minimisation with total variation priors for image and kernel."""
-
     def __init__(
         self,
         kernel_size: KernelSpec = (9, 9),
@@ -407,8 +404,6 @@ class TV2DeconvolutionAlgorithm(TV1DeconvolutionAlgorithm):
 
 
 class _2924878374VariationalBayesianBlindDeconvolutionUsingATotalVariationPrior(DeconvolutionAlgorithm):
-    """Facade that exposes TV1/TV2 variants via the common framework interface."""
-
     def __init__(
         self,
         variant: str = "tv2",

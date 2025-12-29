@@ -1,3 +1,0 @@
-https://github.com/CACTuS-AI/Blind-Deconvolution-using-Modulated-Inputs
-
-Код невстраиваемый. Не имеет нужного интерфейса и вообще не работает с парой (изображение, ядро)

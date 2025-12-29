@@ -1,12 +1,12 @@
+# https://github.com/sanghviyashiitb/photon-limited-blind
 from __future__ import annotations
-
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
 import numpy as np
 
-from ..base import DeconvolutionAlgorithm
+from algorithms.base import DeconvolutionAlgorithm
 
 SOURCE_ROOT = Path(__file__).resolve().parent / "source"
 
@@ -68,12 +68,6 @@ class _PhotonModelPaths:
 
 
 class SanghviyashiitbPhotonLimitedBlind(DeconvolutionAlgorithm):
-    """Wrapper for the photon-limited Poisson blind deconvolution pipeline (sanghviyashiitb/photon-limited-blind).
-
-    This adapter requires PyTorch with CUDA support and the pretrained checkpoint files supplied by the original
-    repository. Provide ``solver_weights`` and ``denoiser_weights`` if the defaults are not available locally.
-    """
-
     def __init__(
         self,
         photon_level: float = 20.0,
@@ -106,7 +100,6 @@ class SanghviyashiitbPhotonLimitedBlind(DeconvolutionAlgorithm):
         self._denoiser = None
         self._device = None
 
-    # ------------------------------------------------------------------
     def change_param(self, param: Dict[str, Any]):
         if not isinstance(param, dict):
             return super().change_param(param)
@@ -136,7 +129,6 @@ class SanghviyashiitbPhotonLimitedBlind(DeconvolutionAlgorithm):
 
         return super().change_param(param)
 
-    # ------------------------------------------------------------------
     def process(self, image: np.ndarray):
         if torch is None or iterative_scheme is None or P4IP_Net is None:
             raise ImportError(
@@ -167,7 +159,6 @@ class SanghviyashiitbPhotonLimitedBlind(DeconvolutionAlgorithm):
             'VERBOSE': self.verbose,
         }
 
-        # Align the iterative module device selection
         _iterative_module.device = self._device  # type: ignore[assignment]
 
         x_history, k_history = iterative_scheme(  # type: ignore[misc]
@@ -188,7 +179,6 @@ class SanghviyashiitbPhotonLimitedBlind(DeconvolutionAlgorithm):
 
         return restored, kernel
 
-    # ------------------------------------------------------------------
     def get_param(self):
         return [
             ('photon_level', self.photon_level),
@@ -204,7 +194,6 @@ class SanghviyashiitbPhotonLimitedBlind(DeconvolutionAlgorithm):
             ('denoiser_weights', str(self.denoiser_weights)),
         ]
 
-    # ------------------------------------------------------------------
     def _ensure_models(self):
         if self._p4ip is not None and self._denoiser is not None:
             return
