@@ -1,6 +1,18 @@
+"""
+Базовый класс для алгоритмов восстановления изображения
+
+Содержит:
+    - Абстрактный класс, от которого должны наследоваться все другие
+    классы алгоритмов
+    - Базовый интерфейс класса алгоритма
+
+Автор: Юров П.И.
+"""
+
 import abc
 import numpy as np
 from typing import Any
+from pathlib import Path
 import json
 
 class DeconvolutionAlgorithm(abc.ABC):
@@ -27,7 +39,7 @@ class DeconvolutionAlgorithm(abc.ABC):
         pass
     
     @abc.abstractmethod
-    def change_param(self, param):
+    def change_param(self, param: Any) -> None:
         '''
         Необходимо для изменения гиперпараметров во время работы алгоритма
         '''
@@ -60,14 +72,14 @@ class DeconvolutionAlgorithm(abc.ABC):
         """Получение названия алгоритма."""
         return self.name
     
-    def get_timer(self)->float:
+    def get_timer(self) -> float:
         '''
         Возвращает:
             время работы алгоритма
         '''
         return self.timer
     
-    def import_param_from_file(self, file):
+    def import_param_from_file(self, file: Path) -> None:
         with open(file, 'r', encoding='utf-8') as f:
             data = json.load(f)
         self.change_param(data)
