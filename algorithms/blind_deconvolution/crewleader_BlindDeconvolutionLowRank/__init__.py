@@ -1,10 +1,16 @@
+# https://github.com/crewleader/BlindDeconvolutionLowRank
+from __future__ import annotations
+
 import os
+from typing import Any
+
 import cv2
 import numpy as np
 import matlab.engine
 
 from algorithms.base import DeconvolutionAlgorithm
 
+ALGORITHM_NAME = "crewleader_BlindDeconvolutionLowRank"
 SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "source")
 
 
@@ -27,6 +33,7 @@ class CrewleaderBlindDeconvolutionLowRank(DeconvolutionAlgorithm):
         delta: float | None = None,
         transform_type: str = "projective",
     ):
+        super().__init__(ALGORITHM_NAME)
         self._eng = matlab.engine.start_matlab()
         self._eng.addpath(self._eng.genpath(SOURCE_PATH), nargout=0)
         self._eng.cd(os.path.join(SOURCE_PATH, "code"), nargout=0)
@@ -50,7 +57,10 @@ class CrewleaderBlindDeconvolutionLowRank(DeconvolutionAlgorithm):
         self.delta = float(delta) if delta is not None else (0.04 * self.gamma)
         self.transform_type = str(transform_type)
 
-    def change_param(self, param: dict):
+    def change_param(self, param: Any):
+        if not isinstance(param, dict):
+            return
+
         if "psize_y" in param:
             self.psize_y = int(param["psize_y"])
         if "psize_x" in param:
@@ -82,24 +92,24 @@ class CrewleaderBlindDeconvolutionLowRank(DeconvolutionAlgorithm):
         if "transform_type" in param:
             self.transform_type = str(param["transform_type"])
 
-    def get_param(self) -> dict:
-        return {
-            "psize_y": self.psize_y,
-            "psize_x": self.psize_x,
-            "gamma": self.gamma,
-            "p": self.p,
-            "beta": self.beta,
-            "thr_e": self.thr_e,
-            "num_try": self.num_try,
-            "base_psf": self.base_psf,
-            "resize_step": self.resize_step,
-            "alpha_multiplier": self.alpha_multiplier,
-            "min_alpha": self.min_alpha,
-            "num_scale": self.num_scale,
-            "lambda": self.lambda_,
-            "delta": self.delta,
-            "transform_type": self.transform_type,
-        }
+    def get_param(self) -> list[str, Any]:
+        return [
+            ("psize_y", self.psize_y),
+            ("psize_x", self.psize_x),
+            ("gamma", self.gamma),
+            ("p", self.p),
+            ("beta", self.beta),
+            ("thr_e", self.thr_e),
+            ("num_try", self.num_try),
+            ("base_psf", self.base_psf),
+            ("resize_step", self.resize_step),
+            ("alpha_multiplier", self.alpha_multiplier),
+            ("min_alpha", self.min_alpha),
+            ("num_scale", self.num_scale),
+            ("lambda", self.lambda_),
+            ("delta", self.delta),
+            ("transform_type", self.transform_type),
+        ]
 
     def process(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         if image.ndim == 3 and image.shape[2] == 3:

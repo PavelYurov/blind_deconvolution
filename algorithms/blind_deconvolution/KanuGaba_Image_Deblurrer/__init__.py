@@ -1,5 +1,8 @@
+# https://github.com/KanuGaba/Image-Deblurrer/
+from __future__ import annotations
+
 import os
-from typing import Optional
+from typing import Any, Optional
 
 import cv2
 import matlab.engine
@@ -7,6 +10,7 @@ import numpy as np
 
 from algorithms.base import DeconvolutionAlgorithm
 
+ALGORITHM_NAME = "KanuGaba_Image_Deblurrer"
 SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "source")
 
 
@@ -18,6 +22,7 @@ class KanuGabaImageDeblurrer(DeconvolutionAlgorithm):
 		noise_var: float = 1e-4,
 		nsr: Optional[float] = None,
 	):
+		super().__init__(ALGORITHM_NAME)
 		self._eng = matlab.engine.start_matlab()
 		self._eng.addpath(self._eng.genpath(SOURCE_PATH), nargout=0)
 		self._eng.cd(SOURCE_PATH, nargout=0)
@@ -27,7 +32,10 @@ class KanuGabaImageDeblurrer(DeconvolutionAlgorithm):
 		self.noise_var = float(noise_var)
 		self.nsr = None if nsr is None else float(nsr)
 
-	def change_param(self, param):
+	def change_param(self, param: Any):
+		if not isinstance(param, dict):
+			return
+
 		if "length" in param:
 			self.length = int(param["length"])
 		if "theta" in param:
@@ -37,13 +45,13 @@ class KanuGabaImageDeblurrer(DeconvolutionAlgorithm):
 		if "nsr" in param:
 			self.nsr = None if param["nsr"] is None else float(param["nsr"])
 
-	def get_param(self):
-		return {
-			"length": self.length,
-			"theta": self.theta,
-			"noise_var": self.noise_var,
-			"nsr": self.nsr,
-		}
+	def get_param(self) -> list[str, Any]:
+		return [
+			("length", self.length),
+			("theta", self.theta),
+			("noise_var", self.noise_var),
+			("nsr", self.nsr),
+		]
 
 	def process(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
 		if image.ndim == 2:
@@ -78,4 +86,3 @@ class KanuGabaImageDeblurrer(DeconvolutionAlgorithm):
 			self._eng.quit()
 		except Exception:
 			pass
-

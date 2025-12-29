@@ -1,14 +1,13 @@
+# https://github.com/dragos2001/Total_Variation_Blind_Deconvolution
 from __future__ import annotations
-
 import sys
 from time import time
 from typing import Any, Dict, Iterable, Tuple, Union
 
 import numpy as np
 
-from ...base import DeconvolutionAlgorithm
+from algorithms.base import DeconvolutionAlgorithm
 
-# Ensure legacy absolute imports inside source modules resolve correctly.
 from .source import L1_support as _l1_support
 from .source import blur_kernels as _blur_kernels
 
@@ -68,8 +67,6 @@ def _restore_dtype(image: np.ndarray, dtype: np.dtype, scale: float) -> np.ndarr
 
 
 class Dragos2001TotalVariationBlindDeconvolution(DeconvolutionAlgorithm):
-    """Wrapper around the source TV blind deconvolution routine."""
-
     def __init__(
         self,
         sigma = 2,
@@ -175,8 +172,6 @@ class Dragos2001TotalVariationBlindDeconvolution(DeconvolutionAlgorithm):
 
 
 class Dragos2001blinddeconvolutiondevilindetails(DeconvolutionAlgorithm):
-    """Wrapper around the source TV blind deconvolution routine."""
-
     def __init__(
         self,
         kernel_size: KernelSpec = 9,
@@ -257,5 +252,4 @@ class Dragos2001blinddeconvolutiondevilindetails(DeconvolutionAlgorithm):
         ]
 
 __all__ = ["Dragos2001TotalVariationBlindDeconvolution"]
-# __all__ = ["Dragos2001blinddeconvolutiondevilindetails"]
 

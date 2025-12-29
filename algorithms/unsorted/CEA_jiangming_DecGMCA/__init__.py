@@ -1,17 +1,15 @@
+# https://github.com/CEA-jiangming/DecGMCA
 from __future__ import annotations
-
 from time import time
 from typing import Any, Optional, Tuple
 
 import numpy as np
 
-from ...base import DeconvolutionAlgorithm
+from algorithms.base import DeconvolutionAlgorithm
 from .source.pyDecGMCA.algoDecG import DecGMCA
 
-Array2D = np.ndarray
 
-
-def _prepare_image(image: Array2D) -> Tuple[Array2D, np.dtype, Optional[int]]:
+def _prepare_image(image: np.ndarray) -> Tuple[np.ndarray, np.dtype, Optional[int]]:
     original_dtype = image.dtype
     channels: Optional[int] = None
 
@@ -31,7 +29,7 @@ def _prepare_image(image: Array2D) -> Tuple[Array2D, np.dtype, Optional[int]]:
     return working, original_dtype, channels
 
 
-def _stretch_to_unit(image: Array2D) -> Array2D:
+def _stretch_to_unit(image: np.ndarray) -> np.ndarray:
     min_val = float(image.min())
     max_val = float(image.max())
     if not np.isfinite(min_val) or not np.isfinite(max_val) or max_val - min_val < 1e-12:
@@ -40,7 +38,7 @@ def _stretch_to_unit(image: Array2D) -> Array2D:
     return np.clip(scaled, 0.0, 1.0)
 
 
-def _restore_dtype(restored: Array2D, original_dtype: np.dtype, channels: Optional[int]) -> Array2D:
+def _restore_dtype(restored: np.ndarray, original_dtype: np.dtype, channels: Optional[int]) -> np.ndarray:
     clipped = np.clip(restored, 0.0, 1.0)
     if np.issubdtype(original_dtype, np.integer):
         output = (clipped * 255.0).round().astype(original_dtype)
@@ -53,7 +51,7 @@ def _restore_dtype(restored: Array2D, original_dtype: np.dtype, channels: Option
     return output
 
 
-def _normalised_kernel(kernel_size: Tuple[int, int]) -> Array2D:
+def _normalised_kernel(kernel_size: Tuple[int, int]) -> np.ndarray:
     kernel = np.ones(kernel_size, dtype=np.float32)
     total = float(kernel.sum())
     if total > 0:
@@ -110,7 +108,7 @@ class CEAJiangmingDecGMCA(DeconvolutionAlgorithm):
         else:
             size = int(kernel_size)
             self.kernel_size = (size, size)
-        self._last_kernel: Optional[Array2D] = None
+        self._last_kernel: Optional[np.ndarray] = None
 
     def change_param(self, param: Any):
         if not isinstance(param, dict):
@@ -152,7 +150,7 @@ class CEAJiangmingDecGMCA(DeconvolutionAlgorithm):
                 self.kernel_size = (size, size)
         return super().change_param(param)
 
-    def process(self, image: Array2D) -> Tuple[Array2D, Array2D]:
+    def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         working, original_dtype, channels = _prepare_image(image)
         start = time()
 
@@ -204,7 +202,6 @@ class CEAJiangmingDecGMCA(DeconvolutionAlgorithm):
         restored_out = _restore_dtype(restored, original_dtype, channels)
 
         self._last_kernel = _normalised_kernel(self.kernel_size)
-        # self._last_kernel = self.kernel_size
         self.timer = time() - start
         return restored_out, self._last_kernel
 

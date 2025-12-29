@@ -1,5 +1,5 @@
+# https://github.com/COR-OPT/RobustBlindDeconv
 from __future__ import annotations
-
 import sys
 from pathlib import Path
 from time import time
@@ -8,16 +8,14 @@ from typing import Any, Dict, Optional, Tuple
 import numpy as np
 from scipy.signal import fftconvolve, correlate2d
 
-from ...base import DeconvolutionAlgorithm
-
-Array2D = np.ndarray
+from algorithms.base import DeconvolutionAlgorithm
 
 SOURCE_ROOT = Path(__file__).resolve().parent / "source"
 if str(SOURCE_ROOT) not in sys.path:
     sys.path.insert(0, str(SOURCE_ROOT))
 
 
-def _gaussian_kernel(size: int, sigma: float) -> Array2D:
+def _gaussian_kernel(size: int, sigma: float) -> np.ndarray:
     ax = np.linspace(-(size // 2), size // 2, size)
     xx, yy = np.meshgrid(ax, ax)
     kernel = np.exp(-(xx ** 2 + yy ** 2) / (2.0 * sigma ** 2))
@@ -28,11 +26,11 @@ def _gaussian_kernel(size: int, sigma: float) -> Array2D:
     return kernel / kernel_sum
 
 
-def _flip_kernel(kernel: Array2D) -> Array2D:
+def _flip_kernel(kernel: np.ndarray) -> np.ndarray:
     return np.flip(kernel, axis=(0, 1))
 
 
-def _laplacian(arr: Array2D) -> Array2D:
+def _laplacian(arr: np.ndarray) -> np.ndarray:
     lap = (
         -4.0 * arr
         + np.roll(arr, 1, axis=0)
@@ -43,7 +41,7 @@ def _laplacian(arr: Array2D) -> Array2D:
     return lap
 
 
-def _project_kernel(kernel: Array2D) -> Array2D:
+def _project_kernel(kernel: np.ndarray) -> np.ndarray:
     kernel = np.clip(kernel, 0.0, None)
     total = kernel.sum()
     if total <= 0:
@@ -52,7 +50,7 @@ def _project_kernel(kernel: Array2D) -> Array2D:
     return kernel / total
 
 
-def _pad_kernel_like(kernel: Array2D, shape: Tuple[int, int]) -> Array2D:
+def _pad_kernel_like(kernel: np.ndarray, shape: Tuple[int, int]) -> np.ndarray:
     padded = np.zeros(shape, dtype=np.float64)
     kh, kw = kernel.shape
     ph, pw = (shape[0] - kh) // 2, (shape[1] - kw) // 2
@@ -60,23 +58,23 @@ def _pad_kernel_like(kernel: Array2D, shape: Tuple[int, int]) -> Array2D:
     return padded
 
 
-def _compute_residual(sharp: Array2D, kernel: Array2D, observed: Array2D) -> Array2D:
+def _compute_residual(sharp: np.ndarray, kernel: np.ndarray, observed: np.ndarray) -> np.ndarray:
     return fftconvolve(sharp, kernel, mode="same") - observed
 
 
-def _robust_weight(residual: Array2D, epsilon: float) -> Array2D:
+def _robust_weight(residual: np.ndarray, epsilon: float) -> np.ndarray:
     denom = np.sqrt(residual * residual + epsilon)
     return residual / np.maximum(denom, epsilon)
 
 
 def _update_sharp(
-    sharp: Array2D,
-    kernel: Array2D,
-    observed: Array2D,
+    sharp: np.ndarray,
+    kernel: np.ndarray,
+    observed: np.ndarray,
     step_size: float,
     epsilon: float,
     tv_weight: float,
-) -> Array2D:
+) -> np.ndarray:
     residual = _compute_residual(sharp, kernel, observed)
     weight = _robust_weight(residual, epsilon)
     grad_data = fftconvolve(weight, _flip_kernel(kernel), mode="same")
@@ -86,14 +84,14 @@ def _update_sharp(
 
 
 def _update_kernel(
-    sharp: Array2D,
-    kernel: Array2D,
-    observed: Array2D,
+    sharp: np.ndarray,
+    kernel: np.ndarray,
+    observed: np.ndarray,
     step_size: float,
     epsilon: float,
     smooth_weight: float,
     kernel_size: int,
-) -> Array2D:
+) -> np.ndarray:
     residual = _compute_residual(sharp, kernel, observed)
     weight = _robust_weight(residual, epsilon)
     flipped_sharp = _flip_kernel(sharp)
@@ -115,7 +113,7 @@ def _update_kernel(
     return _project_kernel(updated)
 
 
-def _resize_kernel(kernel: Array2D, kernel_size: int) -> Array2D:
+def _resize_kernel(kernel: np.ndarray, kernel_size: int) -> np.ndarray:
     kh, kw = kernel.shape
     if kh == kernel_size and kw == kernel_size:
         return kernel
@@ -133,8 +131,6 @@ def _resize_kernel(kernel: Array2D, kernel_size: int) -> Array2D:
 
 
 class COROPTRobustBlindDeconv(DeconvolutionAlgorithm):
-    """Robust blind deconvolution via alternating robust updates (Python port)."""
-
     def __init__(
         self,
         kernel_size: int = 15,
@@ -155,8 +151,8 @@ class COROPTRobustBlindDeconv(DeconvolutionAlgorithm):
         self.tv_weight = float(tv_weight)
         self.kernel_smooth = float(kernel_smooth)
         self.init_sigma = float(init_sigma) if init_sigma is not None else None
-        self._last_kernel: Optional[Array2D] = None
-        self._last_output: Optional[Array2D] = None
+        self._last_kernel: Optional[np.ndarray] = None
+        self._last_output: Optional[np.ndarray] = None
 
     def change_param(self, param: Dict[str, Any]):
         if not isinstance(param, dict):
@@ -194,7 +190,7 @@ class COROPTRobustBlindDeconv(DeconvolutionAlgorithm):
             ("last_output_shape", None if self._last_output is None else self._last_output.shape),
         ]
 
-    def process(self, image: Array2D) -> Tuple[Array2D, Array2D]:
+    def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         if image is None:
             raise ValueError("Input image is None.")
         arr = np.asarray(image)
@@ -238,7 +234,7 @@ class COROPTRobustBlindDeconv(DeconvolutionAlgorithm):
         self._last_kernel = kernel
         return restored, kernel
 
-    def get_kernel(self) -> Array2D | None:
+    def get_kernel(self) -> np.ndarray | None:
         return None if self._last_kernel is None else self._last_kernel.copy()
 
 

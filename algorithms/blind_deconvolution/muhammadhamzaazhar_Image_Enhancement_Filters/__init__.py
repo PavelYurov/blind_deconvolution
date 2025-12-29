@@ -1,11 +1,15 @@
+# https://github.com/muhammadhamzaazhar/Image-Enhancement-Filters
+from __future__ import annotations
 import os
+from typing import Any, Literal
+
 import cv2
-import numpy as np
 import matlab.engine
-from typing import Literal
+import numpy as np
 
 from algorithms.base import DeconvolutionAlgorithm
 
+ALGORITHM_NAME = "muhammadhamzaazhar_Image_Enhancement_Filters"
 SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "source")
 
 KERNEL_PLACEHOLDER = np.array([[0.0]])
@@ -25,6 +29,7 @@ class MuhammadhamzaazharImageEnhancementFilters(DeconvolutionAlgorithm):
 		wiener_psf_sigma: float = 10.0,
 		wiener_noise_variance: float = 0.01,
 	):
+		super().__init__(ALGORITHM_NAME)
 		self._eng = matlab.engine.start_matlab()
 		self._eng.addpath(self._eng.genpath(SOURCE_PATH), nargout=0)
 		self._eng.cd(SOURCE_PATH, nargout=0)
@@ -41,7 +46,10 @@ class MuhammadhamzaazharImageEnhancementFilters(DeconvolutionAlgorithm):
 		self.wiener_psf_sigma = float(wiener_psf_sigma)
 		self.wiener_noise_variance = float(wiener_noise_variance)
 
-	def change_param(self, param):
+	def change_param(self, param: Any):
+		if not isinstance(param, dict):
+			return
+
 		if "method" in param:
 			self.method = param["method"]
 
@@ -66,17 +74,17 @@ class MuhammadhamzaazharImageEnhancementFilters(DeconvolutionAlgorithm):
 		if "wiener_noise_variance" in param:
 			self.wiener_noise_variance = float(param["wiener_noise_variance"])
 
-	def get_param(self):
-		return {
-			"method": self.method,
-			"psf_size": self.psf_size,
-			"psf_sigma": self.psf_sigma,
-			"lucy_iterations": self.lucy_iterations,
-			"lucy_noise_variance": self.lucy_noise_variance,
-			"wiener_psf_size": self.wiener_psf_size,
-			"wiener_psf_sigma": self.wiener_psf_sigma,
-			"wiener_noise_variance": self.wiener_noise_variance,
-		}
+	def get_param(self) -> list[str, Any]:
+		return [
+			("method", self.method),
+			("psf_size", self.psf_size),
+			("psf_sigma", self.psf_sigma),
+			("lucy_iterations", self.lucy_iterations),
+			("lucy_noise_variance", self.lucy_noise_variance),
+			("wiener_psf_size", self.wiener_psf_size),
+			("wiener_psf_sigma", self.wiener_psf_sigma),
+			("wiener_noise_variance", self.wiener_noise_variance),
+		]
 
 	def _prepare_image_gray(self, image: np.ndarray) -> np.ndarray:
 		if image.ndim == 3:

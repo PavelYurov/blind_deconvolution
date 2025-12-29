@@ -1,3 +1,5 @@
+# https://github.com/panpanfei/Phase-only-Image-Based-Kernel-Estimation-for-Blind-Motion-Deblurring/
+from __future__ import annotations
 import os
 from typing import Any
 
@@ -7,6 +9,7 @@ import numpy as np
 
 from algorithms.base import DeconvolutionAlgorithm
 
+ALGORITHM_NAME = "panpanfei_Phase_only_Image_Based_Kernel_Estimation_for_Blind_Motion_Deblurring"
 SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "source")
 
 
@@ -26,6 +29,7 @@ class PanpanfeiPhaseOnlyKernelEstimationBlindMotionDeblurring(DeconvolutionAlgor
 		synth_theta: float = 30.0,
 		ifdisplay: int = 0,
 	):
+		super().__init__(ALGORITHM_NAME)
 		self._eng = matlab.engine.start_matlab()
 		self._eng.addpath(self._eng.genpath(SOURCE_PATH), nargout=0)
 		self._eng.cd(SOURCE_PATH, nargout=0)
@@ -43,7 +47,10 @@ class PanpanfeiPhaseOnlyKernelEstimationBlindMotionDeblurring(DeconvolutionAlgor
 		self.synth_theta = float(synth_theta)
 		self.ifdisplay = int(ifdisplay)
 
-	def change_param(self, param: dict[str, Any]):
+	def change_param(self, param: Any):
+		if not isinstance(param, dict):
+			return
+
 		if "needsys" in param:
 			self.needsys = int(param["needsys"])
 		if "motion" in param:
@@ -69,21 +76,21 @@ class PanpanfeiPhaseOnlyKernelEstimationBlindMotionDeblurring(DeconvolutionAlgor
 		if "ifdisplay" in param:
 			self.ifdisplay = int(param["ifdisplay"])
 
-	def get_param(self):
-		return {
-			"needsys": self.needsys,
-			"motion": self.motion,
-			"fast": self.fast,
-			"kernel_size": self.kernel_size,
-			"auto_size": self.auto_size,
-			"iter_num": self.iter_num,
-			"lambda_grad": self.lambda_grad,
-			"lambda_l0": self.lambda_l0,
-			"lambda_tv": self.lambda_tv,
-			"synth_len": self.synth_len,
-			"synth_theta": self.synth_theta,
-			"ifdisplay": self.ifdisplay,
-		}
+	def get_param(self) -> list[str, Any]:
+		return [
+			("needsys", self.needsys),
+			("motion", self.motion),
+			("fast", self.fast),
+			("kernel_size", self.kernel_size),
+			("auto_size", self.auto_size),
+			("iter_num", self.iter_num),
+			("lambda_grad", self.lambda_grad),
+			("lambda_l0", self.lambda_l0),
+			("lambda_tv", self.lambda_tv),
+			("synth_len", self.synth_len),
+			("synth_theta", self.synth_theta),
+			("ifdisplay", self.ifdisplay),
+		]
 
 	def process(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
 		if image.ndim == 2:
@@ -160,4 +167,3 @@ class PanpanfeiPhaseOnlyKernelEstimationBlindMotionDeblurring(DeconvolutionAlgor
 			self._eng.quit()
 		except Exception:
 			pass
-

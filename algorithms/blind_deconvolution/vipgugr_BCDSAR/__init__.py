@@ -1,14 +1,20 @@
+# https://github.com/vipgugr/BCDSAR
+from __future__ import annotations
 import os
+from typing import Any
+
 import cv2
 import numpy as np
 import matlab.engine
 
 from algorithms.base import DeconvolutionAlgorithm
 
+ALGORITHM_NAME = "vipgugr_BCDSAR"
 SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "source")
 
 class VipgugrBCDSAR(DeconvolutionAlgorithm):
 	def __init__(self, epsilon: float = 2.0e-5, niter: int = 1000, ns: int = 2):
+		super().__init__(ALGORITHM_NAME)
 		self._eng = matlab.engine.start_matlab()
 		self._eng.addpath(self._eng.genpath(SOURCE_PATH), nargout=0)
 		self._eng.cd(SOURCE_PATH, nargout=0)
@@ -17,7 +23,10 @@ class VipgugrBCDSAR(DeconvolutionAlgorithm):
 		self.niter = int(niter)
 		self.ns = int(ns)
 
-	def change_param(self, param):
+	def change_param(self, param: Any):
+		if not isinstance(param, dict):
+			return
+
 		if "epsilon" in param:
 			self.epsilon = float(param["epsilon"])
 
@@ -27,12 +36,12 @@ class VipgugrBCDSAR(DeconvolutionAlgorithm):
 		if "ns" in param:
 			self.ns = int(param["ns"])
 
-	def get_param(self):
-		return {
-			"epsilon": self.epsilon,
-			"niter": self.niter,
-			"ns": self.ns,
-		}
+	def get_param(self) -> list[str, Any]:
+		return [
+			("epsilon", self.epsilon),
+			("niter", self.niter),
+			("ns", self.ns),
+		]
 
 	def process(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
 		if image.ndim == 2:

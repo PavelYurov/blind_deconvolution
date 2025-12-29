@@ -1,3 +1,5 @@
+# https://github.com/huacheng/Shift-Invariant-Deblurring
+from __future__ import annotations
 import os
 from typing import Any, Sequence
 
@@ -7,6 +9,7 @@ import numpy as np
 
 from algorithms.base import DeconvolutionAlgorithm
 
+ALGORITHM_NAME = "huacheng_Shift_Invariant_Deblurring"
 SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "source")
 
 
@@ -29,6 +32,7 @@ class HuachengShiftInvariantDeblurring(DeconvolutionAlgorithm):
 		shock_dt: float = 0.1,
 		shock_h: float = 1.0,
 	):
+		super().__init__(ALGORITHM_NAME)
 		self._eng = matlab.engine.start_matlab()
 		self._eng.addpath(self._eng.genpath(SOURCE_PATH), nargout=0)
 		self._eng.cd(SOURCE_PATH, nargout=0)
@@ -45,7 +49,10 @@ class HuachengShiftInvariantDeblurring(DeconvolutionAlgorithm):
 		self.shock_dt = float(shock_dt)
 		self.shock_h = float(shock_h)
 
-	def change_param(self, param: dict[str, Any]):
+	def change_param(self, param: Any):
+		if not isinstance(param, dict):
+			return
+
 		if "lambda_coarse" in param:
 			self.lambda_coarse = float(param["lambda_coarse"])
 		if "gamma" in param:
@@ -69,20 +76,20 @@ class HuachengShiftInvariantDeblurring(DeconvolutionAlgorithm):
 		if "shock_h" in param:
 			self.shock_h = float(param["shock_h"])
 
-	def get_param(self):
-		return {
-			"lambda_coarse": self.lambda_coarse,
-			"gamma": self.gamma,
-			"final_lambda": self.final_lambda,
-			"ratio": list(self.ratio),
-			"ks": list(self.ks),
-			"gaussian_sigma": self.gaussian_sigma,
-			"edgetaper_iters": self.edgetaper_iters,
-			"perona_iter": self.perona_iter,
-			"shock_iter": self.shock_iter,
-			"shock_dt": self.shock_dt,
-			"shock_h": self.shock_h,
-		}
+	def get_param(self) -> list[str, Any]:
+		return [
+			("lambda_coarse", self.lambda_coarse),
+			("gamma", self.gamma),
+			("final_lambda", self.final_lambda),
+			("ratio", list(self.ratio)),
+			("ks", list(self.ks)),
+			("gaussian_sigma", self.gaussian_sigma),
+			("edgetaper_iters", self.edgetaper_iters),
+			("perona_iter", self.perona_iter),
+			("shock_iter", self.shock_iter),
+			("shock_dt", self.shock_dt),
+			("shock_h", self.shock_h),
+		]
 
 	def process(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
 		if image.ndim == 3:
@@ -126,4 +133,3 @@ class HuachengShiftInvariantDeblurring(DeconvolutionAlgorithm):
 			self._eng.quit()
 		except Exception:
 			pass
-

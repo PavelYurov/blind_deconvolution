@@ -1,11 +1,16 @@
+# https://github.com/mujib2020/Non-blind-and-Blind-Deconvolution-under-Poisson-noise
+from __future__ import annotations
+
 import os
+from typing import Any, Literal
+
 import cv2
-import numpy as np
 import matlab.engine
-from typing import Literal
+import numpy as np
 
 from algorithms.base import DeconvolutionAlgorithm
 
+ALGORITHM_NAME = "mujib2020_Non_blind_and_Blind_Deconvolution_under_Poisson_noise"
 SOURCE_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     "source",
@@ -25,7 +30,7 @@ class Mujib2020NonBlindAndBlindDeconvolutionUnderPoissonNoise(DeconvolutionAlgor
         mu2: float = 1.0,
         maxit: int = 150,
     ):
-        super().__init__(name="mujib2020_blind_poisson_fotv")
+        super().__init__(ALGORITHM_NAME)
 
         self._eng = matlab.engine.start_matlab()
         self._eng.addpath(self._eng.genpath(SOURCE_PATH), nargout=0)
@@ -40,7 +45,10 @@ class Mujib2020NonBlindAndBlindDeconvolutionUnderPoissonNoise(DeconvolutionAlgor
         self.mu2 = float(mu2)
         self.maxit = int(maxit)
         
-    def change_param(self, param: dict):
+    def change_param(self, param: Any):
+        if not isinstance(param, dict):
+            return
+
         if "mode" in param:
             if param["mode"] in ("EM", "FOTV"):
                 self.mode = param["mode"]
@@ -66,17 +74,17 @@ class Mujib2020NonBlindAndBlindDeconvolutionUnderPoissonNoise(DeconvolutionAlgor
         if "maxit" in param:
             self.maxit = int(param["maxit"])
 
-    def get_param(self) -> dict:
-        return {
-            "mode": self.mode,  # 'EM' или 'FOTV'
-            "kernel_height": self.kernel_height,
-            "kernel_width": self.kernel_width,
-            "alpha": self.alpha,
-            "beta": self.beta,
-            "mu1": self.mu1,
-            "mu2": self.mu2,
-            "maxit": self.maxit,
-        }
+    def get_param(self) -> list[str, Any]:
+        return [
+            ("mode", self.mode),
+            ("kernel_height", self.kernel_height),
+            ("kernel_width", self.kernel_width),
+            ("alpha", self.alpha),
+            ("beta", self.beta),
+            ("mu1", self.mu1),
+            ("mu2", self.mu2),
+            ("maxit", self.maxit),
+        ]
 
     def process(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         if image.ndim == 3:

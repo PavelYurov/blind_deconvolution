@@ -1,3 +1,4 @@
+# https://github.com/jtaoz/GKPILE-Deconvolution
 from __future__ import annotations
 
 import math
@@ -7,7 +8,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 
-from ...base import DeconvolutionAlgorithm
+from algorithms.base import DeconvolutionAlgorithm
 
 SOURCE_ROOT = Path(__file__).resolve().parent / "source"
 try:  # optional heavy dependencies
@@ -45,8 +46,6 @@ def _lazy_import_utils():
 
 
 class JtaozGKPILEDeconvolution(DeconvolutionAlgorithm):
-    """Generative kernel prior blind deconvolution (GKPILE)."""
-
     def __init__(
         self,
         kernel_size: int = 31,

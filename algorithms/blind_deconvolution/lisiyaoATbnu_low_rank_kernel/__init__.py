@@ -1,10 +1,15 @@
+# https://github.com/lisiyaoATbnu/low_rank_kernel
+from __future__ import annotations
 import os
+from typing import Any
+
 import cv2
 import numpy as np
 import matlab.engine
 
 from algorithms.base import DeconvolutionAlgorithm
 
+ALGORITHM_NAME = "lisiyaoATbnu_low_rank_kernel"
 SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "source")
 
 
@@ -27,6 +32,7 @@ class LisiyaoATbnuLowRankKernel(DeconvolutionAlgorithm):
 		kernel_size: int = 185,
 		verbose: bool = True,
 	):
+		super().__init__(ALGORITHM_NAME)
 		self._eng = matlab.engine.start_matlab()
 		self._eng.addpath(self._eng.genpath(SOURCE_PATH), nargout=0)
 		self._eng.cd(SOURCE_PATH, nargout=0)
@@ -47,7 +53,10 @@ class LisiyaoATbnuLowRankKernel(DeconvolutionAlgorithm):
 		self.kernel_size = int(kernel_size)
 		self.verbose = bool(verbose)
 
-	def change_param(self, param):
+	def change_param(self, param: Any):
+		if not isinstance(param, dict):
+			return
+
 		if "tx" in param:
 			self.tx = float(param["tx"])
 		if "tau" in param:
@@ -79,24 +88,24 @@ class LisiyaoATbnuLowRankKernel(DeconvolutionAlgorithm):
 		if "verbose" in param:
 			self.verbose = bool(param["verbose"])
 
-	def get_param(self):
-		return {
-			"tx": self.tx,
-			"tau": self.tau,
-			"delta": self.delta,
-			"imax": self.imax,
-			"ximax": self.ximax,
-			"xjmax": self.xjmax,
-			"kmax": self.kmax,
-			"rmax": self.rmax,
-			"sigma": self.sigma,
-			"lambda": self.lambda_,
-			"threshold": self.threshold,
-			"mu": self.mu,
-			"iterkrank": self.iterkrank,
-			"kernel_size": self.kernel_size,
-			"verbose": self.verbose,
-		}
+	def get_param(self) -> list[str, Any]:
+		return [
+			("tx", self.tx),
+			("tau", self.tau),
+			("delta", self.delta),
+			("imax", self.imax),
+			("ximax", self.ximax),
+			("xjmax", self.xjmax),
+			("kmax", self.kmax),
+			("rmax", self.rmax),
+			("sigma", self.sigma),
+			("lambda", self.lambda_),
+			("threshold", self.threshold),
+			("mu", self.mu),
+			("iterkrank", self.iterkrank),
+			("kernel_size", self.kernel_size),
+			("verbose", self.verbose),
+		]
 	def process(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
 		if image.ndim == 2:
 			image_bgr = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)

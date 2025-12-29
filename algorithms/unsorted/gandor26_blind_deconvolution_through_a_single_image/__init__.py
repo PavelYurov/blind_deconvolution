@@ -1,3 +1,4 @@
+#https://github.com/Gandor26/Blind-Deconvolution-through-a-Single-Image
 from typing import Any, Dict, Tuple
 
 import numpy as np
@@ -6,7 +7,7 @@ try:
 except ImportError:  # pragma: no cover - optional dependency
     cv2 = None
 
-from ..base import DeconvolutionAlgorithm
+from algorithms.base import DeconvolutionAlgorithm
 from .deconvolution import DeConvolution
 
 

@@ -1,3 +1,4 @@
+# https://github.com/gpl27/deblur
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -6,7 +7,7 @@ from typing import Any, Dict, Tuple
 
 import numpy as np
 
-from ...base import DeconvolutionAlgorithm
+from algorithms.base import DeconvolutionAlgorithm
 from .convolve import create_line_psf
 from .deblur import computeLocalPrior, updatePsi, computeL, updatef
 
@@ -20,8 +21,6 @@ class HQMotionParams:
 
 
 class HQMotionBlindDeconvolution(DeconvolutionAlgorithm):
-    """High-quality motion blind deconvolution (Stuani & Lacroix, 2008)."""
-
     def __init__(
         self,
         kernel_shape: Tuple[int, int] = (27, 27),
@@ -71,7 +70,6 @@ class HQMotionBlindDeconvolution(DeconvolutionAlgorithm):
         if img.max(initial=0.0) > 1.5:
             img = img / 255.0
 
-        # Work with grayscale but keep channel dimension for the legacy helpers.
         gray = np.atleast_3d(img.mean(axis=2) if img.ndim == 3 else img)
 
         kernel = create_line_psf(
@@ -80,7 +78,6 @@ class HQMotionBlindDeconvolution(DeconvolutionAlgorithm):
             sz=self.kernel_shape,
         )
 
-        # local priors per channel
         M = np.zeros_like(gray)
         for channel in range(gray.shape[2]):
             M[:, :, channel] = computeLocalPrior(gray[:, :, channel], kernel.shape, self.local_threshold)

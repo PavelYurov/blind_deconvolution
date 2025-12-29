@@ -1,5 +1,5 @@
+# https://github.com/jeffreysblake/funsearch-blind-deconvolution
 from __future__ import annotations
-
 from dataclasses import dataclass
 from time import time
 from typing import Any, Dict, Iterable, Optional, Sequence, Tuple, Union
@@ -7,7 +7,7 @@ from typing import Any, Dict, Iterable, Optional, Sequence, Tuple, Union
 import numpy as np
 from scipy import ndimage
 
-from ..base import DeconvolutionAlgorithm
+from algorithms.base import DeconvolutionAlgorithm
 
 from .source.blind_deconvolution.deconvolution_utils import (
     lucy_richardson_iteration,
@@ -120,8 +120,6 @@ class _KernelConfig:
 
 
 class JeffreysblakeFunsearchBlindDeconvolution(DeconvolutionAlgorithm):
-    """Lucy-Richardson deconvolution with learned-style stopping criteria."""
-
     def __init__(
         self,
         kernel_size: KernelSpec = 15,

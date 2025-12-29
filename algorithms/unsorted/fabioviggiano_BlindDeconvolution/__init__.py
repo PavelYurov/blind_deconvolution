@@ -1,17 +1,15 @@
-from ..base import DeconvolutionAlgorithm
-import numpy as np
+# https://github.com/fabioviggiano/BlindDeconvolution
+from __future__ import annotations
+
 from typing import Any, Dict
 
-# Обертка над реализацией из shan_impl
+import numpy as np
+
+from algorithms.base import DeconvolutionAlgorithm
 from .shan_impl import deblurShanPyramidal
 
 
 class FabioviggianoBlindDeconvolution(DeconvolutionAlgorithm):
-    """
-    Обертка алгоритма Shan (pyramidal) под интерфейс DeconvolutionAlgorithm.
-    Использует реализацию `deblurShanPyramidal` из `shan_impl.py`.
-    """
-
     def __init__(
         self,
         kernel_size: int = 35,
@@ -28,18 +26,8 @@ class FabioviggianoBlindDeconvolution(DeconvolutionAlgorithm):
         self.num_levels = int(num_levels)
 
     def change_param(self, param: Dict[str, Any]):
-        """
-        Изменение гиперпараметров алгоритма.
-
-        Ожидаемые ключи в param:
-        - 'kernel_size'
-        - 'iterations' или 'num_iterations'
-        - 'lambda_prior'
-        - 'lambda_kernel_reg' или 'lambda_kernel'
-        - 'num_levels' или 'pyramid_levels'
-        """
         if not isinstance(param, dict):
-            return super().change_param(param)
+            return
 
         if 'kernel_size' in param and param['kernel_size']:
             self.kernel_size = int(param['kernel_size'])
@@ -49,7 +37,6 @@ class FabioviggianoBlindDeconvolution(DeconvolutionAlgorithm):
             self.iterations = int(param['num_iterations'])
         if 'lambda_prior' in param and param['lambda_prior'] is not None:
             self.lambda_prior = float(param['lambda_prior'])
-        # допускаем синоним с именем из CLI примера
         if 'lambda_kernel_reg' in param and param['lambda_kernel_reg'] is not None:
             self.lambda_kernel_reg = float(param['lambda_kernel_reg'])
         if 'lambda_kernel' in param and param['lambda_kernel'] is not None:
@@ -59,7 +46,7 @@ class FabioviggianoBlindDeconvolution(DeconvolutionAlgorithm):
         if 'pyramid_levels' in param and param['pyramid_levels'] is not None:
             self.num_levels = int(param['pyramid_levels'])
 
-        return super().change_param(param)
+        return
 
     def get_param(self):
         return [
@@ -71,12 +58,6 @@ class FabioviggianoBlindDeconvolution(DeconvolutionAlgorithm):
         ]
 
     def process(self, image: np.ndarray):
-        """
-        Запуск blind-deconvolution по Shan.
-
-        Возвращает: (restored_image, estimated_kernel)
-        """
-        # Приведение типа к [0,1] для устойчивости вычислений
         orig_dtype = image.dtype
         img = image.astype(np.float32)
         if img.max() > 1.5:
@@ -91,7 +72,6 @@ class FabioviggianoBlindDeconvolution(DeconvolutionAlgorithm):
             num_levels=self.num_levels,
         )
 
-        # Возврат изображения в исходный тип
         if np.issubdtype(orig_dtype, np.integer):
             restored_out = (np.clip(restored, 0, 1) * 255.0).astype(orig_dtype)
         else:

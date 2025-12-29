@@ -1,29 +1,34 @@
+# https://github.com/zalteck/BCDTV
+from __future__ import annotations
+
 import os
+from typing import Any
+
 import cv2
 import numpy as np
 import matlab.engine
 
 from algorithms.base import DeconvolutionAlgorithm
 
+ALGORITHM_NAME = "zalteck_BCDTV"
 SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "source")
 
 KERNEL_PLACEHOLDER = np.array([[0]])
 
 class ZalteckBCDTV(DeconvolutionAlgorithm):
 	def __init__(self):
+		super().__init__(ALGORITHM_NAME)
 		self._eng = matlab.engine.start_matlab()
 		self._eng.addpath(self._eng.genpath(SOURCE_PATH), nargout=0)
 		self._eng.cd(SOURCE_PATH, nargout=0)
 
-	def change_param(self, param):
-		return None
+	def change_param(self, param: Any):
+		return
 
-	def get_param(self):
-		return {}
+	def get_param(self) -> list[str, Any]:
+		return []
 
 	def process(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-		'''image: cv2.COLOR_BGR2RGB'''
-
 		image = image.astype(np.float64) / 255.0
 
 		m, n, nc = image.shape

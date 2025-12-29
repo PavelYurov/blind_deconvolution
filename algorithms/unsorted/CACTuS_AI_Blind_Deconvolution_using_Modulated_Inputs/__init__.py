@@ -1,5 +1,5 @@
+# https://github.com/CACTuS-AI/Blind-Deconvolution-using-Modulated-Inputs
 from __future__ import annotations
-
 import sys
 from pathlib import Path
 from time import time
@@ -8,16 +8,14 @@ from typing import Any, Dict, Optional, Tuple
 import numpy as np
 from scipy.signal import correlate2d, fftconvolve
 
-from ..base import DeconvolutionAlgorithm
-
-Array2D = np.ndarray
+from algorithms.base import DeconvolutionAlgorithm
 
 SOURCE_ROOT = Path(__file__).resolve().parent / "source"
 if str(SOURCE_ROOT) not in sys.path:
     sys.path.insert(0, str(SOURCE_ROOT))
 
 
-def _gaussian_kernel(size: int, sigma: float) -> Array2D:
+def _gaussian_kernel(size: int, sigma: float) -> np.ndarray:
     ax = np.linspace(-(size // 2), size // 2, size)
     xx, yy = np.meshgrid(ax, ax)
     kernel = np.exp(-(xx ** 2 + yy ** 2) / (2.0 * sigma ** 2))
@@ -28,11 +26,11 @@ def _gaussian_kernel(size: int, sigma: float) -> Array2D:
     return kernel / total
 
 
-def _flip_kernel(kernel: Array2D) -> Array2D:
+def _flip_kernel(kernel: np.ndarray) -> np.ndarray:
     return np.flip(kernel, axis=(0, 1))
 
 
-def _laplacian(arr: Array2D) -> Array2D:
+def _laplacian(arr: np.ndarray) -> np.ndarray:
     return (
         -4.0 * arr
         + np.roll(arr, 1, axis=0)
@@ -42,7 +40,7 @@ def _laplacian(arr: Array2D) -> Array2D:
     )
 
 
-def _project_kernel(kernel: Array2D) -> Array2D:
+def _project_kernel(kernel: np.ndarray) -> np.ndarray:
     kernel = np.clip(kernel, 0.0, None)
     total = float(kernel.sum())
     if total <= 0.0:
@@ -52,14 +50,14 @@ def _project_kernel(kernel: Array2D) -> Array2D:
 
 
 def _update_sharp(
-    sharp: Array2D,
-    kernel: Array2D,
-    observed: Array2D,
-    mask: Array2D,
+    sharp: np.ndarray,
+    kernel: np.ndarray,
+    observed: np.ndarray,
+    mask: np.ndarray,
     step_size: float,
     epsilon: float,
     tv_weight: float,
-) -> Array2D:
+) -> np.ndarray:
     modulated = mask * sharp
     predicted = fftconvolve(modulated, kernel, mode="same")
     residual = predicted - observed
@@ -71,15 +69,15 @@ def _update_sharp(
 
 
 def _update_kernel(
-    sharp: Array2D,
-    kernel: Array2D,
-    observed: Array2D,
-    mask: Array2D,
+    sharp: np.ndarray,
+    kernel: np.ndarray,
+    observed: np.ndarray,
+    mask: np.ndarray,
     step_size: float,
     epsilon: float,
     smooth_weight: float,
     kernel_size: int,
-) -> Array2D:
+) -> np.ndarray:
     modulated = mask * sharp
     predicted = fftconvolve(modulated, kernel, mode="same")
     residual = predicted - observed
@@ -91,7 +89,7 @@ def _update_kernel(
     return _project_kernel(updated)
 
 
-def _resize_kernel(kernel: Array2D, kernel_size: int) -> Array2D:
+def _resize_kernel(kernel: np.ndarray, kernel_size: int) -> np.ndarray:
     if kernel.shape == (kernel_size, kernel_size):
         return kernel
     resized = np.zeros((kernel_size, kernel_size), dtype=np.float64)
@@ -112,8 +110,6 @@ def _ensure_odd(value: int) -> int:
 
 
 class CACTuSAIBlindDeconvolutionUsingModulatedInputs(DeconvolutionAlgorithm):
-    """Blind deconvolution with optional input modulation (Python port)."""
-
     def __init__(
         self,
         kernel_size: int = 21,
@@ -138,8 +134,8 @@ class CACTuSAIBlindDeconvolutionUsingModulatedInputs(DeconvolutionAlgorithm):
         self.init_sigma = float(init_sigma) if init_sigma is not None else None
         self.modulation_seed = modulation_seed
         self.modulation_prob = float(np.clip(modulation_prob, 0.0, 1.0))
-        self._last_kernel: Optional[Array2D] = None
-        self._last_output: Optional[Array2D] = None
+        self._last_kernel: Optional[np.ndarray] = None
+        self._last_output: Optional[np.ndarray] = None
 
     def change_param(self, param: Dict[str, Any]):
         if not isinstance(param, dict):
@@ -183,7 +179,7 @@ class CACTuSAIBlindDeconvolutionUsingModulatedInputs(DeconvolutionAlgorithm):
             ('last_output_shape', None if self._last_output is None else self._last_output.shape),
         ]
 
-    def _make_mask(self, shape: Tuple[int, int]) -> Array2D:
+    def _make_mask(self, shape: Tuple[int, int]) -> np.ndarray:
         if self.modulation_prob <= 0.0:
             return np.ones(shape, dtype=np.float64)
         rng = np.random.default_rng(self.modulation_seed)
@@ -192,7 +188,7 @@ class CACTuSAIBlindDeconvolutionUsingModulatedInputs(DeconvolutionAlgorithm):
         mask[~keep] = 1.0
         return mask
 
-    def process(self, image: Array2D) -> Tuple[Array2D, Array2D]:
+    def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         if image is None:
             raise ValueError('Input image is None.')
 
@@ -247,7 +243,7 @@ class CACTuSAIBlindDeconvolutionUsingModulatedInputs(DeconvolutionAlgorithm):
         self._last_output = restored
         return restored, kernel
 
-    def get_kernel(self) -> Array2D | None:
+    def get_kernel(self) -> np.ndarray | None:
         return None if self._last_kernel is None else self._last_kernel.copy()
 
 

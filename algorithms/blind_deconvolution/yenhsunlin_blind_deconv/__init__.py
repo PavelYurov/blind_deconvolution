@@ -1,3 +1,4 @@
+# https://github.com/yenhsunlin/blind_deconv
 from __future__ import annotations
 
 from time import time
@@ -7,9 +8,6 @@ import numpy as np
 
 from algorithms.base import DeconvolutionAlgorithm
 from .source.libs.deconv import PSFest, deconv
-
-ArrayND = np.ndarray
-Array2D = np.ndarray
 
 
 def _ensure_odd(value: int) -> int:
@@ -27,7 +25,7 @@ def _coerce_kernel_size(kernel_size: int | Tuple[int, int]) -> Tuple[int, int]:
     return (_ensure_odd(kernel_size), _ensure_odd(kernel_size))
 
 
-def _normalise_kernel(kernel: Array2D) -> Array2D:
+def _normalise_kernel(kernel: np.ndarray) -> np.ndarray:
     kernel = np.clip(kernel.astype(np.float64, copy=False), 0.0, None)
     total = float(kernel.sum())
     if total <= 0:
@@ -35,7 +33,7 @@ def _normalise_kernel(kernel: Array2D) -> Array2D:
     return kernel / total
 
 
-def _prepare_image(image: ArrayND) -> Tuple[ArrayND, np.dtype, Tuple[int, ...], bool]:
+def _prepare_image(image: np.ndarray) -> Tuple[np.ndarray, np.dtype, Tuple[int, ...], bool]:
     original_dtype = image.dtype
     original_shape = image.shape
 
@@ -59,7 +57,7 @@ def _prepare_image(image: ArrayND) -> Tuple[ArrayND, np.dtype, Tuple[int, ...], 
     return working, original_dtype, original_shape, is_color
 
 
-def _restore_dtype(image01: ArrayND, original_dtype: np.dtype, original_shape: Tuple[int, ...]) -> ArrayND:
+def _restore_dtype(image01: np.ndarray, original_dtype: np.dtype, original_shape: Tuple[int, ...]) -> np.ndarray:
     clipped = np.clip(image01, 0.0, 1.0)
     if np.issubdtype(original_dtype, np.integer):
         restored = (clipped * 255.0).round().astype(original_dtype)
@@ -73,12 +71,6 @@ def _restore_dtype(image01: ArrayND, original_dtype: np.dtype, original_shape: T
 
 
 class YenhsunlinBlindDeconv(DeconvolutionAlgorithm):
-    """
-    Обёртка над экспериментальным Bayesian blind deconvolution.
-
-    Источник: https://github.com/yenhsunlin/blind_deconv
-    """
-
     def __init__(
         self,
         kernel_size: int | Tuple[int, int] = 15,
@@ -99,9 +91,9 @@ class YenhsunlinBlindDeconv(DeconvolutionAlgorithm):
         self.Lp = float(Lp)
         self.ccreltol = float(ccreltol)
         self.return_nonblind_deconv = bool(return_nonblind_deconv)
-        self._last_kernel: Array2D | None = None
+        self._last_kernel: np.ndarray | None = None
 
-    def _initial_kernel(self) -> Array2D:
+    def _initial_kernel(self) -> np.ndarray:
         kx, ky = self.kernel_size
         kernel = np.zeros((kx, ky), dtype=np.float64)
         kernel[kx // 2, ky // 2] = 1.0
@@ -144,7 +136,7 @@ class YenhsunlinBlindDeconv(DeconvolutionAlgorithm):
             ("return_nonblind_deconv", self.return_nonblind_deconv),
         ]
 
-    def process(self, image: ArrayND) -> tuple[ArrayND, Array2D]:
+    def process(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         working, original_dtype, original_shape, is_color = _prepare_image(image)
 
         kernel_init = self._initial_kernel()
@@ -202,7 +194,7 @@ class YenhsunlinBlindDeconv(DeconvolutionAlgorithm):
         self.timer = time() - start
         return _restore_dtype(restored01, original_dtype, original_shape), kernel
 
-    def get_kernel(self) -> Array2D | None:
+    def get_kernel(self) -> np.ndarray | None:
         return self._last_kernel
 
 

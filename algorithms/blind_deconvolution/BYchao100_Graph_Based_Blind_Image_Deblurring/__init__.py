@@ -1,18 +1,19 @@
+# https://github.com/BYchao100/Graph-Based-Blind-Image-Deblurring/
 from __future__ import annotations
-
 import os
 from time import time
-from typing import Any, Dict, Tuple
+from typing import Any, Tuple
 
 import cv2
 import matlab.engine
 import numpy as np
 
-from ...base import DeconvolutionAlgorithm
+from algorithms.base import DeconvolutionAlgorithm
 
 SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "source")
 MATLAB_ROOT = os.path.join(SOURCE_PATH, "Graph_Based_BID")
 MATLAB_CODE_PATH = os.path.join(MATLAB_ROOT, "Graph_Based_BID_p1.1")
+ALGORITHM_NAME = "BYchao100_Graph_Based_Blind_Image_Deblurring"
 
 
 def _as_odd_positive(value: Any, *, default: int) -> int:
@@ -32,7 +33,7 @@ class BYchao100GraphBasedBlindImageDeblurring(DeconvolutionAlgorithm):
 		border: int = 20,
 		show_intermediate: bool = False,
 	):
-		super().__init__("BYchao100_GraphBasedBlindImageDeblurring")
+		super().__init__(ALGORITHM_NAME)
 
 		self.k_estimate_size = _as_odd_positive(k_estimate_size, default=69)
 		self.border = max(0, int(border))
@@ -42,7 +43,7 @@ class BYchao100GraphBasedBlindImageDeblurring(DeconvolutionAlgorithm):
 		self._eng.addpath(self._eng.genpath(MATLAB_CODE_PATH), nargout=0)
 		self._eng.cd(MATLAB_CODE_PATH, nargout=0)
 
-	def change_param(self, param: Dict[str, Any]):
+	def change_param(self, param: Any):
 		if not isinstance(param, dict):
 			return
 
@@ -53,12 +54,12 @@ class BYchao100GraphBasedBlindImageDeblurring(DeconvolutionAlgorithm):
 		if "show_intermediate" in param and param["show_intermediate"] is not None:
 			self.show_intermediate = bool(param["show_intermediate"])
 
-	def get_param(self):
-		return {
-			"k_estimate_size": self.k_estimate_size,
-			"border": self.border,
-			"show_intermediate": self.show_intermediate,
-		}
+	def get_param(self) -> list[str, Any]:
+		return [
+			("k_estimate_size", self.k_estimate_size),
+			("border", self.border),
+			("show_intermediate", self.show_intermediate),
+		]
 
 	def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
 		if image.ndim == 2:
@@ -122,4 +123,3 @@ class BYchao100GraphBasedBlindImageDeblurring(DeconvolutionAlgorithm):
 			self._eng.quit()
 		except Exception:
 			pass
-
