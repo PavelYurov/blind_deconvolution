@@ -741,7 +741,7 @@ def variational_blind_deconvolution(g, kernel_shape, **kwargs):
     history : dict
         История сходимости.
     """
-    algo = Molina2006(kernel_shape=kernel_shape, **kwargs)
+    algo = VAPIBE(kernel_shape=kernel_shape, **kwargs)
     f_est, h_est = algo.process(g)
     return f_est, h_est, algo.hyperparams, algo.history
 
