@@ -1,0 +1,194 @@
+{
+    "1": {
+        "original_path": "alg_test\\original\\boy.png",
+        "blurred_path": "alg_test\\blurred\\boy_convolved_kernel.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\convolved_kernel.png",
+        "filters": "convolved_kernel",
+        "blurred_psnr": 19.572547367119984,
+        "blurred_ssim": 0.46397209564044023,
+        "is_color": false,
+        "restored_paths": {
+            "HQMBR_FIX": "alg_test\\restored\\boy_convolved_kernel_HQMBR_FIX.png"
+        },
+        "algorithm": [
+            "HQMBR_FIX"
+        ],
+        "kernel_paths": {
+            "HQMBR_FIX": "alg_test\\restored_kernel\\boy_convolved_kernel_HQMBR_FIX_kernel.png"
+        },
+        "psnr": {
+            "HQMBR_FIX": 18.89963471530683
+        },
+        "ssim": {
+            "HQMBR_FIX": 0.44319600803849335
+        }
+    },
+    "2": {
+        "original_path": "alg_test\\original\\boy.png",
+        "blurred_path": "alg_test\\blurred\\boy_defocusdisk.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\defocusdisk.png",
+        "filters": "defocusdisk",
+        "blurred_psnr": 27.613144377744,
+        "blurred_ssim": 0.8393829594160839,
+        "is_color": false,
+        "restored_paths": {
+            "HQMBR_FIX": "alg_test\\restored\\boy_defocusdisk_HQMBR_FIX.png"
+        },
+        "algorithm": [
+            "HQMBR_FIX"
+        ],
+        "kernel_paths": {
+            "HQMBR_FIX": "alg_test\\restored_kernel\\boy_defocusdisk_HQMBR_FIX_kernel.png"
+        },
+        "psnr": {
+            "HQMBR_FIX": 14.473025837100806
+        },
+        "ssim": {
+            "HQMBR_FIX": 0.2958819014761218
+        }
+    },
+    "3": {
+        "original_path": "alg_test\\original\\boy.png",
+        "blurred_path": "alg_test\\blurred\\boy_defocusgaussian.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\defocusgaussian.png",
+        "filters": "defocusgaussian",
+        "blurred_psnr": 28.561621638869667,
+        "blurred_ssim": 0.8732877274263933,
+        "is_color": false,
+        "restored_paths": {
+            "HQMBR_FIX": "alg_test\\restored\\boy_defocusgaussian_HQMBR_FIX.png"
+        },
+        "algorithm": [
+            "HQMBR_FIX"
+        ],
+        "kernel_paths": {
+            "HQMBR_FIX": "alg_test\\restored_kernel\\boy_defocusgaussian_HQMBR_FIX_kernel.png"
+        },
+        "psnr": {
+            "HQMBR_FIX": 14.18492706825825
+        },
+        "ssim": {
+            "HQMBR_FIX": 0.2653551692936345
+        }
+    },
+    "4": {
+        "original_path": "alg_test\\original\\boy.png",
+        "blurred_path": "alg_test\\blurred\\boy_defocusring.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\defocusring.png",
+        "filters": "defocusring",
+        "blurred_psnr": 23.713121259735253,
+        "blurred_ssim": 0.654071685719808,
+        "is_color": false,
+        "restored_paths": {
+            "HQMBR_FIX": "alg_test\\restored\\boy_defocusring_HQMBR_FIX.png"
+        },
+        "algorithm": [
+            "HQMBR_FIX"
+        ],
+        "kernel_paths": {
+            "HQMBR_FIX": "alg_test\\restored_kernel\\boy_defocusring_HQMBR_FIX_kernel.png"
+        },
+        "psnr": {
+            "HQMBR_FIX": 14.120929256996014
+        },
+        "ssim": {
+            "HQMBR_FIX": 0.21856482946720887
+        }
+    },
+    "5": {
+        "original_path": "alg_test\\original\\boy.png",
+        "blurred_path": "alg_test\\blurred\\boy_motionbsplinesimplecurve.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\motionbsplinesimplecurve.png",
+        "filters": "motionbsplinesimplecurve",
+        "blurred_psnr": 20.098402056379374,
+        "blurred_ssim": 0.5068036007527111,
+        "is_color": false,
+        "restored_paths": {
+            "HQMBR_FIX": "alg_test\\restored\\boy_motionbsplinesimplecurve_HQMBR_FIX.png"
+        },
+        "algorithm": [
+            "HQMBR_FIX"
+        ],
+        "kernel_paths": {
+            "HQMBR_FIX": "alg_test\\restored_kernel\\boy_motionbsplinesimplecurve_HQMBR_FIX_kernel.png"
+        },
+        "psnr": {
+            "HQMBR_FIX": 20.083790594179128
+        },
+        "ssim": {
+            "HQMBR_FIX": 0.4599374896247866
+        }
+    },
+    "6": {
+        "original_path": "alg_test\\original\\boy.png",
+        "blurred_path": "alg_test\\blurred\\boy_motionlinearexp.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\motionlinearexp.png",
+        "filters": "motionlinearexp",
+        "blurred_psnr": 24.57291595233128,
+        "blurred_ssim": 0.7485742807810183,
+        "is_color": false,
+        "restored_paths": {
+            "HQMBR_FIX": "alg_test\\restored\\boy_motionlinearexp_HQMBR_FIX.png"
+        },
+        "algorithm": [
+            "HQMBR_FIX"
+        ],
+        "kernel_paths": {
+            "HQMBR_FIX": "alg_test\\restored_kernel\\boy_motionlinearexp_HQMBR_FIX_kernel.png"
+        },
+        "psnr": {
+            "HQMBR_FIX": 16.91988911504866
+        },
+        "ssim": {
+            "HQMBR_FIX": 0.3863777360921937
+        }
+    },
+    "7": {
+        "original_path": "alg_test\\original\\boy.png",
+        "blurred_path": "alg_test\\blurred\\boy_motionlinearuniform.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\motionlinearuniform.png",
+        "filters": "motionlinearuniform",
+        "blurred_psnr": 21.10359800600659,
+        "blurred_ssim": 0.5833302604157155,
+        "is_color": false,
+        "restored_paths": {
+            "HQMBR_FIX": "alg_test\\restored\\boy_motionlinearuniform_HQMBR_FIX.png"
+        },
+        "algorithm": [
+            "HQMBR_FIX"
+        ],
+        "kernel_paths": {
+            "HQMBR_FIX": "alg_test\\restored_kernel\\boy_motionlinearuniform_HQMBR_FIX_kernel.png"
+        },
+        "psnr": {
+            "HQMBR_FIX": 15.313270947350315
+        },
+        "ssim": {
+            "HQMBR_FIX": 0.24288164226228715
+        }
+    },
+    "8": {
+        "original_path": "alg_test\\original\\boy.png",
+        "blurred_path": "alg_test\\blurred\\boy_stretched_gaussian_kernel.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\stretched_gaussian_kernel.png",
+        "filters": "stretched_gaussian_kernel",
+        "blurred_psnr": 21.86400434718841,
+        "blurred_ssim": 0.6054214010929444,
+        "is_color": false,
+        "restored_paths": {
+            "HQMBR_FIX": "alg_test\\restored\\boy_stretched_gaussian_kernel_HQMBR_FIX.png"
+        },
+        "algorithm": [
+            "HQMBR_FIX"
+        ],
+        "kernel_paths": {
+            "HQMBR_FIX": "alg_test\\restored_kernel\\boy_stretched_gaussian_kernel_HQMBR_FIX_kernel.png"
+        },
+        "psnr": {
+            "HQMBR_FIX": 15.979178418887571
+        },
+        "ssim": {
+            "HQMBR_FIX": 0.29558171229098895
+        }
+    }
+}

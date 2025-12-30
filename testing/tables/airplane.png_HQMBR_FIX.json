@@ -1,0 +1,194 @@
+{
+    "1": {
+        "original_path": "alg_test\\original\\airplane.png",
+        "blurred_path": "alg_test\\blurred\\airplane_convolved_kernel.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\convolved_kernel.png",
+        "filters": "convolved_kernel",
+        "blurred_psnr": 25.985003415695584,
+        "blurred_ssim": 0.8835403153503018,
+        "is_color": false,
+        "restored_paths": {
+            "HQMBR_FIX": "alg_test\\restored\\airplane_convolved_kernel_HQMBR_FIX.png"
+        },
+        "algorithm": [
+            "HQMBR_FIX"
+        ],
+        "kernel_paths": {
+            "HQMBR_FIX": "alg_test\\restored_kernel\\airplane_convolved_kernel_HQMBR_FIX_kernel.png"
+        },
+        "psnr": {
+            "HQMBR_FIX": 25.74484851366226
+        },
+        "ssim": {
+            "HQMBR_FIX": 0.8781951047981332
+        }
+    },
+    "2": {
+        "original_path": "alg_test\\original\\airplane.png",
+        "blurred_path": "alg_test\\blurred\\airplane_defocusdisk.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\defocusdisk.png",
+        "filters": "defocusdisk",
+        "blurred_psnr": 32.570606355129435,
+        "blurred_ssim": 0.948352878724055,
+        "is_color": false,
+        "restored_paths": {
+            "HQMBR_FIX": "alg_test\\restored\\airplane_defocusdisk_HQMBR_FIX.png"
+        },
+        "algorithm": [
+            "HQMBR_FIX"
+        ],
+        "kernel_paths": {
+            "HQMBR_FIX": "alg_test\\restored_kernel\\airplane_defocusdisk_HQMBR_FIX_kernel.png"
+        },
+        "psnr": {
+            "HQMBR_FIX": 21.600610439185562
+        },
+        "ssim": {
+            "HQMBR_FIX": 0.7989347103515321
+        }
+    },
+    "3": {
+        "original_path": "alg_test\\original\\airplane.png",
+        "blurred_path": "alg_test\\blurred\\airplane_defocusgaussian.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\defocusgaussian.png",
+        "filters": "defocusgaussian",
+        "blurred_psnr": 33.383421415023456,
+        "blurred_ssim": 0.9559291822227306,
+        "is_color": false,
+        "restored_paths": {
+            "HQMBR_FIX": "alg_test\\restored\\airplane_defocusgaussian_HQMBR_FIX.png"
+        },
+        "algorithm": [
+            "HQMBR_FIX"
+        ],
+        "kernel_paths": {
+            "HQMBR_FIX": "alg_test\\restored_kernel\\airplane_defocusgaussian_HQMBR_FIX_kernel.png"
+        },
+        "psnr": {
+            "HQMBR_FIX": 21.983831623188227
+        },
+        "ssim": {
+            "HQMBR_FIX": 0.7895598178768443
+        }
+    },
+    "4": {
+        "original_path": "alg_test\\original\\airplane.png",
+        "blurred_path": "alg_test\\blurred\\airplane_defocusring.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\defocusring.png",
+        "filters": "defocusring",
+        "blurred_psnr": 30.055102490741568,
+        "blurred_ssim": 0.9203933237738084,
+        "is_color": false,
+        "restored_paths": {
+            "HQMBR_FIX": "alg_test\\restored\\airplane_defocusring_HQMBR_FIX.png"
+        },
+        "algorithm": [
+            "HQMBR_FIX"
+        ],
+        "kernel_paths": {
+            "HQMBR_FIX": "alg_test\\restored_kernel\\airplane_defocusring_HQMBR_FIX_kernel.png"
+        },
+        "psnr": {
+            "HQMBR_FIX": 22.887942338055772
+        },
+        "ssim": {
+            "HQMBR_FIX": 0.8193882307673811
+        }
+    },
+    "5": {
+        "original_path": "alg_test\\original\\airplane.png",
+        "blurred_path": "alg_test\\blurred\\airplane_motionbsplinesimplecurve.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\motionbsplinesimplecurve.png",
+        "filters": "motionbsplinesimplecurve",
+        "blurred_psnr": 26.46186429938238,
+        "blurred_ssim": 0.8855307365158887,
+        "is_color": false,
+        "restored_paths": {
+            "HQMBR_FIX": "alg_test\\restored\\airplane_motionbsplinesimplecurve_HQMBR_FIX.png"
+        },
+        "algorithm": [
+            "HQMBR_FIX"
+        ],
+        "kernel_paths": {
+            "HQMBR_FIX": "alg_test\\restored_kernel\\airplane_motionbsplinesimplecurve_HQMBR_FIX_kernel.png"
+        },
+        "psnr": {
+            "HQMBR_FIX": 24.60799125108278
+        },
+        "ssim": {
+            "HQMBR_FIX": 0.8246702213857577
+        }
+    },
+    "6": {
+        "original_path": "alg_test\\original\\airplane.png",
+        "blurred_path": "alg_test\\blurred\\airplane_motionlinearexp.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\motionlinearexp.png",
+        "filters": "motionlinearexp",
+        "blurred_psnr": 30.28335745556857,
+        "blurred_ssim": 0.9312849418114386,
+        "is_color": false,
+        "restored_paths": {
+            "HQMBR_FIX": "alg_test\\restored\\airplane_motionlinearexp_HQMBR_FIX.png"
+        },
+        "algorithm": [
+            "HQMBR_FIX"
+        ],
+        "kernel_paths": {
+            "HQMBR_FIX": "alg_test\\restored_kernel\\airplane_motionlinearexp_HQMBR_FIX_kernel.png"
+        },
+        "psnr": {
+            "HQMBR_FIX": 22.870256762989985
+        },
+        "ssim": {
+            "HQMBR_FIX": 0.8112658456678863
+        }
+    },
+    "7": {
+        "original_path": "alg_test\\original\\airplane.png",
+        "blurred_path": "alg_test\\blurred\\airplane_motionlinearuniform.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\motionlinearuniform.png",
+        "filters": "motionlinearuniform",
+        "blurred_psnr": 28.155176453753995,
+        "blurred_ssim": 0.9156365242118195,
+        "is_color": false,
+        "restored_paths": {
+            "HQMBR_FIX": "alg_test\\restored\\airplane_motionlinearuniform_HQMBR_FIX.png"
+        },
+        "algorithm": [
+            "HQMBR_FIX"
+        ],
+        "kernel_paths": {
+            "HQMBR_FIX": "alg_test\\restored_kernel\\airplane_motionlinearuniform_HQMBR_FIX_kernel.png"
+        },
+        "psnr": {
+            "HQMBR_FIX": 22.651177056856817
+        },
+        "ssim": {
+            "HQMBR_FIX": 0.7879586173193942
+        }
+    },
+    "8": {
+        "original_path": "alg_test\\original\\airplane.png",
+        "blurred_path": "alg_test\\blurred\\airplane_stretched_gaussian_kernel.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\stretched_gaussian_kernel.png",
+        "filters": "stretched_gaussian_kernel",
+        "blurred_psnr": 28.91749231341713,
+        "blurred_ssim": 0.9161679714554399,
+        "is_color": false,
+        "restored_paths": {
+            "HQMBR_FIX": "alg_test\\restored\\airplane_stretched_gaussian_kernel_HQMBR_FIX.png"
+        },
+        "algorithm": [
+            "HQMBR_FIX"
+        ],
+        "kernel_paths": {
+            "HQMBR_FIX": "alg_test\\restored_kernel\\airplane_stretched_gaussian_kernel_HQMBR_FIX_kernel.png"
+        },
+        "psnr": {
+            "HQMBR_FIX": 24.716022153631528
+        },
+        "ssim": {
+            "HQMBR_FIX": 0.8607828170531401
+        }
+    }
+}
