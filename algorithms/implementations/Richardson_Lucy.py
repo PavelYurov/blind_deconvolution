@@ -12,7 +12,7 @@ class RichardsonLucy(DeconvolutionAlgorithm):
     изображений, основанный на максимизации правдоподобия при пуассоновском
     шуме. Слепая версия чередует оценку изображения и ядра.
 
-    Parameters
+    Параметры
     ----------
     param : dict
         Словарь параметров:
@@ -22,7 +22,7 @@ class RichardsonLucy(DeconvolutionAlgorithm):
         - 'm': количество итераций обновления ядра (int)
         - 'r': количество итераций обновления изображения (int)
 
-    References
+    Литература
     ----------
     .. [1] Richardson, W. H. (1972). Bayesian-Based Iterative Method of
            Image Restoration. JOSA, 62(1), 55-59.
