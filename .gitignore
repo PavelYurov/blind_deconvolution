@@ -120,6 +120,7 @@ Desktop.ini
 /dataset_blurred/
 /alg_test/
 /pareto_analysis/
+/preprocess/
 
 # Прочие файлы
 /benchmark_generation.ipynb

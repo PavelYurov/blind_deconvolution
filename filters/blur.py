@@ -276,3 +276,22 @@ class Kernel_convolution(FilterBase):
         kernel = np.load(self.npy_file_path)
         blurred = cv.filter2D(image, -1, kernel)
         return blurred
+
+class Identical_kernel(FilterBase):
+    """
+    Фильтр единичной матрицы
+    """
+
+    def __init__(self) -> None:
+        """
+        Инициализация идентичного фильтра.
+        """
+        super().__init__(1, 'blur')
+
+    def discription(self) -> str:
+        """Возвращает название способа смаза в файловой системею"""
+        return f"|I_"
+
+    def filter(self, image: np.ndarray) -> np.ndarray:
+        "Применение фильтра к изображению"
+        return image
