@@ -35,6 +35,7 @@ import optuna
 from IPython.display import display
 from extensions import HyperparameterOptimizer
 from extensions import ParetoFrontAnalyzer
+from filters.blur import Identical_kernel
 
 
 class Processing:
@@ -49,7 +50,8 @@ class Processing:
                  restored_folder: str = 'restored', 
                  data_path: str = 'data', 
                  color: bool = False, 
-                 kernel_dir: str = 'kernels', 
+                 kernel_dir: str = 'kernels',
+                 preprocess_dir: str = 'preprocess', 
                  dataset_path: str = 'dataset') -> None:
         '''
             Инициализация фреймворка
@@ -74,13 +76,15 @@ class Processing:
         self.analyzer = ParetoFrontAnalyzer(self)
         self.kernel_dir = Path(kernel_dir)
         self.dataset_path = Path(dataset_path)
+        self.preprocess_dir = Path(preprocess_dir)
         
         for folder in [self.folder_path, 
                        self.folder_path_blurred, 
                        self.folder_path_restored, 
                        self.data_path, 
                        self.kernel_dir, 
-                       self.dataset_path ]:
+                       self.dataset_path, 
+                       self.preprocess_dir]:
             folder.mkdir(parents=True, exist_ok=True)
 
     def changescale(self, color: bool) -> None:
@@ -93,6 +97,8 @@ class Processing:
 
     def _imread(self, path: str, color: bool) -> Optional[np.ndarray]:
         '''Загружает изображение соответствующего цветового формата'''
+        if path is None:
+            return None
         return cv.imread(path, cv.IMREAD_COLOR if color else cv.IMREAD_GRAYSCALE)
 
     def read_all(self) -> None:
@@ -134,7 +140,7 @@ class Processing:
             alg_arr.extend(img_obj.get_algorithm())
         
         alg_arr = list(set(alg_arr))
-        w = len(alg_arr) + 2
+        w = len(alg_arr) + 2 + 1
         
         fig, axes = plt.subplots(2 * h, w, figsize=(5 * w * size, 8 * h * size))
         line = 0
@@ -167,7 +173,8 @@ class Processing:
         filter_name = img_obj.get_filters()
 
         for blurred_path in img_obj.get_blurred_array():
-            line = self._plot_images_line(img_obj, blurred_path, original_image, alg_arr, 
+            preprocess_path = img_obj.get_preprocessed_blurred_path().get(blurred_path, blurred_path)
+            line = self._plot_images_line(img_obj, blurred_path, preprocess_path, original_image, alg_arr, 
                                         restored_psnr, restored_ssim, restored_paths,
                                         blurred_psnr, blurred_ssim, axes, line, filter_name)
             
@@ -179,6 +186,7 @@ class Processing:
     def _plot_images_line(self, 
                           img_obj: utils.Image, 
                           blurred_path: str, 
+                          preprocess_path: str,
                           original_image: np.ndarray, 
                           alg_arr: np.ndarray, 
                           restored_psnr: Dict[Tuple[str, str], str], 
@@ -191,6 +199,7 @@ class Processing:
                           filters_name: Dict[str, str]) -> int:
         '''Отрисовка строки с изображениями'''
         blurred_image = self._imread(str(blurred_path), img_obj.get_color())
+        preprocess_image = self._imread(str(preprocess_path), img_obj.get_color())
         
         plt.subplots_adjust(hspace=0.5)
 
@@ -206,8 +215,13 @@ class Processing:
         axes[line, 1].set_title(f"{filter_name}\n\nDistorted\nPSNR: {psnr_val:.4f} | SSIM: {ssim_val:.4f}", 
                                 fontsize=10)
         axes[line, 1].axis('off')
+
+        axes[line, 2].imshow(cv.cvtColor(preprocess_image, cv.COLOR_BGR2RGB))
+        axes[line, 2].set_title(f"Prepreocessed Image", 
+                                fontsize=10)
+        axes[line, 2].axis('off')
         
-        for col, alg_name in enumerate(alg_arr, 2):
+        for col, alg_name in enumerate(alg_arr, 3):
             axes[line, col].axis('off')
             self._plot_restored_image(img_obj, blurred_path, alg_name, restored_psnr, 
                                     restored_ssim, restored_paths, axes, line, col)
@@ -289,8 +303,10 @@ class Processing:
                     axes[line, 1].set_title("original kernel", fontsize=10)
                     axes[line, 1].set_aspect('equal', adjustable='box')
                     axes[line, 1].axis('off')
+
+        axes[line, 2].axis('off')
         
-        for col, alg_name in enumerate(alg_arr, 2):
+        for col, alg_name in enumerate(alg_arr, 3):
             axes[line, col].axis('off')
             self._plot_restored_kernel(img_obj, blurred_path, alg_name, kernels, 
                                     axes, line, col, kernel_intencity_scale)
@@ -328,21 +344,25 @@ class Processing:
                                view_histogram: bool = False) -> None:
         '''Выполняет выравнивание гистограмм'''
         for img_obj in self.images:
+            blurred_path = img_obj.get_blurred()
+            if blurred_path is None:
+                self._copy_original_to_blurred(img_obj)
+                blurred_path = img_obj.get_blurred()
+
             current_image = img_obj.get_blurred_image()
-            original_blurred_image = current_image.copy()
+            
             filtered_image = equalize_hist(current_image, nbins=256)
             filtered_image = self._float_img_to_int(filtered_image)
             
             original_filename = Path(img_obj.get_blurred()).name
-            new_path = self.folder_path_blurred / f'hist_eq_orig_{str(original_filename)}'
+            new_path_preprocess = self.preprocess_dir / f'{str(original_filename)}'
 
-            cv.imwrite(str(new_path), original_blurred_image)
-            cv.imwrite(str(img_obj.get_blurred()), filtered_image)
+            cv.imwrite(str(new_path_preprocess), filtered_image)
 
-            img_obj.set_he_data(new_path)
+            img_obj.add_preprocessed_blurred_path(blurred_path, new_path_preprocess)
 
             if (view_histogram):
-                hist1 = histogram(original_blurred_image)
+                hist1 = histogram(current_image)
                 hist2 = histogram(filtered_image)
                 plt.figure(figsize=(12, 6))
                 plt.bar(hist1[1], hist1[0], alpha=0.5, color='blue')
@@ -350,7 +370,7 @@ class Processing:
                 plt.grid(alpha=0.3)
                 plt.show()
                 
-                cdf1 = cumulative_distribution(original_blurred_image)
+                cdf1 = cumulative_distribution(current_image)
                 cdf2 = cumulative_distribution(filtered_image)
                 plt.figure(figsize=(12, 6))
                 plt.plot(cdf1[0], cdf1[1], color='blue')
@@ -362,23 +382,26 @@ class Processing:
                                      clip_limit: float = 0.01) -> None:
         '''Выполняет адаптивное выравнивание гистограмм с ограничением контрастности'''
         for img_obj in self.images:
+            blurred_path = img_obj.get_blurred()
+            if blurred_path is None:
+                self._copy_original_to_blurred(img_obj)
+                blurred_path = img_obj.get_blurred()
+
             current_image = img_obj.get_blurred_image()
-            original_blurred_image = current_image.copy()
             filtered_image = equalize_adapthist(current_image, 
                                                 nbins=256, 
                                                 clip_limit=clip_limit)
             filtered_image = self._float_img_to_int(filtered_image)
             
             original_filename = Path(img_obj.get_blurred()).name
-            new_path = self.folder_path_blurred / f'hist_eq_orig_{str(original_filename)}'
+            new_path_preprocess = self.preprocess_dir / f'{str(original_filename)}'
 
-            cv.imwrite(str(new_path), original_blurred_image)
-            cv.imwrite(str(img_obj.get_blurred()), filtered_image)
+            cv.imwrite(str(new_path_preprocess), filtered_image)
 
-            img_obj.set_he_data(new_path)
+            img_obj.add_preprocessed_blurred_path(blurred_path, new_path_preprocess)
 
             if (view_histogram):
-                hist1 = histogram(original_blurred_image)
+                hist1 = histogram(current_image)
                 hist2 = histogram(filtered_image)
                 plt.figure(figsize=(12, 6))
                 plt.bar(hist1[1], hist1[0], alpha=0.5, color='blue')
@@ -386,7 +409,7 @@ class Processing:
                 plt.grid(alpha=0.3)
                 plt.show()
                 
-                cdf1 = cumulative_distribution(original_blurred_image)
+                cdf1 = cumulative_distribution(current_image)
                 cdf2 = cumulative_distribution(filtered_image)
                 plt.figure(figsize=(12, 6))
                 plt.plot(cdf1[0], cdf1[1], color='blue')
@@ -397,16 +420,25 @@ class Processing:
                                        view_histogram: bool = False) -> None:
         '''Обращает выравнивание гистограмм'''
         for img_obj in self.images:
-            current_image = img_obj.get_blurred_image()
+
             blurred_path = img_obj.get_blurred()
+            
+            preprocessed_image_paths = img_obj.get_preprocessed_blurred_path()
+            preprocessed_image_path = preprocessed_image_paths.get(blurred_path, None)
+            if preprocessed_image_path is None:
+                raise Exception('Image didn\'t preprocessed or Image not found')
+            current_image = self._imread(preprocessed_image_path, img_obj.get_color())
+
             restored_array = img_obj.get_restored()
-            original_blurred_image = self._imread(img_obj.get_he_data(), img_obj.get_color())
+            original_blurred_image = img_obj.get_blurred_image()
+            if original_blurred_image is None:
+                raise Exception("Оригинальное смазанное изображение не найдено")
             
             filtered_image = self.inverse_histogram_equalization_one(current_image, 
                                                                 original_blurred_image, 
                                                                 view_histogram)
             
-            cv.imwrite(str(img_obj.get_blurred()), filtered_image)
+            cv.imwrite(str(preprocessed_image_path), filtered_image)
 
             for alg_name in img_obj.get_algorithm():
                 current_image_path = restored_array[(blurred_path, alg_name)]
@@ -536,7 +568,8 @@ class Processing:
             ('algorithm', np.array([])),
             ('blurred_array', np.array([])),
             ('current_filter', None),
-            ('filters', np.array([]))
+            ('filters', np.array([])),
+            ('preprocessed_blurred_path',{})
         ]
         
         for attr, default_value in reset_operations:
@@ -561,7 +594,8 @@ class Processing:
             img_obj.get_restored().values(),
             img_obj.get_kernels().values(), 
             img_obj.get_original_kernels().values(),
-            img_obj.get_blurred_array()
+            img_obj.get_blurred_array(),
+            img_obj.get_preprocessed_blurred_path().values()
         ]
     
         for file_source in file_sources:
@@ -585,7 +619,7 @@ class Processing:
             print("Operation canceled")
             return
         
-        directories = [self.folder_path_blurred, self.folder_path_restored]
+        directories = [self.folder_path_blurred, self.folder_path_restored, self.preprocess_dir]
         
         for directory in directories:
             self._clear_directory(directory)
@@ -938,32 +972,70 @@ class Processing:
         '''
         Применение фильтра к одному изображению
         '''
-        if img_obj.get_blurred() is not None:
-            current_image = img_obj.get_blurred_image()
-        else:
+        blurred_path = img_obj.get_blurred()
+        preprocess_path = img_obj.get_preprocessed_blurred_path().get(blurred_path, None)
+        denoising_filter = (filter_processor.get_type() == 'denoise')
+        if blurred_path is None:
             current_image = img_obj.get_original_image()
+        elif denoising_filter and preprocess_path is not None:
+            current_image = self._imread(preprocess_path, img_obj.get_color())
+        else:
+            current_image = img_obj.get_blurred_image()
         
         if current_image is None:
             raise Exception("Не удалось загрузить изображение")
         
         filtered_image = filter_processor.filter(current_image)
         
-        if img_obj.get_blurred() is None:
-            original_filename = Path(img_obj.get_original()).name
-            new_path = self._generate_unique_file_path(self.folder_path_blurred, original_filename)
-        else:
-            original_filename = Path(img_obj.get_blurred()).name
-            new_path = self.folder_path_blurred / original_filename
+        if not denoising_filter:
+            if blurred_path is None:
+                original_filename = Path(img_obj.get_original()).name
+                new_path = self._generate_unique_file_path(self.folder_path_blurred, 
+                                                           original_filename)
+            else:
+                original_filename = Path(blurred_path).name
+                new_path = self.folder_path_blurred / original_filename
 
-        psnr_val, ssim_val = self._calculate_metrics(img_obj.get_original_image(), filtered_image)
-        
+            psnr_val, ssim_val = self._calculate_metrics(img_obj.get_original_image(), 
+                                                         filtered_image)
+            
+            img_obj.add_blurred_PSNR(psnr_val, str(new_path))
+            img_obj.add_blurred_SSIM(ssim_val, str(new_path))
+            cv.imwrite(str(new_path), filtered_image)
+            img_obj.set_blurred(str(new_path))
+            img_obj.add_to_current_filter(filter_processor.discription())
+            
+            self._process_kernel(img_obj, 
+                                 filter_processor, 
+                                 new_path, 
+                                 original_filename)
+            return
+        else:
+            if blurred_path is None:
+                self._copy_original_to_blurred(img_obj)
+                
+
+            if preprocess_path is None:
+                original_filename = Path(img_obj.get_blurred()).name
+                new_path = self._generate_unique_file_path(self.preprocess_dir, original_filename)
+            else:
+                original_filename = Path(img_obj.get_blurred()).name
+                new_path = self.preprocess_dir / original_filename
+            
+            cv.imwrite(str(new_path), filtered_image)
+            img_obj.add_preprocessed_blurred_path(str(img_obj.get_blurred()), str(new_path))
+            img_obj.add_to_current_filter(filter_processor.discription()) 
+
+    def _copy_original_to_blurred(self, img_obj: utils.Image) -> None:
+        original_filename = Path(img_obj.get_original()).name
+        new_path = self._generate_unique_file_path(self.folder_path_blurred, original_filename)
+
+        psnr_val, ssim_val = math.nan, math.nan
         img_obj.add_blurred_PSNR(psnr_val, str(new_path))
         img_obj.add_blurred_SSIM(ssim_val, str(new_path))
-        cv.imwrite(str(new_path), filtered_image)
+        cv.imwrite(str(new_path), img_obj.get_original_image())
         img_obj.set_blurred(str(new_path))
-        img_obj.add_to_current_filter(filter_processor.discription())
-        
-        self._process_kernel(img_obj, filter_processor, new_path, original_filename)
+        self._process_kernel(img_obj, Identical_kernel(), new_path, original_filename)
 
     def _process_kernel(self, 
                         img_obj: utils.Image, 
@@ -1067,10 +1139,17 @@ class Processing:
         Восстановление одного изображения
         '''        
         original_image = img_obj.get_original_image()
-        blurred_image = img_obj.get_blurred_image()
+        blurred_image_path = img_obj.get_blurred()
+        preprocessed_image_path = img_obj.get_preprocessed_blurred_path().get(blurred_image_path, None)
         
-        if blurred_image is None:
+        if blurred_image_path is None:
             blurred_image = original_image
+
+        elif preprocessed_image_path is not None:
+            blurred_image = self._imread(preprocessed_image_path, 
+                                         img_obj.get_color())
+        else:
+            blurred_image = img_obj.get_blurred_image()
         
         if blurred_image is None:
             print(f"Pass: Unable to load image for {img_obj.get_original()}")
