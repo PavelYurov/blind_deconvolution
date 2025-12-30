@@ -10,6 +10,9 @@ Implementation of 'High-Quality Motion Deblurring from a Single Image (SIGGRAPH 
       of the local prior mask M, which is calculated using the standard
       deviation of all channels.
 """
+"""
+Редактировано Юров П.И.
+"""
 import cv2
 import warnings
 import numpy as np
@@ -37,6 +40,8 @@ def get_derivatives(matrix):
 
     Returns
     - derivatives: dictionary containg the derivatives
+
+    Добавлена вариация нахожения градиента
     """
     derivatives = {
         'd0': matrix.copy(),
@@ -60,6 +65,7 @@ def get_derivatives(matrix):
     #     'dxy': dxx_dxy[1],
     #     'dyx': dyx_dyy[0],
     # }
+
     return derivatives
 
 def computeLocalPrior(I, f, t):
@@ -133,6 +139,8 @@ def updatePsi(I_d, L_d, M, lambda1, lambda2, gamma):
 
     Returns:
     - nPsi: 3D array, the updated Psi with shape (direction, height, width)
+
+    Исправлено нахождение экстремума функции энергии
     """
     k = 2.7
     a = 6.1e-4
@@ -182,6 +190,8 @@ def computeL(L, I, f, Psi, gamma):
 
     Returns:
     - L_star: 2D array, the updated latent image with shape (height, width)
+
+    Переделано преобразование фурье от оператора дифференцирования
     """
     # Derivatives and derivative weights for the Delta calculation
     # d = get_derivatives(L)
