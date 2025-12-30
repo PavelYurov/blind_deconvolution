@@ -1179,7 +1179,7 @@ def dual_exposure_blind_deconvolution(y_l, y_s, kernel_shape, **kwargs):
     ----------
     x_est, h_est, hyperparams, history
     """
-    algo = Babacan2010(kernel_shape=kernel_shape, **kwargs)
+    algo = BBD_DEIP(kernel_shape=kernel_shape, **kwargs)
     algo.set_short_exposure_image(y_s)
     x_est, h_est = algo.process(y_l)
     return x_est, h_est, algo.hyperparams, algo.history
