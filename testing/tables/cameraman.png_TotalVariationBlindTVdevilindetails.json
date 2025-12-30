@@ -1,0 +1,194 @@
+{
+    "1": {
+        "original_path": "alg_test\\original\\cameraman.png",
+        "blurred_path": "alg_test\\blurred\\cameraman_convolved_kernel.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\convolved_kernel.png",
+        "filters": "convolved_kernel",
+        "blurred_psnr": 17.5782550634217,
+        "blurred_ssim": 0.4963319495704821,
+        "is_color": false,
+        "restored_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored\\cameraman_convolved_kernel_TotalVariationBlindTVdevilindetails.png"
+        },
+        "algorithm": [
+            "TotalVariationBlindTVdevilindetails"
+        ],
+        "kernel_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored_kernel\\cameraman_convolved_kernel_TotalVariationBlindTVdevilindetails_kernel.png"
+        },
+        "psnr": {
+            "TotalVariationBlindTVdevilindetails": 5.493708751857894
+        },
+        "ssim": {
+            "TotalVariationBlindTVdevilindetails": 0.004311848361424996
+        }
+    },
+    "2": {
+        "original_path": "alg_test\\original\\cameraman.png",
+        "blurred_path": "alg_test\\blurred\\cameraman_defocusdisk.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\defocusdisk.png",
+        "filters": "defocusdisk",
+        "blurred_psnr": 21.87574487882488,
+        "blurred_ssim": 0.6873006239412109,
+        "is_color": false,
+        "restored_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored\\cameraman_defocusdisk_TotalVariationBlindTVdevilindetails.png"
+        },
+        "algorithm": [
+            "TotalVariationBlindTVdevilindetails"
+        ],
+        "kernel_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored_kernel\\cameraman_defocusdisk_TotalVariationBlindTVdevilindetails_kernel.png"
+        },
+        "psnr": {
+            "TotalVariationBlindTVdevilindetails": 5.752434011126894
+        },
+        "ssim": {
+            "TotalVariationBlindTVdevilindetails": 0.018796995974069527
+        }
+    },
+    "3": {
+        "original_path": "alg_test\\original\\cameraman.png",
+        "blurred_path": "alg_test\\blurred\\cameraman_defocusgaussian.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\defocusgaussian.png",
+        "filters": "defocusgaussian",
+        "blurred_psnr": 22.58494406650314,
+        "blurred_ssim": 0.7261339640385822,
+        "is_color": false,
+        "restored_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored\\cameraman_defocusgaussian_TotalVariationBlindTVdevilindetails.png"
+        },
+        "algorithm": [
+            "TotalVariationBlindTVdevilindetails"
+        ],
+        "kernel_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored_kernel\\cameraman_defocusgaussian_TotalVariationBlindTVdevilindetails_kernel.png"
+        },
+        "psnr": {
+            "TotalVariationBlindTVdevilindetails": 5.760446687012491
+        },
+        "ssim": {
+            "TotalVariationBlindTVdevilindetails": 0.02010608139970095
+        }
+    },
+    "4": {
+        "original_path": "alg_test\\original\\cameraman.png",
+        "blurred_path": "alg_test\\blurred\\cameraman_defocusring.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\defocusring.png",
+        "filters": "defocusring",
+        "blurred_psnr": 19.91081128257055,
+        "blurred_ssim": 0.5720093396580798,
+        "is_color": false,
+        "restored_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored\\cameraman_defocusring_TotalVariationBlindTVdevilindetails.png"
+        },
+        "algorithm": [
+            "TotalVariationBlindTVdevilindetails"
+        ],
+        "kernel_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored_kernel\\cameraman_defocusring_TotalVariationBlindTVdevilindetails_kernel.png"
+        },
+        "psnr": {
+            "TotalVariationBlindTVdevilindetails": 5.7001121095638085
+        },
+        "ssim": {
+            "TotalVariationBlindTVdevilindetails": 0.010077860986585004
+        }
+    },
+    "5": {
+        "original_path": "alg_test\\original\\cameraman.png",
+        "blurred_path": "alg_test\\blurred\\cameraman_motionbsplinesimplecurve.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\motionbsplinesimplecurve.png",
+        "filters": "motionbsplinesimplecurve",
+        "blurred_psnr": 17.971955757158923,
+        "blurred_ssim": 0.5068208656585997,
+        "is_color": false,
+        "restored_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored\\cameraman_motionbsplinesimplecurve_TotalVariationBlindTVdevilindetails.png"
+        },
+        "algorithm": [
+            "TotalVariationBlindTVdevilindetails"
+        ],
+        "kernel_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored_kernel\\cameraman_motionbsplinesimplecurve_TotalVariationBlindTVdevilindetails_kernel.png"
+        },
+        "psnr": {
+            "TotalVariationBlindTVdevilindetails": 5.4930690902847426
+        },
+        "ssim": {
+            "TotalVariationBlindTVdevilindetails": 0.006509902299612893
+        }
+    },
+    "6": {
+        "original_path": "alg_test\\original\\cameraman.png",
+        "blurred_path": "alg_test\\blurred\\cameraman_motionlinearexp.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\motionlinearexp.png",
+        "filters": "motionlinearexp",
+        "blurred_psnr": 20.790615733677487,
+        "blurred_ssim": 0.6542044315069975,
+        "is_color": false,
+        "restored_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored\\cameraman_motionlinearexp_TotalVariationBlindTVdevilindetails.png"
+        },
+        "algorithm": [
+            "TotalVariationBlindTVdevilindetails"
+        ],
+        "kernel_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored_kernel\\cameraman_motionlinearexp_TotalVariationBlindTVdevilindetails_kernel.png"
+        },
+        "psnr": {
+            "TotalVariationBlindTVdevilindetails": 5.718777633925491
+        },
+        "ssim": {
+            "TotalVariationBlindTVdevilindetails": 0.024897660755679746
+        }
+    },
+    "7": {
+        "original_path": "alg_test\\original\\cameraman.png",
+        "blurred_path": "alg_test\\blurred\\cameraman_motionlinearuniform.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\motionlinearuniform.png",
+        "filters": "motionlinearuniform",
+        "blurred_psnr": 18.934349851903466,
+        "blurred_ssim": 0.5767464824137615,
+        "is_color": false,
+        "restored_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored\\cameraman_motionlinearuniform_TotalVariationBlindTVdevilindetails.png"
+        },
+        "algorithm": [
+            "TotalVariationBlindTVdevilindetails"
+        ],
+        "kernel_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored_kernel\\cameraman_motionlinearuniform_TotalVariationBlindTVdevilindetails_kernel.png"
+        },
+        "psnr": {
+            "TotalVariationBlindTVdevilindetails": 5.658243497445047
+        },
+        "ssim": {
+            "TotalVariationBlindTVdevilindetails": 0.012474507052497964
+        }
+    },
+    "8": {
+        "original_path": "alg_test\\original\\cameraman.png",
+        "blurred_path": "alg_test\\blurred\\cameraman_stretched_gaussian_kernel.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\stretched_gaussian_kernel.png",
+        "filters": "stretched_gaussian_kernel",
+        "blurred_psnr": 19.281713538256543,
+        "blurred_ssim": 0.5693909539252324,
+        "is_color": false,
+        "restored_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored\\cameraman_stretched_gaussian_kernel_TotalVariationBlindTVdevilindetails.png"
+        },
+        "algorithm": [
+            "TotalVariationBlindTVdevilindetails"
+        ],
+        "kernel_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored_kernel\\cameraman_stretched_gaussian_kernel_TotalVariationBlindTVdevilindetails_kernel.png"
+        },
+        "psnr": {
+            "TotalVariationBlindTVdevilindetails": 5.673499212977511
+        },
+        "ssim": {
+            "TotalVariationBlindTVdevilindetails": 0.013026438858129782
+        }
+    }
+}

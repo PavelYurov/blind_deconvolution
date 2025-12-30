@@ -1,0 +1,194 @@
+{
+    "1": {
+        "original_path": "alg_test\\original\\airplane.png",
+        "blurred_path": "alg_test\\blurred\\airplane_convolved_kernel.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\convolved_kernel.png",
+        "filters": "convolved_kernel",
+        "blurred_psnr": 25.985003415695584,
+        "blurred_ssim": 0.8835403153503018,
+        "is_color": false,
+        "restored_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored\\airplane_convolved_kernel_TotalVariationBlindTVdevilindetails.png"
+        },
+        "algorithm": [
+            "TotalVariationBlindTVdevilindetails"
+        ],
+        "kernel_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored_kernel\\airplane_convolved_kernel_TotalVariationBlindTVdevilindetails_kernel.png"
+        },
+        "psnr": {
+            "TotalVariationBlindTVdevilindetails": 22.00245509467505
+        },
+        "ssim": {
+            "TotalVariationBlindTVdevilindetails": 0.21787220419125516
+        }
+    },
+    "2": {
+        "original_path": "alg_test\\original\\airplane.png",
+        "blurred_path": "alg_test\\blurred\\airplane_defocusdisk.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\defocusdisk.png",
+        "filters": "defocusdisk",
+        "blurred_psnr": 32.570606355129435,
+        "blurred_ssim": 0.948352878724055,
+        "is_color": false,
+        "restored_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored\\airplane_defocusdisk_TotalVariationBlindTVdevilindetails.png"
+        },
+        "algorithm": [
+            "TotalVariationBlindTVdevilindetails"
+        ],
+        "kernel_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored_kernel\\airplane_defocusdisk_TotalVariationBlindTVdevilindetails_kernel.png"
+        },
+        "psnr": {
+            "TotalVariationBlindTVdevilindetails": 23.34274488055317
+        },
+        "ssim": {
+            "TotalVariationBlindTVdevilindetails": 0.22099233760300374
+        }
+    },
+    "3": {
+        "original_path": "alg_test\\original\\airplane.png",
+        "blurred_path": "alg_test\\blurred\\airplane_defocusgaussian.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\defocusgaussian.png",
+        "filters": "defocusgaussian",
+        "blurred_psnr": 33.383421415023456,
+        "blurred_ssim": 0.9559291822227306,
+        "is_color": false,
+        "restored_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored\\airplane_defocusgaussian_TotalVariationBlindTVdevilindetails.png"
+        },
+        "algorithm": [
+            "TotalVariationBlindTVdevilindetails"
+        ],
+        "kernel_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored_kernel\\airplane_defocusgaussian_TotalVariationBlindTVdevilindetails_kernel.png"
+        },
+        "psnr": {
+            "TotalVariationBlindTVdevilindetails": 23.539175930659752
+        },
+        "ssim": {
+            "TotalVariationBlindTVdevilindetails": 0.23051210850125387
+        }
+    },
+    "4": {
+        "original_path": "alg_test\\original\\airplane.png",
+        "blurred_path": "alg_test\\blurred\\airplane_defocusring.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\defocusring.png",
+        "filters": "defocusring",
+        "blurred_psnr": 30.055102490741568,
+        "blurred_ssim": 0.9203933237738084,
+        "is_color": false,
+        "restored_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored\\airplane_defocusring_TotalVariationBlindTVdevilindetails.png"
+        },
+        "algorithm": [
+            "TotalVariationBlindTVdevilindetails"
+        ],
+        "kernel_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored_kernel\\airplane_defocusring_TotalVariationBlindTVdevilindetails_kernel.png"
+        },
+        "psnr": {
+            "TotalVariationBlindTVdevilindetails": 22.958225718183538
+        },
+        "ssim": {
+            "TotalVariationBlindTVdevilindetails": 0.2063621931971799
+        }
+    },
+    "5": {
+        "original_path": "alg_test\\original\\airplane.png",
+        "blurred_path": "alg_test\\blurred\\airplane_motionbsplinesimplecurve.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\motionbsplinesimplecurve.png",
+        "filters": "motionbsplinesimplecurve",
+        "blurred_psnr": 26.46186429938238,
+        "blurred_ssim": 0.8855307365158887,
+        "is_color": false,
+        "restored_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored\\airplane_motionbsplinesimplecurve_TotalVariationBlindTVdevilindetails.png"
+        },
+        "algorithm": [
+            "TotalVariationBlindTVdevilindetails"
+        ],
+        "kernel_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored_kernel\\airplane_motionbsplinesimplecurve_TotalVariationBlindTVdevilindetails_kernel.png"
+        },
+        "psnr": {
+            "TotalVariationBlindTVdevilindetails": 21.793081399230978
+        },
+        "ssim": {
+            "TotalVariationBlindTVdevilindetails": 0.18709181545292825
+        }
+    },
+    "6": {
+        "original_path": "alg_test\\original\\airplane.png",
+        "blurred_path": "alg_test\\blurred\\airplane_motionlinearexp.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\motionlinearexp.png",
+        "filters": "motionlinearexp",
+        "blurred_psnr": 30.28335745556857,
+        "blurred_ssim": 0.9312849418114386,
+        "is_color": false,
+        "restored_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored\\airplane_motionlinearexp_TotalVariationBlindTVdevilindetails.png"
+        },
+        "algorithm": [
+            "TotalVariationBlindTVdevilindetails"
+        ],
+        "kernel_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored_kernel\\airplane_motionlinearexp_TotalVariationBlindTVdevilindetails_kernel.png"
+        },
+        "psnr": {
+            "TotalVariationBlindTVdevilindetails": 22.737695949510357
+        },
+        "ssim": {
+            "TotalVariationBlindTVdevilindetails": 0.20039913909176132
+        }
+    },
+    "7": {
+        "original_path": "alg_test\\original\\airplane.png",
+        "blurred_path": "alg_test\\blurred\\airplane_motionlinearuniform.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\motionlinearuniform.png",
+        "filters": "motionlinearuniform",
+        "blurred_psnr": 28.155176453753995,
+        "blurred_ssim": 0.9156365242118195,
+        "is_color": false,
+        "restored_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored\\airplane_motionlinearuniform_TotalVariationBlindTVdevilindetails.png"
+        },
+        "algorithm": [
+            "TotalVariationBlindTVdevilindetails"
+        ],
+        "kernel_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored_kernel\\airplane_motionlinearuniform_TotalVariationBlindTVdevilindetails_kernel.png"
+        },
+        "psnr": {
+            "TotalVariationBlindTVdevilindetails": 22.329253726622817
+        },
+        "ssim": {
+            "TotalVariationBlindTVdevilindetails": 0.19836243261637812
+        }
+    },
+    "8": {
+        "original_path": "alg_test\\original\\airplane.png",
+        "blurred_path": "alg_test\\blurred\\airplane_stretched_gaussian_kernel.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\stretched_gaussian_kernel.png",
+        "filters": "stretched_gaussian_kernel",
+        "blurred_psnr": 28.91749231341713,
+        "blurred_ssim": 0.9161679714554399,
+        "is_color": false,
+        "restored_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored\\airplane_stretched_gaussian_kernel_TotalVariationBlindTVdevilindetails.png"
+        },
+        "algorithm": [
+            "TotalVariationBlindTVdevilindetails"
+        ],
+        "kernel_paths": {
+            "TotalVariationBlindTVdevilindetails": "alg_test\\restored_kernel\\airplane_stretched_gaussian_kernel_TotalVariationBlindTVdevilindetails_kernel.png"
+        },
+        "psnr": {
+            "TotalVariationBlindTVdevilindetails": 22.92475373007551
+        },
+        "ssim": {
+            "TotalVariationBlindTVdevilindetails": 0.22559481413663834
+        }
+    }
+}
