@@ -764,7 +764,7 @@ def _update_auxiliary_u(x, epsilon=TV_EPSILON):
     return u
 
 
-class Babacan2010(DeconvolutionAlgorithm):
+class BBD_DEIP(DeconvolutionAlgorithm):
     """
     Байесовская слепая деконволюция по паре изображений с разной экспозицией.
     
