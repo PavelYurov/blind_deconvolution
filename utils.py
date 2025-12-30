@@ -35,7 +35,8 @@ class Image:
         current_filter (Optional(str)): Текущий фильтр
         blurred_psnr (Dict[str, float]): Значение PSNR для смазанных изображений
         blurred_ssim (Dict[str, float]): Значение SSIM для смазанных изображений
-        he_data (str): изображения до выравнивания гистограм, для его обращения
+        preprocessed_blurred_path (Dict[str]): путь к обработанному смазанному изображению (буфер)
+        
 
     Структура:
     основное изображение original_path - то, от чего начинается связь
@@ -46,6 +47,7 @@ class Image:
         original_kernels_path [путь к смазанному изображению] - список всех ядер
         blurred_psnr, blurred_ssim [путь к смазанному изображению] - метрики для смазанных изображений
         current_filter, filters - буфер и список фильров, которые применялись к изображению. используется для зашифровки разных смазов
+        preprocessed_blurred_path - отдельное изображение, чтобы не засорять датасет обработками по типу денойзинга и выравнивания
 
     от каждого смазанного идет блок восстановленных изображений:
         restored_paths [путь к смазанному изображению, имя алгоритма восстановления] - пути к восстановленным изображениям
@@ -81,15 +83,19 @@ class Image:
         self.current_filter = None
         self.blurred_psnr = {}
         self.blurred_ssim = {}
-        self.he_data = None
+        self.preprocessed_blurred_path = {}
+    
+    def set_preprocessed_blurred_path(self, preprocessed_blurred_path: Dict[str, str]) -> None:
+        """Переопределяет изображение для прелобработки"""
+        self.preprocessed_blurred_path = preprocessed_blurred_path
 
-    def set_he_data(self, he_data: str) -> None:
-        """Полностью переопределяет информацию об выравнивании гистограмм"""
-        self.he_data = he_data
+    def add_preprocessed_blurred_path(self, blurred_path: str, preprocessed_blurred_path: str) -> None:
+        """Добавляет изображение для прелобработки"""
+        self.preprocessed_blurred_path[blurred_path] = preprocessed_blurred_path
 
-    def get_he_data(self) -> str:
-        """Возвращает информацию об выравнивании гистограмм"""
-        return self.he_data
+    def get_preprocessed_blurred_path(self) -> Dict[str, str]:
+        """Возвращает путь до изображения для предобработки"""
+        return self.preprocessed_blurred_path
 
     def set_blurred_PSNR(self, psnr: Dict[str, float])  -> None:
         """Полностью переопределяет psnr смазанных изображений"""
