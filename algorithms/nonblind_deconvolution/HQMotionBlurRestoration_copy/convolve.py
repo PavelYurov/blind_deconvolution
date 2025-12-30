@@ -5,6 +5,10 @@ from scipy.signal import convolve2d
 from scipy.linalg import toeplitz
 
 def gradient(Mat):
+    """
+    Функция нахожления градиента
+    grad(n) = x(n+1) - x(n)
+    """
     devx = np.diff(Mat, axis=0)
     resx = np.zeros(Mat.shape)
     if len(devx.shape)==3:

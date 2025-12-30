@@ -1,3 +1,14 @@
+"""
+Класс метода высоко-качественного восстановления смаза от движения
+
+Содержит:
+    - Методы по оптимизации необходимых функций
+    - Метод аппроксимации ядра смаз
+    - Итерационный метод восстановления исходного изображения по аппроксимации ядра
+
+Редактировал: Юров П.И.
+Оригинал: https://github.com/gpl27/deblur
+"""
 import time
 import numpy as np
 from ...base import DeconvolutionAlgorithm
@@ -16,7 +27,18 @@ class HQMBR(DeconvolutionAlgorithm):
         'lambda2': 25, # [10, 25]
         'k2': 1.5,
     }
-    def __init__(self, predict_psf, MAX_ITER = 5, gamma=2,lambda1=0.5,lambda2=25,k1=1.1,k2=1.5,O_THRESHOLD=5, inner_iter = 3, F_THRESHOLD = 0.1, L_THRESHOLD = 0.01,PHI_THRESHOLD=0.01):
+    def __init__(self, predict_psf, 
+                 MAX_ITER = 5, 
+                 gamma=2, 
+                 lambda1=0.5, 
+                 lambda2=25, 
+                 k1=1.1, 
+                 k2=1.5, 
+                 O_THRESHOLD=5, 
+                 inner_iter = 3, 
+                 F_THRESHOLD = 0.1, 
+                 L_THRESHOLD = 0.01, 
+                 PHI_THRESHOLD=0.01):
         super().__init__('HQMBR_FIX')
         self.param = 1
         self.VARS={

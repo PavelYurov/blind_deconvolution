@@ -440,6 +440,8 @@ class Processing:
             
             cv.imwrite(str(preprocessed_image_path), filtered_image)
 
+            original_image = img_obj.get_original_image()
+            original_image = self._prepare_image_for_metric(original_image)
             for alg_name in img_obj.get_algorithm():
                 current_image_path = restored_array[(blurred_path, alg_name)]
                 current_image = self._imread(current_image_path, img_obj.get_color())
@@ -447,7 +449,24 @@ class Processing:
                 filtered_image = self.inverse_histogram_equalization_one(current_image, 
                                                                          original_blurred_image, 
                                                                          view_histogram)
+                
                 cv.imwrite(str(current_image_path), filtered_image)
+                
+                filtered_image = self._prepare_image_for_metric(filtered_image)
+                
+                psnr_val, ssim_val = self._calculate_metrics(original_image, 
+                                                             filtered_image, 
+                                                             data_range=1.0)
+                
+                # blurred_ref = img_obj.get_blurred()
+                
+                img_obj.add_PSNR(psnr_val, blurred_path, alg_name)
+                img_obj.add_SSIM(ssim_val, blurred_path, alg_name)
+                img_obj.add_algorithm(alg_name)
+                img_obj.add_restored(str(current_image_path), str(blurred_path), alg_name)
+
+                
+
                      
     def inverse_histogram_equalization_one(self, 
                                            current_image: np.ndarray, 
