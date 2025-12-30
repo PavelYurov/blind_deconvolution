@@ -1,0 +1,194 @@
+{
+    "1": {
+        "original_path": "alg_test\\original\\childs.png",
+        "blurred_path": "alg_test\\blurred\\childs_convolved_kernel.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\convolved_kernel.png",
+        "filters": "convolved_kernel",
+        "blurred_psnr": 17.34306311327196,
+        "blurred_ssim": 0.391363151950428,
+        "is_color": false,
+        "restored_paths": {
+            "GKPILE": "alg_test\\restored\\childs_convolved_kernel_GKPILE.png"
+        },
+        "algorithm": [
+            "GKPILE"
+        ],
+        "kernel_paths": {
+            "GKPILE": "alg_test\\restored_kernel\\childs_convolved_kernel_GKPILE_kernel.png"
+        },
+        "psnr": {
+            "GKPILE": 20.630730074888774
+        },
+        "ssim": {
+            "GKPILE": 0.5499550652617253
+        }
+    },
+    "2": {
+        "original_path": "alg_test\\original\\childs.png",
+        "blurred_path": "alg_test\\blurred\\childs_defocusdisk.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\defocusdisk.png",
+        "filters": "defocusdisk",
+        "blurred_psnr": 25.68438490222313,
+        "blurred_ssim": 0.7894077041158483,
+        "is_color": false,
+        "restored_paths": {
+            "GKPILE": "alg_test\\restored\\childs_defocusdisk_GKPILE.png"
+        },
+        "algorithm": [
+            "GKPILE"
+        ],
+        "kernel_paths": {
+            "GKPILE": "alg_test\\restored_kernel\\childs_defocusdisk_GKPILE_kernel.png"
+        },
+        "psnr": {
+            "GKPILE": 13.779336247498389
+        },
+        "ssim": {
+            "GKPILE": 0.2552521250016323
+        }
+    },
+    "3": {
+        "original_path": "alg_test\\original\\childs.png",
+        "blurred_path": "alg_test\\blurred\\childs_defocusgaussian.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\defocusgaussian.png",
+        "filters": "defocusgaussian",
+        "blurred_psnr": 26.579736144551802,
+        "blurred_ssim": 0.8291436034457492,
+        "is_color": false,
+        "restored_paths": {
+            "GKPILE": "alg_test\\restored\\childs_defocusgaussian_GKPILE.png"
+        },
+        "algorithm": [
+            "GKPILE"
+        ],
+        "kernel_paths": {
+            "GKPILE": "alg_test\\restored_kernel\\childs_defocusgaussian_GKPILE_kernel.png"
+        },
+        "psnr": {
+            "GKPILE": 13.804626383902882
+        },
+        "ssim": {
+            "GKPILE": 0.2728877916833024
+        }
+    },
+    "4": {
+        "original_path": "alg_test\\original\\childs.png",
+        "blurred_path": "alg_test\\blurred\\childs_defocusring.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\defocusring.png",
+        "filters": "defocusring",
+        "blurred_psnr": 22.14913877884392,
+        "blurred_ssim": 0.6112267420914139,
+        "is_color": false,
+        "restored_paths": {
+            "GKPILE": "alg_test\\restored\\childs_defocusring_GKPILE.png"
+        },
+        "algorithm": [
+            "GKPILE"
+        ],
+        "kernel_paths": {
+            "GKPILE": "alg_test\\restored_kernel\\childs_defocusring_GKPILE_kernel.png"
+        },
+        "psnr": {
+            "GKPILE": 17.65459318779261
+        },
+        "ssim": {
+            "GKPILE": 0.5058685200831914
+        }
+    },
+    "5": {
+        "original_path": "alg_test\\original\\childs.png",
+        "blurred_path": "alg_test\\blurred\\childs_motionbsplinesimplecurve.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\motionbsplinesimplecurve.png",
+        "filters": "motionbsplinesimplecurve",
+        "blurred_psnr": 17.62465343217243,
+        "blurred_ssim": 0.40621628336797955,
+        "is_color": false,
+        "restored_paths": {
+            "GKPILE": "alg_test\\restored\\childs_motionbsplinesimplecurve_GKPILE.png"
+        },
+        "algorithm": [
+            "GKPILE"
+        ],
+        "kernel_paths": {
+            "GKPILE": "alg_test\\restored_kernel\\childs_motionbsplinesimplecurve_GKPILE_kernel.png"
+        },
+        "psnr": {
+            "GKPILE": 19.24836606191445
+        },
+        "ssim": {
+            "GKPILE": 0.446113969799283
+        }
+    },
+    "6": {
+        "original_path": "alg_test\\original\\childs.png",
+        "blurred_path": "alg_test\\blurred\\childs_motionlinearexp.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\motionlinearexp.png",
+        "filters": "motionlinearexp",
+        "blurred_psnr": 21.63270767223377,
+        "blurred_ssim": 0.6539027318589477,
+        "is_color": false,
+        "restored_paths": {
+            "GKPILE": "alg_test\\restored\\childs_motionlinearexp_GKPILE.png"
+        },
+        "algorithm": [
+            "GKPILE"
+        ],
+        "kernel_paths": {
+            "GKPILE": "alg_test\\restored_kernel\\childs_motionlinearexp_GKPILE_kernel.png"
+        },
+        "psnr": {
+            "GKPILE": 22.029702015138895
+        },
+        "ssim": {
+            "GKPILE": 0.6570974464561272
+        }
+    },
+    "7": {
+        "original_path": "alg_test\\original\\childs.png",
+        "blurred_path": "alg_test\\blurred\\childs_motionlinearuniform.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\motionlinearuniform.png",
+        "filters": "motionlinearuniform",
+        "blurred_psnr": 20.345111911802647,
+        "blurred_ssim": 0.6157427133135036,
+        "is_color": false,
+        "restored_paths": {
+            "GKPILE": "alg_test\\restored\\childs_motionlinearuniform_GKPILE.png"
+        },
+        "algorithm": [
+            "GKPILE"
+        ],
+        "kernel_paths": {
+            "GKPILE": "alg_test\\restored_kernel\\childs_motionlinearuniform_GKPILE_kernel.png"
+        },
+        "psnr": {
+            "GKPILE": 17.896176288291297
+        },
+        "ssim": {
+            "GKPILE": 0.5034187257148713
+        }
+    },
+    "8": {
+        "original_path": "alg_test\\original\\childs.png",
+        "blurred_path": "alg_test\\blurred\\childs_stretched_gaussian_kernel.png",
+        "original_kernel": "alg_test\\ground_truth_filters\\stretched_gaussian_kernel.png",
+        "filters": "stretched_gaussian_kernel",
+        "blurred_psnr": 20.963074314295895,
+        "blurred_ssim": 0.6064223238819209,
+        "is_color": false,
+        "restored_paths": {
+            "GKPILE": "alg_test\\restored\\childs_stretched_gaussian_kernel_GKPILE.png"
+        },
+        "algorithm": [
+            "GKPILE"
+        ],
+        "kernel_paths": {
+            "GKPILE": "alg_test\\restored_kernel\\childs_stretched_gaussian_kernel_GKPILE_kernel.png"
+        },
+        "psnr": {
+            "GKPILE": 23.26107250586549
+        },
+        "ssim": {
+            "GKPILE": 0.6855241550252757
+        }
+    }
+}

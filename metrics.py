@@ -3,20 +3,12 @@ import numpy as np
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 from typing import Callable, Optional, Tuple
 
-"""
-    над кодом работали:
-    Юров П.И.
-    Беззаборов А.А.
-"""
-
 def PSNR(original: np.ndarray, 
          restored: np.ndarray) -> float:
     """
-        над кодом работал:
-        Юров П.И.
-    """
-    """
     Вычисляет отношение пикового сигнала к шуму (PSNR) между изображениями.
+
+    Авторы: Юров П.И.
 
     Аргументы:
         original (ndarray): Исходное изображение
@@ -33,11 +25,9 @@ def SSIM(original: np.ndarray,
          restored: np.ndarray, 
          data_range: Optional[float] = None) -> float:
     """
-        над кодом работал:
-        Юров П.И.
-    """
-    """
     Вычисляет индекс структурного сходства (SSIM) между изображениями.
+
+    Авторы: Юров П.И.
 
     Аргументы:
         original: Исходное изображение
@@ -53,11 +43,9 @@ def SSIM(original: np.ndarray,
 
 def calculate_sml(image: np.ndarray) -> float:
     """
-        над кодом работал:
-        Беззаборов А.А.
-    """
-    """
     Вычисляет Sum of Modified Laplacian (SML) для изображения.
+
+    Авторы: Беззаборов А.А.
     Мера общей резкости/количества краев.
 
     Аргументы:
@@ -79,11 +67,9 @@ def calculate_sml(image: np.ndarray) -> float:
 
 def Sharpness(image: np.ndarray):
     """
-        над кодом работал:
-        Юров П.И.
-    """
-    """
     Подсчет резкости через дисперсию Лапласа.
+
+    Авторы: Юров П.И.
     Более высокое значение указывает на большую резкость.
 
     Аргументы:
@@ -96,11 +82,9 @@ def Sharpness(image: np.ndarray):
 def blur_complexity(original: np.ndarray, 
                     blurred: np.ndarray) -> float:
     """
-        над кодом работал:
-        Беззаборов А.А.
-    """
-    """
     Вычисляет нормированную меру сложности смаза [0, 1] на основе SML.
+
+    Авторы: Беззаборов А.А.
 
     Аргументы:
         original: Исходное резкое изображение
@@ -123,11 +107,9 @@ def blur_complexity(original: np.ndarray,
 def calculate_snr(signal: np.ndarray, 
                   noise: np.ndarray) -> float:
     """
-        над кодом работал:
-        Беззаборов А.А.
-    """
-    """
     Вычисляет отношение сигнал-шум (SNR) в dB.
+
+    Авторы: Беззаборов А.А.
 
     Аргументы:
         signal: Сигнал (смазанное изображение без шума)
@@ -148,11 +130,9 @@ def noise_complexity(signal: np.ndarray,
                      min_snr: float = 0.0, 
                      max_snr: float = 50.0) -> float:
     """
-        над кодом работал:
-        Беззаборов А.А.
-    """
-    """
     Вычисляет нормированную меру сложности шума [0, 1] на основе SNR.
+
+    Авторы: Беззаборов А.А.
 
     Аргументы:
         signal: Сигнал (смазанное изображение без шума)

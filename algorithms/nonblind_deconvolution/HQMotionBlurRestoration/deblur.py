@@ -10,6 +10,9 @@ Implementation of 'High-Quality Motion Deblurring from a Single Image (SIGGRAPH 
       of the local prior mask M, which is calculated using the standard
       deviation of all channels.
 """
+"""
+Редактировано Юров П.И.
+"""
 import cv2
 import warnings
 import numpy as np
@@ -17,8 +20,11 @@ from scipy.fft import fft2, ifft2
 from scipy.optimize import lsq_linear, nnls
 from numba import njit, jit
 from numba.core.errors import NumbaPendingDeprecationWarning
-from .convolve import psf2otf, toeplitz_transform, matrix_to_vector, vector_to_matrix, expand_matrix, expand_vector, extract_rows_top_sd
+from .convolve import psf2otf, toeplitz_transform, matrix_to_vector, vector_to_matrix, expand_matrix, expand_vector, extract_rows_top_sd, gradient
 from .helpers import open_image, write_image, kernel_from_image
+from scipy.optimize import fminbound, minimize_scalar
+from pypher.pypher import psf2otf as psf2otf_pypher
+
 
 
 # Filter Numba deprecation warnings
@@ -34,6 +40,8 @@ def get_derivatives(matrix):
 
     Returns
     - derivatives: dictionary containg the derivatives
+
+    Добавлена вариация нахожения градиента
     """
     derivatives = {
         'd0': matrix.copy(),
@@ -44,6 +52,20 @@ def get_derivatives(matrix):
         'dxy': np.gradient(np.gradient(matrix, axis=1), axis=0),
         'dyx': np.gradient(np.gradient(matrix, axis=0), axis=1),
     }
+
+    # dx_dy = gradient(matrix)
+    # dxx_dxy = gradient(dx_dy[0])
+    # dyx_dyy = gradient(dx_dy[1])
+    # derivatives = {
+    #     'd0': matrix.copy(),
+    #     'dx': dx_dy[0],
+    #     'dy': dx_dy[1],
+    #     'dxx': dxx_dxy[0],
+    #     'dyy': dyx_dyy[1],
+    #     'dxy': dxx_dxy[1],
+    #     'dyx': dyx_dyy[0],
+    # }
+
     return derivatives
 
 def computeLocalPrior(I, f, t):
@@ -90,6 +112,17 @@ def save_mask_as_image(mask, output_path):
     cv2.imwrite(output_path, mask_image)
 
 @njit
+def PSI(x,a,b,k,lt):
+    if (np.abs(x) <= lt):
+        return -k*np.abs(x)
+    else:
+        return -a*x**2-b
+
+@njit
+def Energy(x, lambda1,lambda2,gamma, d_I, d_L,m,a,b,k,lt):
+    return lambda1*np.abs(PSI(x,a,b,k,lt))+lambda2*m*(x-d_I)**2+gamma*(x-d_L)**2
+
+@njit
 def updatePsi(I_d, L_d, M, lambda1, lambda2, gamma):
     """
     Updates the Psi values for a single channel. By the paper definition,
@@ -106,20 +139,41 @@ def updatePsi(I_d, L_d, M, lambda1, lambda2, gamma):
 
     Returns:
     - nPsi: 3D array, the updated Psi with shape (direction, height, width)
+
+    Исправлено нахождение экстремума функции энергии
     """
     k = 2.7
     a = 6.1e-4
     b = 5.0
     lt = 1.852
-    x = np.zeros(3)
+
+    x = np.zeros(8)
+    x[3]=-255.0
+    x[4]=-lt
+    x[5]=0
+    x[6]=lt
+    x[7]=255.0
+    func = np.zeros(8)
     nPsi = [np.zeros_like(M), np.zeros_like(M)]
     for v in range(2):
         for i in range(M.shape[0]):
             for j in range(M.shape[1]):
+
                 x[0] = (lambda2*M[i, j]*I_d[v][i, j] + gamma*L_d[v][i, j])/(-a*lambda1 + lambda2*M[i, j] + gamma)
+                if(x[0]<=lt and x[0] >= -lt):
+                    x[0] = 255.0
                 x[1] = ((k/2)*lambda1 + lambda2*M[i, j]*I_d[v][i, j] + gamma*L_d[v][i, j])/(lambda2*M[i, j] + gamma)
+                if(x[1]>lt or x[1] < 0):
+                    x[1] = 255.0
                 x[2] = ((-k/2)*lambda1 + lambda2*M[i, j]*I_d[v][i, j] + gamma*L_d[v][i, j])/(lambda2*M[i, j] + gamma)
-                result = np.min(x)
+                if(x[2]<-lt or x[2]>0):
+                    x[2] = 255.0
+                
+                for fi, xi in enumerate(x):
+                    func[fi] = Energy(xi, lambda1,lambda2,gamma, I_d[v][i, j], L_d[v][i, j],M[i, j],a,b,k,lt)
+                result = x[np.argmin(func)]
+
+                
                 nPsi[v][i, j] = result 
     return nPsi
 
@@ -136,9 +190,11 @@ def computeL(L, I, f, Psi, gamma):
 
     Returns:
     - L_star: 2D array, the updated latent image with shape (height, width)
+
+    Переделано преобразование фурье от оператора дифференцирования
     """
     # Derivatives and derivative weights for the Delta calculation
-    d = get_derivatives(L)
+    # d = get_derivatives(L)
     d_w = {
         'd0': 0,
         'dx': 1,
@@ -149,18 +205,34 @@ def computeL(L, I, f, Psi, gamma):
         'dyx': 2
     }
 
+    d_filter = {
+        'd0': np.array([[0,0,0],[0,1.0,0],[0,0,0]]),
+        'dx': np.array([[0,0,0],[0,-1.0,0],[0,1.0,0]]),
+        'dy': np.array([[0,0,0],[0,-1.0,1.0],[0,0,0]]),
+        'dxx': np.array([[0,0,0,0,0],[0,0,0,0,0],[0,0,1.0,0,0],[0,0,-2.0,0,0],[0,0,1.0,0,0]]),
+        'dyy': np.array([[0,0,0,0,0],[0,0,0,0,0],[0,0,1.0,-2.0,1.0],[0,0,0,0,0],[0,0,0,0,0]]),
+        'dxy': np.array([[0,0,0],[0,1.0,-2.0],[0,0,1.0]]),
+        'dyx': np.array([[0,0,0],[0,1.0,0],[0,-2.0,1.0]])
+    }
+    F_d_filter = {}
+
     # Calculate Delta
     delta = np.zeros(I.shape, np.complex128)
-    for key in d:
-        dv = fft2(d[key])
+    for key in d_filter:
+        dv = psf2otf(d_filter[key],I.shape)
+        # dv = psf2otf_pypher(d_filter[key],I.shape)
+
+        F_d_filter[key] = dv
         delta += np.complex128(50/(2**d_w[key]))*np.conjugate(dv)*dv
 
     # Calculate L*
     F_f = psf2otf(f, I.shape)
+    # F_f = psf2otf_pypher(f, I.shape)
+
     CF_f = np.conjugate(F_f)
-    F_dx = fft2(d['dx'])
+    F_dx = F_d_filter['dx']
     CF_dx = np.conjugate(F_dx)
-    F_dy = fft2(d['dy'])
+    F_dy = F_d_filter['dy']
     CF_dy = np.conjugate(F_dy)
     L_nominator = CF_f*fft2(I)*delta + gamma*(CF_dx*fft2(Psi[0])) + gamma*(CF_dy*fft2(Psi[1]))
     L_denominator = CF_f*F_f*delta + gamma*(CF_dx*F_dx) + gamma*(CF_dy*F_dy)

@@ -4,6 +4,30 @@ from scipy.fft import fft2, ifft2, fftshift
 from scipy.signal import convolve2d
 from scipy.linalg import toeplitz
 
+def gradient(Mat):
+    """
+    Функция нахожления градиента
+    grad(n) = x(n+1) - x(n)
+    """
+    devx = np.diff(Mat, axis=0)
+    resx = np.zeros(Mat.shape)
+    if len(devx.shape)==3:
+        h,w,a = devx.shape
+        resx[0:h,0:w] = devx
+    else:
+        h,w = devx.shape
+        resx[0:h,0:w] = devx
+
+    devy = np.diff(Mat, axis=1)
+    resy = np.zeros(Mat.shape)
+    if len(devy.shape)==3:
+        h,w,a = devy.shape
+        resy[0:h,0:w] = devy
+    else:
+        h,w = devy.shape
+        resy[0:h,0:w] = devy
+    return [resx,resy]
+    
 
 def create_line_psf(theta, scale, sz):
     """

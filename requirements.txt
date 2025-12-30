@@ -45,3 +45,6 @@ tqdm
 visdom
 wget
 pypher
+sphinx
+sphinx-rtd-theme
+flake8
