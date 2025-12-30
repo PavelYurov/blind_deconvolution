@@ -347,7 +347,7 @@ def _project_kernel(M_h, kernel_shape, image_shape):
     return fft2(h_padded)
 
 
-class EMBlindDeconvolution(DeconvolutionAlgorithm):
+class EM(DeconvolutionAlgorithm):
     """
     EM-алгоритм для слепой деконволюции изображений.
     
@@ -570,7 +570,7 @@ def em_blind_deconvolution(g, kernel_shape, **kwargs):
     ----------
     f_est, h_est, params
     """
-    algo = EMBlindDeconvolution(kernel_shape=kernel_shape, **kwargs)
+    algo = EM(kernel_shape=kernel_shape, **kwargs)
     f_est, h_est = algo.process(g)
     return f_est, h_est, algo.hyperparams
 
