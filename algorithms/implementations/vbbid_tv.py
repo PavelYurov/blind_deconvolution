@@ -1122,7 +1122,7 @@ def tv_blind_deconvolution(y, kernel_shape, **kwargs):
     history : dict
         История сходимости.
     """
-    algo = Babacan2009(kernel_shape=kernel_shape, **kwargs)
+    algo = VBBID_TV(kernel_shape=kernel_shape, **kwargs)
     x_est, h_est = algo.process(y)
     return x_est, h_est, algo.hyperparams, algo.history
 
