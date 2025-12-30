@@ -680,7 +680,7 @@ def var3_blind_deconvolution(g, kernel_shape, **kwargs):
     history : dict
         История сходимости.
     """
-    algo = Likas2004(kernel_shape=kernel_shape, **kwargs)
+    algo = VABID(kernel_shape=kernel_shape, **kwargs)
     f_est, h_est = algo.process(g)
     return f_est, h_est, algo.hyperparams, algo.history
 
