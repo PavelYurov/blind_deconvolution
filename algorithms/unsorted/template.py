@@ -1,4 +1,4 @@
-from .base import DeconvolutionAlgorithm
+from algorithms.base import DeconvolutionAlgorithm
 import numpy as np
 from typing import Any
 from time import time

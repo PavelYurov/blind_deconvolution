@@ -102,14 +102,11 @@ class Qingqu06MCSBD(DeconvolutionAlgorithm):
 			"""
 [n1,n2,p] = size(Y);
 
-% Предобработка данных (как в test_2D.m)
 V = (1/(n1*n2*p) * sum(abs(fft2(Y)).^2, 3)).^(-1/2);
 Y_p = ifft2(bsxfun(@times, fft2(Y), V));
 
-% Выбор функции потерь (берём Huber, как в примере)
 f = func_huber_2D(Y_p, mu);
 
-% Настройка опций оптимизации
 opts = struct();
 opts.islinesearch = logical(use_linesearch);
 opts.isprint = false;
@@ -123,10 +120,8 @@ opts.truth = false;
 Z_init = randn(n1, n2);
 opts.Z_init = Z_init / norm(Z_init(:));
 
-% Фаза 1: Riemannian gradient descent
 [Z_r, F_val, Err] = grad_descent_2D(f, opts);
 
-% Фаза 2: rounding (опционально)
 if opts.rounding
 	opts_r = struct();
 	opts_r.MaxIter = 200;
@@ -137,7 +132,6 @@ else
 	Z = Z_r;
 end
 
-% Восстановление ядра (preconditioned Z)
 precond_Z = real(ifft2(V .* fft2(Z)));
 			""",
 			nargout=0,
