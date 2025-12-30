@@ -142,7 +142,7 @@ def _compute_gradient_operator() -> np.ndarray:
                      [0, -1, 0]], dtype=np.float64)
 
 
-class MAPDeconvolution(DeconvolutionAlgorithm):
+class AlternatingMinimizationDeconv(DeconvolutionAlgorithm):
     """
     MAP-алгоритм для слепой деконволюции с регуляризацией Хубера.
     
@@ -572,7 +572,7 @@ def map_blind_deconvolution(
     restored : ndarray (H, W)
         Восстановленное изображение.
     """
-    algo = MAPDeconvolution(
+    algo = AlternatingMinimizationDeconv(
         max_iter=max_iter,
         huber_threshold=huber_threshold,
         init_kernel=init_kernel,
