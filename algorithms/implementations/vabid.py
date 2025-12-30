@@ -345,7 +345,7 @@ def _update_beta(G, M_f, S_f, M_h, S_h):
     return N / (E_error_sq + EPSILON)
 
 
-class Likas2004(DeconvolutionAlgorithm):
+class VABID(DeconvolutionAlgorithm):
     """
     Алгоритм VAR3 для вариационной байесовской слепой деконволюции.
     
