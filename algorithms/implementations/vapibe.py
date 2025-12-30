@@ -396,7 +396,7 @@ def _update_q_gamma(M_h, S_h, Lambda_D, a_gamma, b_gamma, kernel_shape):
     return E_gamma
 
 
-class Molina2006(DeconvolutionAlgorithm):
+class VAPIBE(DeconvolutionAlgorithm):
     """
     Вариационная байесовская слепая деконволюция.
     
