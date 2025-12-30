@@ -81,7 +81,6 @@ class FelixwempeBlindDeconvolution(DeconvolutionAlgorithm):
 			y = I(:);
 			L = numel(y);
 
-			% Build kernel subspace B as a centered square support of size kernel_size.
 			k = round(kernel_size_py);
 			k = max(1, min(k, min(s1, s2)));
 			mask = zeros(s1, s2);
@@ -101,7 +100,6 @@ class FelixwempeBlindDeconvolution(DeconvolutionAlgorithm):
 				B(idxB(j), j) = 1;
 			end
 
-			% Build image subspace C from wavelet coefficients (thresholdable).
 			wave = wavelet_py;
 			lev = round(wavelet_level_py);
 			[Cw, S] = wavedec2(reshape(y, s1, s2), lev, wave);
@@ -119,7 +117,6 @@ class FelixwempeBlindDeconvolution(DeconvolutionAlgorithm):
 				m_gt(j) = Cw(idxC(j));
 			end
 
-			% Construct linear operator A (as in the repo's blind_image_deconvolution.m).
 			A = zeros(L, K*N);
 			B_full = full(B);
 			for i = 1:N
@@ -127,7 +124,6 @@ class FelixwempeBlindDeconvolution(DeconvolutionAlgorithm):
 				A(:, (i-1)*K+1:i*K) = Del * B_full;
 			end
 
-			% Solve nuclear-norm minimization via CVX.
 			if cvx_quiet_py
 				cvx_quiet(true);
 			else
@@ -140,17 +136,14 @@ class FelixwempeBlindDeconvolution(DeconvolutionAlgorithm):
 					A * X(:) == y
 			cvx_end
 
-			% Recover rank-1 factors (h, m) from X using SVD (repo's recov_m_h.m expects h_gt).
 			[U, Sv, V] = svd(full(X), 'econ');
 			sigma1 = Sv(1, 1);
 			h_opt = U(:, 1) * sqrt(sigma1);
 			m_opt = V(:, 1) * sqrt(sigma1);
 
-			% Reconstruct latent image from wavelet coefficients.
 			C_dec = C * m_opt;
 			x_dec = waverec2(C_dec, S, wave);
 
-			% Reconstruct blur kernel in image domain and return centered crop.
 			w_vec = B * h_opt;
 			w_img = reshape(w_vec, s1, s2);
 			kernel = w_img(r1:r2, c1s:c2s);
