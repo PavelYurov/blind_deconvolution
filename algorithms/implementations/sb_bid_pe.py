@@ -750,7 +750,7 @@ def _resize_kernel(h, target_shape):
     return h_resized
 
 
-class Amizic2012(DeconvolutionAlgorithm):
+class SB_BID_PE(DeconvolutionAlgorithm):
     """
     Разреженная байесовская слепая деконволюция с оценкой параметров.
     
