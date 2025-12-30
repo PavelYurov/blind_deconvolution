@@ -5,12 +5,16 @@
 алгоритмов слепой деконволюции.
 
 Доступные алгоритмы:
-    - RichardsonLucy: Алгоритм Richardson-Lucy
-    - EMBlindDeconvolution: EM-алгоритм
-    - MAP: Maximum a Posteriori
-    - Babacan2009, Babacan2010: Байесовские методы
-    - Molina2006, Likas2004, Tzikas2009: Вариационные методы
-    - Amizic2012: Sparse Bayesian Blind Deconvolution
+    - RichardsonLucy: Алгоритм Richardson-Lucy (слепой и не-слепой)
+    - EMBlindDeconvolution: EM-алгоритм для слепой деконволюции
+    - MAPDeconvolution: MAP алгоритм с регуляризацией Хубера (alternating minimization)
+    - VBBID_TV: Вариационная байесовская деконволюция с TV априори (Babacan2009)
+    - BBD_DEIP: Байесовская слепая деконволюция с разными экспозициями (Babacan2010)
+    - VAPIBE: Вариационный подход к оценке параметров, изображения и размытия (Molina2006)
+    - VABID: Вариационный подход к байесовской слепой деконволюции (Likas2004)
+    - VBSK_SID_ST: Вариационная байесовская слепая деконволюция с разреженным ядром и Student's-t (Tzikas2009)
+    - SB_BID_PE: Разреженная байесовская слепая деконволюция с оценкой параметров (Amizic2012)
+    - VBC_BID: Вариационная байесовская компрессивная слепая деконволюция (Amizic2013)
 
 Авторы: Юров П.И., Беззаборов А.А.
 """
@@ -20,12 +24,13 @@
 __all__ = [
     'RichardsonLucy',
     'EMBlindDeconvolution',
-    'MAP',
-    'Babacan2009',
-    'Babacan2010',
-    'Molina2006',
-    'Likas2004',
-    'Tzikas2009',
-    'Amizic2012',
+    'MAPDeconvolution',
+    'VBBID_TV',
+    'BBD_DEIP',
+    'VAPIBE',
+    'VABID',
+    'VBSK_SID_ST',
+    'SB_BID_PE',
+    'VBC_BID',
 ]
 
