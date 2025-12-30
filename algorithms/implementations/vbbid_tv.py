@@ -717,7 +717,7 @@ def _update_auxiliary_u(x, epsilon=TV_EPSILON):
     return u
 
 
-class Babacan2009(DeconvolutionAlgorithm):
+class VBBID_TV(DeconvolutionAlgorithm):
     """
     Вариационная байесовская слепая деконволюция с TV априори.
     
