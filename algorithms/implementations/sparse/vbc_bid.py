@@ -40,7 +40,7 @@ from base import DeconvolutionAlgorithm
 EPSILON = 1e-10
 
 
-class Amizic2013(DeconvolutionAlgorithm):
+class VBC_BID(DeconvolutionAlgorithm):
     """
     Реализация алгоритма VB-ADMM Blind Deconvolution (Amizic et al., 2013).
 

@@ -506,7 +506,7 @@ def _update_noise_precision(residual, beta_weights, a_beta=1e-3, b_beta=1e-3):
     return E_beta
 
 
-class Tzikas2009(DeconvolutionAlgorithm):
+class VBSK_SID_ST(DeconvolutionAlgorithm):
     """
     Вариационная байесовская слепая деконволюция с разреженным ядром
     и распределениями Стьюдента.

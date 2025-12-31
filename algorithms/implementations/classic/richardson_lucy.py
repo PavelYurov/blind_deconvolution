@@ -12,7 +12,7 @@ class RichardsonLucy(DeconvolutionAlgorithm):
     изображений, основанный на максимизации правдоподобия при пуассоновском
     шуме. Слепая версия чередует оценку изображения и ядра.
 
-    Parameters
+    Параметры
     ----------
     param : dict
         Словарь параметров:
@@ -22,7 +22,7 @@ class RichardsonLucy(DeconvolutionAlgorithm):
         - 'm': количество итераций обновления ядра (int)
         - 'r': количество итераций обновления изображения (int)
 
-    References
+    Литература
     ----------
     .. [1] Richardson, W. H. (1972). Bayesian-Based Iterative Method of
            Image Restoration. JOSA, 62(1), 55-59.
@@ -223,3 +223,35 @@ class NonBlindRichardsonLucy:
 
         res = f[:h, :w].real * 255.0
         return res.astype(np.int16)
+
+def richardson_lucy_blind_deconvolution(
+    image: np.ndarray,
+    psf: np.ndarray,
+    max_iter: int = 50,
+    eps: float = 1e-8,
+    m_iter: int = 1,
+    r_iter: int = 1,
+    **kwargs
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Обёртка для совместимости со старым API.
+    
+    Возвращает (восстановленное_изображение, оценённое_ядро).
+    """
+    param = {
+        'psf': psf,
+        'iter': max_iter,
+        'eps': eps,
+        'm': m_iter,
+        'r': r_iter
+    }
+    algo = RichardsonLucy(param, **kwargs)
+    result = algo.process(image)
+    
+    # Если process возвращает (image, kernel)
+    if isinstance(result, tuple) and len(result) == 2:
+        return result
+    else:
+        # Возвращаем изображение и начальное/оценённое ядро
+        kernel = psf  # или algo.get_estimated_kernel() если реализовано
+        return result, kernel

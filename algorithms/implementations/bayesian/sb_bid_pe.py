@@ -750,7 +750,7 @@ def _resize_kernel(h, target_shape):
     return h_resized
 
 
-class Amizic2012(DeconvolutionAlgorithm):
+class SB_BID_PE(DeconvolutionAlgorithm):
     """
     Разреженная байесовская слепая деконволюция с оценкой параметров.
     
@@ -1096,7 +1096,7 @@ def sparse_bayesian_blind_deconvolution(y, kernel_shape, **kwargs):
     ----------
     x_est, h_est, params, history
     """
-    algo = Amizic2012(kernel_shape=kernel_shape, **kwargs)
+    algo = SB_BID_PE(kernel_shape=kernel_shape, **kwargs)
     x_est, h_est = algo.process(y)
     return x_est, h_est, algo.hyperparams, algo.history
 
