@@ -1,31 +1,23 @@
 """
-Вариационный подход к байесовской слепой деконволюции (алгоритм VAR3)
+Вариационный байесовский алгоритм слепой деконволюции
 
 Литература:
-    Likas, A. C., & Galatsanos, N. P. (2004).
-    A variational approach for Bayesian blind image deconvolution.
-    IEEE Transactions on Signal Processing, 52(8), 2222-2233.
-    DOI: 10.1109/TSP.2004.831119
+    Molina, R., Mateos, J., & Katsaggelos, A. K. (2006).
+    Blind Deconvolution Using a Variational Approach to Parameter,
+    Image, and Blur Estimation.
+    IEEE Transactions on Image Processing, 15(12), 3715-3727.
+    DOI: 10.1109/TIP.2006.881972
 
-Реализация подхода VAR3 с использованием вариационного приближения 
-к полному байесовскому апостериорному распределению.
-В отличие от VAR1, здесь используется двухэтапная процедура (Alternating Variational):
-    1. Этап f: Ядро h считается детерминированным (ковариация S_h = 0).
-    2. Этап h: Изображение f считается детерминированным (ковариация S_f = 0).
+Иерархическая байесовская модель:
+    - Гауссова модель наблюдений: p(g|f,h,β) ∝ β^(N/2) exp(-β/2 ||g - Hf||²)
+    - SAR априори изображения: p(f|α) ∝ α^(N/2) exp(-α/2 ||Cf||²)
+    - SAR априори размытия: p(h|γ) ∝ γ^(P/2) exp(-γ/2 ||Dh||²)
+    - Гамма гиперприори: p(α), p(β), p(γ)
 
-Модель:
-    - Гауссова модель наблюдений: p(g|f,h,β) ∝ exp(-β/2 ||g - h*f||²)
-    - SAR априори для изображения: p(f|α) ∝ exp(-α/2 ||Cf||²)  
-    - Гауссово априори для размытия: p(h|γ) ∝ exp(-γ/2 ||h||²)
+Вариационное приближение факторизуется как:
+    q(f, h, Ω) = q(f) q(h) q(α) q(β) q(γ)
 
-Подход VAR3 учитывает неопределённость в оценках изображения и ядра
-(апостериорные ковариационные члены) при вариационных обновлениях.
-
-Реализованные уравнения (нумерация по статье):
-    - Ур. (10): Вариационная нижняя граница для случая VAR3
-    - Ур. (11): Обновление шума β на этапе оценки f
-    - Ур. (12): Обновление шума β на этапе оценки h
-    - Appendix B: Обновление параметров q(f) и q(h) (аналог фильтра Винера)
+где q(f) и q(h) — гауссовы, а q(α), q(β), q(γ) — гамма-распределения.
 """
 
 import numpy as np
@@ -39,7 +31,16 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from base import DeconvolutionAlgorithm
 
 
-EPSILON = 1e-12
+# Параметры гиперприори для гамма-распределений (плоские/неинформативные)
+# Для Gamma(x | a, b): p(x) ∝ x^(a-1) exp(-b*x), Среднее = a/b
+DEFAULT_HYPERPRIORS = {
+    'a_alpha': 1e-3,   # Априори изображения
+    'b_alpha': 1e-3,
+    'a_beta': 1e-3,    # Точность шума
+    'b_beta': 1e-3,
+    'a_gamma': 1e-3,   # Априори размытия
+    'b_gamma': 1e-3,
+}
 
 
 def _pad_kernel_for_fft(h, image_shape):
@@ -89,18 +90,16 @@ def _extract_kernel_from_padded(h_padded, kernel_shape):
     return shifted[:kh, :kw]
 
 
-def _compute_laplacian_spectrum(image_shape):
+def _compute_laplacian_operator_fft(image_shape):
     """
-    Вычисляет |C(k)|² для оператора Лапласа в частотной области.
+    Вычисляет |C(k)|² в частотной области для оператора Лапласа C.
     
     Ядро Лапласа:
         [0, -1,  0]
         [-1, 4, -1]
         [0, -1,  0]
     
-    Используется для SAR априори: ||Cf||² = f^T C^T C f.
-    
-    Ссылка: Раздел II-B в Likas & Galatsanos (2004)
+    Соответствует SAR априори ||Cf||² = f^T C^T C f.
     
     Параметры
     ---------
@@ -114,9 +113,9 @@ def _compute_laplacian_spectrum(image_shape):
     """
     H, W = image_shape
     laplacian = np.array([
-        [0, -1, 0],
+        [0, -1,  0],
         [-1, 4, -1],
-        [0, -1, 0]
+        [0, -1,  0]
     ], dtype=np.float64)
     
     C_padded = np.zeros((H, W), dtype=np.float64)
@@ -124,21 +123,21 @@ def _compute_laplacian_spectrum(image_shape):
     C_padded = np.roll(C_padded, shift=-1, axis=0)
     C_padded = np.roll(C_padded, shift=-1, axis=1)
     
-    return np.abs(fft2(C_padded))**2
+    C_fft = fft2(C_padded)
+    Lambda_C = np.abs(C_fft) ** 2
+    
+    return Lambda_C
 
 
-def _update_q_f(G, M_h, S_h, alpha, beta, Lambda_C):
+def _update_q_f(G, M_h, S_h, E_alpha, E_beta, Lambda_C):
     """
     Обновляет q(f) = N(f | μ_f, Σ_f).
     
-    Ур. (16): Σ_f(k) = [β E[|H(k)|²] + α |C(k)|²]^{-1}
-    Ур. (17): μ_f(k) = β Σ_f(k) M_h(k)* G(k)
+    Уравнения (22)-(23):
+        Σ_f = (⟨β⟩ ⟨H^T H⟩ + ⟨α⟩ C^T C)^{-1}
+        μ_f = ⟨β⟩ Σ_f ⟨H⟩^T g
     
-    где E[|H(k)|²] = |M_h(k)|² + S_h(k).
-    
-    Формула Винера обобщённая на случай неопределённости в ядре.
-    
-    Ссылка: Ур. (16)-(17) в Likas & Galatsanos (2004)
+    Ссылка: Ур. (22)-(23) в Molina et al. (2006)
     
     Параметры
     ---------
@@ -148,10 +147,10 @@ def _update_q_f(G, M_h, S_h, alpha, beta, Lambda_C):
         Среднее размытия в частотной области.
     S_h : ndarray (H, W)
         Дисперсия размытия в частотной области.
-    alpha : float
-        Точность априори изображения.
-    beta : float
-        Точность шума.
+    E_alpha : float
+        Мат. ожидание точности априори изображения.
+    E_beta : float
+        Мат. ожидание точности шума.
     Lambda_C : ndarray (H, W)
         Квадрат модуля оператора Лапласа.
     
@@ -162,23 +161,26 @@ def _update_q_f(G, M_h, S_h, alpha, beta, Lambda_C):
     S_f : ndarray (H, W)
         Апостериорная дисперсия f в частотной области.
     """
-    E_H_sq = np.abs(M_h)**2 + S_h
-    precision = beta * E_H_sq + alpha * Lambda_C + EPSILON
-    S_f = 1.0 / precision
-    M_f = beta * S_f * np.conj(M_h) * G
+    # E[H^t H] = |E[H]|² + cov(H)
+    E_H_squared = np.abs(M_h) ** 2 + S_h
+    
+    # M^k(f) = β * E[H^t H] + α * C^t C
+    precision_f = E_beta * E_H_squared + E_alpha * Lambda_C
+    precision_f = np.maximum(precision_f, 1e-12)
+    
+    S_f = 1.0 / precision_f
+    M_f = E_beta * S_f * np.conj(M_h) * G
+    
     return M_f, S_f
 
 
-def _update_q_h(G, M_f, S_f, gamma, beta):
+def _update_q_h(G, M_f, S_f, E_gamma, E_beta, Lambda_D):
     """
     Обновляет q(h) = N(h | μ_h, Σ_h).
     
-    Ур. (18): Σ_h(k) = [β E[|F(k)|²] + γ]^{-1}
-    Ур. (19): μ_h(k) = β Σ_h(k) M_f(k)* G(k)
+    Уравнения (26)-(27).
     
-    где E[|F(k)|²] = |M_f(k)|² + S_f(k).
-    
-    Ссылка: Ур. (18)-(19) в Likas & Galatsanos (2004)
+    Ссылка: Ур. (26)-(27) в Molina et al. (2006)
     
     Параметры
     ---------
@@ -188,10 +190,12 @@ def _update_q_h(G, M_f, S_f, gamma, beta):
         Среднее изображения в частотной области.
     S_f : ndarray (H, W)
         Дисперсия изображения в частотной области.
-    gamma : float
-        Точность априори размытия.
-    beta : float
-        Точность шума.
+    E_gamma : float
+        Мат. ожидание точности априори размытия.
+    E_beta : float
+        Мат. ожидание точности шума.
+    Lambda_D : ndarray (H, W)
+        Квадрат модуля оператора априори размытия.
     
     Возвращает
     ----------
@@ -200,16 +204,22 @@ def _update_q_h(G, M_f, S_f, gamma, beta):
     S_h : ndarray (H, W)
         Апостериорная дисперсия h в частотной области.
     """
-    E_F_sq = np.abs(M_f)**2 + S_f
-    precision = beta * E_F_sq + gamma + EPSILON
-    S_h = 1.0 / precision
-    M_h = beta * S_h * np.conj(M_f) * G
+    # E[F^t F] = |E[F]|² + cov(F)
+    E_F_squared = np.abs(M_f) ** 2 + S_f
+    
+    # M^k(h) = β * E[F^t F] + α_bl * C^t C
+    precision_h = E_beta * E_F_squared + E_gamma * Lambda_D
+    precision_h = np.maximum(precision_h, 1e-12)
+    
+    S_h = 1.0 / precision_h
+    M_h = E_beta * S_h * np.conj(M_f) * G
+    
     return M_h, S_h
 
 
-def _project_kernel_constraints(M_h, kernel_shape, image_shape):
+def _project_kernel_constraints(M_h, S_h, kernel_shape, image_shape):
     """
-    Проецирует h на допустимое множество (неотрицательность, нормировка).
+    Проецирует оценку размытия на допустимое множество.
     
     Ограничения:
         1. Ограничение носителя: h ненулевое только в kernel_shape
@@ -220,6 +230,8 @@ def _project_kernel_constraints(M_h, kernel_shape, image_shape):
     ---------
     M_h : ndarray (H, W), complex
         Среднее размытия в частотной области.
+    S_h : ndarray (H, W)
+        Дисперсия размытия в частотной области (не изменяется).
     kernel_shape : tuple (kh, kw)
         Размер ядра.
     image_shape : tuple (H, W)
@@ -234,24 +246,28 @@ def _project_kernel_constraints(M_h, kernel_shape, image_shape):
     h_kernel = _extract_kernel_from_padded(h_spatial, kernel_shape)
     
     h_kernel = np.maximum(h_kernel, 0.0)
+    
     h_sum = np.sum(h_kernel)
-    if h_sum > EPSILON:
+    if h_sum > 1e-12:
         h_kernel = h_kernel / h_sum
     else:
         h_kernel = np.zeros(kernel_shape)
         h_kernel[kernel_shape[0]//2, kernel_shape[1]//2] = 1.0
     
     h_padded = _pad_kernel_for_fft(h_kernel, image_shape)
-    return fft2(h_padded)
+    M_h_proj = fft2(h_padded)
+    
+    return M_h_proj
 
 
-def _update_alpha(M_f, S_f, Lambda_C):
+def _update_q_alpha(M_f, S_f, Lambda_C, a_alpha, b_alpha):
     """
-    Обновляет точность априори изображения α.
+    Обновляет q(α), которое является гамма-распределением.
     
-    Ур. (20): α = N / E[||Cf||²]
+    Для гамма гиперприори Gamma(α | a, b):
+        ⟨α⟩ = (N/2 + a - 1) / (E[||Cf||²]/2 + b)
     
-    где E[||Cf||²] = (1/N) Σ_k |C(k)|² (|M_f(k)|² + S_f(k))
+    Ссылка: Раздел III-B в Molina et al. (2006)
     
     Параметры
     ---------
@@ -261,59 +277,39 @@ def _update_alpha(M_f, S_f, Lambda_C):
         Дисперсия изображения в частотной области.
     Lambda_C : ndarray (H, W)
         Квадрат модуля оператора Лапласа.
+    a_alpha : float
+        Параметр формы гамма-гиперприори.
+    b_alpha : float
+        Параметр масштаба гамма-гиперприори.
     
     Возвращает
     ----------
-    alpha : float
-        Обновлённая точность априори изображения.
+    E_alpha : float
+        Мат. ожидание точности априори изображения.
     """
     H, W = M_f.shape
     N = H * W
-    E_Cf_sq = np.sum(Lambda_C * (np.abs(M_f)**2 + S_f)) / N
-    return N / (E_Cf_sq + EPSILON)
+    
+     # Ур. (44): E[||Cf||²] = ||C E[f]||² + trace(C^t C cov(f))
+    # В частотной области это сумма элементов.
+    E_Cf_squared = np.sum(Lambda_C * (np.abs(M_f) ** 2 + S_f)) / N
+    
+    numerator = a_alpha + N / 2.0
+    denominator = b_alpha + E_Cf_squared / 2.0
+    
+    E_alpha = numerator / denominator
+    E_alpha = max(E_alpha, 1e-12)
+    
+    return E_alpha
 
 
-def _update_gamma(M_h, S_h, kernel_shape):
+def _update_q_beta(G, M_f, S_f, M_h, S_h, a_beta, b_beta):
     """
-    Обновляет точность априори размытия γ.
+    Обновляет q(β), которое является гамма-распределением.
     
-    Ур. (21): γ = P / E[||h||²]
+    Ур. (57): E[β] = (a_beta^o + N/2) / (b_beta^o + 1/2 * E[||g - Hf||²])
     
-    где P = kh × kw — размер ядра.
-    
-    Параметры
-    ---------
-    M_h : ndarray (H, W), complex
-        Среднее размытия в частотной области.
-    S_h : ndarray (H, W)
-        Дисперсия размытия в частотной области.
-    kernel_shape : tuple (kh, kw)
-        Размер ядра.
-    
-    Возвращает
-    ----------
-    gamma : float
-        Обновлённая точность априори размытия.
-    """
-    H, W = M_h.shape
-    N = H * W
-    kh, kw = kernel_shape
-    P = kh * kw
-    E_h_sq = np.sum(np.abs(M_h)**2 + S_h) / N
-    return P / (E_h_sq + EPSILON)
-
-
-def _update_beta(G, M_f, S_f, M_h, S_h):
-    """
-    Обновляет точность шума β.
-    
-    Ур. (22): β = N / E[||g - h*f||²]
-    
-    где E[||g - h*f||²] = (1/N) Σ_k {|G(k) - M_h(k)M_f(k)|² 
-                                    + S_f(k)|M_h(k)|² 
-                                    + S_h(k)|M_f(k)|² 
-                                    + S_f(k)S_h(k)}
-    
+    Ссылка: Раздел III-B в Molina et al. (2006)
     
     Параметры
     ---------
@@ -327,41 +323,93 @@ def _update_beta(G, M_f, S_f, M_h, S_h):
         Среднее размытия в частотной области.
     S_h : ndarray (H, W)
         Дисперсия размытия в частотной области.
+    a_beta : float
+        Параметр формы гамма-гиперприори.
+    b_beta : float
+        Параметр масштаба гамма-гиперприори.
     
     Возвращает
     ----------
-    beta : float
-        Обновлённая точность шума.
+    E_beta : float
+        Мат. ожидание точности шума.
     """
     H, W = G.shape
     N = H * W
     
-    residual_sq = np.abs(G - M_h * M_f)**2
-    variance_terms = (S_f * np.abs(M_h)**2 + 
-                      S_h * np.abs(M_f)**2 + 
+    # Ур. (46)-(48): E[||g - Hf||²]
+    residual_squared = np.abs(G - M_h * M_f) ** 2
+    variance_terms = (S_f * np.abs(M_h) ** 2 + 
+                      S_h * np.abs(M_f) ** 2 + 
                       S_f * S_h)
     
-    E_error_sq = np.sum(residual_sq + variance_terms) / N
-    return N / (E_error_sq + EPSILON)
-
-
-class Likas2004(DeconvolutionAlgorithm):
-    """
-    Алгоритм VAR3 для вариационной байесовской слепой деконволюции.
+    E_error_squared = np.sum(residual_squared + variance_terms) / N
     
-    Совместно оценивает латентное изображение f, ядро размытия h
-    и гиперпараметры (α, β, γ) методом вариационного вывода.
+    numerator = a_beta + N / 2.0
+    denominator = b_beta + E_error_squared / 2.0
+    
+    E_beta = numerator / denominator
+    E_beta = max(E_beta, 1e-12)
+    
+    return E_beta
+
+
+def _update_q_gamma(M_h, S_h, Lambda_D, a_gamma, b_gamma, kernel_shape):
+    """
+    Обновляет q(α_bl), которое является гамма-распределением.
+    
+    Ур. (56): E[α_bl] = (a_bl^o + M/2) / (b_bl^o + 1/2 * E[||Ch||²])
+    
+    Параметры
+    ---------
+    M_h : ndarray (H, W), complex
+        Среднее размытия.
+    S_h : ndarray (H, W)
+        Дисперсия размытия.
+    Lambda_D : ndarray (H, W)
+        Квадрат модуля оператора априори размытия.
+    a_gamma : float
+        Параметр формы гамма-гиперприори.
+    b_gamma : float
+        Параметр масштаба гамма-гиперприори.
+    kernel_shape : tuple (kh, kw)
+        Размер ядра.
+    
+    Возвращает
+    ----------
+    E_gamma : float
+        Мат. ожидание точности априори размытия.
+    """
+    H, W = M_h.shape
+    N = H * W
+    kh, kw = kernel_shape
+    P = kh * kw  # В статье обозначается как M
+    
+    # Ур. (45): E[||Ch||²] = ||C E[h]||² + trace(C^t C cov(h))
+    E_Dh_squared = np.sum(Lambda_D * (np.abs(M_h) ** 2 + S_h)) / N
+    
+    numerator = a_gamma + P / 2.0
+    denominator = b_gamma + E_Dh_squared / 2.0
+    
+    E_gamma = numerator / denominator
+    E_gamma = max(E_gamma, 1e-12)
+    
+    return E_gamma
+
+
+class VAPIBE(DeconvolutionAlgorithm):
+    """
+    Вариационная байесовская слепая деконволюция.
+    
+    Алгоритм из Molina et al. (2006) совместно оценивает латентное 
+    изображение f, ядро размытия h и гиперпараметры (α, β, γ) 
+    методом вариационного вывода.
     
     Вариационное приближение:
-        q(f, h) = q(f) q(h)
+        q(f, h, α, β, γ) = q(f) q(h) q(α) q(β) q(γ)
     
-    где q(f) и q(h) — гауссовы распределения с моментами, вычисляемыми
-    в частотной области (диагональное приближение ковариации).
+    где q(f) и q(h) — гауссовы, а q(α), q(β), q(γ) — гамма-распределения.
+    Используется модель SAR как для изображения, так и для размытия.
 
-    Используется схема Alternating Variational Minimization (VAR3):
-    1. E-шаг и M-шаг для f при фиксированном h (h считается детерминированным).
-    2. E-шаг и M-шаг для h при фиксированном f (f считается детерминированным).
-    
     Атрибуты
     --------
     kernel_shape : tuple (kh, kw)
@@ -369,17 +417,19 @@ class Likas2004(DeconvolutionAlgorithm):
     max_iterations : int
         Максимальное число VB-итераций.
     tolerance : float
-        Порог сходимости (относительное изменение гиперпараметров).
+        Порог сходимости.
+    hyperpriors : dict
+        Параметры гамма гиперприори.
     initial_alpha : float или None
         Начальное значение точности априори изображения.
-    initial_gamma : float или None
-        Начальное значение точности априори ядра.
     initial_beta : float или None
         Начальное значение точности шума.
+    initial_gamma : float или None
+        Начальное значение точности априори размытия.
     apply_kernel_constraints : bool
         Проецировать ядро на допустимое множество.
     verbose : bool
-        Выводить прогресс на консоль.
+        Выводить прогресс.
     history : dict
         История сходимости (заполняется после process()).
     hyperparams : dict
@@ -391,14 +441,15 @@ class Likas2004(DeconvolutionAlgorithm):
         kernel_shape: Tuple[int, int],
         max_iterations: int = 50,
         tolerance: float = 1e-6,
+        hyperpriors: dict = None,
         initial_alpha: float = None,
-        initial_gamma: float = None,
         initial_beta: float = None,
+        initial_gamma: float = None,
         apply_kernel_constraints: bool = True,
         verbose: bool = False
     ):
         """
-        Инициализация алгоритма Likas2004 (VAR3).
+        Инициализация алгоритма Molina2006.
         
         Параметры
         ---------
@@ -408,25 +459,29 @@ class Likas2004(DeconvolutionAlgorithm):
             Максимальное число VB-итераций.
         tolerance : float
             Порог сходимости.
+        hyperpriors : dict или None
+            Параметры гамма гиперприори. Если None, используются значения
+            по умолчанию (неинформативные приори).
         initial_alpha : float или None
             Начальное значение точности априори изображения.
-        initial_gamma : float или None
-            Начальное значение точности априори ядра.
         initial_beta : float или None
             Начальное значение точности шума.
+        initial_gamma : float или None
+            Начальное значение точности априори размытия.
         apply_kernel_constraints : bool
             Проецировать ядро на допустимое множество.
         verbose : bool
-            Выводить прогресс на консоль.
+            Выводить прогресс.
         """
-        super().__init__(name='Likas2004')
+        super().__init__(name='Molina2006')
         
         self.kernel_shape = tuple(kernel_shape)
         self.max_iterations = max_iterations
         self.tolerance = tolerance
+        self.hyperpriors = hyperpriors if hyperpriors else DEFAULT_HYPERPRIORS.copy()
         self.initial_alpha = initial_alpha
-        self.initial_gamma = initial_gamma
         self.initial_beta = initial_beta
+        self.initial_gamma = initial_gamma
         self.apply_kernel_constraints = apply_kernel_constraints
         self.verbose = verbose
         
@@ -435,10 +490,8 @@ class Likas2004(DeconvolutionAlgorithm):
     
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Выполнение слепой деконволюции методом VAR3.
+        Выполнение слепой деконволюции.
         
-        Реализует итеративный процесс, описанный в Section III-B.
-
         Параметры
         ---------
         image : ndarray (H, W)
@@ -474,109 +527,114 @@ class Likas2004(DeconvolutionAlgorithm):
         N = H * W
         kh, kw = self.kernel_shape
         
-        # Предвычисление спектра Лапласа
-        Lambda_C = _compute_laplacian_spectrum((H, W))
+        # Параметры гиперприори
+        a_alpha = self.hyperpriors.get('a_alpha', 1e-3)
+        b_alpha = self.hyperpriors.get('b_alpha', 1e-3)
+        a_beta = self.hyperpriors.get('a_beta', 1e-3)
+        b_beta = self.hyperpriors.get('b_beta', 1e-3)
+        a_gamma = self.hyperpriors.get('a_gamma', 1e-3)
+        b_gamma = self.hyperpriors.get('b_gamma', 1e-3)
         
-        # Инициализация изображения: f = g
+        # Предвычисление операторов
+        Lambda_C = _compute_laplacian_operator_fft((H, W))
+        # Согласно (Ур. 8), для размытия также используется оператор Лапласа
+        Lambda_D = Lambda_C 
+        # Lambda_D = np.ones((H, W), dtype=np.float64)  # Тождественный оператор для h
+        
+        # Инициализация изображения: μ_f = g
         f_init = g.copy()
         M_f = fft2(f_init)
-        # S_f инициализируем, но в цикле VAR3 он будет вычисляться локально на шаге 1
         S_f = np.zeros((H, W), dtype=np.float64)
         
-        # Инициализация размытия: дельта-функция
+        # Инициализация размытия: h = дельта-функция
         h_init = np.zeros((kh, kw), dtype=np.float64)
-        h_init[kh//2, kw//2] = 1.0
+        h_init[kh // 2, kw // 2] = 1.0
         h_padded = _pad_kernel_for_fft(h_init, (H, W))
         M_h = fft2(h_padded)
-        # S_h инициализируем, но в цикле VAR3 он будет вычисляться локально на шаге 2
         S_h = np.zeros((H, W), dtype=np.float64)
         
         # Инициализация гиперпараметров
-        noise_var = max(1e-3 * np.var(g), EPSILON)
+        noise_var_estimate = 1e-3 * np.var(g)
         
-        alpha = self.initial_alpha if self.initial_alpha else 1.0 / np.var(g)
-        gamma = self.initial_gamma if self.initial_gamma else 1.0
-        beta = self.initial_beta if self.initial_beta else 1.0 / noise_var
+        if self.initial_beta is None:
+            E_beta = 1.0 / max(noise_var_estimate, 1e-6)
+        else:
+            E_beta = self.initial_beta
+            
+        if self.initial_alpha is None:
+            E_alpha = 1.0 / max(np.var(g), 1e-6)
+        else:
+            E_alpha = self.initial_alpha
+            
+        if self.initial_gamma is None:
+            E_gamma = 1.0
+        else:
+            E_gamma = self.initial_gamma
         
-        # БПФ наблюдения
+        # Наблюдение в частотной области
         G = fft2(g)
         
-        # Нулевой массив для передачи в функции, где ковариация считается равной нулю
-        zeros_shape = (H, W)
-        zeros_cov = np.zeros(zeros_shape, dtype=np.float64)
-
         # История
         self.history = {
-            'alpha': [alpha],
-            'beta': [beta],
-            'gamma': [gamma]
+            'alpha': [E_alpha],
+            'beta': [E_beta],
+            'gamma': [E_gamma]
         }
         
         for iteration in range(self.max_iterations):
             
-            params_prev = np.array([alpha, beta, gamma])
+            E_alpha_prev = E_alpha
+            E_beta_prev = E_beta
+            E_gamma_prev = E_gamma
             
-            # Обновление f (h фиксировано и детерминировано) 
-            # h считается детерминированным, значит S_h = 0
-            # Обновление q(f) — Ур. (16)-(17)
-
-            # E-step f:
-            M_f, S_f = _update_q_f(G, M_h, zeros_cov, alpha, beta, Lambda_C)
+            # Обновление q(f)
+            M_f, S_f = _update_q_f(G, M_h, S_h, E_alpha, E_beta, Lambda_C)
             
-            # M-step f (обновление alpha):
-            alpha = _update_alpha(M_f, S_f, Lambda_C)
-            
-            # Обновление шума beta (Ур. 11): используется S_f, но S_h=0
-            beta = _update_beta(G, M_f, S_f, M_h, zeros_cov)
-
-            # Обновление h (f фиксировано и детерминировано)
-            # f считается детерминированным, значит S_f = 0
-            # Обновление q(h) — Ур. (18)-(19)
-
-            # E-step h:
-            M_h, S_h = _update_q_h(G, M_f, zeros_cov, gamma, beta)
+            # Обновление q(h)
+            M_h, S_h = _update_q_h(G, M_f, S_f, E_gamma, E_beta, Lambda_D)
             
             # Проекция на допустимое множество
             if self.apply_kernel_constraints:
-                M_h = _project_kernel_constraints(M_h, self.kernel_shape, (H, W))
+                M_h = _project_kernel_constraints(M_h, S_h, self.kernel_shape, (H, W))
             
             # Обновление гиперпараметров
-            # M-step h (обновление gamma):
-            gamma = _update_gamma(M_h, S_h, self.kernel_shape)
-             # Обновление шума beta (Ур. 12): используется S_h, но S_f=0
-            beta = _update_beta(G, M_f, zeros_cov, M_h, S_h)
+            E_alpha = _update_q_alpha(M_f, S_f, Lambda_C, a_alpha, b_alpha)
+            E_beta = _update_q_beta(G, M_f, S_f, M_h, S_h, a_beta, b_beta)
+            E_gamma = _update_q_gamma(M_h, S_h, Lambda_D, a_gamma, b_gamma, self.kernel_shape)
             
-            self.history['alpha'].append(alpha)
-            self.history['beta'].append(beta)
-            self.history['gamma'].append(gamma)
+            self.history['alpha'].append(E_alpha)
+            self.history['beta'].append(E_beta)
+            self.history['gamma'].append(E_gamma)
             
             # Проверка сходимости
-            params_curr = np.array([alpha, beta, gamma])
-            max_delta = np.max(np.abs(params_curr - params_prev) / (params_prev + EPSILON))
+            delta_alpha = abs(E_alpha - E_alpha_prev) / max(E_alpha_prev, 1e-12)
+            delta_beta = abs(E_beta - E_beta_prev) / max(E_beta_prev, 1e-12)
+            delta_gamma = abs(E_gamma - E_gamma_prev) / max(E_gamma_prev, 1e-12)
+            max_delta = max(delta_alpha, delta_beta, delta_gamma)
             
             if self.verbose:
-                print(f"Итерация {iteration+1:3d}: α={alpha:.4e}, β={beta:.4e}, "
-                      f"γ={gamma:.4e}, Δ={max_delta:.4e}")
+                print(f"Итерация {iteration+1:3d}: α={E_alpha:.4e}, β={E_beta:.4e}, "
+                      f"γ={E_gamma:.4e}, Δ={max_delta:.4e}")
             
             if max_delta < self.tolerance:
                 if self.verbose:
                     print(f"Сходимость достигнута на итерации {iteration+1}")
                 break
         
-        # Извлечение результатов
+        # Извлечение финальных оценок
         f_est = np.real(ifft2(M_f))
         
         h_spatial = np.real(ifft2(M_h))
         h_est = _extract_kernel_from_padded(h_spatial, self.kernel_shape)
         h_est = np.maximum(h_est, 0.0)
         h_sum = np.sum(h_est)
-        if h_sum > EPSILON:
+        if h_sum > 1e-12:
             h_est = h_est / h_sum
         
         self.hyperparams = {
-            'alpha': alpha,
-            'beta': beta,
-            'gamma': gamma
+            'alpha': E_alpha,
+            'beta': E_beta,
+            'gamma': E_gamma
         }
         
         self.timer = time.time() - start_time
@@ -596,9 +654,10 @@ class Likas2004(DeconvolutionAlgorithm):
             ('kernel_shape', self.kernel_shape),
             ('max_iterations', self.max_iterations),
             ('tolerance', self.tolerance),
+            ('hyperpriors', self.hyperpriors),
             ('initial_alpha', self.initial_alpha),
-            ('initial_gamma', self.initial_gamma),
             ('initial_beta', self.initial_beta),
+            ('initial_gamma', self.initial_gamma),
             ('apply_kernel_constraints', self.apply_kernel_constraints),
             ('verbose', self.verbose),
         ]
@@ -619,12 +678,14 @@ class Likas2004(DeconvolutionAlgorithm):
             self.max_iterations = int(params['max_iterations'])
         if 'tolerance' in params:
             self.tolerance = float(params['tolerance'])
+        if 'hyperpriors' in params:
+            self.hyperpriors = params['hyperpriors']
         if 'initial_alpha' in params:
             self.initial_alpha = params['initial_alpha']
-        if 'initial_gamma' in params:
-            self.initial_gamma = params['initial_gamma']
         if 'initial_beta' in params:
             self.initial_beta = params['initial_beta']
+        if 'initial_gamma' in params:
+            self.initial_gamma = params['initial_gamma']
         if 'apply_kernel_constraints' in params:
             self.apply_kernel_constraints = bool(params['apply_kernel_constraints'])
         if 'verbose' in params:
@@ -632,7 +693,7 @@ class Likas2004(DeconvolutionAlgorithm):
     
     def get_history(self) -> dict:
         """
-        Возвращает историю сходимости после выполнения process().
+        Возвращает историю сходимости.
         
         Возвращает
         ----------
@@ -644,7 +705,7 @@ class Likas2004(DeconvolutionAlgorithm):
     
     def get_hyperparams(self) -> dict:
         """
-        Возвращает оценённые гиперпараметры после выполнения process().
+        Возвращает оценённые гиперпараметры.
         
         Возвращает
         ----------
@@ -655,8 +716,8 @@ class Likas2004(DeconvolutionAlgorithm):
         return self.hyperparams
 
 
-# Обратная совместимость: функция-обёртка
-def var3_blind_deconvolution(g, kernel_shape, **kwargs):
+# Обратная совместимость
+def variational_blind_deconvolution(g, kernel_shape, **kwargs):
     """
     Обёртка для совместимости со старым API.
     
@@ -667,7 +728,7 @@ def var3_blind_deconvolution(g, kernel_shape, **kwargs):
     kernel_shape : tuple (kh, kw)
         Размер оцениваемой PSF.
     **kwargs
-        Дополнительные параметры для Likas2004.
+        Дополнительные параметры для Molina2006.
     
     Возвращает
     ----------
@@ -680,11 +741,11 @@ def var3_blind_deconvolution(g, kernel_shape, **kwargs):
     history : dict
         История сходимости.
     """
-    algo = Likas2004(kernel_shape=kernel_shape, **kwargs)
+    algo = VAPIBE(kernel_shape=kernel_shape, **kwargs)
     f_est, h_est = algo.process(g)
     return f_est, h_est, algo.hyperparams, algo.history
 
 
 def run_algorithm(g, kernel_shape, **kwargs):
-    """Обёртка для var3_blind_deconvolution()."""
-    return var3_blind_deconvolution(g, kernel_shape, **kwargs)
+    """Обёртка для variational_blind_deconvolution()."""
+    return variational_blind_deconvolution(g, kernel_shape, **kwargs)

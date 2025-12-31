@@ -83,14 +83,14 @@ pip install -r requirements.txt
 
 ```
 BlindDeconvolution/
-├── algorithms/                 # Алгоритмы деконволюции
-│   ├── base.py                 # Базовый класс DeconvolutionAlgorithm
-│   ├── implementations/        # Готовые реализации
-│   ├── unsorted/               # Алгоритмы в разработке
+├── algorithms/                 # Blind Deconvolution алгоритмы
+│   ├── base.py                 # DeconvolutionAlgorithm
+│   ├── implementations/        # Реализации методов
+│   ├── unsorted/               # Алгоритмы в доработке
 │   └── blind_deconvolution/    # Внешние обёртки
 │
 ├── filters/                    # Генерация искажений
-│   ├── base.py                 # Базовый класс FilterBase
+│   ├── base.py                 # FilterBase
 │   ├── blur.py                 # Размытие
 │   ├── noise.py                # Шумы
 │   ├── denoise.py              # Шумоподавление
@@ -100,15 +100,15 @@ BlindDeconvolution/
 │   ├── hyperparameter_optimization.py
 │   └── pareto_analysis.py
 │
-├── experiments/                # Jupyter notebooks
+├── experiments/                # Тестирование алгоритмов и подбор гиперпараметров
 ├── scripts/                    # Вспомогательные скрипты
 │   ├── kernel_generator.py     # Генератор ядер размытия (PSF)
 │   └── dataset_generator.py    # Генератор датасета
 ├── docs/                       # Документация (Sphinx)
 │
-├── processing.py               # Главный класс Processing
+├── processing.py               # Основной функционал
 ├── metrics.py                  # Метрики качества
-├── utils.py                    # Вспомогательный класс Image
+├── utils.py                    # Вспомогательные утилиты
 │
 ├── requirements.txt            # Зависимости
 └── setup.cfg                   # Конфигурация flake8
