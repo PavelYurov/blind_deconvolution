@@ -1,5 +1,5 @@
 """
-Вспомогательные классы для управления изображениями и метриками.
+Вспомогательные классы и методы для управления изображениями и метриками.
 
 Автор: Юров П.И.
 """
@@ -7,7 +7,10 @@
 import cv2 as cv
 import numpy as np
 from typing import Optional, Tuple, Dict
-
+from pathlib import Path
+import processing.metrics as metrics
+import math
+from filters.blur import Identical_kernel
 
 class Image:
     """
@@ -166,7 +169,7 @@ class Image:
     def save_filter(self) -> None:
         """Сохраняет буфер смазанного изображения в общий список."""
         if self.blurred_path is not None:
-            self.filters[self.blurred_path] = self.current_filter
+            self.filters[str(self.blurred_path)] = self.current_filter
             self.blurred_array = np.append(self.blurred_array, self.blurred_path)
         
         self.current_filter = None
@@ -349,3 +352,60 @@ class Image:
             res = np.append(res, self.current_filter)
         return res
         
+
+def imread(path: str, color: bool) -> Optional[np.ndarray]:
+    """Загружает изображение соответствующего цветового формата."""
+    if path is None:
+        return None
+    return cv.imread(path, cv.IMREAD_COLOR if color else cv.IMREAD_GRAYSCALE)
+
+def float_img_to_int(image: np.ndarray) -> np.ndarray:
+    """Переводит изображение из диапазона [0.0, 1.0] в диапазон [0, 255]."""
+    return np.clip(image*255.0, 0.0, 255.0).astype(np.int16)
+
+def prepare_image_for_metric(image: np.ndarray) -> np.ndarray:
+        """Подготовка изображения для расчета метрик с нормализацией."""
+        image = np.array(image.copy(), dtype=np.float32)
+
+        if image.max() > 1.0:
+            image = image / 255.0
+
+        if len(image.shape) == 3:
+            image = image.mean(axis=2)
+        
+        image = np.clip(image, 0.0, 1.0)
+
+        return image
+
+def generate_unique_file_path(directory: Path, 
+                                filename: str) -> Path:
+    """Генерация уникального пути к файлу."""
+    path = directory / filename
+    counter = 1
+    
+    while path.exists():
+        stem, suffix = Path(filename).stem, Path(filename).suffix
+        path = directory / f"{stem}_{counter}{suffix}"
+        counter += 1
+    
+    return path
+
+def calculate_metrics(original_image: np.ndarray, 
+                       restored_image: np.ndarray, 
+                       data_range: Optional[float] = None) -> tuple[float, float]:
+    """Расчет метрик восстановления."""
+    try:
+        psnr_val = metrics.PSNR(original_image, restored_image)
+    except:
+        psnr_val = math.nan
+    try:
+        ssim_val = metrics.SSIM(original_image, restored_image, data_range=data_range)
+    except:
+        ssim_val = math.nan 
+    return psnr_val, ssim_val 
+
+
+
+
+
+
