@@ -1,0 +1,69 @@
+*.ipynb linguist-language=Python
+
+*.csv linguist-vendored=true
+*.tsv linguist-vendored=true
+*.xlsx linguist-vendored=true
+*.xls linguist-vendored=true
+
+*.jpg linguist-vendored=true
+*.jpeg linguist-vendored=true
+*.png linguist-vendored=true
+*.gif linguist-vendored=true
+*.bmp linguist-vendored=true
+*.tiff linguist-vendored=true
+*.svg linguist-vendored=true
+*.ico linguist-vendored=true
+
+*.mp4 linguist-vendored=true
+*.avi linguist-vendored=true
+*.mov linguist-vendored=true
+*.mp3 linguist-vendored=true
+*.wav linguist-vendored=true
+
+*.pdf linguist-vendored=true
+*.doc linguist-vendored=true
+*.docx linguist-vendored=true
+
+*.zip linguist-vendored=true
+*.tar linguist-vendored=true
+*.gz linguist-vendored=true
+*.7z linguist-vendored=true
+*.rar linguist-vendored=true
+
+*.pkl linguist-vendored=true
+*.pickle linguist-vendored=true
+*.npz linguist-vendored=true
+*.npy linguist-vendored=true
+*.h5 linguist-vendored=true
+*.hdf5 linguist-vendored=true
+*.mat linguist-vendored=true
+
+*.json linguist-vendored=true
+*.yaml linguist-vendored=true
+*.yml linguist-vendored=true
+*.toml linguist-vendored=true
+*.ini linguist-vendored=true
+*.cfg linguist-vendored=true
+
+data/** linguist-vendored=true
+images/** linguist-vendored=true
+figures/** linguist-vendored=true
+assets/** linguist-vendored=true
+outputs/** linguist-vendored=true
+results/** linguist-vendored=true
+models/** linguist-vendored=true
+weights/** linguist-vendored=true
+checkpoints/** linguist-vendored=true
+logs/** linguist-vendored=true
+
+*.md linguist-documentation=true
+*.rst linguist-documentation=true
+*.txt linguist-documentation=true
+
+*.pyc linguist-vendored=true
+__pycache__/** linguist-vendored=true
+
+.vscode/** linguist-vendored=true
+.idea/** linguist-vendored=true
+*.swp linguist-vendored=true
+*.swo linguist-vendored=true
