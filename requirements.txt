@@ -5,59 +5,14 @@ scikit-image
 imageio
 tifffile
 opencv-python
-astropy
-imutils
-
-# Deep learning frameworks
-tensorflow
-keras
-torch
-torchvision
-pytorch-lightning
-torchsummary
-jax
 
 # Machine learning
-scikit-learn
 numpy
 scipy
 pandas
-numba
 
 # Optimization & math
-cvxpy
-pylops
-pymanopt
 optuna
-autograd
-starlette
 
 # GUI & visualization
-PyQt5
 matplotlib
-visdom
-dominate
-progressbar2
-tqdm
-
-# Utilities
-PyYAML
-absl-py
-beautifulsoup4
-cloud-volume
-h5py
-mlflow
-nanonispy
-natsort
-pytube
-requests
-wget
-pypher
-
-# Development tools
-setuptools
-ipython
-pytest
-flake8
-sphinx
-sphinx-rtd-theme
