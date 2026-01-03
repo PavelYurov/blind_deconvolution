@@ -30,6 +30,7 @@ pylops
 pymanopt
 optuna
 autograd
+starlet==0.54.1
 
 # GUI & visualization
 PyQt5
