@@ -1,0 +1,8 @@
+h5py
+imutils
+matplotlib
+numpy
+opencv-python
+progressbar2
+scikit-learn
+tensorflow

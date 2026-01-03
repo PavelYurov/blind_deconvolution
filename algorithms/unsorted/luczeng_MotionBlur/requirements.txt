@@ -1,0 +1,11 @@
+PyYAML
+matplotlib
+mlflow
+numpy
+opencv-python
+pytest
+scikit-image
+setuptools
+torch
+torchsummary
+wget

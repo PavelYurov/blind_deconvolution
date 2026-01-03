@@ -1,0 +1,7 @@
+autograd
+matplotlib
+numpy
+scipy
+torch
+torchvision
+tqdm

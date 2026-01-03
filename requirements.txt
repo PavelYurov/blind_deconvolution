@@ -16,3 +16,11 @@ optuna
 
 # GUI & visualization
 matplotlib
+
+# Development tools
+setuptools
+ipython
+pytest
+flake8
+sphinx
+sphinx-rtd-theme

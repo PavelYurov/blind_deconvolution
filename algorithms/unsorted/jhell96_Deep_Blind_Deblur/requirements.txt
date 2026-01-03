@@ -1,0 +1,13 @@
+Pillow
+beautifulsoup4
+dominate
+matplotlib
+numpy
+opencv-python
+pytube
+requests
+scikit-image
+scipy
+torch
+torchvision
+visdom

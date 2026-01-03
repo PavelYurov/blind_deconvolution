@@ -6,7 +6,7 @@
     implementations: Реализованные алгоритмы
     unsorted: Алгоритмы в разработке
 
-Авторы: Юров П.И., Беззаборов А.А., Малыш Я.
+Авторы: Юров П.И., Беззаборов А.А., Малыш Я.В.
 """
 
 from algorithms.base import DeconvolutionAlgorithm
