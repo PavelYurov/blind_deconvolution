@@ -16,7 +16,6 @@ import math
 from typing import Tuple, Dict, List, Any
 import matplotlib.pyplot as plt
 
-# Импорты из фреймворка
 import processing as pr
 from filters.blur import DefocusBlur, MotionBlur, BSpline_blur
 from filters.distributions import (
@@ -270,7 +269,6 @@ class DatasetGenerator:
         if not visualizations:
             return
 
-        print("\nОтображение сгенерированных ядер...")
         num_kernels = len(visualizations)
         cols = int(math.ceil(math.sqrt(num_kernels)))
         rows = int(math.ceil(num_kernels / cols))
@@ -303,7 +301,7 @@ class DatasetGenerator:
         visualizations : List[Tuple[str, np.ndarray]]
             Список данных для визуализации.
         """
-        print("--- Генерация и сохранение ядер ---")
+        print("Генерация и сохранение ядер")
         kernel_paths = {}
         visualizations = []
 
@@ -344,7 +342,7 @@ class DatasetGenerator:
             cv2.imwrite(png_path, kernel_img)
 
             kernel_paths[name] = {'npy': npy_path, 'png': png_path}
-            print(f"  -> Ядро '{name}' сохранено ({kernel.shape[0]}x{kernel.shape[1]})")
+            print(f"  Ядро '{name}' сохранено ({kernel.shape[0]}x{kernel.shape[1]})")
             visualizations.append((name, kernel_img))
 
         return kernel_paths, visualizations
@@ -373,7 +371,7 @@ class DatasetGenerator:
         )
 
         if not image_paths:
-            print("\nНе найдено изображений в папке 'original'. Завершение.")
+            print("\nНе найдено изображений в директории 'original'. Завершение.")
             self._visualize_kernels(visualizations)
             return
 
@@ -382,7 +380,7 @@ class DatasetGenerator:
         # Обработка каждого изображения
         for image_path in image_paths:
             base_name = os.path.splitext(os.path.basename(image_path))[0]
-            print(f"--- Обработка: {os.path.basename(image_path)} ---")
+            print(f" Обработка: {os.path.basename(image_path)} ")
 
             image_gray = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
             if image_gray is None:
@@ -434,9 +432,6 @@ class DatasetGenerator:
 
 
 def main() -> None:
-    """Точка входа для запуска генерации датасета."""
-    print("Запуск генерации датасета...\n")
-
     proc_instance = pr.Processing(
         images_folder='images_dataset/original',
         blurred_folder='images_dataset/distorted',
