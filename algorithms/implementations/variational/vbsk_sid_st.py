@@ -779,7 +779,7 @@ def sparse_kernel_blind_deconvolution(y, kernel_shape, **kwargs):
     ----------
     f_est, h_est, hyperparams, history
     """
-    algo = Tzikas2009(kernel_shape=kernel_shape, **kwargs)
+    algo = VBSK_SID_ST(kernel_shape=kernel_shape, **kwargs)
     f_est, h_est = algo.process(y)
     return f_est, h_est, algo.hyperparams, algo.history
 
