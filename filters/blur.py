@@ -1,13 +1,7 @@
 """
-Фильтры смаза изображения
+Фильтры размытия изображений.
 
-Содержит:
-    - Фильтр расфокуса изображения
-    - Фильтр смаза от прямолинейного движения
-    - Фильтр смаза от движения, полученного на 2D сплайне
-    - Фильтры, полученный иным путем
-
-Авторы: Беззаборов А.А. Юров П.И.
+Автор: Беззаборов А.А., Юров П.И.
 """
 
 import cv2 as cv
@@ -25,10 +19,14 @@ class DefocusBlur(FilterBase):
     
     Создает 2D размытие в форме колокола с использованием настраиваемой PSF-функции.
     
-    Атрибуты:
-        psf (Callable): Функция распределения точки (PSF), генерирующая ядро размытия
-        param (float): Параметр интенсивности размытия
-        kernel_size (Optional[int]): Фиксированный размер ядра размытия (None для автоопределения)
+    Атрибуты
+    --------
+    psf : Callable
+        Функция распределения точки (PSF), генерирующая ядро размытия.
+    param : float
+        Параметр интенсивности размытия.
+    kernel_size : Optional[int]
+        Фиксированный размер ядра размытия (None для автоопределения).
     """
 
     def __init__(self, 
@@ -38,17 +36,21 @@ class DefocusBlur(FilterBase):
         """
         Инициализация фильтра размытия вне фокуса.
         
-        Аргументы:
-            psf (Callable): Функция, принимающая (radius, param) и возвращающая значения ядра
-            param (float): Параметр контроля интенсивности размытия
-            kernel_size (Optional[int]): Опциональный фиксированный размер ядра (должен быть нечетным если указан)
+        Параметры
+        ---------
+        psf : Callable
+            Функция, принимающая (radius, param) и возвращающая значения ядра.
+        param : float
+            Параметр контроля интенсивности размытия.
+        kernel_size : Optional[int]
+            Опциональный фиксированный размер ядра (должен быть нечетным).
         """
         self.psf = psf
         self.param = param
         self.kernel_size = kernel_size
         super().__init__(param, 'blur')
 
-    def discription(self) -> str:
+    def description(self) -> str:
         """Возвращает название способа смаза и его параметры в файловой системе."""
         return f"|defocus_{self.psf.__name__}_{self.param}_{self.kernel_size}"
 
@@ -70,11 +72,15 @@ class DefocusBlur(FilterBase):
         """
         Применение размытия вне фокуса к изображению.
         
-        Аргументы:
-            image (narray): Входное изображение для размытия
+        Параметры
+        ---------
+        image : np.ndarray
+            Входное изображение для размытия.
             
-        Возвращает:
-            Размытое изображение
+        Возвращает
+        ----------
+        np.ndarray
+            Размытое изображение.
         """
         return cv.filter2D(image, -1, self.generate_kernel())
 
@@ -85,11 +91,16 @@ class MotionBlur(FilterBase):
     
     Создает одномерное направленное размытие, которое можно повернуть на любой угол.
     
-    Атрибуты:
-        psf (Callable): PSF-функция для одномерного движения
-        param (float): Параметр контроля длины/интенсивности размытия
-        angle (float): Направление движения в градусах (0 = горизонтальное)
-        kernel_length (Optional[int]): Фиксированная длина ядра размытия
+    Атрибуты
+    --------
+    psf : Callable
+        PSF-функция для одномерного движения.
+    param : float
+        Параметр контроля длины/интенсивности размытия.
+    angle : float
+        Направление движения в градусах (0 = горизонтальное).
+    kernel_length : Optional[int]
+        Фиксированная длина ядра размытия.
     """
     
     def __init__(self, 
@@ -100,11 +111,16 @@ class MotionBlur(FilterBase):
         """
         Инициализация фильтра размытия в движении.
         
-        Аргументы:
-            psf (Callable): Функция (x, param) -> значения ядра, где x - 1D массив координат
-            param (float): Параметр для PSF-функции
-            angle (float): Угол направления размытия (в градусах)
-            kernel_length (Optional[int]): Длина размытия (нечетное число)
+        Параметры
+        ---------
+        psf : Callable
+            Функция (x, param) -> значения ядра, где x - 1D массив координат.
+        param : float
+            Параметр для PSF-функции.
+        angle : float
+            Угол направления размытия (в градусах).
+        kernel_length : Optional[int]
+            Длина размытия (нечетное число).
         """
         self.psf = psf
         self.param = param
@@ -112,12 +128,12 @@ class MotionBlur(FilterBase):
         self.kernel_length = kernel_length
         super().__init__(param, 'blur')
 
-    def discription(self) -> str:
-        """Возвращает название способа смаза и его параметры в файловой системе"""
+    def description(self) -> str:
+        """Возвращает название способа смаза и его параметры в файловой системе."""
         return f"|motion_{self.psf.__name__}_{self.param}_{self.angle}_{self.kernel_length}"
 
     def generate_kernel(self) -> np.ndarray:
-        """Генерация ядра размытия в движении"""
+        """Генерация ядра размытия в движении."""
         length = self.kernel_length or self._calculate_kernel_length()
         if length % 2 == 0:
             raise ValueError("Длина ядра должна быть нечетной")
@@ -149,34 +165,48 @@ class BSpline_blur(FilterBase):
     """
     Фильтр размытия в движении, имитирующий криволинейное неравномерное движение.
 
-    Создает 2D B-spline.
+    Создает 2D B-spline для моделирования сложных траекторий.
     
-    Аргументы:
-        shape_points (narray): Точки, задающие форму B-spline
-        intensity_points (narray): Точки, задающие интенсивность
-        output_size (tuple[int,int]): Размер выходной матрицы PSF
-        shape_degree (int): Степень B-spline
-        intensity_degree (int): Степень B-spline
-        n_samples (int): Количество точек для дискретизации кривой
+    Атрибуты
+    --------
+    shape_points : np.ndarray
+        Точки, задающие форму B-spline.
+    intensity_points : np.ndarray
+        Точки, задающие интенсивность.
+    output_size : Tuple[int, int]
+        Размер выходной матрицы PSF.
+    shape_degree : int
+        Степень B-spline для формы.
+    intensity_degree : int
+        Степень B-spline для интенсивности.
+    n_samples : int
+        Количество точек для дискретизации кривой.
     """
 
     def __init__(self,
                  shape_points: np.ndarray,
                  intensity_points: np.ndarray, 
-                 output_size: Tuple[int,int] = (15, 15), 
+                 output_size: Tuple[int, int] = (15, 15), 
                  shape_degree: int = 3, 
                  intensity_degree: int = 2, 
                  n_samples: int = 1000):
         """
-        Инициализация фильтра в криволинейном движении.
+        Инициализация фильтра криволинейного движения.
         
-        Аргументы:
-            shape_points (narray): Точки, задающие форму кривой [x, y]
-            intensity_points (narray): Точки, задающие интенсивность вдоль кривой
-            output_size (tuple[int,int]): (width, height) Размер выходной матрицы PSF
-            shape_degree (int): Степень B-spline для формы
-            intensity_degree (int): Степень B-spline для интенсивности
-            n_samples (int): Количество точек для дискретизации кривой
+        Параметры
+        ---------
+        shape_points : np.ndarray
+            Точки, задающие форму кривой [x, y].
+        intensity_points : np.ndarray
+            Точки, задающие интенсивность вдоль кривой.
+        output_size : Tuple[int, int]
+            (width, height) Размер выходной матрицы PSF.
+        shape_degree : int
+            Степень B-spline для формы.
+        intensity_degree : int
+            Степень B-spline для интенсивности.
+        n_samples : int
+            Количество точек для дискретизации кривой.
         """
         super().__init__(1, 'blur')
 
@@ -187,14 +217,13 @@ class BSpline_blur(FilterBase):
         self.intensity_degree = intensity_degree
         self.n_samples = n_samples
 
-
     def filter(self, image: np.ndarray) -> np.ndarray:
         """Применение размытия к изображению."""
         kernel = self.create_dual_bspline_psf()
-        res = cv.filter2D(src=image,ddepth=-1,kernel=kernel)
+        res = cv.filter2D(src=image, ddepth=-1, kernel=kernel)
         return res
     
-    def discription(self) -> str:
+    def description(self) -> str:
         """Возвращает название способа смаза в файловой системе."""
         return f"|Bspline_motion_"
     
@@ -249,49 +278,54 @@ class BSpline_blur(FilterBase):
 
 class Kernel_convolution(FilterBase):
     """
-    Фильтр, значения матрицы которого сохранены .npy файле.
+    Фильтр, значения матрицы которого сохранены в .npy файле.
 
     Загружает и применяет эту матрицу к изображению.
 
-    Аргументы:
-        npy_file_path (str): Путь до .npy файла с ядром
+    Атрибуты
+    --------
+    npy_file_path : str
+        Путь до .npy файла с ядром.
     """
 
     def __init__(self, npy_file_path: str) -> None:
         """
         Инициализация сохраненного фильтра.
 
-        Аргументы:
-            npy_file_path (str): Путь до .npy файла с ядром
+        Параметры
+        ---------
+        npy_file_path : str
+            Путь до .npy файла с ядром.
         """
         self.npy_file_path = npy_file_path
         super().__init__(1, 'custom_kernel')
 
-    def discription(self) -> str:
-        """Возвращает название способа смаза в файловой системею"""
-        return f"|custom_kelner_"
+    def description(self) -> str:
+        """Возвращает название способа смаза в файловой системе."""
+        return f"|custom_kernel_"
 
     def filter(self, image: np.ndarray) -> np.ndarray:
-        "Применение фильтра к изображению"
+        """Применение фильтра к изображению."""
         kernel = np.load(self.npy_file_path)
         blurred = cv.filter2D(image, -1, kernel)
         return blurred
 
+
 class Identical_kernel(FilterBase):
     """
-    Фильтр единичной матрицы
+    Фильтр единичной матрицы.
+
+    Фильтр, используемый при копировании оригинального изображения в буфер.
     """
 
     def __init__(self) -> None:
-        """
-        Инициализация идентичного фильтра.
-        """
+        """Инициализация идентичного фильтра."""
         super().__init__(1, 'blur')
 
     def discription(self) -> str:
-        """Возвращает название способа смаза в файловой системею"""
+        """Возвращает название способа смаза в файловой системе."""
         return f"|I_"
 
     def filter(self, image: np.ndarray) -> np.ndarray:
-        "Применение фильтра к изображению"
+        "Применение фильтра к изображению."
         return image
