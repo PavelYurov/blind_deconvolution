@@ -107,11 +107,6 @@ class Jhell96DeepBlindDeblur(DeconvolutionAlgorithm):
         self._model = model
         return self._model
 
-            input_nc=3,
-            output_nc=3,
-            ngf=64,
-        )
-
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         if image is None:
             raise ValueError('Input image is None.')
