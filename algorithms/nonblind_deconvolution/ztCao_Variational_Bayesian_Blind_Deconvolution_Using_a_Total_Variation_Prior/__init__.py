@@ -403,7 +403,7 @@ class TV2DeconvolutionAlgorithm(TV1DeconvolutionAlgorithm):
         return base
 
 
-class _2924878374VariationalBayesianBlindDeconvolutionUsingATotalVariationPrior(DeconvolutionAlgorithm):
+class ZtCaoVariationalBayesianBlindDeconvolutionUsingATotalVariationPrior(DeconvolutionAlgorithm):
     def __init__(
         self,
         variant: str = "tv2",
@@ -521,9 +521,9 @@ class _2924878374VariationalBayesianBlindDeconvolutionUsingATotalVariationPrior(
 
 
 __all__ = [
-    "_2924878374VariationalBayesianBlindDeconvolutionUsingATotalVariationPrior",
+    "ZtCaoVariationalBayesianBlindDeconvolutionUsingATotalVariationPrior",
     "TV1DeconvolutionAlgorithm",
     "TV2DeconvolutionAlgorithm",
 ]
 
-__all__ = ["TV1DeconvolutionAlgorithm", "_2924878374VariationalBayesianBlindDeconvolutionUsingATotalVariationPrior"]
+__all__ = ["TV1DeconvolutionAlgorithm", "ZtCaoVariationalBayesianBlindDeconvolutionUsingATotalVariationPrior"]
