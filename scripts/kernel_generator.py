@@ -315,22 +315,21 @@ class KernelGenerator:
         Dict[str, np.ndarray]
             Сгенерированные ядра.
         """
-        print("--- Генерация ядер ---")
+        print(" Генерация ядер ")
         kernels = self.generate_all()
 
         if save:
-            print("\n--- Сохранение ядер ---")
+            print("\n Сохранение ядер ")
             self.save(kernels)
 
         if visualize:
-            print("\n--- Визуализация ---")
+            print("\n Визуализация ")
             self.visualize(kernels)
 
         return kernels
 
 
 def main() -> None:
-    """Точка входа."""
     generator = KernelGenerator()
     generator.run()
 
