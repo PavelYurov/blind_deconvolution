@@ -105,6 +105,10 @@ BlindDeconvolution/
 │   ├── kernel_generator.py     # Генератор ядер размытия (PSF)
 │   └── dataset_generator.py    # Генератор датасета
 ├── docs/                       # Документация (Sphinx)
+├── docsrc/                     # Исходники документации
+├── tools/                      # Скрипты развертывания
+│   ├── build_docs.py
+│   └── check_environment.py
 │
 ├── processing.py               # Основной функционал
 ├── metrics.py                  # Метрики качества
