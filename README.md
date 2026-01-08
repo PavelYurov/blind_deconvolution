@@ -81,13 +81,17 @@ pip install -r requirements.txt
 
 ## Структура проекта
 
+Отдельно смотри [Путеводитель по алгоритмам](algorithms/README.md) для большей информации.
+
 ```
 BlindDeconvolution/
-├── algorithms/                 # Blind Deconvolution алгоритмы
+├── algorithms/                 # Алгоритмы и обёртки
 │   ├── base.py                 # DeconvolutionAlgorithm
-│   ├── implementations/        # Реализации методов
-│   ├── unsorted/               # Алгоритмы в доработке
-│   └── blind_deconvolution/    # Внешние обёртки
+│   ├── implementations/        # Собственные реализации методов
+│   ├── kernel_estimation/      # Оценка PSF (заготовка/в процессе)
+│   ├── blind_deconvolution/    # Внешние обёртки (blind)
+│   ├── nonblind_deconvolution/ # Внешние обёртки (non-blind)
+│   └── unsorted/               # Алгоритмы в доработке/на разбор
 │
 ├── filters/                    # Генерация искажений
 │   ├── base.py                 # FilterBase
@@ -104,17 +108,20 @@ BlindDeconvolution/
 ├── scripts/                    # Вспомогательные скрипты
 │   ├── kernel_generator.py     # Генератор ядер размытия (PSF)
 │   └── dataset_generator.py    # Генератор датасета
-├── docs/                       # Документация (Sphinx)
-├── docsrc/                     # Исходники документации
-├── tools/                      # Скрипты развертывания
+├── docs/                       # Документация (Sphinx) и утилиты сборки
+│   ├── conf.py
+│   ├── index.rst
 │   ├── build_docs.py
 │   └── check_environment.py
 │
-├── processing.py               # Основной функционал
-├── metrics.py                  # Метрики качества
-├── utils.py                    # Вспомогательные утилиты
+├── processing/                 # Основной функционал пайплайна
+├── pareto_analysis/            # Анализ Парето-фронтов
+├── dataset/                    # Данные/артефакты (если используются)
+├── images/                     # Примеры изображений/артефакты
+├── testing/                    # Тестовые наборы/выходы прогонов
 │
 ├── requirements.txt            # Зависимости
+├── pyproject.toml              # Метаданные проекта
 └── setup.cfg                   # Конфигурация flake8
 ```
 
@@ -140,13 +147,15 @@ BlindDeconvolution/
 ### Генерация HTML-документации
 
 ```bash
-cd docs
-sphinx-apidoc -f -o . ..
-make html
+python docs/build_docs.py
 ```
-Документация будет доступна в `docs/_build/html/`.
+Документация будет доступна в `docs/_build/html/index.html`.
 
 ## Авторы
+
+Руководитель проекта - Парфенов Д.В.
+
+Участники проекта:
 
 - Юров П.И.
 - Беззаборов А.А.

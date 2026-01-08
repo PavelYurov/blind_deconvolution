@@ -16,7 +16,7 @@ BlindDeconvolution Documentation
 
    from processing import Processing
    from algorithms.implementations.richardson_lucy import RichardsonLucy
-   
+
    proc = Processing()
    proc.read_all()
    proc.process(RichardsonLucy({'iter': 50}))

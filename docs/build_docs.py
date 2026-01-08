@@ -3,31 +3,32 @@ import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DOCSRC = ROOT / "docsrc"
 DOCS = ROOT / "docs"
+OUT = DOCS / "_build" / "html"
+
 
 def main():
     print("Building documentation")
 
-    if not DOCSRC.exists():
-        print("ERROR: docsrc directory not found")
+    if not DOCS.exists():
+        print("ERROR: docs directory not found")
         sys.exit(1)
 
-    conf = DOCSRC / "conf.py"
-    index = DOCSRC / "index.rst"
+    conf = DOCS / "conf.py"
+    index = DOCS / "index.rst"
 
     if not conf.exists():
-        print("ERROR: conf.py not found in docsrc")
+        print("ERROR: conf.py not found in docs")
         sys.exit(1)
 
     if not index.exists():
-        print("ERROR: index.rst not found in docsrc")
+        print("ERROR: index.rst not found in docs")
         sys.exit(1)
 
-    DOCS.mkdir(exist_ok=True)
+    OUT.mkdir(parents=True, exist_ok=True)
 
-    print("Source:", DOCSRC)
-    print("Output:", DOCS)
+    print("Source:", DOCS)
+    print("Output:", OUT)
 
     cmd = [
         sys.executable,
@@ -35,16 +36,17 @@ def main():
         "sphinx",
         "-b",
         "html",
-        str(DOCSRC),
-        str(DOCS)
+        str(DOCS),
+        str(OUT),
     ]
 
     print("Running:", " ".join(cmd))
-
     subprocess.check_call(cmd)
 
-    print("API documentation generated")
-    print("Open docs/index.html")
+    print("HTML documentation generated")
+    print("Open docs/_build/html/index.html")
+
 
 if __name__ == "__main__":
     main()
+
