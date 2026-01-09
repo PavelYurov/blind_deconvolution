@@ -4,7 +4,7 @@ BlindDeconvolution Documentation
 Фреймворк для исследования методов слепой деконволюции.
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 4
    :caption: Содержание:
 
    modules
