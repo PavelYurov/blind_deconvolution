@@ -81,8 +81,6 @@ pip install -r requirements.txt
 
 ## Структура проекта
 
-Отдельно смотри [Путеводитель по алгоритмам](algorithms/README.md) для большей информации.
-
 ```
 BlindDeconvolution/
 ├── algorithms/                 # Алгоритмы и обёртки
@@ -125,6 +123,8 @@ BlindDeconvolution/
 └── setup.cfg                   # Конфигурация flake8
 ```
 
+Подробнее об алгоритмах: [Путеводитель по алгоритмам](algorithms/README.md)
+
 ## Качество кода
 
 В проекте настроен линтер **flake8** для проверки стиля и качества Python-кода. Конфигурация находится в файле `setup.cfg`.
@@ -153,11 +153,11 @@ python docs/build_docs.py
 
 ## Авторы
 
-Руководитель проекта - Парфенов Д.В.
+Руководитель проекта - Парфенов Д.В. (promasterden@yandex.ru)
 
 Участники проекта:
 
-- Юров П.И.
-- Беззаборов А.А.
-- Куропатов К.Л.
-- Малыш Я.В.
+- Юров П.И. (pavel.yurov0425@gmail.com)
+- Беззаборов А.А. (antonbezzaborov929@gmail.com)
+- Куропатов К.Л. (konstantinkuropatov@gmail.com)
+- Малыш Я.В. (mrgeroixyu@gmail.com)
