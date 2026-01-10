@@ -16,8 +16,7 @@ Algorithm Description:
 
 Author: AUTHOR_PROJECT
 Wrapper Version: 1.0.0
-Original Author: ceciledellavalle
-Original License: Unknown (check repository)"""
+Original Author: ceciledellavalle"""
 
 from __future__ import annotations
 

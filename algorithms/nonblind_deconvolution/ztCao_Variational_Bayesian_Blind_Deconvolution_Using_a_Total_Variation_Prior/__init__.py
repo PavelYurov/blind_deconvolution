@@ -16,8 +16,7 @@ Algorithm Description:
 
 Author: AUTHOR_PROJECT
 Wrapper Version: 1.0.0
-Original Author: 2924878374
-Original License: Unknown (check repository)"""
+Original Author: 2924878374"""
 
 from __future__ import annotations
 

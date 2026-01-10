@@ -16,8 +16,7 @@ Algorithm Description:
 
 Author: AUTHOR_PROJECT
 Wrapper Version: 1.0.0
-Original Author: CEA-jiangming
-Original License: Unknown (check repository)"""
+Original Author: CEA-jiangming"""
 
 from __future__ import annotations
 from time import time

@@ -16,8 +16,7 @@ Algorithm Description:
 
 Author: AUTHOR_PROJECT
 Wrapper Version: 1.0.0
-Original Author: GeekLogan
-Original License: Unknown (check repository)"""
+Original Author: GeekLogan"""
 
 from __future__ import annotations
 from contextlib import contextmanager

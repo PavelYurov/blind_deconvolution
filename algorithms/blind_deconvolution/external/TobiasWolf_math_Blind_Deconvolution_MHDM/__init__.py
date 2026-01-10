@@ -16,8 +16,7 @@ Algorithm Description:
 
 Author: AUTHOR_PROJECT
 Wrapper Version: 1.0.0
-Original Author: TobiasWolf-math
-Original License: Unknown (check repository)"""
+Original Author: TobiasWolf-math"""
 
 from __future__ import annotations
 

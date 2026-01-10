@@ -16,8 +16,7 @@ Algorithm Description:
 
 Author: AUTHOR_PROJECT
 Wrapper Version: 1.0.0
-Original Author: Youngforgithub
-Original License: Unknown (check repository)"""
+Original Author: Youngforgithub"""
 
 import os
 from dataclasses import dataclass, asdict

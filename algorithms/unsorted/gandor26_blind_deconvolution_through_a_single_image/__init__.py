@@ -16,8 +16,7 @@ Algorithm Description:
 
 Author: AUTHOR_PROJECT
 Wrapper Version: 1.0.0
-Original Author: Gandor26
-Original License: Unknown (check repository)"""
+Original Author: Gandor26"""
 
 from typing import Any, Dict, Tuple
 

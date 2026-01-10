@@ -16,8 +16,7 @@ Algorithm Description:
 
 Author: AUTHOR_PROJECT
 Wrapper Version: 1.0.0
-Original Author: jeffreysblake
-Original License: Unknown (check repository)"""
+Original Author: jeffreysblake"""
 
 from __future__ import annotations
 from dataclasses import dataclass

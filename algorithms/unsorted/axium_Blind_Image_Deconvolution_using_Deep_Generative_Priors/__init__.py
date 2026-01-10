@@ -16,8 +16,7 @@ Algorithm Description:
 
 Author: AUTHOR_PROJECT
 Wrapper Version: 1.0.0
-Original Author: axium
-Original License: Unknown (check repository)"""
+Original Author: axium"""
 
 from __future__ import annotations
 import os
