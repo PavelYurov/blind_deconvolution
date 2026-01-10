@@ -2,7 +2,7 @@ from pathlib import Path
 import subprocess
 
 DOCSRC = Path(__file__).resolve().parents[1] / "docsrc"
-BUILD = Path(__file__).resolve().parents[1] / "html"
+BUILD = Path(__file__).resolve().parents[1] / "_build" / "html"
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 def generate_rst():
