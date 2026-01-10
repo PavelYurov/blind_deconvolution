@@ -1,0 +1,618 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="ru" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>filters.noise &mdash; документация BlindDeconvolution 1.0.0</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=e35015f7"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/translations.js?v=5b699b7f"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Алфавитный указатель" href="../../genindex.html" />
+    <link rel="search" title="Поиск" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            BlindDeconvolution
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Поиск в документации" aria-label="Поиск в документации" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Меню навигации">
+              <p class="caption" role="heading"><span class="caption-text">Содержание:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">blind_deconvolution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Меню навигации для мобильных устройств" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">BlindDeconvolution</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Навигация по страницам">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Код модуля</a></li>
+      <li class="breadcrumb-item active">filters.noise</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Исходный код filters.noise</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Фильтры добавления шума к изображениям.</span>
+
+<span class="sd">Автор: Юров П.И.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">random</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Tuple</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">random</span><span class="w"> </span><span class="kn">import</span> <span class="n">sample</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">FilterBase</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">scipy.signal</span><span class="w"> </span><span class="kn">import</span> <span class="n">lfilter</span><span class="p">,</span> <span class="n">butter</span><span class="p">,</span> <span class="n">sosfilt</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.colored_noise</span><span class="w"> </span><span class="kn">import</span> <span class="n">powerlaw_psd_gaussian</span><span class="p">,</span> <span class="n">pink_noise_2d</span>
+
+
+<div class="viewcode-block" id="GaussianNoise">
+<a class="viewcode-back" href="../../filters.html#filters.noise.GaussianNoise">[документация]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">GaussianNoise</span><span class="p">(</span><span class="n">FilterBase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Фильтр аддитивного гауссовского шума.</span>
+<span class="sd">    </span>
+<span class="sd">    Добавляет нормально распределенный шум с заданным стандартным отклонением.</span>
+<span class="sd">    </span>
+<span class="sd">    Атрибуты</span>
+<span class="sd">    --------</span>
+<span class="sd">    param : float</span>
+<span class="sd">        Стандартное отклонение гауссовского шума.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="GaussianNoise.__init__">
+<a class="viewcode-back" href="../../filters.html#filters.noise.GaussianNoise.__init__">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">param</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Инициализация фильтра гауссовского шума.</span>
+<span class="sd">        </span>
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        param : float</span>
+<span class="sd">            Стандартное отклонение шума (должно быть положительным).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">param</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Стандартное отклонение должно быть положительным&quot;</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">param</span><span class="p">,</span> <span class="s1">&#39;noise&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">param</span> <span class="o">=</span> <span class="n">param</span></div>
+
+
+<div class="viewcode-block" id="GaussianNoise.description">
+<a class="viewcode-back" href="../../filters.html#filters.noise.GaussianNoise.description">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">description</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Выдает название шума в файловой системе с параметром.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;|gaussiannoise_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">param</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+    
+<div class="viewcode-block" id="GaussianNoise.filter">
+<a class="viewcode-back" href="../../filters.html#filters.noise.GaussianNoise.filter">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">filter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">image</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Применение гауссовского шума к изображению.</span>
+<span class="sd">        </span>
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        image : np.ndarray</span>
+<span class="sd">            Входное изображение (любой тип, будет преобразовано в float32).</span>
+<span class="sd">            </span>
+<span class="sd">        Возвращает</span>
+<span class="sd">        ----------</span>
+<span class="sd">        np.ndarray</span>
+<span class="sd">            Зашумленное изображение (той же формы и типа, что и входное).</span>
+<span class="sd">        &quot;&quot;&quot;</span> 
+
+        <span class="n">noise</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">param</span><span class="p">,</span> <span class="n">image</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="n">noisy</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span> <span class="o">+</span> <span class="n">noise</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">noisy</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">255.0</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">image</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="PoissonNoise">
+<a class="viewcode-back" href="../../filters.html#filters.noise.PoissonNoise">[документация]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PoissonNoise</span><span class="p">(</span><span class="n">FilterBase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Фильтр пуассоновского шума (шума дробления).</span>
+<span class="sd">    </span>
+<span class="sd">    Имитирует шум подсчета фотонов с пуассоновской статистикой.</span>
+<span class="sd">    </span>
+<span class="sd">    Атрибуты</span>
+<span class="sd">    --------</span>
+<span class="sd">    param : float</span>
+<span class="sd">        Интенсивность шума (от 0.0 до 1.0).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+<div class="viewcode-block" id="PoissonNoise.__init__">
+<a class="viewcode-back" href="../../filters.html#filters.noise.PoissonNoise.__init__">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">param</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Инициализация фильтра пуассоновского шума.</span>
+<span class="sd">        </span>
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        param : float</span>
+<span class="sd">            Интенсивность шума (от 0.0 до 1.0).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">param</span><span class="p">,</span> <span class="s1">&#39;noise&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">param</span> <span class="o">=</span> <span class="n">param</span></div>
+
+
+<div class="viewcode-block" id="PoissonNoise.description">
+<a class="viewcode-back" href="../../filters.html#filters.noise.PoissonNoise.description">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">description</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Выдает название шума в файловой системе с параметром.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;|poissonnoise_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">param</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+    
+<div class="viewcode-block" id="PoissonNoise.filter">
+<a class="viewcode-back" href="../../filters.html#filters.noise.PoissonNoise.filter">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">filter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">image</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Применение пуассоновского шума к изображению.</span>
+<span class="sd">        </span>
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        image : np.ndarray</span>
+<span class="sd">            Входное изображение (любой тип).</span>
+<span class="sd">            </span>
+<span class="sd">        Возвращает</span>
+<span class="sd">        ----------</span>
+<span class="sd">        np.ndarray</span>
+<span class="sd">            Зашумленное изображение (той же формы и типа, что и входное).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">noisy</span> <span class="o">=</span> <span class="n">image</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">image</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">image</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">param</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">noisy</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">255</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">image</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="SaltAndPepperNoise">
+<a class="viewcode-back" href="../../filters.html#filters.noise.SaltAndPepperNoise">[документация]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">SaltAndPepperNoise</span><span class="p">(</span><span class="n">FilterBase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Фильтр импульсного шума (типа &quot;соль-перец&quot;).</span>
+<span class="sd">    </span>
+<span class="sd">    Добавляет случайные белые (соль) и черные (перец) пиксели к изображению.</span>
+<span class="sd">    </span>
+<span class="sd">    Атрибуты</span>
+<span class="sd">    --------</span>
+<span class="sd">    white_pixel : float</span>
+<span class="sd">        Относительная интенсивность белых пикселей (соль).</span>
+<span class="sd">    black_pixel : float</span>
+<span class="sd">        Относительная интенсивность черных пикселей (перец).</span>
+<span class="sd">    noise_amount : int</span>
+<span class="sd">        Максимальное количество зашумляемых пикселей.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+<div class="viewcode-block" id="SaltAndPepperNoise.__init__">
+<a class="viewcode-back" href="../../filters.html#filters.noise.SaltAndPepperNoise.__init__">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">param</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Инициализация фильтра шума &quot;соль-перец&quot;.</span>
+<span class="sd">        </span>
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        param : Tuple[float, float, float]</span>
+<span class="sd">            Кортеж, содержащий:</span>
+<span class="sd">            - white_pixel: Относительное количество белых пикселей (&gt;=0).</span>
+<span class="sd">            - black_pixel: Относительное количество черных пикселей (&gt;=0).</span>
+<span class="sd">            - noise_amount: Максимальное число изменяемых пикселей (&gt;=0).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">param</span><span class="p">,</span> <span class="s1">&#39;noise&#39;</span><span class="p">)</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">white_pixel</span> <span class="o">=</span> <span class="n">param</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> 
+        <span class="bp">self</span><span class="o">.</span><span class="n">black_pixel</span> <span class="o">=</span> <span class="n">param</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>  
+        <span class="bp">self</span><span class="o">.</span><span class="n">noise_amount</span> <span class="o">=</span> <span class="n">param</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="SaltAndPepperNoise.description">
+<a class="viewcode-back" href="../../filters.html#filters.noise.SaltAndPepperNoise.description">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">description</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Выдает название шума в файловой системе с параметром.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;|saltandpappernoise_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">param</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+
+<div class="viewcode-block" id="SaltAndPepperNoise.filter">
+<a class="viewcode-back" href="../../filters.html#filters.noise.SaltAndPepperNoise.filter">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">filter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">image</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Применение шума &quot;соль-перец&quot; к входному изображению.</span>
+<span class="sd">        </span>
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        image : np.ndarray</span>
+<span class="sd">            Входное изображение (в градациях серого или цветное).</span>
+<span class="sd">            </span>
+<span class="sd">        Возвращает</span>
+<span class="sd">        ----------</span>
+<span class="sd">        np.ndarray</span>
+<span class="sd">            Изображение с добавленным шумом &quot;соль-перец&quot;.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="n">noisy</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">h</span><span class="p">,</span> <span class="n">w</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span>
+        <span class="n">total_pixels</span> <span class="o">=</span> <span class="n">h</span> <span class="o">*</span> <span class="n">w</span>
+
+        <span class="n">white_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">param</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">black_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">param</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">max_noise</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">param</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+        
+        <span class="k">if</span> <span class="n">white_count</span> <span class="o">+</span> <span class="n">black_count</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">max_noise</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">noisy</span>
+        
+        <span class="n">total</span> <span class="o">=</span> <span class="n">white_count</span> <span class="o">+</span> <span class="n">black_count</span>
+        <span class="n">white_prob</span> <span class="o">=</span> <span class="n">white_count</span> <span class="o">/</span> <span class="n">total</span>
+        <span class="n">black_prob</span> <span class="o">=</span> <span class="n">black_count</span> <span class="o">/</span> <span class="n">total</span>
+        
+        <span class="n">num_pixels</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">max_noise</span><span class="p">,</span> <span class="n">total_pixels</span><span class="p">)</span>
+        <span class="n">indices</span> <span class="o">=</span> <span class="n">sample</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">total_pixels</span><span class="p">),</span> <span class="n">num_pixels</span><span class="p">)</span>
+        
+        <span class="n">noise_values</span> <span class="o">=</span> <span class="p">[</span><span class="mi">255</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+        
+        <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">indices</span><span class="p">:</span>
+            <span class="n">selected_value</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">choices</span><span class="p">(</span><span class="n">noise_values</span><span class="p">,</span>
+                                            <span class="n">weights</span><span class="o">=</span><span class="p">[</span><span class="n">white_prob</span><span class="p">,</span> <span class="n">black_prob</span><span class="p">],</span>
+                                            <span class="n">k</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">image</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span> 
+                <span class="n">noisy</span><span class="p">[</span><span class="n">idx</span> <span class="o">//</span> <span class="n">w</span><span class="p">,</span> <span class="n">idx</span> <span class="o">%</span> <span class="n">w</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">[</span><span class="n">selected_value</span><span class="p">]</span> <span class="o">*</span> <span class="mi">3</span>
+            <span class="k">else</span><span class="p">:</span> 
+                <span class="n">noisy</span><span class="p">[</span><span class="n">idx</span> <span class="o">//</span> <span class="n">w</span><span class="p">,</span> <span class="n">idx</span> <span class="o">%</span> <span class="n">w</span><span class="p">]</span> <span class="o">=</span> <span class="n">selected_value</span>
+
+        <span class="k">return</span> <span class="n">noisy</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="OldPhotoNoise">
+<a class="viewcode-back" href="../../filters.html#filters.noise.OldPhotoNoise">[документация]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">OldPhotoNoise</span><span class="p">(</span><span class="n">FilterBase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Коричневый шум для имитации старых фотографий.</span>
+
+<span class="sd">    Атрибуты</span>
+<span class="sd">    --------</span>
+<span class="sd">    strength : int</span>
+<span class="sd">        Сила шума (0-255).</span>
+<span class="sd">    f3dB : float</span>
+<span class="sd">        Частота среза экспоненциального фильтра (0-0.5).</span>
+<span class="sd">    fs : float</span>
+<span class="sd">        Псевдо-частота дискретизации.</span>
+<span class="sd">    apply_highpass : bool</span>
+<span class="sd">        Применять ли high-pass фильтр.</span>
+<span class="sd">    highpass_cutoff : float</span>
+<span class="sd">        Cutoff частота для high-pass фильтра.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="OldPhotoNoise.__init__">
+<a class="viewcode-back" href="../../filters.html#filters.noise.OldPhotoNoise.__init__">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+                 <span class="n">strength</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">30</span><span class="p">,</span> 
+                 <span class="n">f3dB</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.05</span><span class="p">,</span> 
+                 <span class="n">fs</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> 
+                 <span class="n">apply_highpass</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> 
+                 <span class="n">highpass_cutoff</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.01</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Инициализация.</span>
+
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        strength : int</span>
+<span class="sd">            Сила шума (0-255).</span>
+<span class="sd">        f3dB : float</span>
+<span class="sd">            Частота среза экспоненциального фильтра (0-0.5).</span>
+<span class="sd">        fs : float</span>
+<span class="sd">            Псевдо-частота дискретизации.</span>
+<span class="sd">        apply_highpass : bool</span>
+<span class="sd">            Применять ли high-pass фильтр.</span>
+<span class="sd">        highpass_cutoff : float</span>
+<span class="sd">            Cutoff частота для high-pass фильтра.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">strength</span> <span class="o">=</span> <span class="n">strength</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">f3dB</span> <span class="o">=</span> <span class="n">f3dB</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fs</span> <span class="o">=</span> <span class="n">fs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">apply_highpass</span> <span class="o">=</span> <span class="n">apply_highpass</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">highpass_cutoff</span> <span class="o">=</span> <span class="n">highpass_cutoff</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;noise&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="OldPhotoNoise.description">
+<a class="viewcode-back" href="../../filters.html#filters.noise.OldPhotoNoise.description">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">description</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Выдает название шума в файловой системе с параметром.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;|oldphotonoise_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">strength</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+
+<div class="viewcode-block" id="OldPhotoNoise.find_alpha">
+<a class="viewcode-back" href="../../filters.html#filters.noise.OldPhotoNoise.find_alpha">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">find_alpha</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+                   <span class="n">Fs</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> 
+                   <span class="n">f3dB</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Вычислить альфу для экспоненциального фильтра.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">power</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">f3dB</span> <span class="o">/</span> <span class="n">Fs</span><span class="p">),</span> <span class="mi">2</span><span class="p">)</span>
+                <span class="o">-</span> <span class="mi">4</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">f3dB</span> <span class="o">/</span> <span class="n">Fs</span><span class="p">)</span>
+                <span class="o">+</span> <span class="mi">3</span>
+            <span class="p">)</span>
+            <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">f3dB</span> <span class="o">/</span> <span class="n">Fs</span><span class="p">)</span>
+            <span class="o">-</span> <span class="mi">1</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="OldPhotoNoise.generate_2d_brownian_noise">
+<a class="viewcode-back" href="../../filters.html#filters.noise.OldPhotoNoise.generate_2d_brownian_noise">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">generate_2d_brownian_noise</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+                                   <span class="n">shape</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> 
+                                   <span class="n">alpha</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Создает 2D коричневый шум с фильтрацией по строкам и столбцам.&quot;&quot;&quot;</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">shape</span><span class="p">)</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="p">[</span><span class="n">alpha</span><span class="p">]</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">)]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+            <span class="n">x</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">lfilter</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">x</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:])</span>
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+            <span class="n">x</span><span class="p">[:,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">lfilter</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">x</span><span class="p">[:,</span> <span class="n">j</span><span class="p">])</span>
+        
+        <span class="k">return</span> <span class="n">x</span></div>
+
+
+<div class="viewcode-block" id="OldPhotoNoise.high_pass_filter_2d">
+<a class="viewcode-back" href="../../filters.html#filters.noise.OldPhotoNoise.high_pass_filter_2d">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">high_pass_filter_2d</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+                            <span class="n">img</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> 
+                            <span class="n">fs</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> 
+                            <span class="n">cutoff</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.01</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Применяет 2D high-pass фильтр через Butterworth.&quot;&quot;&quot;</span>
+        <span class="n">sos</span> <span class="o">=</span> <span class="n">butter</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">cutoff</span><span class="p">,</span> <span class="n">btype</span><span class="o">=</span><span class="s1">&#39;highpass&#39;</span><span class="p">,</span> <span class="n">fs</span><span class="o">=</span><span class="n">fs</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s1">&#39;sos&#39;</span><span class="p">)</span>
+        <span class="n">filtered</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">img</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">img</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+            <span class="n">filtered</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">sosfilt</span><span class="p">(</span><span class="n">sos</span><span class="p">,</span> <span class="n">img</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:])</span>
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">img</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+            <span class="n">filtered</span><span class="p">[:,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">sosfilt</span><span class="p">(</span><span class="n">sos</span><span class="p">,</span> <span class="n">filtered</span><span class="p">[:,</span> <span class="n">j</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">filtered</span></div>
+
+
+<div class="viewcode-block" id="OldPhotoNoise.filter">
+<a class="viewcode-back" href="../../filters.html#filters.noise.OldPhotoNoise.filter">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">filter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">img</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Применяет 2D Brownian шум к изображению.&quot;&quot;&quot;</span>
+        <span class="n">img</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+
+        <span class="n">alpha</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">find_alpha</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">f3dB</span><span class="p">)</span>
+        <span class="n">brown_noise</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generate_2d_brownian_noise</span><span class="p">(</span><span class="n">img</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">alpha</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">apply_highpass</span><span class="p">:</span>
+            <span class="n">brown_noise</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">high_pass_filter_2d</span><span class="p">(</span><span class="n">brown_noise</span><span class="p">,</span> 
+                                                   <span class="bp">self</span><span class="o">.</span><span class="n">fs</span><span class="p">,</span> 
+                                                   <span class="n">cutoff</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">highpass_cutoff</span><span class="p">)</span>
+
+        <span class="n">brown_noise</span> <span class="o">-=</span> <span class="n">brown_noise</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
+        <span class="n">brown_noise</span> <span class="o">/=</span> <span class="p">(</span><span class="n">brown_noise</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">-</span> <span class="n">brown_noise</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
+        <span class="n">brown_noise</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">brown_noise</span> <span class="o">-</span> <span class="mi">1</span>
+
+        <span class="n">noisy_img</span> <span class="o">=</span> <span class="n">img</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">strength</span> <span class="o">*</span> <span class="n">brown_noise</span>
+
+        <span class="n">noisy_img</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">noisy_img</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">255</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">noisy_img</span></div>
+</div>
+
+
+    
+<div class="viewcode-block" id="ColoredNoise">
+<a class="viewcode-back" href="../../filters.html#filters.noise.ColoredNoise">[документация]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ColoredNoise</span><span class="p">(</span><span class="n">FilterBase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Цветной шум (1/f)^beta.</span>
+
+<span class="sd">    Атрибуты</span>
+<span class="sd">    --------</span>
+<span class="sd">    noise_level : float</span>
+<span class="sd">        Уровень шума (0.0 - без шума, 1.0 - сильный шум).</span>
+<span class="sd">    beta : float</span>
+<span class="sd">        Параметр спектрального наклона (1.0 = розовый шум, 2.0 = коричневый).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="ColoredNoise.__init__">
+<a class="viewcode-back" href="../../filters.html#filters.noise.ColoredNoise.__init__">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+                 <span class="n">noise_level</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.2</span><span class="p">,</span> 
+                 <span class="n">beta</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Инициализация.</span>
+
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        noise_level : float</span>
+<span class="sd">            Уровень шума (0.0 - без шума, 1.0 - сильный шум).</span>
+<span class="sd">        beta : float</span>
+<span class="sd">            Параметр спектрального наклона (1.0 = розовый, 2.0 = коричневый).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">noise_level</span> <span class="o">=</span> <span class="n">noise_level</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">beta</span> <span class="o">=</span> <span class="n">beta</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;noise&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ColoredNoise.description">
+<a class="viewcode-back" href="../../filters.html#filters.noise.ColoredNoise.description">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">description</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Выдает название шума в файловой системе с параметром.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;|colorednoise_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">beta</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">noise_level</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+
+<div class="viewcode-block" id="ColoredNoise.filter">
+<a class="viewcode-back" href="../../filters.html#filters.noise.ColoredNoise.filter">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">filter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">img</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Применяет цветной шум к изображению.&quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="n">img</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;Ожидается двумерное изображение (grayscale).&quot;</span>
+        <span class="n">h</span><span class="p">,</span> <span class="n">w</span> <span class="o">=</span> <span class="n">img</span><span class="o">.</span><span class="n">shape</span>
+        <span class="n">pink_noise</span> <span class="o">=</span> <span class="n">powerlaw_psd_gaussian</span><span class="p">(</span><span class="n">exponent</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">beta</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="n">w</span><span class="p">))</span>
+
+        <span class="n">pink_noise</span> <span class="o">=</span> <span class="n">pink_noise</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">pink_noise</span><span class="p">)</span>
+        <span class="n">pink_noise</span> <span class="o">=</span> <span class="n">pink_noise</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">noise_level</span> <span class="o">*</span> <span class="mf">255.0</span>
+
+        <span class="n">noisy_img</span> <span class="o">=</span> <span class="n">img</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span> <span class="o">+</span> <span class="n">pink_noise</span>
+        <span class="n">noisy_img</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">noisy_img</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">255</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">noisy_img</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="Pink_Noise">
+<a class="viewcode-back" href="../../filters.html#filters.noise.Pink_Noise">[документация]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Pink_Noise</span><span class="p">(</span><span class="n">FilterBase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Розовый шум (1/f).</span>
+
+<span class="sd">    Атрибуты</span>
+<span class="sd">    --------</span>
+<span class="sd">    noise_level : float</span>
+<span class="sd">        Уровень шума (0.0 - без шума, 1.0 - сильный шум).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="Pink_Noise.__init__">
+<a class="viewcode-back" href="../../filters.html#filters.noise.Pink_Noise.__init__">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">noise_level</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.2</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Инициализация.</span>
+
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        noise_level : float</span>
+<span class="sd">            Уровень шума (0.0 - без шума, 1.0 - сильный шум).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">noise_level</span> <span class="o">=</span> <span class="n">noise_level</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;noise&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Pink_Noise.description">
+<a class="viewcode-back" href="../../filters.html#filters.noise.Pink_Noise.description">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">description</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Выдает название шума в файловой системе с параметром.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;|pinknoise_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">noise_level</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+
+<div class="viewcode-block" id="Pink_Noise.filter">
+<a class="viewcode-back" href="../../filters.html#filters.noise.Pink_Noise.filter">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">filter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">img</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Применяет розовый шум к изображению.&quot;&quot;&quot;</span>
+        <span class="n">noise</span> <span class="o">=</span> <span class="n">pink_noise_2d</span><span class="p">(</span><span class="n">img</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">noise_level</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">img</span> <span class="o">+</span> <span class="n">noise</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">255.0</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int16</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">res</span></div>
+</div>
+
+        
+        
+<div class="viewcode-block" id="Brown_Noise">
+<a class="viewcode-back" href="../../filters.html#filters.noise.Brown_Noise">[документация]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Brown_Noise</span><span class="p">(</span><span class="n">FilterBase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Коричневый шум (1/f)^2.</span>
+
+<span class="sd">    Атрибуты</span>
+<span class="sd">    --------</span>
+<span class="sd">    noise_level : float</span>
+<span class="sd">        Уровень шума (0.0 - без шума, 1.0 - сильный шум).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="Brown_Noise.__init__">
+<a class="viewcode-back" href="../../filters.html#filters.noise.Brown_Noise.__init__">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">noise_level</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.2</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Инициализация.</span>
+
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        noise_level : float</span>
+<span class="sd">            Уровень шума (0.0 - без шума, 1.0 - сильный шум).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">noise_level</span> <span class="o">=</span> <span class="n">noise_level</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;noise&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Brown_Noise.description">
+<a class="viewcode-back" href="../../filters.html#filters.noise.Brown_Noise.description">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">description</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Выдает название шума в файловой системе с параметром.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;|brownnoise_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">noise_level</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+
+<div class="viewcode-block" id="Brown_Noise.filter">
+<a class="viewcode-back" href="../../filters.html#filters.noise.Brown_Noise.filter">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">filter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">img</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Применяет коричневый шум к изображению.&quot;&quot;&quot;</span>
+        <span class="n">noise</span> <span class="o">=</span> <span class="n">pink_noise_2d</span><span class="p">(</span><span class="n">img</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">noise_level</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">img</span> <span class="o">+</span> <span class="n">noise</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">255.0</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int16</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">res</span></div>
+</div>
+
+        
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Авторские права 2024, Юров П.И., Беззаборов А.А., Куропатов К.Л., Малыш Я.В.. </p>
+  </div>
+
+  Собрано при помощи <a href="https://www.sphinx-doc.org/">Sphinx</a> с использованием
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">темы,</a>
+    предоставленной <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

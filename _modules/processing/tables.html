@@ -1,0 +1,196 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="ru" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>processing.tables &mdash; документация BlindDeconvolution 1.0.0</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=e35015f7"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/translations.js?v=5b699b7f"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Алфавитный указатель" href="../../genindex.html" />
+    <link rel="search" title="Поиск" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            BlindDeconvolution
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Поиск в документации" aria-label="Поиск в документации" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Меню навигации">
+              <p class="caption" role="heading"><span class="caption-text">Содержание:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">blind_deconvolution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Меню навигации для мобильных устройств" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">BlindDeconvolution</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Навигация по страницам">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Код модуля</a></li>
+      <li class="breadcrumb-item active">processing.tables</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Исходный код processing.tables</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Модуль загрузки связей и метрик в таблицы.</span>
+
+<span class="sd">Автор: Юров П.И.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Any</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">IPython.display</span><span class="w"> </span><span class="kn">import</span> <span class="n">display</span>
+
+
+<div class="viewcode-block" id="ModuleData">
+<a class="viewcode-back" href="../../processing.html#processing.tables.ModuleData">[документация]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ModuleData</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Модуль загрузки связей и метрик в таблицы.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="ModuleData.__init__">
+<a class="viewcode-back" href="../../processing.html#processing.tables.ModuleData.__init__">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">processing_instance</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Инициализация.</span>
+<span class="sd">        </span>
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        processing_instance : Any</span>
+<span class="sd">            Ссылка на объект Processing с изображениями.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">processing</span> <span class="o">=</span> <span class="n">processing_instance</span></div>
+
+
+<div class="viewcode-block" id="ModuleData.get_table">
+<a class="viewcode-back" href="../../processing.html#processing.tables.ModuleData.get_table">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_table</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+                   <span class="n">table_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> 
+                   <span class="n">display_table</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Получение метрик в структурированном виде.&quot;&quot;&quot;</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_collect_data</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> 
+        <span class="bp">self</span><span class="o">.</span><span class="n">_save_data_to_csv</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">table_path</span><span class="p">,</span> <span class="n">display_table</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_collect_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Сбор и сохранение информации для общего анализа.&quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">img</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">processing</span><span class="o">.</span><span class="n">images</span><span class="p">:</span>
+            <span class="n">original_image</span> <span class="o">=</span> <span class="n">img</span><span class="o">.</span><span class="n">get_original</span><span class="p">()</span>
+            <span class="n">img</span><span class="o">.</span><span class="n">save_filter</span><span class="p">()</span>
+
+            <span class="n">blurred_kernel_array</span> <span class="o">=</span> <span class="n">img</span><span class="o">.</span><span class="n">get_original_kernels</span><span class="p">()</span>
+            <span class="n">blurred_psnr_array</span> <span class="o">=</span> <span class="n">img</span><span class="o">.</span><span class="n">get_blurred_PSNR</span><span class="p">()</span>
+            <span class="n">blurred_ssim_array</span> <span class="o">=</span> <span class="n">img</span><span class="o">.</span><span class="n">get_blurred_SSIM</span><span class="p">()</span>
+
+            <span class="n">algorithm_kernel</span> <span class="o">=</span> <span class="n">img</span><span class="o">.</span><span class="n">get_kernels</span><span class="p">()</span>
+            <span class="n">algorithm_restored_image</span> <span class="o">=</span> <span class="n">img</span><span class="o">.</span><span class="n">get_restored</span><span class="p">()</span>
+            <span class="n">algorithm_restored_psnr</span> <span class="o">=</span> <span class="n">img</span><span class="o">.</span><span class="n">get_PSNR</span><span class="p">()</span>
+            <span class="n">algorithm_restored_ssim</span> <span class="o">=</span> <span class="n">img</span><span class="o">.</span><span class="n">get_SSIM</span><span class="p">()</span>
+            
+            <span class="c1">#линия за линией</span>
+            <span class="k">for</span> <span class="n">blurred_image</span> <span class="ow">in</span> <span class="n">img</span><span class="o">.</span><span class="n">get_blurred_array</span><span class="p">():</span> <span class="c1">#подразумеваем, что она точно существует</span>
+                <span class="n">data</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s1">&#39;original&#39;</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">original_image</span><span class="p">)</span>
+                <span class="n">data</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s1">&#39;kernel blur&#39;</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">blurred_kernel_array</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">blurred_image</span><span class="p">),</span> <span class="s1">&#39;missing&#39;</span><span class="p">))</span>
+                <span class="n">data</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s1">&#39;blurred&#39;</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">blurred_image</span><span class="p">)</span>
+
+                <span class="n">data</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s1">&#39;blurred psnr&#39;</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">blurred_psnr_array</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">blurred_image</span><span class="p">),</span> <span class="n">math</span><span class="o">.</span><span class="n">nan</span><span class="p">))</span>
+                <span class="n">data</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s1">&#39;blurred ssim&#39;</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">blurred_ssim_array</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">blurred_image</span><span class="p">),</span> <span class="n">math</span><span class="o">.</span><span class="n">nan</span><span class="p">))</span>
+                <span class="k">for</span> <span class="n">algorithm_name</span> <span class="ow">in</span> <span class="n">img</span><span class="o">.</span><span class="n">get_algorithm</span><span class="p">():</span>
+                    <span class="n">data</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;kernel_</span><span class="si">{</span><span class="n">algorithm_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                        <span class="n">algorithm_kernel</span><span class="o">.</span><span class="n">get</span><span class="p">((</span><span class="nb">str</span><span class="p">(</span><span class="n">blurred_image</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">algorithm_name</span><span class="p">)),</span> <span class="s1">&#39;missing&#39;</span><span class="p">)</span>
+                    <span class="p">)</span>
+                    <span class="n">data</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">algorithm_name</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                        <span class="n">algorithm_restored_image</span><span class="o">.</span><span class="n">get</span><span class="p">((</span><span class="nb">str</span><span class="p">(</span><span class="n">blurred_image</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">algorithm_name</span><span class="p">)),</span> <span class="s1">&#39;missing&#39;</span><span class="p">)</span>
+                    <span class="p">)</span>
+                    <span class="n">data</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;psnr_</span><span class="si">{</span><span class="n">algorithm_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                        <span class="n">algorithm_restored_psnr</span><span class="o">.</span><span class="n">get</span><span class="p">((</span><span class="nb">str</span><span class="p">(</span><span class="n">blurred_image</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">algorithm_name</span><span class="p">)),</span> <span class="n">math</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span>
+                    <span class="p">)</span>
+                    <span class="n">data</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;ssim_</span><span class="si">{</span><span class="n">algorithm_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                        <span class="n">algorithm_restored_ssim</span><span class="o">.</span><span class="n">get</span><span class="p">((</span><span class="nb">str</span><span class="p">(</span><span class="n">blurred_image</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">algorithm_name</span><span class="p">)),</span> <span class="n">math</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span>
+                    <span class="p">)</span>
+        <span class="k">return</span> <span class="n">data</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_save_data_to_csv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+                          <span class="n">data</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> 
+                          <span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> 
+                          <span class="n">display_table</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Сохраняет словарь в CSV файл.&quot;&quot;&quot;</span>
+        <span class="n">df_data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">display_table</span><span class="p">:</span>
+            <span class="n">display</span><span class="p">(</span><span class="n">df_data</span><span class="p">)</span>
+        <span class="n">df_data</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Авторские права 2024, Юров П.И., Беззаборов А.А., Куропатов К.Л., Малыш Я.В.. </p>
+  </div>
+
+  Собрано при помощи <a href="https://www.sphinx-doc.org/">Sphinx</a> с использованием
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">темы,</a>
+    предоставленной <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

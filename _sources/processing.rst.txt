@@ -1,0 +1,109 @@
+processing package
+==================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   processing.extensions
+
+Submodules
+----------
+
+processing.applyfilter module
+-----------------------------
+
+.. automodule:: processing.applyfilter
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+processing.clear module
+-----------------------
+
+.. automodule:: processing.clear
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+processing.core module
+----------------------
+
+.. automodule:: processing.core
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+processing.display module
+-------------------------
+
+.. automodule:: processing.display
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+processing.metrics module
+-------------------------
+
+.. automodule:: processing.metrics
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+processing.preprocessing module
+-------------------------------
+
+.. automodule:: processing.preprocessing
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+processing.reader module
+------------------------
+
+.. automodule:: processing.reader
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+processing.restore module
+-------------------------
+
+.. automodule:: processing.restore
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+processing.restorepipeline module
+---------------------------------
+
+.. automodule:: processing.restorepipeline
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+processing.tables module
+------------------------
+
+.. automodule:: processing.tables
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+processing.utils module
+-----------------------
+
+.. automodule:: processing.utils
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: processing
+   :members:
+   :undoc-members:
+   :show-inheritance:

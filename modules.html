@@ -1,0 +1,689 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="ru" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>blind_deconvolution &mdash; документация BlindDeconvolution 1.0.0</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=e35015f7"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/translations.js?v=5b699b7f"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Алфавитный указатель" href="genindex.html" />
+    <link rel="search" title="Поиск" href="search.html" />
+    <link rel="next" title="algorithms package" href="algorithms.html" />
+    <link rel="prev" title="BlindDeconvolution Documentation" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            BlindDeconvolution
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Поиск в документации" aria-label="Поиск в документации" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Меню навигации">
+              <p class="caption" role="heading"><span class="caption-text">Содержание:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">blind_deconvolution</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="algorithms.html">algorithms package</a></li>
+<li class="toctree-l2"><a class="reference internal" href="filters.html">filters package</a></li>
+<li class="toctree-l2"><a class="reference internal" href="processing.html">processing package</a></li>
+<li class="toctree-l2"><a class="reference internal" href="scripts.html">scripts package</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Меню навигации для мобильных устройств" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">BlindDeconvolution</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Навигация по страницам">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">blind_deconvolution</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/modules.rst.txt" rel="nofollow"> Просмотреть исходный код страницы</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="blind-deconvolution">
+<h1>blind_deconvolution<a class="headerlink" href="#blind-deconvolution" title="Ссылка на этот заголовок"></a></h1>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="algorithms.html">algorithms package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="algorithms.html#subpackages">Subpackages</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="algorithms.implementations.html">algorithms.implementations package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="algorithms.implementations.html#module-algorithms.implementations">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="algorithms.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="algorithms.html#module-algorithms.base">algorithms.base module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="algorithms.html#algorithms.base.DeconvolutionAlgorithm"><code class="docutils literal notranslate"><span class="pre">DeconvolutionAlgorithm</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="algorithms.html#algorithms.base.DeconvolutionAlgorithm.name"><code class="docutils literal notranslate"><span class="pre">DeconvolutionAlgorithm.name</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="algorithms.html#algorithms.base.DeconvolutionAlgorithm.timer"><code class="docutils literal notranslate"><span class="pre">DeconvolutionAlgorithm.timer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="algorithms.html#algorithms.base.DeconvolutionAlgorithm.__init__"><code class="docutils literal notranslate"><span class="pre">DeconvolutionAlgorithm.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="algorithms.html#algorithms.base.DeconvolutionAlgorithm.change_param"><code class="docutils literal notranslate"><span class="pre">DeconvolutionAlgorithm.change_param()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="algorithms.html#algorithms.base.DeconvolutionAlgorithm.get_name"><code class="docutils literal notranslate"><span class="pre">DeconvolutionAlgorithm.get_name()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="algorithms.html#algorithms.base.DeconvolutionAlgorithm.get_param"><code class="docutils literal notranslate"><span class="pre">DeconvolutionAlgorithm.get_param()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="algorithms.html#algorithms.base.DeconvolutionAlgorithm.get_timer"><code class="docutils literal notranslate"><span class="pre">DeconvolutionAlgorithm.get_timer()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="algorithms.html#algorithms.base.DeconvolutionAlgorithm.import_param_from_file"><code class="docutils literal notranslate"><span class="pre">DeconvolutionAlgorithm.import_param_from_file()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="algorithms.html#id0"><code class="docutils literal notranslate"><span class="pre">DeconvolutionAlgorithm.name</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="algorithms.html#algorithms.base.DeconvolutionAlgorithm.param"><code class="docutils literal notranslate"><span class="pre">DeconvolutionAlgorithm.param</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="algorithms.html#algorithms.base.DeconvolutionAlgorithm.process"><code class="docutils literal notranslate"><span class="pre">DeconvolutionAlgorithm.process()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="algorithms.html#module-algorithms">Module contents</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="algorithms.html#algorithms.DeconvolutionAlgorithm"><code class="docutils literal notranslate"><span class="pre">DeconvolutionAlgorithm</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="algorithms.html#algorithms.DeconvolutionAlgorithm.name"><code class="docutils literal notranslate"><span class="pre">DeconvolutionAlgorithm.name</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="algorithms.html#algorithms.DeconvolutionAlgorithm.timer"><code class="docutils literal notranslate"><span class="pre">DeconvolutionAlgorithm.timer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="algorithms.html#algorithms.DeconvolutionAlgorithm.__init__"><code class="docutils literal notranslate"><span class="pre">DeconvolutionAlgorithm.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="algorithms.html#algorithms.DeconvolutionAlgorithm.change_param"><code class="docutils literal notranslate"><span class="pre">DeconvolutionAlgorithm.change_param()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="algorithms.html#algorithms.DeconvolutionAlgorithm.get_name"><code class="docutils literal notranslate"><span class="pre">DeconvolutionAlgorithm.get_name()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="algorithms.html#algorithms.DeconvolutionAlgorithm.get_param"><code class="docutils literal notranslate"><span class="pre">DeconvolutionAlgorithm.get_param()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="algorithms.html#algorithms.DeconvolutionAlgorithm.get_timer"><code class="docutils literal notranslate"><span class="pre">DeconvolutionAlgorithm.get_timer()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="algorithms.html#algorithms.DeconvolutionAlgorithm.import_param_from_file"><code class="docutils literal notranslate"><span class="pre">DeconvolutionAlgorithm.import_param_from_file()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="algorithms.html#id1"><code class="docutils literal notranslate"><span class="pre">DeconvolutionAlgorithm.name</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="algorithms.html#algorithms.DeconvolutionAlgorithm.param"><code class="docutils literal notranslate"><span class="pre">DeconvolutionAlgorithm.param</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="algorithms.html#algorithms.DeconvolutionAlgorithm.process"><code class="docutils literal notranslate"><span class="pre">DeconvolutionAlgorithm.process()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="filters.html">filters package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="filters.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="filters.html#module-filters.base">filters.base module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.base.FilterBase"><code class="docutils literal notranslate"><span class="pre">FilterBase</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.base.FilterBase.__init__"><code class="docutils literal notranslate"><span class="pre">FilterBase.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.base.FilterBase.description"><code class="docutils literal notranslate"><span class="pre">FilterBase.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.base.FilterBase.filter"><code class="docutils literal notranslate"><span class="pre">FilterBase.filter()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.base.FilterBase.get_type"><code class="docutils literal notranslate"><span class="pre">FilterBase.get_type()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.base.FilterBase.param"><code class="docutils literal notranslate"><span class="pre">FilterBase.param</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="filters.html#module-filters.blur">filters.blur module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.blur.BSpline_blur"><code class="docutils literal notranslate"><span class="pre">BSpline_blur</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.blur.BSpline_blur.__init__"><code class="docutils literal notranslate"><span class="pre">BSpline_blur.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.blur.BSpline_blur.create_dual_bspline_psf"><code class="docutils literal notranslate"><span class="pre">BSpline_blur.create_dual_bspline_psf()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.blur.BSpline_blur.description"><code class="docutils literal notranslate"><span class="pre">BSpline_blur.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.blur.BSpline_blur.filter"><code class="docutils literal notranslate"><span class="pre">BSpline_blur.filter()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.blur.DefocusBlur"><code class="docutils literal notranslate"><span class="pre">DefocusBlur</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.blur.DefocusBlur.__init__"><code class="docutils literal notranslate"><span class="pre">DefocusBlur.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.blur.DefocusBlur.description"><code class="docutils literal notranslate"><span class="pre">DefocusBlur.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.blur.DefocusBlur.filter"><code class="docutils literal notranslate"><span class="pre">DefocusBlur.filter()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.blur.DefocusBlur.generate_kernel"><code class="docutils literal notranslate"><span class="pre">DefocusBlur.generate_kernel()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.blur.Identical_kernel"><code class="docutils literal notranslate"><span class="pre">Identical_kernel</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.blur.Identical_kernel.__init__"><code class="docutils literal notranslate"><span class="pre">Identical_kernel.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.blur.Identical_kernel.discription"><code class="docutils literal notranslate"><span class="pre">Identical_kernel.discription()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.blur.Identical_kernel.filter"><code class="docutils literal notranslate"><span class="pre">Identical_kernel.filter()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.blur.Kernel_convolution"><code class="docutils literal notranslate"><span class="pre">Kernel_convolution</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.blur.Kernel_convolution.__init__"><code class="docutils literal notranslate"><span class="pre">Kernel_convolution.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.blur.Kernel_convolution.description"><code class="docutils literal notranslate"><span class="pre">Kernel_convolution.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.blur.Kernel_convolution.filter"><code class="docutils literal notranslate"><span class="pre">Kernel_convolution.filter()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.blur.MotionBlur"><code class="docutils literal notranslate"><span class="pre">MotionBlur</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.blur.MotionBlur.__init__"><code class="docutils literal notranslate"><span class="pre">MotionBlur.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.blur.MotionBlur.description"><code class="docutils literal notranslate"><span class="pre">MotionBlur.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.blur.MotionBlur.filter"><code class="docutils literal notranslate"><span class="pre">MotionBlur.filter()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.blur.MotionBlur.generate_kernel"><code class="docutils literal notranslate"><span class="pre">MotionBlur.generate_kernel()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="filters.html#module-filters.colored_noise">filters.colored_noise module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.colored_noise.pink_noise_2d"><code class="docutils literal notranslate"><span class="pre">pink_noise_2d()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.colored_noise.powerlaw_psd_gaussian"><code class="docutils literal notranslate"><span class="pre">powerlaw_psd_gaussian()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="filters.html#filters-denoise-module">filters.denoise module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="filters.html#module-filters.distributions">filters.distributions module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.distributions.exponential_decay_distribution"><code class="docutils literal notranslate"><span class="pre">exponential_decay_distribution()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.distributions.gaussian_distribution"><code class="docutils literal notranslate"><span class="pre">gaussian_distribution()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.distributions.generate_bspline_motion_kernel"><code class="docutils literal notranslate"><span class="pre">generate_bspline_motion_kernel()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.distributions.generate_multivariate_normal_kernel"><code class="docutils literal notranslate"><span class="pre">generate_multivariate_normal_kernel()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.distributions.linear_decay_distribution"><code class="docutils literal notranslate"><span class="pre">linear_decay_distribution()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.distributions.ring_distribution"><code class="docutils literal notranslate"><span class="pre">ring_distribution()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.distributions.uniform_distribution"><code class="docutils literal notranslate"><span class="pre">uniform_distribution()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="filters.html#module-filters.noise">filters.noise module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.noise.Brown_Noise"><code class="docutils literal notranslate"><span class="pre">Brown_Noise</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.noise.Brown_Noise.__init__"><code class="docutils literal notranslate"><span class="pre">Brown_Noise.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.noise.Brown_Noise.description"><code class="docutils literal notranslate"><span class="pre">Brown_Noise.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.noise.Brown_Noise.filter"><code class="docutils literal notranslate"><span class="pre">Brown_Noise.filter()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.noise.ColoredNoise"><code class="docutils literal notranslate"><span class="pre">ColoredNoise</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.noise.ColoredNoise.__init__"><code class="docutils literal notranslate"><span class="pre">ColoredNoise.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.noise.ColoredNoise.description"><code class="docutils literal notranslate"><span class="pre">ColoredNoise.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.noise.ColoredNoise.filter"><code class="docutils literal notranslate"><span class="pre">ColoredNoise.filter()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.noise.GaussianNoise"><code class="docutils literal notranslate"><span class="pre">GaussianNoise</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.noise.GaussianNoise.__init__"><code class="docutils literal notranslate"><span class="pre">GaussianNoise.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.noise.GaussianNoise.description"><code class="docutils literal notranslate"><span class="pre">GaussianNoise.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.noise.GaussianNoise.filter"><code class="docutils literal notranslate"><span class="pre">GaussianNoise.filter()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.noise.OldPhotoNoise"><code class="docutils literal notranslate"><span class="pre">OldPhotoNoise</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.noise.OldPhotoNoise.__init__"><code class="docutils literal notranslate"><span class="pre">OldPhotoNoise.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.noise.OldPhotoNoise.description"><code class="docutils literal notranslate"><span class="pre">OldPhotoNoise.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.noise.OldPhotoNoise.filter"><code class="docutils literal notranslate"><span class="pre">OldPhotoNoise.filter()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.noise.OldPhotoNoise.find_alpha"><code class="docutils literal notranslate"><span class="pre">OldPhotoNoise.find_alpha()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.noise.OldPhotoNoise.generate_2d_brownian_noise"><code class="docutils literal notranslate"><span class="pre">OldPhotoNoise.generate_2d_brownian_noise()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.noise.OldPhotoNoise.high_pass_filter_2d"><code class="docutils literal notranslate"><span class="pre">OldPhotoNoise.high_pass_filter_2d()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.noise.Pink_Noise"><code class="docutils literal notranslate"><span class="pre">Pink_Noise</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.noise.Pink_Noise.__init__"><code class="docutils literal notranslate"><span class="pre">Pink_Noise.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.noise.Pink_Noise.description"><code class="docutils literal notranslate"><span class="pre">Pink_Noise.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.noise.Pink_Noise.filter"><code class="docutils literal notranslate"><span class="pre">Pink_Noise.filter()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.noise.PoissonNoise"><code class="docutils literal notranslate"><span class="pre">PoissonNoise</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.noise.PoissonNoise.__init__"><code class="docutils literal notranslate"><span class="pre">PoissonNoise.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.noise.PoissonNoise.description"><code class="docutils literal notranslate"><span class="pre">PoissonNoise.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.noise.PoissonNoise.filter"><code class="docutils literal notranslate"><span class="pre">PoissonNoise.filter()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.noise.SaltAndPepperNoise"><code class="docutils literal notranslate"><span class="pre">SaltAndPepperNoise</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.noise.SaltAndPepperNoise.__init__"><code class="docutils literal notranslate"><span class="pre">SaltAndPepperNoise.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.noise.SaltAndPepperNoise.description"><code class="docutils literal notranslate"><span class="pre">SaltAndPepperNoise.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.noise.SaltAndPepperNoise.filter"><code class="docutils literal notranslate"><span class="pre">SaltAndPepperNoise.filter()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="filters.html#module-filters.smooth">filters.smooth module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.smooth.BilateralFilter"><code class="docutils literal notranslate"><span class="pre">BilateralFilter</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.smooth.BilateralFilter.__init__"><code class="docutils literal notranslate"><span class="pre">BilateralFilter.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.smooth.BilateralFilter.description"><code class="docutils literal notranslate"><span class="pre">BilateralFilter.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.smooth.BilateralFilter.filter"><code class="docutils literal notranslate"><span class="pre">BilateralFilter.filter()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.smooth.GaussianBlur"><code class="docutils literal notranslate"><span class="pre">GaussianBlur</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.smooth.GaussianBlur.__init__"><code class="docutils literal notranslate"><span class="pre">GaussianBlur.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.smooth.GaussianBlur.description"><code class="docutils literal notranslate"><span class="pre">GaussianBlur.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.smooth.GaussianBlur.filter"><code class="docutils literal notranslate"><span class="pre">GaussianBlur.filter()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.smooth.MeanBlur"><code class="docutils literal notranslate"><span class="pre">MeanBlur</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.smooth.MeanBlur.__init__"><code class="docutils literal notranslate"><span class="pre">MeanBlur.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.smooth.MeanBlur.description"><code class="docutils literal notranslate"><span class="pre">MeanBlur.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.smooth.MeanBlur.filter"><code class="docutils literal notranslate"><span class="pre">MeanBlur.filter()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.smooth.MedianBlur"><code class="docutils literal notranslate"><span class="pre">MedianBlur</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.smooth.MedianBlur.__init__"><code class="docutils literal notranslate"><span class="pre">MedianBlur.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.smooth.MedianBlur.description"><code class="docutils literal notranslate"><span class="pre">MedianBlur.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.smooth.MedianBlur.filter"><code class="docutils literal notranslate"><span class="pre">MedianBlur.filter()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="filters.html#module-filters">Module contents</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.BSpline_blur"><code class="docutils literal notranslate"><span class="pre">BSpline_blur</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.BSpline_blur.__init__"><code class="docutils literal notranslate"><span class="pre">BSpline_blur.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.BSpline_blur.create_dual_bspline_psf"><code class="docutils literal notranslate"><span class="pre">BSpline_blur.create_dual_bspline_psf()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.BSpline_blur.description"><code class="docutils literal notranslate"><span class="pre">BSpline_blur.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.BSpline_blur.filter"><code class="docutils literal notranslate"><span class="pre">BSpline_blur.filter()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.BilateralFilter"><code class="docutils literal notranslate"><span class="pre">BilateralFilter</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.BilateralFilter.__init__"><code class="docutils literal notranslate"><span class="pre">BilateralFilter.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.BilateralFilter.description"><code class="docutils literal notranslate"><span class="pre">BilateralFilter.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.BilateralFilter.filter"><code class="docutils literal notranslate"><span class="pre">BilateralFilter.filter()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.Brown_Noise"><code class="docutils literal notranslate"><span class="pre">Brown_Noise</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.Brown_Noise.__init__"><code class="docutils literal notranslate"><span class="pre">Brown_Noise.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.Brown_Noise.description"><code class="docutils literal notranslate"><span class="pre">Brown_Noise.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.Brown_Noise.filter"><code class="docutils literal notranslate"><span class="pre">Brown_Noise.filter()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.ColoredNoise"><code class="docutils literal notranslate"><span class="pre">ColoredNoise</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.ColoredNoise.__init__"><code class="docutils literal notranslate"><span class="pre">ColoredNoise.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.ColoredNoise.description"><code class="docutils literal notranslate"><span class="pre">ColoredNoise.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.ColoredNoise.filter"><code class="docutils literal notranslate"><span class="pre">ColoredNoise.filter()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.DefocusBlur"><code class="docutils literal notranslate"><span class="pre">DefocusBlur</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.DefocusBlur.__init__"><code class="docutils literal notranslate"><span class="pre">DefocusBlur.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.DefocusBlur.description"><code class="docutils literal notranslate"><span class="pre">DefocusBlur.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.DefocusBlur.filter"><code class="docutils literal notranslate"><span class="pre">DefocusBlur.filter()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.DefocusBlur.generate_kernel"><code class="docutils literal notranslate"><span class="pre">DefocusBlur.generate_kernel()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.FilterBase"><code class="docutils literal notranslate"><span class="pre">FilterBase</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.FilterBase.__init__"><code class="docutils literal notranslate"><span class="pre">FilterBase.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.FilterBase.description"><code class="docutils literal notranslate"><span class="pre">FilterBase.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.FilterBase.filter"><code class="docutils literal notranslate"><span class="pre">FilterBase.filter()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.FilterBase.get_type"><code class="docutils literal notranslate"><span class="pre">FilterBase.get_type()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.FilterBase.param"><code class="docutils literal notranslate"><span class="pre">FilterBase.param</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.GaussianBlur"><code class="docutils literal notranslate"><span class="pre">GaussianBlur</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.GaussianBlur.__init__"><code class="docutils literal notranslate"><span class="pre">GaussianBlur.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.GaussianBlur.description"><code class="docutils literal notranslate"><span class="pre">GaussianBlur.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.GaussianBlur.filter"><code class="docutils literal notranslate"><span class="pre">GaussianBlur.filter()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.GaussianNoise"><code class="docutils literal notranslate"><span class="pre">GaussianNoise</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.GaussianNoise.__init__"><code class="docutils literal notranslate"><span class="pre">GaussianNoise.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.GaussianNoise.description"><code class="docutils literal notranslate"><span class="pre">GaussianNoise.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.GaussianNoise.filter"><code class="docutils literal notranslate"><span class="pre">GaussianNoise.filter()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.Kernel_convolution"><code class="docutils literal notranslate"><span class="pre">Kernel_convolution</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.Kernel_convolution.__init__"><code class="docutils literal notranslate"><span class="pre">Kernel_convolution.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.Kernel_convolution.description"><code class="docutils literal notranslate"><span class="pre">Kernel_convolution.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.Kernel_convolution.filter"><code class="docutils literal notranslate"><span class="pre">Kernel_convolution.filter()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.MeanBlur"><code class="docutils literal notranslate"><span class="pre">MeanBlur</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.MeanBlur.__init__"><code class="docutils literal notranslate"><span class="pre">MeanBlur.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.MeanBlur.description"><code class="docutils literal notranslate"><span class="pre">MeanBlur.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.MeanBlur.filter"><code class="docutils literal notranslate"><span class="pre">MeanBlur.filter()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.MedianBlur"><code class="docutils literal notranslate"><span class="pre">MedianBlur</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.MedianBlur.__init__"><code class="docutils literal notranslate"><span class="pre">MedianBlur.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.MedianBlur.description"><code class="docutils literal notranslate"><span class="pre">MedianBlur.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.MedianBlur.filter"><code class="docutils literal notranslate"><span class="pre">MedianBlur.filter()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.MotionBlur"><code class="docutils literal notranslate"><span class="pre">MotionBlur</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.MotionBlur.__init__"><code class="docutils literal notranslate"><span class="pre">MotionBlur.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.MotionBlur.description"><code class="docutils literal notranslate"><span class="pre">MotionBlur.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.MotionBlur.filter"><code class="docutils literal notranslate"><span class="pre">MotionBlur.filter()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.MotionBlur.generate_kernel"><code class="docutils literal notranslate"><span class="pre">MotionBlur.generate_kernel()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.OldPhotoNoise"><code class="docutils literal notranslate"><span class="pre">OldPhotoNoise</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.OldPhotoNoise.__init__"><code class="docutils literal notranslate"><span class="pre">OldPhotoNoise.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.OldPhotoNoise.description"><code class="docutils literal notranslate"><span class="pre">OldPhotoNoise.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.OldPhotoNoise.filter"><code class="docutils literal notranslate"><span class="pre">OldPhotoNoise.filter()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.OldPhotoNoise.find_alpha"><code class="docutils literal notranslate"><span class="pre">OldPhotoNoise.find_alpha()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.OldPhotoNoise.generate_2d_brownian_noise"><code class="docutils literal notranslate"><span class="pre">OldPhotoNoise.generate_2d_brownian_noise()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.OldPhotoNoise.high_pass_filter_2d"><code class="docutils literal notranslate"><span class="pre">OldPhotoNoise.high_pass_filter_2d()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.Pink_Noise"><code class="docutils literal notranslate"><span class="pre">Pink_Noise</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.Pink_Noise.__init__"><code class="docutils literal notranslate"><span class="pre">Pink_Noise.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.Pink_Noise.description"><code class="docutils literal notranslate"><span class="pre">Pink_Noise.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.Pink_Noise.filter"><code class="docutils literal notranslate"><span class="pre">Pink_Noise.filter()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.PoissonNoise"><code class="docutils literal notranslate"><span class="pre">PoissonNoise</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.PoissonNoise.__init__"><code class="docutils literal notranslate"><span class="pre">PoissonNoise.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.PoissonNoise.description"><code class="docutils literal notranslate"><span class="pre">PoissonNoise.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.PoissonNoise.filter"><code class="docutils literal notranslate"><span class="pre">PoissonNoise.filter()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html#filters.SaltAndPepperNoise"><code class="docutils literal notranslate"><span class="pre">SaltAndPepperNoise</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.SaltAndPepperNoise.__init__"><code class="docutils literal notranslate"><span class="pre">SaltAndPepperNoise.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.SaltAndPepperNoise.description"><code class="docutils literal notranslate"><span class="pre">SaltAndPepperNoise.description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="filters.html#filters.SaltAndPepperNoise.filter"><code class="docutils literal notranslate"><span class="pre">SaltAndPepperNoise.filter()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="processing.html">processing package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="processing.html#subpackages">Subpackages</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="processing.extensions.html">processing.extensions package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="processing.extensions.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.extensions.html#module-processing.extensions.base">processing.extensions.base module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.extensions.html#module-processing.extensions.hyperparameter_optimization">processing.extensions.hyperparameter_optimization module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.extensions.html#module-processing.extensions.pareto_analysis">processing.extensions.pareto_analysis module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.extensions.html#module-processing.extensions">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="processing.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="processing.html#module-processing.applyfilter">processing.applyfilter module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#processing.applyfilter.ModuleFilter"><code class="docutils literal notranslate"><span class="pre">ModuleFilter</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.applyfilter.ModuleFilter.__init__"><code class="docutils literal notranslate"><span class="pre">ModuleFilter.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.applyfilter.ModuleFilter.custom_filter"><code class="docutils literal notranslate"><span class="pre">ModuleFilter.custom_filter()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.applyfilter.ModuleFilter.filter"><code class="docutils literal notranslate"><span class="pre">ModuleFilter.filter()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="processing.html#module-processing.clear">processing.clear module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#processing.clear.ModuleClear"><code class="docutils literal notranslate"><span class="pre">ModuleClear</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.clear.ModuleClear.__init__"><code class="docutils literal notranslate"><span class="pre">ModuleClear.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.clear.ModuleClear.clear_all"><code class="docutils literal notranslate"><span class="pre">ModuleClear.clear_all()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.clear.ModuleClear.clear_input"><code class="docutils literal notranslate"><span class="pre">ModuleClear.clear_input()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.clear.ModuleClear.clear_output"><code class="docutils literal notranslate"><span class="pre">ModuleClear.clear_output()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.clear.ModuleClear.clear_output_directory"><code class="docutils literal notranslate"><span class="pre">ModuleClear.clear_output_directory()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.clear.ModuleClear.clear_restored"><code class="docutils literal notranslate"><span class="pre">ModuleClear.clear_restored()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.clear.ModuleClear.reset"><code class="docutils literal notranslate"><span class="pre">ModuleClear.reset()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.clear.ModuleClear.unbind_restored"><code class="docutils literal notranslate"><span class="pre">ModuleClear.unbind_restored()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="processing.html#module-processing.core">processing.core module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#processing.core.Processing"><code class="docutils literal notranslate"><span class="pre">Processing</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.core.Processing.__init__"><code class="docutils literal notranslate"><span class="pre">Processing.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.core.Processing.bind"><code class="docutils literal notranslate"><span class="pre">Processing.bind()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.core.Processing.changescale"><code class="docutils literal notranslate"><span class="pre">Processing.changescale()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.core.Processing.clear_all"><code class="docutils literal notranslate"><span class="pre">Processing.clear_all()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.core.Processing.clear_input"><code class="docutils literal notranslate"><span class="pre">Processing.clear_input()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.core.Processing.clear_output"><code class="docutils literal notranslate"><span class="pre">Processing.clear_output()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.core.Processing.clear_output_directory"><code class="docutils literal notranslate"><span class="pre">Processing.clear_output_directory()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.core.Processing.clear_restored"><code class="docutils literal notranslate"><span class="pre">Processing.clear_restored()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.core.Processing.custom_filter"><code class="docutils literal notranslate"><span class="pre">Processing.custom_filter()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.core.Processing.filter"><code class="docutils literal notranslate"><span class="pre">Processing.filter()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.core.Processing.full_process"><code class="docutils literal notranslate"><span class="pre">Processing.full_process()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.core.Processing.get_table"><code class="docutils literal notranslate"><span class="pre">Processing.get_table()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.core.Processing.histogram_equalization"><code class="docutils literal notranslate"><span class="pre">Processing.histogram_equalization()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.core.Processing.histogram_equalization_CLAHE"><code class="docutils literal notranslate"><span class="pre">Processing.histogram_equalization_CLAHE()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.core.Processing.inverse_histogram_equalization"><code class="docutils literal notranslate"><span class="pre">Processing.inverse_histogram_equalization()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.core.Processing.len_blur"><code class="docutils literal notranslate"><span class="pre">Processing.len_blur()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.core.Processing.load_bind_state"><code class="docutils literal notranslate"><span class="pre">Processing.load_bind_state()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.core.Processing.load_filter"><code class="docutils literal notranslate"><span class="pre">Processing.load_filter()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.core.Processing.pareto"><code class="docutils literal notranslate"><span class="pre">Processing.pareto()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.core.Processing.process"><code class="docutils literal notranslate"><span class="pre">Processing.process()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.core.Processing.process_hyperparameter_optimization"><code class="docutils literal notranslate"><span class="pre">Processing.process_hyperparameter_optimization()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.core.Processing.read_all"><code class="docutils literal notranslate"><span class="pre">Processing.read_all()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.core.Processing.read_one"><code class="docutils literal notranslate"><span class="pre">Processing.read_one()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.core.Processing.reset"><code class="docutils literal notranslate"><span class="pre">Processing.reset()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.core.Processing.save_bind_state"><code class="docutils literal notranslate"><span class="pre">Processing.save_bind_state()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.core.Processing.save_filter"><code class="docutils literal notranslate"><span class="pre">Processing.save_filter()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.core.Processing.show"><code class="docutils literal notranslate"><span class="pre">Processing.show()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.core.Processing.show_line"><code class="docutils literal notranslate"><span class="pre">Processing.show_line()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.core.Processing.unbind_restored"><code class="docutils literal notranslate"><span class="pre">Processing.unbind_restored()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#processing.core.merge"><code class="docutils literal notranslate"><span class="pre">merge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#processing.core.show_from_table"><code class="docutils literal notranslate"><span class="pre">show_from_table()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="processing.html#module-processing.display">processing.display module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#processing.display.ModuleDisplay"><code class="docutils literal notranslate"><span class="pre">ModuleDisplay</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.display.ModuleDisplay.__init__"><code class="docutils literal notranslate"><span class="pre">ModuleDisplay.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.display.ModuleDisplay.show"><code class="docutils literal notranslate"><span class="pre">ModuleDisplay.show()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.display.ModuleDisplay.show_line"><code class="docutils literal notranslate"><span class="pre">ModuleDisplay.show_line()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="processing.html#module-processing.metrics">processing.metrics module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#processing.metrics.PSNR"><code class="docutils literal notranslate"><span class="pre">PSNR()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#processing.metrics.SSIM"><code class="docutils literal notranslate"><span class="pre">SSIM()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#processing.metrics.Sharpness"><code class="docutils literal notranslate"><span class="pre">Sharpness()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#processing.metrics.blur_complexity"><code class="docutils literal notranslate"><span class="pre">blur_complexity()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#processing.metrics.calculate_sml"><code class="docutils literal notranslate"><span class="pre">calculate_sml()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#processing.metrics.calculate_snr"><code class="docutils literal notranslate"><span class="pre">calculate_snr()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#processing.metrics.noise_complexity"><code class="docutils literal notranslate"><span class="pre">noise_complexity()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="processing.html#module-processing.preprocessing">processing.preprocessing module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#processing.preprocessing.ModulePreprocessing"><code class="docutils literal notranslate"><span class="pre">ModulePreprocessing</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.preprocessing.ModulePreprocessing.__init__"><code class="docutils literal notranslate"><span class="pre">ModulePreprocessing.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.preprocessing.ModulePreprocessing.histogram_equalization"><code class="docutils literal notranslate"><span class="pre">ModulePreprocessing.histogram_equalization()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.preprocessing.ModulePreprocessing.histogram_equalization_CLAHE"><code class="docutils literal notranslate"><span class="pre">ModulePreprocessing.histogram_equalization_CLAHE()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.preprocessing.ModulePreprocessing.inverse_histogram_equalization"><code class="docutils literal notranslate"><span class="pre">ModulePreprocessing.inverse_histogram_equalization()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="processing.html#module-processing.reader">processing.reader module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#processing.reader.ModuleReader"><code class="docutils literal notranslate"><span class="pre">ModuleReader</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.reader.ModuleReader.__init__"><code class="docutils literal notranslate"><span class="pre">ModuleReader.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.reader.ModuleReader.bind"><code class="docutils literal notranslate"><span class="pre">ModuleReader.bind()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.reader.ModuleReader.load_bind_state"><code class="docutils literal notranslate"><span class="pre">ModuleReader.load_bind_state()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.reader.ModuleReader.read_all"><code class="docutils literal notranslate"><span class="pre">ModuleReader.read_all()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.reader.ModuleReader.read_one"><code class="docutils literal notranslate"><span class="pre">ModuleReader.read_one()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.reader.ModuleReader.save_bind_state"><code class="docutils literal notranslate"><span class="pre">ModuleReader.save_bind_state()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="processing.html#module-processing.restore">processing.restore module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#processing.restore.ModuleProcess"><code class="docutils literal notranslate"><span class="pre">ModuleProcess</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.restore.ModuleProcess.__init__"><code class="docutils literal notranslate"><span class="pre">ModuleProcess.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.restore.ModuleProcess.process"><code class="docutils literal notranslate"><span class="pre">ModuleProcess.process()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="processing.html#module-processing.restorepipeline">processing.restorepipeline module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#processing.restorepipeline.ModuleProcessPipeline"><code class="docutils literal notranslate"><span class="pre">ModuleProcessPipeline</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.restorepipeline.ModuleProcessPipeline.__init__"><code class="docutils literal notranslate"><span class="pre">ModuleProcessPipeline.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.restorepipeline.ModuleProcessPipeline.full_process"><code class="docutils literal notranslate"><span class="pre">ModuleProcessPipeline.full_process()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="processing.html#module-processing.tables">processing.tables module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#processing.tables.ModuleData"><code class="docutils literal notranslate"><span class="pre">ModuleData</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.tables.ModuleData.__init__"><code class="docutils literal notranslate"><span class="pre">ModuleData.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.tables.ModuleData.get_table"><code class="docutils literal notranslate"><span class="pre">ModuleData.get_table()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="processing.html#module-processing.utils">processing.utils module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#processing.utils.Image"><code class="docutils literal notranslate"><span class="pre">Image</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.__init__"><code class="docutils literal notranslate"><span class="pre">Image.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.add_PSNR"><code class="docutils literal notranslate"><span class="pre">Image.add_PSNR()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.add_SSIM"><code class="docutils literal notranslate"><span class="pre">Image.add_SSIM()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.add_algorithm"><code class="docutils literal notranslate"><span class="pre">Image.add_algorithm()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.add_blurred_PSNR"><code class="docutils literal notranslate"><span class="pre">Image.add_blurred_PSNR()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.add_blurred_SSIM"><code class="docutils literal notranslate"><span class="pre">Image.add_blurred_SSIM()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.add_kernel"><code class="docutils literal notranslate"><span class="pre">Image.add_kernel()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.add_original_kernel"><code class="docutils literal notranslate"><span class="pre">Image.add_original_kernel()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.add_preprocessed_blurred_path"><code class="docutils literal notranslate"><span class="pre">Image.add_preprocessed_blurred_path()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.add_restored"><code class="docutils literal notranslate"><span class="pre">Image.add_restored()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.add_to_current_filter"><code class="docutils literal notranslate"><span class="pre">Image.add_to_current_filter()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.get_PSNR"><code class="docutils literal notranslate"><span class="pre">Image.get_PSNR()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.get_SSIM"><code class="docutils literal notranslate"><span class="pre">Image.get_SSIM()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.get_algorithm"><code class="docutils literal notranslate"><span class="pre">Image.get_algorithm()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.get_all_blurred_images"><code class="docutils literal notranslate"><span class="pre">Image.get_all_blurred_images()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.get_all_filters"><code class="docutils literal notranslate"><span class="pre">Image.get_all_filters()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.get_blurred"><code class="docutils literal notranslate"><span class="pre">Image.get_blurred()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.get_blurred_PSNR"><code class="docutils literal notranslate"><span class="pre">Image.get_blurred_PSNR()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.get_blurred_SSIM"><code class="docutils literal notranslate"><span class="pre">Image.get_blurred_SSIM()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.get_blurred_array"><code class="docutils literal notranslate"><span class="pre">Image.get_blurred_array()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.get_blurred_image"><code class="docutils literal notranslate"><span class="pre">Image.get_blurred_image()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.get_color"><code class="docutils literal notranslate"><span class="pre">Image.get_color()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.get_current_filter"><code class="docutils literal notranslate"><span class="pre">Image.get_current_filter()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.get_filters"><code class="docutils literal notranslate"><span class="pre">Image.get_filters()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.get_kernels"><code class="docutils literal notranslate"><span class="pre">Image.get_kernels()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.get_len_algorithms"><code class="docutils literal notranslate"><span class="pre">Image.get_len_algorithms()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.get_len_filter"><code class="docutils literal notranslate"><span class="pre">Image.get_len_filter()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.get_original"><code class="docutils literal notranslate"><span class="pre">Image.get_original()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.get_original_image"><code class="docutils literal notranslate"><span class="pre">Image.get_original_image()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.get_original_kernels"><code class="docutils literal notranslate"><span class="pre">Image.get_original_kernels()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.get_preprocessed_blurred_path"><code class="docutils literal notranslate"><span class="pre">Image.get_preprocessed_blurred_path()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.get_restored"><code class="docutils literal notranslate"><span class="pre">Image.get_restored()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.load"><code class="docutils literal notranslate"><span class="pre">Image.load()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.save_filter"><code class="docutils literal notranslate"><span class="pre">Image.save_filter()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.set_PSNR"><code class="docutils literal notranslate"><span class="pre">Image.set_PSNR()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.set_SSIM"><code class="docutils literal notranslate"><span class="pre">Image.set_SSIM()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.set_algorithm"><code class="docutils literal notranslate"><span class="pre">Image.set_algorithm()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.set_blurred"><code class="docutils literal notranslate"><span class="pre">Image.set_blurred()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.set_blurred_PSNR"><code class="docutils literal notranslate"><span class="pre">Image.set_blurred_PSNR()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.set_blurred_SSIM"><code class="docutils literal notranslate"><span class="pre">Image.set_blurred_SSIM()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.set_blurred_array"><code class="docutils literal notranslate"><span class="pre">Image.set_blurred_array()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.set_current_filter"><code class="docutils literal notranslate"><span class="pre">Image.set_current_filter()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.set_filters"><code class="docutils literal notranslate"><span class="pre">Image.set_filters()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.set_kernels"><code class="docutils literal notranslate"><span class="pre">Image.set_kernels()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.set_original"><code class="docutils literal notranslate"><span class="pre">Image.set_original()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.set_original_kernels"><code class="docutils literal notranslate"><span class="pre">Image.set_original_kernels()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.set_preprocessed_blurred_path"><code class="docutils literal notranslate"><span class="pre">Image.set_preprocessed_blurred_path()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.utils.Image.set_restored"><code class="docutils literal notranslate"><span class="pre">Image.set_restored()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#processing.utils.calculate_metrics"><code class="docutils literal notranslate"><span class="pre">calculate_metrics()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#processing.utils.float_img_to_int"><code class="docutils literal notranslate"><span class="pre">float_img_to_int()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#processing.utils.generate_unique_file_path"><code class="docutils literal notranslate"><span class="pre">generate_unique_file_path()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#processing.utils.imread"><code class="docutils literal notranslate"><span class="pre">imread()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#processing.utils.prepare_image_for_metric"><code class="docutils literal notranslate"><span class="pre">prepare_image_for_metric()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="processing.html#module-processing">Module contents</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#processing.Processing"><code class="docutils literal notranslate"><span class="pre">Processing</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.Processing.__init__"><code class="docutils literal notranslate"><span class="pre">Processing.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.Processing.bind"><code class="docutils literal notranslate"><span class="pre">Processing.bind()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.Processing.changescale"><code class="docutils literal notranslate"><span class="pre">Processing.changescale()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.Processing.clear_all"><code class="docutils literal notranslate"><span class="pre">Processing.clear_all()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.Processing.clear_input"><code class="docutils literal notranslate"><span class="pre">Processing.clear_input()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.Processing.clear_output"><code class="docutils literal notranslate"><span class="pre">Processing.clear_output()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.Processing.clear_output_directory"><code class="docutils literal notranslate"><span class="pre">Processing.clear_output_directory()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.Processing.clear_restored"><code class="docutils literal notranslate"><span class="pre">Processing.clear_restored()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.Processing.custom_filter"><code class="docutils literal notranslate"><span class="pre">Processing.custom_filter()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.Processing.filter"><code class="docutils literal notranslate"><span class="pre">Processing.filter()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.Processing.full_process"><code class="docutils literal notranslate"><span class="pre">Processing.full_process()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.Processing.get_table"><code class="docutils literal notranslate"><span class="pre">Processing.get_table()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.Processing.histogram_equalization"><code class="docutils literal notranslate"><span class="pre">Processing.histogram_equalization()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.Processing.histogram_equalization_CLAHE"><code class="docutils literal notranslate"><span class="pre">Processing.histogram_equalization_CLAHE()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.Processing.inverse_histogram_equalization"><code class="docutils literal notranslate"><span class="pre">Processing.inverse_histogram_equalization()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.Processing.len_blur"><code class="docutils literal notranslate"><span class="pre">Processing.len_blur()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.Processing.load_bind_state"><code class="docutils literal notranslate"><span class="pre">Processing.load_bind_state()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.Processing.load_filter"><code class="docutils literal notranslate"><span class="pre">Processing.load_filter()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.Processing.pareto"><code class="docutils literal notranslate"><span class="pre">Processing.pareto()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.Processing.process"><code class="docutils literal notranslate"><span class="pre">Processing.process()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.Processing.process_hyperparameter_optimization"><code class="docutils literal notranslate"><span class="pre">Processing.process_hyperparameter_optimization()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.Processing.read_all"><code class="docutils literal notranslate"><span class="pre">Processing.read_all()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.Processing.read_one"><code class="docutils literal notranslate"><span class="pre">Processing.read_one()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.Processing.reset"><code class="docutils literal notranslate"><span class="pre">Processing.reset()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.Processing.save_bind_state"><code class="docutils literal notranslate"><span class="pre">Processing.save_bind_state()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.Processing.save_filter"><code class="docutils literal notranslate"><span class="pre">Processing.save_filter()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.Processing.show"><code class="docutils literal notranslate"><span class="pre">Processing.show()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.Processing.show_line"><code class="docutils literal notranslate"><span class="pre">Processing.show_line()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="processing.html#processing.Processing.unbind_restored"><code class="docutils literal notranslate"><span class="pre">Processing.unbind_restored()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#processing.merge"><code class="docutils literal notranslate"><span class="pre">merge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#processing.show_from_table"><code class="docutils literal notranslate"><span class="pre">show_from_table()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="scripts.html">scripts package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="scripts.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="scripts.html#module-scripts.dataset_generator">scripts.dataset_generator module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="scripts.html#scripts.dataset_generator.DatasetGenerator"><code class="docutils literal notranslate"><span class="pre">DatasetGenerator</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="scripts.html#scripts.dataset_generator.DatasetGenerator.generate_and_save_kernels"><code class="docutils literal notranslate"><span class="pre">DatasetGenerator.generate_and_save_kernels()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="scripts.html#scripts.dataset_generator.DatasetGenerator.process_and_bind_images"><code class="docutils literal notranslate"><span class="pre">DatasetGenerator.process_and_bind_images()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="scripts.html#scripts.dataset_generator.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="scripts.html#module-scripts.kernel_generator">scripts.kernel_generator module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="scripts.html#scripts.kernel_generator.KernelGenerator"><code class="docutils literal notranslate"><span class="pre">KernelGenerator</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="scripts.html#scripts.kernel_generator.KernelGenerator.generate_all"><code class="docutils literal notranslate"><span class="pre">KernelGenerator.generate_all()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="scripts.html#scripts.kernel_generator.KernelGenerator.run"><code class="docutils literal notranslate"><span class="pre">KernelGenerator.run()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="scripts.html#scripts.kernel_generator.KernelGenerator.save"><code class="docutils literal notranslate"><span class="pre">KernelGenerator.save()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="scripts.html#scripts.kernel_generator.KernelGenerator.visualize"><code class="docutils literal notranslate"><span class="pre">KernelGenerator.visualize()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="scripts.html#scripts.kernel_generator.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="scripts.html#module-scripts">Module contents</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="scripts.html#scripts.DatasetGenerator"><code class="docutils literal notranslate"><span class="pre">DatasetGenerator</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="scripts.html#scripts.DatasetGenerator.generate_and_save_kernels"><code class="docutils literal notranslate"><span class="pre">DatasetGenerator.generate_and_save_kernels()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="scripts.html#scripts.DatasetGenerator.process_and_bind_images"><code class="docutils literal notranslate"><span class="pre">DatasetGenerator.process_and_bind_images()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="scripts.html#scripts.KernelGenerator"><code class="docutils literal notranslate"><span class="pre">KernelGenerator</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="scripts.html#scripts.KernelGenerator.generate_all"><code class="docutils literal notranslate"><span class="pre">KernelGenerator.generate_all()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="scripts.html#scripts.KernelGenerator.run"><code class="docutils literal notranslate"><span class="pre">KernelGenerator.run()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="scripts.html#scripts.KernelGenerator.save"><code class="docutils literal notranslate"><span class="pre">KernelGenerator.save()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="scripts.html#scripts.KernelGenerator.visualize"><code class="docutils literal notranslate"><span class="pre">KernelGenerator.visualize()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Нижняя область">
+        <a href="index.html" class="btn btn-neutral float-left" title="BlindDeconvolution Documentation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Предыдущая</a>
+        <a href="algorithms.html" class="btn btn-neutral float-right" title="algorithms package" accesskey="n" rel="next">Следующая <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Авторские права 2024, Юров П.И., Беззаборов А.А., Куропатов К.Л., Малыш Я.В.. </p>
+  </div>
+
+  Собрано при помощи <a href="https://www.sphinx-doc.org/">Sphinx</a> с использованием
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">темы,</a>
+    предоставленной <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

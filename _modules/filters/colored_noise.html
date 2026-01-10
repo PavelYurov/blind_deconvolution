@@ -1,0 +1,268 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="ru" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>filters.colored_noise &mdash; документация BlindDeconvolution 1.0.0</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=e35015f7"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/translations.js?v=5b699b7f"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Алфавитный указатель" href="../../genindex.html" />
+    <link rel="search" title="Поиск" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            BlindDeconvolution
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Поиск в документации" aria-label="Поиск в документации" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Меню навигации">
+              <p class="caption" role="heading"><span class="caption-text">Содержание:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">blind_deconvolution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Меню навигации для мобильных устройств" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">BlindDeconvolution</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Навигация по страницам">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Код модуля</a></li>
+      <li class="breadcrumb-item active">filters.colored_noise</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Исходный код filters.colored_noise</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Функции генерации цветного шума.</span>
+
+<span class="sd">Автор: Юров П.И.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Union</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="kn">import</span> <span class="n">sqrt</span><span class="p">,</span> <span class="n">newaxis</span><span class="p">,</span> <span class="n">integer</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">numpy.fft</span><span class="w"> </span><span class="kn">import</span> <span class="n">irfft</span><span class="p">,</span> <span class="n">rfftfreq</span><span class="p">,</span> <span class="n">irfft2</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">numpy.random</span><span class="w"> </span><span class="kn">import</span> <span class="n">default_rng</span><span class="p">,</span> <span class="n">Generator</span><span class="p">,</span> <span class="n">RandomState</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="kn">import</span> <span class="nb">sum</span> <span class="k">as</span> <span class="n">npsum</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+
+<div class="viewcode-block" id="powerlaw_psd_gaussian">
+<a class="viewcode-back" href="../../filters.html#filters.colored_noise.powerlaw_psd_gaussian">[документация]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">powerlaw_psd_gaussian</span><span class="p">(</span>
+        <span class="n">exponent</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> 
+        <span class="n">size</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">int</span><span class="p">]],</span> 
+        <span class="n">fmin</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> 
+        <span class="n">random_state</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Generator</span><span class="p">,</span> <span class="n">RandomState</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Гауссов (1/f)**beta шум.</span>
+
+<span class="sd">    Параметры</span>
+<span class="sd">    ---------</span>
+<span class="sd">    exponent : float</span>
+<span class="sd">        Экспонента шума S(f) = (1 / f)**beta.</span>
+<span class="sd">        Розовый шум: beta = 1.</span>
+<span class="sd">        Коричневый шум: beta = 2.</span>
+<span class="sd">    size : Union[int, Iterable[int]]</span>
+<span class="sd">        Размер выходной марицы.</span>
+<span class="sd">    fmin : float</span>
+<span class="sd">        Порог минимальной частоты от 0.0 до 0.5.</span>
+<span class="sd">    random_state : Optional[Union[int, Generator, RandomState]]</span>
+<span class="sd">        Генератор случайных чисел.</span>
+
+<span class="sd">    Возвращает</span>
+<span class="sd">    ----------</span>
+<span class="sd">    np.ndarray</span>
+<span class="sd">        Матрица шума.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">size</span><span class="p">,</span> <span class="p">(</span><span class="n">integer</span><span class="p">,</span> <span class="nb">int</span><span class="p">)):</span>
+        <span class="n">size</span> <span class="o">=</span> <span class="p">[</span><span class="n">size</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">size</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">):</span>
+        <span class="n">size</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">size</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Size must be of type int or Iterable[int]&quot;</span><span class="p">)</span>
+    
+    <span class="n">samples</span> <span class="o">=</span> <span class="n">size</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    
+    <span class="n">f</span> <span class="o">=</span> <span class="n">rfftfreq</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span>
+    <span class="k">if</span> <span class="mi">0</span> <span class="o">&lt;=</span> <span class="n">fmin</span> <span class="o">&lt;=</span> <span class="mf">0.5</span><span class="p">:</span>
+        <span class="n">fmin</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">fmin</span><span class="p">,</span> <span class="mf">1.</span><span class="o">/</span><span class="n">samples</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;fmin must be chosen between 0 and 0.5.&quot;</span><span class="p">)</span>
+    
+    <span class="n">s_scale</span> <span class="o">=</span> <span class="n">f</span>    
+    <span class="n">ix</span> <span class="o">=</span> <span class="n">npsum</span><span class="p">(</span><span class="n">s_scale</span> <span class="o">&lt;</span> <span class="n">fmin</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">ix</span> <span class="ow">and</span> <span class="n">ix</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">s_scale</span><span class="p">):</span>
+        <span class="n">s_scale</span><span class="p">[:</span><span class="n">ix</span><span class="p">]</span> <span class="o">=</span> <span class="n">s_scale</span><span class="p">[</span><span class="n">ix</span><span class="p">]</span>
+    <span class="n">s_scale</span> <span class="o">=</span> <span class="n">s_scale</span><span class="o">**</span><span class="p">(</span><span class="o">-</span><span class="n">exponent</span><span class="o">/</span><span class="mf">2.</span><span class="p">)</span>
+    
+    <span class="n">w</span> <span class="o">=</span> <span class="n">s_scale</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">w</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">*=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="p">(</span><span class="n">samples</span> <span class="o">%</span> <span class="mi">2</span><span class="p">))</span> <span class="o">/</span> <span class="mf">2.</span>
+    <span class="n">sigma</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">npsum</span><span class="p">(</span><span class="n">w</span><span class="o">**</span><span class="mi">2</span><span class="p">))</span> <span class="o">/</span> <span class="n">samples</span>
+    
+    <span class="n">size</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+
+    <span class="n">dims_to_add</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">size</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+    <span class="n">s_scale</span> <span class="o">=</span> <span class="n">s_scale</span><span class="p">[(</span><span class="n">newaxis</span><span class="p">,)</span> <span class="o">*</span> <span class="n">dims_to_add</span> <span class="o">+</span> <span class="p">(</span><span class="bp">Ellipsis</span><span class="p">,)]</span>
+    
+    <span class="n">normal_dist</span> <span class="o">=</span> <span class="n">_get_normal_distribution</span><span class="p">(</span><span class="n">random_state</span><span class="p">)</span>
+
+    <span class="n">sr</span> <span class="o">=</span> <span class="n">normal_dist</span><span class="p">(</span><span class="n">scale</span><span class="o">=</span><span class="n">s_scale</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">size</span><span class="p">)</span>
+    <span class="n">si</span> <span class="o">=</span> <span class="n">normal_dist</span><span class="p">(</span><span class="n">scale</span><span class="o">=</span><span class="n">s_scale</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">size</span><span class="p">)</span>
+    
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">samples</span> <span class="o">%</span> <span class="mi">2</span><span class="p">):</span>
+        <span class="n">si</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">sr</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">*=</span> <span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+    
+    <span class="n">si</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">sr</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">*=</span> <span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+    
+    <span class="n">s</span> <span class="o">=</span> <span class="n">sr</span> <span class="o">+</span> <span class="mi">1</span><span class="n">J</span> <span class="o">*</span> <span class="n">si</span>
+
+    <span class="n">y</span> <span class="o">=</span> <span class="n">irfft</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="n">samples</span><span class="p">,</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span> <span class="o">/</span> <span class="n">sigma</span>
+    
+    <span class="k">return</span> <span class="n">y</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_get_normal_distribution</span><span class="p">(</span><span class="n">random_state</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Generator</span><span class="p">,</span> <span class="n">RandomState</span><span class="p">]]):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Возвращает генератор случайных чисел с нормальным распределением.</span>
+
+<span class="sd">    Параметры</span>
+<span class="sd">    ---------</span>
+<span class="sd">    random_state : Optional[Union[int, Generator, RandomState]]</span>
+<span class="sd">        Источник случайности.</span>
+<span class="sd">        </span>
+<span class="sd">    Возвращает</span>
+<span class="sd">    ----------</span>
+<span class="sd">    Callable</span>
+<span class="sd">        Функция генерации нормального распределения.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">normal_dist</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">random_state</span><span class="p">,</span> <span class="p">(</span><span class="n">integer</span><span class="p">,</span> <span class="nb">int</span><span class="p">))</span> <span class="ow">or</span> <span class="n">random_state</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">random_state</span> <span class="o">=</span> <span class="n">default_rng</span><span class="p">(</span><span class="n">random_state</span><span class="p">)</span>
+        <span class="n">normal_dist</span> <span class="o">=</span> <span class="n">random_state</span><span class="o">.</span><span class="n">normal</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">random_state</span><span class="p">,</span> <span class="p">(</span><span class="n">Generator</span><span class="p">,</span> <span class="n">RandomState</span><span class="p">)):</span>
+        <span class="n">normal_dist</span> <span class="o">=</span> <span class="n">random_state</span><span class="o">.</span><span class="n">normal</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;random_state must be one of integer, numpy.random.Generator, &quot;</span>
+            <span class="s2">&quot;numpy.random.Randomstate&quot;</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">normal_dist</span>
+
+
+<div class="viewcode-block" id="pink_noise_2d">
+<a class="viewcode-back" href="../../filters.html#filters.colored_noise.pink_noise_2d">[документация]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">pink_noise_2d</span><span class="p">(</span><span class="n">shape</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">alpha</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Генерирует 2D 1/f^a шум.</span>
+<span class="sd">    </span>
+<span class="sd">    Параметры</span>
+<span class="sd">    ---------</span>
+<span class="sd">    shape : Tuple[int, int]</span>
+<span class="sd">        Размер выходного массива шума.</span>
+<span class="sd">    alpha : float</span>
+<span class="sd">        Экспонента &#39;a&#39; 1/f^a шума.</span>
+<span class="sd">    </span>
+<span class="sd">    Возвращает</span>
+<span class="sd">    ----------</span>
+<span class="sd">    np.ndarray</span>
+<span class="sd">        Матрица шума.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">height</span><span class="p">,</span> <span class="n">width</span> <span class="o">=</span> <span class="n">shape</span>
+    
+    <span class="n">white_noise</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">height</span><span class="p">,</span> <span class="n">width</span><span class="p">)</span>
+
+    <span class="n">white_fft</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">fft2</span><span class="p">(</span><span class="n">white_noise</span><span class="p">)</span>
+
+    <span class="n">freqs_y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">fftfreq</span><span class="p">(</span><span class="n">height</span><span class="p">)</span>
+    <span class="n">freqs_x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">fftfreq</span><span class="p">(</span><span class="n">width</span><span class="p">)</span>
+    <span class="n">freq_mesh</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">meshgrid</span><span class="p">(</span><span class="n">freqs_y</span><span class="p">,</span> <span class="n">freqs_x</span><span class="p">,</span> <span class="n">indexing</span><span class="o">=</span><span class="s1">&#39;ij&#39;</span><span class="p">)</span>
+
+    <span class="n">radial_freq</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">freq_mesh</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">freq_mesh</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+
+    <span class="n">radial_freq_shifted</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">fftshift</span><span class="p">(</span><span class="n">radial_freq</span><span class="p">)</span>
+    <span class="n">white_fft_shifted</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">fftshift</span><span class="p">(</span><span class="n">white_fft</span><span class="p">)</span>
+    
+    <span class="k">with</span> <span class="n">np</span><span class="o">.</span><span class="n">errstate</span><span class="p">(</span><span class="n">divide</span><span class="o">=</span><span class="s1">&#39;ignore&#39;</span><span class="p">,</span> <span class="n">invalid</span><span class="o">=</span><span class="s1">&#39;ignore&#39;</span><span class="p">):</span>
+        <span class="n">scaling</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">radial_freq_shifted</span> <span class="o">==</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">radial_freq_shifted</span><span class="o">**</span><span class="p">(</span><span class="o">-</span><span class="n">alpha</span><span class="o">/</span><span class="mi">2</span><span class="p">))</span>
+        <span class="n">pink_fft_shifted</span> <span class="o">=</span> <span class="n">white_fft_shifted</span> <span class="o">*</span> <span class="n">scaling</span>
+    
+    <span class="n">pink_fft</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">ifftshift</span><span class="p">(</span><span class="n">pink_fft_shifted</span><span class="p">)</span>
+    <span class="n">pink_noise</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">real</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">ifft2</span><span class="p">(</span><span class="n">pink_fft</span><span class="p">))</span>
+    
+    <span class="n">pink_noise</span> <span class="o">=</span> <span class="n">pink_noise</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">pink_noise</span><span class="p">)</span> <span class="o">*</span> <span class="mf">255.0</span>
+    
+    <span class="k">return</span> <span class="n">pink_noise</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Авторские права 2024, Юров П.И., Беззаборов А.А., Куропатов К.Л., Малыш Я.В.. </p>
+  </div>
+
+  Собрано при помощи <a href="https://www.sphinx-doc.org/">Sphinx</a> с использованием
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">темы,</a>
+    предоставленной <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

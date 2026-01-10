@@ -1,0 +1,675 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="ru" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>processing.utils &mdash; документация BlindDeconvolution 1.0.0</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=e35015f7"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/translations.js?v=5b699b7f"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Алфавитный указатель" href="../../genindex.html" />
+    <link rel="search" title="Поиск" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            BlindDeconvolution
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Поиск в документации" aria-label="Поиск в документации" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Меню навигации">
+              <p class="caption" role="heading"><span class="caption-text">Содержание:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">blind_deconvolution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Меню навигации для мобильных устройств" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">BlindDeconvolution</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Навигация по страницам">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Код модуля</a></li>
+      <li class="breadcrumb-item active">processing.utils</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Исходный код processing.utils</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Вспомогательные классы и методы для управления изображениями и метриками.</span>
+
+<span class="sd">Автор: Юров П.И.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">cv2</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">cv</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Dict</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">processing.metrics</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">metrics</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">filters.blur</span><span class="w"> </span><span class="kn">import</span> <span class="n">Identical_kernel</span>
+
+<div class="viewcode-block" id="Image">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image">[документация]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Image</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Класс для управления путями к изображениям и метриками качества.</span>
+
+<span class="sd">    В последующем называется &quot;связью&quot;.</span>
+
+<span class="sd">    Атрибуты</span>
+<span class="sd">    --------</span>
+<span class="sd">    original_path : str</span>
+<span class="sd">        Путь к исходному изображению.</span>
+<span class="sd">    blurred_path : Optional[str]</span>
+<span class="sd">        Путь к размытому изображению (буфер).</span>
+<span class="sd">    blurred_array : np.ndarray</span>
+<span class="sd">        Несколько вариантов одного размытого изображения.</span>
+<span class="sd">    restored_paths : Dict[Tuple[str, str], str]</span>
+<span class="sd">        Список путей к восстановленным изображениям.</span>
+<span class="sd">    is_color : bool</span>
+<span class="sd">        Цветное или черно-белое изображение.</span>
+<span class="sd">    psnr : Dict[Tuple[str, str], float]</span>
+<span class="sd">        Значения PSNR для восстановленных изображений.</span>
+<span class="sd">    ssim : Dict[Tuple[str, str], float]</span>
+<span class="sd">        Значения SSIM для восстановленных изображений.</span>
+<span class="sd">    algorithm : np.ndarray</span>
+<span class="sd">        Названия использованных алгоритмов восстановления.</span>
+<span class="sd">    filters : Dict[str, str]</span>
+<span class="sd">        Названия использованных фильтров зашумления.</span>
+<span class="sd">    kernel_paths : Dict[Tuple[str, str], str]</span>
+<span class="sd">        Путь к полученным psf.</span>
+<span class="sd">    original_kernels_path : Dict[str, str]</span>
+<span class="sd">        Путь к изначальным psf.</span>
+<span class="sd">    current_filter : Optional[str]</span>
+<span class="sd">        Текущий фильтр.</span>
+<span class="sd">    blurred_psnr : Dict[str, float]</span>
+<span class="sd">        Значение PSNR для смазанных изображений.</span>
+<span class="sd">    blurred_ssim : Dict[str, float]</span>
+<span class="sd">        Значение SSIM для смазанных изображений.</span>
+<span class="sd">    preprocessed_blurred_path : Dict[str, str]</span>
+<span class="sd">        Изображения после выравнивания гистограмм и/или денойзинга.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    Структура связи:</span>
+<span class="sd">    </span>
+<span class="sd">    Основное изображение original_path - то, от чего начинается связь.</span>
+
+<span class="sd">    От него идет блок смазанных изображений:</span>
+<span class="sd">        - blurred_path - буфер смазанного изображения</span>
+<span class="sd">        - blurred_array - список всех смазанных изображений (кроме буфера)</span>
+<span class="sd">        - original_kernels_path[путь] - список всех ядер</span>
+<span class="sd">        - blurred_psnr, blurred_ssim[путь] - метрики для смазанных изображений</span>
+<span class="sd">        - current_filter, filters - буфер и список фильтров</span>
+
+<span class="sd">    От каждого смазанного идет блок восстановленных изображений:</span>
+<span class="sd">        - restored_paths[путь, алгоритм] - пути к восстановленным изображениям</span>
+<span class="sd">        - algorithm - все алгоритмы, которые применялись к связи</span>
+<span class="sd">        - psnr, ssim[путь, алгоритм] - метрики восстановленного изображения</span>
+<span class="sd">        - kernel_paths[путь, алгоритм] - восстановленные psf</span>
+<span class="sd">    </span>
+<span class="sd">    Класс необходим для того, чтобы автоматически определять последовательность и порядок картинок,</span>
+<span class="sd">    к которым применялись фильтры и методы восстановления</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="Image.__init__">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.__init__">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">original_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">is_color</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Инициализация с путем к исходному изображению.</span>
+
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        original_path : str</span>
+<span class="sd">            Путь к исходному изображению.</span>
+<span class="sd">        is_color : bool</span>
+<span class="sd">            Флаг цветного изображения.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">original_path</span> <span class="o">=</span> <span class="n">original_path</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">blurred_path</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">restored_paths</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">kernel_paths</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">original_kernels_path</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">is_color</span> <span class="o">=</span> <span class="n">is_color</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">psnr</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ssim</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">algorithm</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([])</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">filters</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">blurred_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_filter</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">blurred_psnr</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">blurred_ssim</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">preprocessed_blurred_path</span> <span class="o">=</span> <span class="p">{}</span></div>
+
+    
+<div class="viewcode-block" id="Image.set_preprocessed_blurred_path">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.set_preprocessed_blurred_path">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_preprocessed_blurred_path</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">preprocessed_blurred_path</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Переопределяет изображение для предобработки.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">preprocessed_blurred_path</span> <span class="o">=</span> <span class="n">preprocessed_blurred_path</span></div>
+
+
+<div class="viewcode-block" id="Image.add_preprocessed_blurred_path">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.add_preprocessed_blurred_path">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_preprocessed_blurred_path</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">blurred_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">preprocessed_blurred_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Добавляет изображение для предобработки.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">preprocessed_blurred_path</span><span class="p">[</span><span class="n">blurred_path</span><span class="p">]</span> <span class="o">=</span> <span class="n">preprocessed_blurred_path</span></div>
+
+
+<div class="viewcode-block" id="Image.get_preprocessed_blurred_path">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.get_preprocessed_blurred_path">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_preprocessed_blurred_path</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Возвращает путь до изображения для предобработки.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">preprocessed_blurred_path</span></div>
+
+
+<div class="viewcode-block" id="Image.set_blurred_PSNR">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.set_blurred_PSNR">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_blurred_PSNR</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">psnr</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">])</span>  <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Полностью переопределяет PSNR смазанных изображений.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">blurred_psnr</span> <span class="o">=</span> <span class="n">psnr</span></div>
+
+
+<div class="viewcode-block" id="Image.get_blurred_PSNR">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.get_blurred_PSNR">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_blurred_PSNR</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Возвращает список значений PSNR для смазанных изображений.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">blurred_psnr</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="Image.add_blurred_PSNR">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.add_blurred_PSNR">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_blurred_PSNR</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">psnr</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">blurred_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Добавляет/переопределяет значение psnr для конкретного смазанного изображения.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">blurred_psnr</span><span class="p">[</span><span class="n">blurred_path</span><span class="p">]</span> <span class="o">=</span> <span class="n">psnr</span></div>
+
+
+<div class="viewcode-block" id="Image.set_blurred_SSIM">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.set_blurred_SSIM">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_blurred_SSIM</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ssim</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Полностью переопределяет SSIM смазанных изображений.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">blurred_ssim</span> <span class="o">=</span> <span class="n">ssim</span></div>
+
+
+<div class="viewcode-block" id="Image.get_blurred_SSIM">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.get_blurred_SSIM">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_blurred_SSIM</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Возвращает список значений SSIM смазанных изображений.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">blurred_ssim</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="Image.add_blurred_SSIM">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.add_blurred_SSIM">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_blurred_SSIM</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ssim</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">blurred_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Добавляет/переопределяет значений SSIM для конкретного смазанного изображения.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">blurred_ssim</span><span class="p">[</span><span class="n">blurred_path</span><span class="p">]</span> <span class="o">=</span> <span class="n">ssim</span></div>
+
+    
+<div class="viewcode-block" id="Image.get_original_kernels">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.get_original_kernels">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_original_kernels</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Возвращает список путей к ядрам смазанных изображений.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">original_kernels_path</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="Image.set_original_kernels">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.set_original_kernels">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_original_kernels</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">kernels</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Полностью переопределяет пути к ядрам смазанных изображений.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">original_kernels_path</span> <span class="o">=</span> <span class="n">kernels</span></div>
+
+
+<div class="viewcode-block" id="Image.add_original_kernel">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.add_original_kernel">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_original_kernel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">kernel</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">blur_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Добавляет/переопределяет путь к ядру конкретного смазанного изображения.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">original_kernels_path</span><span class="p">[</span><span class="n">blur_path</span><span class="p">]</span> <span class="o">=</span> <span class="n">kernel</span></div>
+
+
+<div class="viewcode-block" id="Image.get_kernels">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.get_kernels">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_kernels</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Возвращает список путей к ядрам восстановленных изображений.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">kernel_paths</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="Image.set_kernels">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.set_kernels">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_kernels</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">kernels</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Полностью переопределяет пути к ядрам восстановленных изображений.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">kernel_paths</span> <span class="o">=</span> <span class="n">kernels</span></div>
+
+
+<div class="viewcode-block" id="Image.add_kernel">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.add_kernel">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_kernel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+                   <span class="n">kernel</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> 
+                   <span class="n">blur_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> 
+                   <span class="n">alg_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Добавляет/переопределяет путь к ядру конкретного метода для смазанного изображения.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">kernel_paths</span><span class="p">[(</span><span class="n">blur_path</span><span class="p">,</span> <span class="n">alg_path</span><span class="p">)]</span> <span class="o">=</span> <span class="n">kernel</span></div>
+
+
+<div class="viewcode-block" id="Image.save_filter">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.save_filter">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">save_filter</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Сохраняет буфер смазанного изображения в общий список.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">blurred_path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">filters</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">blurred_path</span><span class="p">)]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_filter</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">blurred_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">blurred_array</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">blurred_path</span><span class="p">)</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_filter</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">blurred_path</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="Image.load">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.load">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Загружает в буфер из общего списка смазанное изображение.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">index</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_len_filter</span><span class="p">():</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">current</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;index out of bounds, load empty&quot;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">current_filter</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">blurred_path</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="k">return</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_filter</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span>
+                <span class="s2">&quot;current blurred image is not empty; &quot;</span>
+                <span class="s2">&quot;save it if you do not want to lose it&quot;</span>
+            <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">blurred_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">blurred_array</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">blurred_path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">current_filter</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">filters</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">blurred_path</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">current_filter</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">blurred_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">blurred_array</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Image.get_len_filter">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.get_len_filter">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_len_filter</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Возращает длину общего списка смазанных изображений (не учитывает буфер).&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filters</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">blurred_array</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span>
+                <span class="s2">&quot;filters and blurred images have different counts &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filters</span><span class="p">)</span><span class="si">}</span><span class="s2"> vs </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">blurred_array</span><span class="p">)</span><span class="si">}</span><span class="s2">)&quot;</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filters</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Image.get_len_algorithms">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.get_len_algorithms">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_len_algorithms</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Возвращает количество примененных алгоритмов.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">algorithm</span><span class="p">)</span>  <span class="c1"># +1 current</span></div>
+
+
+<div class="viewcode-block" id="Image.get_blurred_array">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.get_blurred_array">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_blurred_array</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Возвращает список путей к смазанным изображениям (кроме буфера).&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">blurred_array</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="Image.set_blurred_array">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.set_blurred_array">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_blurred_array</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">array</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Полностью переопределяет пути к смазанным изображениям (кроме буфера).&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">blurred_array</span> <span class="o">=</span> <span class="n">array</span></div>
+
+
+<div class="viewcode-block" id="Image.get_filters">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.get_filters">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_filters</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Возвращает список фильтров.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">filters</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="Image.set_filters">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.set_filters">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_filters</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filters</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Полностью переопределяет список фильтров.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">filters</span> <span class="o">=</span> <span class="n">filters</span></div>
+
+
+<div class="viewcode-block" id="Image.set_current_filter">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.set_current_filter">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_current_filter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filter_str</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Полностью переопределяет буфер фильров.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_filter</span> <span class="o">=</span> <span class="n">filter_str</span></div>
+
+
+<div class="viewcode-block" id="Image.get_current_filter">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.get_current_filter">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_current_filter</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Возвращает буфер фильтров.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_filter</span></div>
+
+
+<div class="viewcode-block" id="Image.add_to_current_filter">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.add_to_current_filter">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_to_current_filter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filter_str</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Добавляет фильтр к списку в буфере фильтров.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_filter</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">current_filter</span> <span class="o">=</span> <span class="n">filter_str</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">current_filter</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">current_filter</span><span class="si">}{</span><span class="n">filter_str</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+
+<div class="viewcode-block" id="Image.set_original">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.set_original">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_original</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">original_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Полностью переопределяет оригинальное изображение.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">original_path</span> <span class="o">=</span> <span class="n">original_path</span></div>
+
+
+<div class="viewcode-block" id="Image.set_blurred">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.set_blurred">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_blurred</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">blurred_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Полностью переопределяет буфер смазанных изображений.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">blurred_path</span> <span class="o">=</span> <span class="n">blurred_path</span></div>
+
+
+<div class="viewcode-block" id="Image.set_restored">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.set_restored">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_restored</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">restored_paths</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Полностью переопределяет восстановленные изображения.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">restored_paths</span> <span class="o">=</span> <span class="n">restored_paths</span></div>
+
+
+<div class="viewcode-block" id="Image.add_restored">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.add_restored">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_restored</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+                     <span class="n">restored_paths</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> 
+                     <span class="n">blur_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> 
+                     <span class="n">alg_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Добавляет/переопределяет путь восстановленного изображения.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">restored_paths</span><span class="p">[(</span><span class="n">blur_path</span><span class="p">,</span> <span class="n">alg_name</span><span class="p">)]</span> <span class="o">=</span> <span class="n">restored_paths</span></div>
+
+
+<div class="viewcode-block" id="Image.get_original">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.get_original">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_original</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Возвращает путь к оригинальному изображению.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">original_path</span></div>
+
+
+<div class="viewcode-block" id="Image.get_blurred">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.get_blurred">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_blurred</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Возвращает путь к смазанному изображению из буфера.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">blurred_path</span></div>
+
+
+<div class="viewcode-block" id="Image.get_restored">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.get_restored">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_restored</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Возвращает список восстановленных изображений.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">restored_paths</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>  </div>
+
+
+<div class="viewcode-block" id="Image.get_color">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.get_color">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_color</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Возвращает флаг цвета.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_color</span></div>
+
+
+<div class="viewcode-block" id="Image.set_PSNR">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.set_PSNR">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_PSNR</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">psnr</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Полностью переопределяет PSNR восстановленных изображений.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">psnr</span> <span class="o">=</span> <span class="n">psnr</span></div>
+
+
+<div class="viewcode-block" id="Image.set_SSIM">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.set_SSIM">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_SSIM</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ssim</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Полностью переопределяет SSIM восстановленных изображений.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ssim</span> <span class="o">=</span> <span class="n">ssim</span></div>
+
+
+<div class="viewcode-block" id="Image.add_PSNR">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.add_PSNR">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_PSNR</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">psnr</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">blur_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">alg_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Добавляет/переопределяет PSNR конкретного восстановленного изображения.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">psnr</span><span class="p">[(</span><span class="n">blur_path</span><span class="p">,</span> <span class="n">alg_name</span><span class="p">)]</span> <span class="o">=</span> <span class="n">psnr</span></div>
+
+
+<div class="viewcode-block" id="Image.add_SSIM">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.add_SSIM">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_SSIM</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ssim</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">blur_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">alg_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Добавляет/переопределяет SSIM конкретного воссстановленного изображения.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ssim</span><span class="p">[(</span><span class="n">blur_path</span><span class="p">,</span> <span class="n">alg_name</span><span class="p">)]</span> <span class="o">=</span> <span class="n">ssim</span></div>
+
+
+<div class="viewcode-block" id="Image.get_PSNR">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.get_PSNR">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_PSNR</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Возвращает список PSNR восстановленных изображений.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">psnr</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="Image.get_SSIM">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.get_SSIM">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_SSIM</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Возвращает список SSIM восстановленных изображений.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ssim</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span> </div>
+
+
+<div class="viewcode-block" id="Image.set_algorithm">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.set_algorithm">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_algorithm</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">algorithm</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Полностью переопределяет список алгоритмов восстановления.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">algorithm</span> <span class="o">=</span> <span class="n">algorithm</span></div>
+
+
+<div class="viewcode-block" id="Image.add_algorithm">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.add_algorithm">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_algorithm</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">algorithm</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Добавляет алгоритм для восстановления изображения в список.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">algorithm</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+            <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">algorithm</span><span class="p">,</span> <span class="n">algorithm</span><span class="p">)))</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Image.get_algorithm">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.get_algorithm">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_algorithm</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Возвращает список алгоритмов, примененных для восстановления.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">algorithm</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="Image.get_original_image">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.get_original_image">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_original_image</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Возвращает оригинальное изображение как массив.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">cv</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">original_path</span><span class="p">,</span>
+            <span class="n">cv</span><span class="o">.</span><span class="n">IMREAD_COLOR</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_color</span> <span class="k">else</span> <span class="n">cv</span><span class="o">.</span><span class="n">IMREAD_GRAYSCALE</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Image.get_blurred_image">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.get_blurred_image">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_blurred_image</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Возвращает смазанное изображение из буфера как массив.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">blurred_path</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="n">cv</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">blurred_path</span><span class="p">,</span> 
+            <span class="n">cv</span><span class="o">.</span><span class="n">IMREAD_COLOR</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_color</span> <span class="k">else</span> <span class="n">cv</span><span class="o">.</span><span class="n">IMREAD_GRAYSCALE</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Image.get_all_blurred_images">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.get_all_blurred_images">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_all_blurred_images</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">-&gt;</span><span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Возвращает все смазанные изображения как массивы.&quot;&quot;&quot;</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">cv</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">cv</span><span class="o">.</span><span class="n">IMREAD_COLOR</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_color</span> <span class="k">else</span> <span class="n">cv</span><span class="o">.</span><span class="n">IMREAD_GRAYSCALE</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">blurred_array</span>
+        <span class="p">]</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">blurred_path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="n">res</span><span class="p">,</span>
+                <span class="n">cv</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">blurred_path</span><span class="p">,</span>
+                    <span class="n">cv</span><span class="o">.</span><span class="n">IMREAD_COLOR</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_color</span> <span class="k">else</span> <span class="n">cv</span><span class="o">.</span><span class="n">IMREAD_GRAYSCALE</span><span class="p">,</span>
+                <span class="p">),</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">res</span></div>
+
+
+<div class="viewcode-block" id="Image.get_all_filters">
+<a class="viewcode-back" href="../../processing.html#processing.utils.Image.get_all_filters">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_all_filters</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">-&gt;</span><span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Возращает список всех фильтров смаза.&quot;&quot;&quot;</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">filters</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_filter</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">res</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_filter</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">res</span></div>
+</div>
+
+        
+
+<div class="viewcode-block" id="imread">
+<a class="viewcode-back" href="../../processing.html#processing.utils.imread">[документация]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">imread</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">color</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Загружает изображение соответствующего цветового формата.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">path</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="n">cv</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">cv</span><span class="o">.</span><span class="n">IMREAD_COLOR</span> <span class="k">if</span> <span class="n">color</span> <span class="k">else</span> <span class="n">cv</span><span class="o">.</span><span class="n">IMREAD_GRAYSCALE</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="float_img_to_int">
+<a class="viewcode-back" href="../../processing.html#processing.utils.float_img_to_int">[документация]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">float_img_to_int</span><span class="p">(</span><span class="n">image</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Переводит изображение из диапазона [0.0, 1.0] в диапазон [0, 255].&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">image</span><span class="o">*</span><span class="mf">255.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">255.0</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int16</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="prepare_image_for_metric">
+<a class="viewcode-back" href="../../processing.html#processing.utils.prepare_image_for_metric">[документация]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">prepare_image_for_metric</span><span class="p">(</span><span class="n">image</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Подготовка изображения для расчета метрик с нормализацией.&quot;&quot;&quot;</span>
+        <span class="n">image</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">image</span><span class="o">.</span><span class="n">copy</span><span class="p">(),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">image</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mf">1.0</span><span class="p">:</span>
+            <span class="n">image</span> <span class="o">=</span> <span class="n">image</span> <span class="o">/</span> <span class="mf">255.0</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">image</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="n">image</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+        
+        <span class="n">image</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">image</span></div>
+
+
+<div class="viewcode-block" id="generate_unique_file_path">
+<a class="viewcode-back" href="../../processing.html#processing.utils.generate_unique_file_path">[документация]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">generate_unique_file_path</span><span class="p">(</span><span class="n">directory</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> 
+                                <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Генерация уникального пути к файлу.&quot;&quot;&quot;</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="n">directory</span> <span class="o">/</span> <span class="n">filename</span>
+    <span class="n">counter</span> <span class="o">=</span> <span class="mi">1</span>
+    
+    <span class="k">while</span> <span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="n">stem</span><span class="p">,</span> <span class="n">suffix</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span><span class="o">.</span><span class="n">stem</span><span class="p">,</span> <span class="n">Path</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span><span class="o">.</span><span class="n">suffix</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">directory</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">stem</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">counter</span><span class="si">}{</span><span class="n">suffix</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="n">counter</span> <span class="o">+=</span> <span class="mi">1</span>
+    
+    <span class="k">return</span> <span class="n">path</span></div>
+
+
+<div class="viewcode-block" id="calculate_metrics">
+<a class="viewcode-back" href="../../processing.html#processing.utils.calculate_metrics">[документация]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">calculate_metrics</span><span class="p">(</span><span class="n">original_image</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> 
+                       <span class="n">restored_image</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> 
+                       <span class="n">data_range</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Расчет метрик восстановления.&quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">psnr_val</span> <span class="o">=</span> <span class="n">metrics</span><span class="o">.</span><span class="n">PSNR</span><span class="p">(</span><span class="n">original_image</span><span class="p">,</span> <span class="n">restored_image</span><span class="p">)</span>
+    <span class="k">except</span><span class="p">:</span>
+        <span class="n">psnr_val</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">nan</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">ssim_val</span> <span class="o">=</span> <span class="n">metrics</span><span class="o">.</span><span class="n">SSIM</span><span class="p">(</span><span class="n">original_image</span><span class="p">,</span> <span class="n">restored_image</span><span class="p">,</span> <span class="n">data_range</span><span class="o">=</span><span class="n">data_range</span><span class="p">)</span>
+    <span class="k">except</span><span class="p">:</span>
+        <span class="n">ssim_val</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">nan</span> 
+    <span class="k">return</span> <span class="n">psnr_val</span><span class="p">,</span> <span class="n">ssim_val</span> </div>
+
+
+
+
+
+
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Авторские права 2024, Юров П.И., Беззаборов А.А., Куропатов К.Л., Малыш Я.В.. </p>
+  </div>
+
+  Собрано при помощи <a href="https://www.sphinx-doc.org/">Sphinx</a> с использованием
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">темы,</a>
+    предоставленной <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

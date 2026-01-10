@@ -1,0 +1,434 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="ru" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>processing.display &mdash; документация BlindDeconvolution 1.0.0</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=e35015f7"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/translations.js?v=5b699b7f"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Алфавитный указатель" href="../../genindex.html" />
+    <link rel="search" title="Поиск" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            BlindDeconvolution
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Поиск в документации" aria-label="Поиск в документации" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Меню навигации">
+              <p class="caption" role="heading"><span class="caption-text">Содержание:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">blind_deconvolution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Меню навигации для мобильных устройств" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">BlindDeconvolution</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Навигация по страницам">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Код модуля</a></li>
+      <li class="breadcrumb-item active">processing.display</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Исходный код processing.display</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Модуль вывода связей из фреймворка на экран.</span>
+
+<span class="sd">Выводит оригинальное изображение, смазанное, метрики смазанного,</span>
+<span class="sd">ядро смаза, предобработанное, восстановленное, ядро восстановленного,</span>
+<span class="sd">метрики восстановленного, зашифрованный фильтр смаза.</span>
+
+<span class="sd">Авторы: Юров П.И., Беззаборов А.А., Куропатов К.Л.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">cv2</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">cv</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Any</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">processing.utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">Image</span><span class="p">,</span>
+    <span class="n">imread</span>
+<span class="p">)</span>
+
+<div class="viewcode-block" id="ModuleDisplay">
+<a class="viewcode-back" href="../../processing.html#processing.display.ModuleDisplay">[документация]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ModuleDisplay</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Модуль вывода связей из фреймворка на экран.</span>
+
+<span class="sd">    Выводит оригинальное изображение, смазанное, метрики смазанного,</span>
+<span class="sd">    ядро смаза, предобработанное, восстановленное, ядро восстановленного,</span>
+<span class="sd">    метрики восстановленного, зашифрованный фильтр смаза.</span>
+
+<span class="sd">    Возможности:</span>
+<span class="sd">        - Вывод ядер под изображением.</span>
+<span class="sd">        - Вывод ядер сбоку.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+<div class="viewcode-block" id="ModuleDisplay.__init__">
+<a class="viewcode-back" href="../../processing.html#processing.display.ModuleDisplay.__init__">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">processing_instance</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Инициализация.</span>
+<span class="sd">        </span>
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        processing_instance : Any</span>
+<span class="sd">            Ссылка на объект Processing с изображениями.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">processing</span> <span class="o">=</span> <span class="n">processing_instance</span></div>
+
+    
+<div class="viewcode-block" id="ModuleDisplay.show">
+<a class="viewcode-back" href="../../processing.html#processing.display.ModuleDisplay.show">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">show</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+             <span class="n">size</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> 
+             <span class="n">kernel_intencity_scale</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> 
+             <span class="n">kernel_size</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Вывод всех изображений: оригинал, размытые, восстановленные + метрики.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">processing</span><span class="o">.</span><span class="n">images</span><span class="o">.</span><span class="n">size</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Нет изображений для отображения&quot;</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="n">h</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">alg_arr</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">img_obj</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">processing</span><span class="o">.</span><span class="n">images</span><span class="p">:</span>
+            <span class="n">img_obj</span><span class="o">.</span><span class="n">save_filter</span><span class="p">()</span>
+            <span class="n">h</span> <span class="o">+=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="n">img_obj</span><span class="o">.</span><span class="n">get_len_filter</span><span class="p">())</span>
+            <span class="n">alg_arr</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">img_obj</span><span class="o">.</span><span class="n">get_algorithm</span><span class="p">())</span>
+        
+        <span class="n">alg_arr</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">alg_arr</span><span class="p">))</span>
+        <span class="n">w</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">alg_arr</span><span class="p">)</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span>
+        
+        <span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">h</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span> <span class="o">*</span> <span class="n">w</span> <span class="o">*</span> <span class="n">size</span><span class="p">,</span> <span class="mi">8</span> <span class="o">*</span> <span class="n">h</span> <span class="o">*</span> <span class="n">size</span><span class="p">))</span>
+        <span class="n">line</span> <span class="o">=</span> <span class="mi">0</span>
+        
+        <span class="k">for</span> <span class="n">img_obj</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">processing</span><span class="o">.</span><span class="n">images</span><span class="p">:</span>
+            <span class="n">line</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_plot_single_image</span><span class="p">(</span><span class="n">img_obj</span><span class="p">,</span> <span class="n">alg_arr</span><span class="p">,</span> <span class="n">axes</span><span class="p">,</span> 
+                                           <span class="n">line</span><span class="p">,</span> <span class="n">kernel_intencity_scale</span><span class="p">,</span> <span class="n">kernel_size</span><span class="p">)</span>
+            <span class="n">img_obj</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">img_obj</span><span class="o">.</span><span class="n">get_len_filter</span><span class="p">()</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+
+        <span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">&quot; &quot;</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.02</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">14</span> <span class="o">*</span> <span class="n">size</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_plot_single_image</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+                           <span class="n">img_obj</span><span class="p">:</span> <span class="n">Image</span><span class="p">,</span> 
+                           <span class="n">alg_arr</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> 
+                           <span class="n">axes</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> 
+                           <span class="n">line</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> 
+                           <span class="n">kernel_intencity_scale</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+                           <span class="n">kernel_size</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Отрисовка одного изображения со всеми его размытыми вариантами.&quot;&quot;&quot;</span>
+        <span class="n">original_image</span> <span class="o">=</span> <span class="n">img_obj</span><span class="o">.</span><span class="n">get_original_image</span><span class="p">()</span>
+        <span class="n">restored_psnr</span> <span class="o">=</span> <span class="n">img_obj</span><span class="o">.</span><span class="n">get_PSNR</span><span class="p">()</span>
+        <span class="n">restored_ssim</span> <span class="o">=</span> <span class="n">img_obj</span><span class="o">.</span><span class="n">get_SSIM</span><span class="p">()</span>
+        <span class="n">restored_paths</span> <span class="o">=</span> <span class="n">img_obj</span><span class="o">.</span><span class="n">get_restored</span><span class="p">()</span>
+        <span class="n">blurred_psnr</span> <span class="o">=</span> <span class="n">img_obj</span><span class="o">.</span><span class="n">get_blurred_PSNR</span><span class="p">()</span>
+        <span class="n">blurred_ssim</span> <span class="o">=</span> <span class="n">img_obj</span><span class="o">.</span><span class="n">get_blurred_SSIM</span><span class="p">()</span>
+        <span class="n">original_kernels</span> <span class="o">=</span> <span class="n">img_obj</span><span class="o">.</span><span class="n">get_original_kernels</span><span class="p">()</span>
+        <span class="n">kernels</span> <span class="o">=</span> <span class="n">img_obj</span><span class="o">.</span><span class="n">get_kernels</span><span class="p">()</span>
+        <span class="n">filter_name</span> <span class="o">=</span> <span class="n">img_obj</span><span class="o">.</span><span class="n">get_filters</span><span class="p">()</span>
+
+        <span class="k">for</span> <span class="n">blurred_path</span> <span class="ow">in</span> <span class="n">img_obj</span><span class="o">.</span><span class="n">get_blurred_array</span><span class="p">():</span>
+            <span class="n">preprocess_path</span> <span class="o">=</span> <span class="n">img_obj</span><span class="o">.</span><span class="n">get_preprocessed_blurred_path</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">blurred_path</span><span class="p">,</span> <span class="n">blurred_path</span><span class="p">)</span>
+            <span class="n">line</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_plot_images_line</span><span class="p">(</span><span class="n">img_obj</span><span class="p">,</span> <span class="n">blurred_path</span><span class="p">,</span> <span class="n">preprocess_path</span><span class="p">,</span> <span class="n">original_image</span><span class="p">,</span> <span class="n">alg_arr</span><span class="p">,</span> 
+                                        <span class="n">restored_psnr</span><span class="p">,</span> <span class="n">restored_ssim</span><span class="p">,</span> <span class="n">restored_paths</span><span class="p">,</span>
+                                        <span class="n">blurred_psnr</span><span class="p">,</span> <span class="n">blurred_ssim</span><span class="p">,</span> <span class="n">axes</span><span class="p">,</span> <span class="n">line</span><span class="p">,</span> <span class="n">filter_name</span><span class="p">)</span>
+            
+            <span class="n">line</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_plot_kernels_line</span><span class="p">(</span><span class="n">img_obj</span><span class="p">,</span> <span class="n">blurred_path</span><span class="p">,</span> <span class="n">alg_arr</span><span class="p">,</span> <span class="n">original_kernels</span><span class="p">,</span>
+                                        <span class="n">kernels</span><span class="p">,</span> <span class="n">axes</span><span class="p">,</span> <span class="n">line</span><span class="p">,</span> <span class="n">kernel_intencity_scale</span><span class="p">,</span><span class="n">kernel_size</span><span class="p">)</span>
+        
+        <span class="k">return</span> <span class="n">line</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_plot_images_line</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+                          <span class="n">img_obj</span><span class="p">:</span> <span class="n">Image</span><span class="p">,</span> 
+                          <span class="n">blurred_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> 
+                          <span class="n">preprocess_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+                          <span class="n">original_image</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> 
+                          <span class="n">alg_arr</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> 
+                          <span class="n">restored_psnr</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="nb">str</span><span class="p">],</span> 
+                          <span class="n">restored_ssim</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="nb">str</span><span class="p">],</span> 
+                          <span class="n">restored_paths</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="nb">str</span><span class="p">],</span> 
+                          <span class="n">blurred_psnr</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span> 
+                          <span class="n">blurred_ssim</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span> 
+                          <span class="n">axes</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> 
+                          <span class="n">line</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> 
+                          <span class="n">filters_name</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Отрисовка строки с изображениями.&quot;&quot;&quot;</span>
+        <span class="n">blurred_image</span> <span class="o">=</span> <span class="n">imread</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">blurred_path</span><span class="p">),</span> <span class="n">img_obj</span><span class="o">.</span><span class="n">get_color</span><span class="p">())</span>
+        <span class="n">preprocess_image</span> <span class="o">=</span> <span class="n">imread</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">preprocess_path</span><span class="p">),</span> <span class="n">img_obj</span><span class="o">.</span><span class="n">get_color</span><span class="p">())</span>
+        
+        <span class="n">plt</span><span class="o">.</span><span class="n">subplots_adjust</span><span class="p">(</span><span class="n">hspace</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+
+        <span class="n">axes</span><span class="p">[</span><span class="n">line</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">cv</span><span class="o">.</span><span class="n">cvtColor</span><span class="p">(</span><span class="n">original_image</span><span class="p">,</span> <span class="n">cv</span><span class="o">.</span><span class="n">COLOR_BGR2RGB</span><span class="p">))</span>
+        <span class="n">axes</span><span class="p">[</span><span class="n">line</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Original&quot;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span>
+        <span class="n">axes</span><span class="p">[</span><span class="n">line</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s1">&#39;off&#39;</span><span class="p">)</span>
+        
+        <span class="n">psnr_val</span> <span class="o">=</span> <span class="n">blurred_psnr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">blurred_path</span><span class="p">),</span> <span class="n">math</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span>
+        <span class="n">ssim_val</span> <span class="o">=</span> <span class="n">blurred_ssim</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">blurred_path</span><span class="p">),</span> <span class="n">math</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span>
+        <span class="n">filter_name</span> <span class="o">=</span> <span class="n">filters_name</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">blurred_path</span><span class="p">),</span> <span class="s1">&#39;missing&#39;</span><span class="p">)</span>
+
+        <span class="n">axes</span><span class="p">[</span><span class="n">line</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">cv</span><span class="o">.</span><span class="n">cvtColor</span><span class="p">(</span><span class="n">blurred_image</span><span class="p">,</span> <span class="n">cv</span><span class="o">.</span><span class="n">COLOR_BGR2RGB</span><span class="p">))</span>
+        <span class="n">axes</span><span class="p">[</span><span class="n">line</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">filter_name</span><span class="si">}</span><span class="se">\n\n</span><span class="s2">Distorted</span><span class="se">\n</span><span class="s2">PSNR: </span><span class="si">{</span><span class="n">psnr_val</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> | SSIM: </span><span class="si">{</span><span class="n">ssim_val</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> 
+                                <span class="n">fontsize</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+        <span class="n">axes</span><span class="p">[</span><span class="n">line</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s1">&#39;off&#39;</span><span class="p">)</span>
+
+        <span class="n">axes</span><span class="p">[</span><span class="n">line</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">cv</span><span class="o">.</span><span class="n">cvtColor</span><span class="p">(</span><span class="n">preprocess_image</span><span class="p">,</span> <span class="n">cv</span><span class="o">.</span><span class="n">COLOR_BGR2RGB</span><span class="p">))</span>
+        <span class="n">axes</span><span class="p">[</span><span class="n">line</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Prepreocessed Image&quot;</span><span class="p">,</span> 
+                                <span class="n">fontsize</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+        <span class="n">axes</span><span class="p">[</span><span class="n">line</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s1">&#39;off&#39;</span><span class="p">)</span>
+        
+        <span class="k">for</span> <span class="n">col</span><span class="p">,</span> <span class="n">alg_name</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">alg_arr</span><span class="p">,</span> <span class="mi">3</span><span class="p">):</span>
+            <span class="n">axes</span><span class="p">[</span><span class="n">line</span><span class="p">,</span> <span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s1">&#39;off&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_plot_restored_image</span><span class="p">(</span><span class="n">img_obj</span><span class="p">,</span> <span class="n">blurred_path</span><span class="p">,</span> <span class="n">alg_name</span><span class="p">,</span> <span class="n">restored_psnr</span><span class="p">,</span> 
+                                    <span class="n">restored_ssim</span><span class="p">,</span> <span class="n">restored_paths</span><span class="p">,</span> <span class="n">axes</span><span class="p">,</span> <span class="n">line</span><span class="p">,</span> <span class="n">col</span><span class="p">)</span>
+        
+        <span class="k">return</span> <span class="n">line</span> <span class="o">+</span> <span class="mi">1</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_plot_restored_image</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+                             <span class="n">img_obj</span><span class="p">:</span> <span class="n">Image</span><span class="p">,</span> 
+                             <span class="n">blurred_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> 
+                             <span class="n">alg_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> 
+                             <span class="n">restored_psnr</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="nb">str</span><span class="p">],</span> 
+                             <span class="n">restored_ssim</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="nb">str</span><span class="p">],</span> 
+                             <span class="n">restored_paths</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="nb">str</span><span class="p">],</span> 
+                             <span class="n">axes</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> 
+                             <span class="n">line</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> 
+                             <span class="n">col</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Отрисовка одного восстановленного изображения.&quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">restored_path</span> <span class="o">=</span> <span class="n">restored_paths</span><span class="o">.</span><span class="n">get</span><span class="p">((</span><span class="nb">str</span><span class="p">(</span><span class="n">blurred_path</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">alg_name</span><span class="p">)))</span>
+            <span class="k">if</span> <span class="n">restored_path</span><span class="p">:</span>
+                <span class="n">restored_image</span> <span class="o">=</span> <span class="n">imread</span><span class="p">(</span><span class="n">restored_path</span><span class="p">,</span> <span class="n">img_obj</span><span class="o">.</span><span class="n">get_color</span><span class="p">())</span>
+                <span class="k">if</span> <span class="n">restored_image</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">psnr_val</span> <span class="o">=</span> <span class="n">restored_psnr</span><span class="o">.</span><span class="n">get</span><span class="p">((</span><span class="nb">str</span><span class="p">(</span><span class="n">blurred_path</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">alg_name</span><span class="p">)),</span> <span class="n">math</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span>
+                    <span class="n">ssim_val</span> <span class="o">=</span> <span class="n">restored_ssim</span><span class="o">.</span><span class="n">get</span><span class="p">((</span><span class="nb">str</span><span class="p">(</span><span class="n">blurred_path</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">alg_name</span><span class="p">)),</span> <span class="n">math</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span>
+                    
+                    <span class="n">axes</span><span class="p">[</span><span class="n">line</span><span class="p">,</span> <span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">cv</span><span class="o">.</span><span class="n">cvtColor</span><span class="p">(</span><span class="n">restored_image</span><span class="p">,</span> <span class="n">cv</span><span class="o">.</span><span class="n">COLOR_BGR2RGB</span><span class="p">))</span>
+                    <span class="n">axes</span><span class="p">[</span><span class="n">line</span><span class="p">,</span> <span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">alg_name</span><span class="si">}</span><span class="se">\n</span><span class="s2">PSNR: </span><span class="si">{</span><span class="n">psnr_val</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> | SSIM: </span><span class="si">{</span><span class="n">ssim_val</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">pass</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_crop_kernel_image</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">kernel_image</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">padding</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Обрезает изображение ядра до его содержимого с добавлением отступа.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">kernel_image</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">kernel_image</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">kernel_image</span>
+
+        <span class="n">coords</span> <span class="o">=</span> <span class="n">cv</span><span class="o">.</span><span class="n">findNonZero</span><span class="p">(</span><span class="n">kernel_image</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">coords</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">kernel_image</span>
+
+        <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">h</span> <span class="o">=</span> <span class="n">cv</span><span class="o">.</span><span class="n">boundingRect</span><span class="p">(</span><span class="n">coords</span><span class="p">)</span>
+        
+        <span class="n">img_h</span><span class="p">,</span> <span class="n">img_w</span> <span class="o">=</span> <span class="n">kernel_image</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span>
+
+        <span class="n">start_x</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">x</span> <span class="o">-</span> <span class="n">padding</span><span class="p">)</span>
+        <span class="n">start_y</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">y</span> <span class="o">-</span> <span class="n">padding</span><span class="p">)</span>
+        <span class="n">end_x</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">img_w</span><span class="p">,</span> <span class="n">x</span> <span class="o">+</span> <span class="n">w</span> <span class="o">+</span> <span class="n">padding</span><span class="p">)</span>
+        <span class="n">end_y</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">img_h</span><span class="p">,</span> <span class="n">y</span> <span class="o">+</span> <span class="n">h</span> <span class="o">+</span> <span class="n">padding</span><span class="p">)</span>
+
+        <span class="n">cropped_kernel</span> <span class="o">=</span> <span class="n">kernel_image</span><span class="p">[</span><span class="n">start_y</span><span class="p">:</span><span class="n">end_y</span><span class="p">,</span> <span class="n">start_x</span><span class="p">:</span><span class="n">end_x</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="n">cropped_kernel</span>
+    
+    <span class="k">def</span><span class="w"> </span><span class="nf">_plot_kernels_line</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+                           <span class="n">img_obj</span><span class="p">:</span> <span class="n">Image</span><span class="p">,</span> 
+                           <span class="n">blurred_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> 
+                           <span class="n">alg_arr</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> 
+                           <span class="n">original_kernels</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> 
+                           <span class="n">kernels</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="nb">str</span><span class="p">],</span> 
+                           <span class="n">axes</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> 
+                           <span class="n">line</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> 
+                           <span class="n">kernel_intencity_scale</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> 
+                           <span class="n">kernel_size</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Отрисовка строки с ядрами с сохранением оригинальных пропорций.&quot;&quot;&quot;</span>
+        <span class="n">axes</span><span class="p">[</span><span class="n">line</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s1">&#39;off&#39;</span><span class="p">)</span>
+        
+        <span class="n">original_kernel_path</span> <span class="o">=</span> <span class="n">original_kernels</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">blurred_path</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">original_kernel_path</span><span class="p">:</span>
+            <span class="n">original_kernel</span> <span class="o">=</span> <span class="n">cv</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">original_kernel_path</span><span class="p">),</span> <span class="n">cv</span><span class="o">.</span><span class="n">IMREAD_GRAYSCALE</span><span class="p">)</span>
+            
+            <span class="k">if</span> <span class="n">original_kernel</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">cropped_kernel</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crop_kernel_image</span><span class="p">(</span><span class="n">original_kernel</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="n">cropped_kernel</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">cropped_kernel</span><span class="o">.</span><span class="n">size</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">axes</span><span class="p">[</span><span class="n">line</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">cropped_kernel</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">)</span>
+                    <span class="n">axes</span><span class="p">[</span><span class="n">line</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;original kernel&quot;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+                    <span class="n">axes</span><span class="p">[</span><span class="n">line</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_aspect</span><span class="p">(</span><span class="s1">&#39;equal&#39;</span><span class="p">,</span> <span class="n">adjustable</span><span class="o">=</span><span class="s1">&#39;box&#39;</span><span class="p">)</span>
+                    <span class="n">axes</span><span class="p">[</span><span class="n">line</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s1">&#39;off&#39;</span><span class="p">)</span>
+
+        <span class="n">axes</span><span class="p">[</span><span class="n">line</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s1">&#39;off&#39;</span><span class="p">)</span>
+        
+        <span class="k">for</span> <span class="n">col</span><span class="p">,</span> <span class="n">alg_name</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">alg_arr</span><span class="p">,</span> <span class="mi">3</span><span class="p">):</span>
+            <span class="n">axes</span><span class="p">[</span><span class="n">line</span><span class="p">,</span> <span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s1">&#39;off&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_plot_restored_kernel</span><span class="p">(</span><span class="n">img_obj</span><span class="p">,</span> <span class="n">blurred_path</span><span class="p">,</span> <span class="n">alg_name</span><span class="p">,</span> <span class="n">kernels</span><span class="p">,</span> 
+                                    <span class="n">axes</span><span class="p">,</span> <span class="n">line</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">kernel_intencity_scale</span><span class="p">)</span>
+        
+        <span class="k">return</span> <span class="n">line</span> <span class="o">+</span> <span class="mi">1</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_plot_restored_kernel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+                              <span class="n">img_obj</span><span class="p">:</span> <span class="n">Image</span><span class="p">,</span> 
+                              <span class="n">blurred_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> 
+                              <span class="n">alg_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> 
+                              <span class="n">kernels</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="nb">str</span><span class="p">],</span>
+                              <span class="n">axes</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> 
+                              <span class="n">line</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> 
+                              <span class="n">col</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> 
+                              <span class="n">kernel_intencity_scale</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Отрисовка одного восстановленного ядра с сохранением пропорций.&quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">kernel_path</span> <span class="o">=</span> <span class="n">kernels</span><span class="o">.</span><span class="n">get</span><span class="p">((</span><span class="nb">str</span><span class="p">(</span><span class="n">blurred_path</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">alg_name</span><span class="p">)))</span>
+            <span class="k">if</span> <span class="n">kernel_path</span><span class="p">:</span>
+                <span class="n">kernel</span> <span class="o">=</span> <span class="n">cv</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">kernel_path</span><span class="p">),</span> <span class="n">cv</span><span class="o">.</span><span class="n">IMREAD_GRAYSCALE</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">kernel</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">cropped_kernel</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crop_kernel_image</span><span class="p">(</span><span class="n">kernel</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">cropped_kernel</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">cropped_kernel</span><span class="o">.</span><span class="n">size</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="n">axes</span><span class="p">[</span><span class="n">line</span><span class="p">,</span> <span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">cropped_kernel</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">)</span>
+                        <span class="n">axes</span><span class="p">[</span><span class="n">line</span><span class="p">,</span> <span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">alg_name</span><span class="si">}</span><span class="s2"> kernel&quot;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+                        <span class="n">axes</span><span class="p">[</span><span class="n">line</span><span class="p">,</span> <span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">set_aspect</span><span class="p">(</span><span class="s1">&#39;equal&#39;</span><span class="p">,</span> <span class="n">adjustable</span><span class="o">=</span><span class="s1">&#39;box&#39;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">pass</span>
+    
+<div class="viewcode-block" id="ModuleDisplay.show_line">
+<a class="viewcode-back" href="../../processing.html#processing.display.ModuleDisplay.show_line">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">show_line</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">window_scale</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">fontsize</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">8</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Вывод изображений в строчку.</span>
+<span class="sd">        </span>
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        window_scale : float</span>
+<span class="sd">            Регулирует размер окна.</span>
+<span class="sd">        fontsize : int</span>
+<span class="sd">            Размер шрифта.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">img</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">processing</span><span class="o">.</span><span class="n">images</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_show_line_single_image</span><span class="p">(</span><span class="n">img</span><span class="p">,</span><span class="n">window_scale</span><span class="p">,</span><span class="n">fontsize</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_show_line_single_image</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+                                <span class="n">img</span><span class="p">,</span> 
+                                <span class="n">window_scale</span><span class="p">:</span> <span class="nb">float</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> 
+                                <span class="n">fontsize</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">8</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Рисует одну строчку из изображений.&quot;&quot;&quot;</span>
+        <span class="n">alg_array</span> <span class="o">=</span> <span class="n">img</span><span class="o">.</span><span class="n">get_algorithm</span><span class="p">()</span>
+        <span class="n">w</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">alg_array</span><span class="p">)</span>
+        <span class="n">w</span> <span class="o">=</span> <span class="mi">2</span><span class="o">*</span><span class="n">w</span> <span class="o">+</span> <span class="mi">3</span>
+        <span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span> <span class="o">*</span> <span class="nb">max</span><span class="p">(</span><span class="n">window_scale</span><span class="p">,</span><span class="mf">0.1</span><span class="p">),</span> <span class="mi">5</span> <span class="o">*</span> <span class="n">w</span> <span class="o">*</span> <span class="nb">max</span><span class="p">(</span><span class="n">window_scale</span><span class="p">,</span><span class="mf">0.1</span><span class="p">)))</span>
+
+        <span class="n">blurred_path</span> <span class="o">=</span> <span class="n">img</span><span class="o">.</span><span class="n">get_blurred</span><span class="p">()</span>
+        <span class="n">psnr_array</span> <span class="o">=</span> <span class="n">img</span><span class="o">.</span><span class="n">get_PSNR</span><span class="p">()</span>
+        <span class="n">ssim_array</span> <span class="o">=</span> <span class="n">img</span><span class="o">.</span><span class="n">get_SSIM</span><span class="p">()</span>
+        <span class="n">kernel_restored_array</span> <span class="o">=</span> <span class="n">img</span><span class="o">.</span><span class="n">get_kernels</span><span class="p">()</span>
+        <span class="n">restored_array</span> <span class="o">=</span> <span class="n">img</span><span class="o">.</span><span class="n">get_restored</span><span class="p">()</span>
+
+        <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_read_image_from_file</span><span class="p">(</span><span class="n">img</span><span class="o">.</span><span class="n">get_original</span><span class="p">()),</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">)</span>
+        <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s1">&#39;off&#39;</span><span class="p">)</span>
+
+        <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_read_image_from_file</span><span class="p">(</span><span class="n">blurred_path</span><span class="p">),</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">)</span>
+        <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;PSNR: </span><span class="si">{</span><span class="n">img</span><span class="o">.</span><span class="n">get_blurred_PSNR</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">blurred_path</span><span class="p">),</span><span class="n">math</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="se">\n</span><span class="s2">SSIM: </span><span class="si">{</span><span class="n">img</span><span class="o">.</span><span class="n">get_blurred_SSIM</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">blurred_path</span><span class="p">),</span><span class="n">math</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">fontsize</span><span class="o">=</span><span class="n">fontsize</span><span class="p">)</span>
+        <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s1">&#39;off&#39;</span><span class="p">)</span>
+
+        <span class="n">axes</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_read_image_from_file</span><span class="p">(</span><span class="n">img</span><span class="o">.</span><span class="n">get_original_kernels</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">blurred_path</span><span class="p">),</span> <span class="kc">None</span><span class="p">)),</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">)</span>
+        <span class="n">axes</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s1">&#39;off&#39;</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">alg_one</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">alg_array</span><span class="p">):</span>
+            <span class="n">axes</span><span class="p">[</span><span class="mi">3</span><span class="o">+</span><span class="n">idx</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_read_image_from_file</span><span class="p">(</span>
+                <span class="n">restored_array</span><span class="o">.</span><span class="n">get</span><span class="p">((</span><span class="nb">str</span><span class="p">(</span><span class="n">blurred_path</span><span class="p">),</span><span class="nb">str</span><span class="p">(</span><span class="n">alg_one</span><span class="p">)),</span><span class="kc">None</span><span class="p">)),</span>
+                  <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">)</span>
+            <span class="n">axes</span><span class="p">[</span><span class="mi">3</span><span class="o">+</span><span class="n">idx</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;PSNR: </span><span class="si">{</span><span class="n">psnr_array</span><span class="o">.</span><span class="n">get</span><span class="p">((</span><span class="nb">str</span><span class="p">(</span><span class="n">blurred_path</span><span class="p">),</span><span class="nb">str</span><span class="p">(</span><span class="n">alg_one</span><span class="p">)),</span><span class="n">math</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="se">\n</span><span class="s2">SSIM: </span><span class="si">{</span><span class="n">ssim_array</span><span class="o">.</span><span class="n">get</span><span class="p">((</span><span class="nb">str</span><span class="p">(</span><span class="n">blurred_path</span><span class="p">),</span><span class="nb">str</span><span class="p">(</span><span class="n">alg_one</span><span class="p">)),</span><span class="n">math</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">fontsize</span><span class="o">=</span><span class="n">fontsize</span><span class="p">)</span>
+            <span class="n">axes</span><span class="p">[</span><span class="mi">3</span><span class="o">+</span><span class="n">idx</span><span class="p">]</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s1">&#39;off&#39;</span><span class="p">)</span>
+
+            <span class="n">axes</span><span class="p">[</span><span class="mi">4</span><span class="o">+</span><span class="n">idx</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_read_image_from_file</span><span class="p">(</span>
+                <span class="n">kernel_restored_array</span><span class="o">.</span><span class="n">get</span><span class="p">((</span><span class="nb">str</span><span class="p">(</span><span class="n">blurred_path</span><span class="p">),</span><span class="nb">str</span><span class="p">(</span><span class="n">alg_one</span><span class="p">)),</span><span class="kc">None</span><span class="p">)),</span>
+                <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">)</span>
+            <span class="n">axes</span><span class="p">[</span><span class="mi">4</span><span class="o">+</span><span class="n">idx</span><span class="p">]</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s1">&#39;off&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+    
+    <span class="k">def</span><span class="w"> </span><span class="nf">_read_image_from_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Читает изображение из файла.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+            <span class="n">image</span> <span class="o">=</span> <span class="n">cv</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">cv</span><span class="o">.</span><span class="n">IMREAD_GRAYSCALE</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  - ПРЕДУПРЕЖДЕНИЕ: Файл не найден, будет показана заглушка: </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">image</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">100</span><span class="p">,</span> <span class="mi">100</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span> <span class="c1"># Черный квадрат-заглушка</span>
+        <span class="k">return</span> <span class="n">image</span></div>
+
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Авторские права 2024, Юров П.И., Беззаборов А.А., Куропатов К.Л., Малыш Я.В.. </p>
+  </div>
+
+  Собрано при помощи <a href="https://www.sphinx-doc.org/">Sphinx</a> с использованием
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">темы,</a>
+    предоставленной <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

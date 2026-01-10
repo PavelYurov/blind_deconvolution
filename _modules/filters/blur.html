@@ -1,0 +1,502 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="ru" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>filters.blur &mdash; документация BlindDeconvolution 1.0.0</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=e35015f7"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/translations.js?v=5b699b7f"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Алфавитный указатель" href="../../genindex.html" />
+    <link rel="search" title="Поиск" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            BlindDeconvolution
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Поиск в документации" aria-label="Поиск в документации" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Меню навигации">
+              <p class="caption" role="heading"><span class="caption-text">Содержание:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">blind_deconvolution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Меню навигации для мобильных устройств" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">BlindDeconvolution</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Навигация по страницам">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Код модуля</a></li>
+      <li class="breadcrumb-item active">filters.blur</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Исходный код filters.blur</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Фильтры размытия изображений.</span>
+
+<span class="sd">Автор: Беззаборов А.А., Юров П.И.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">cv2</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">cv</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">FilterBase</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">scipy.interpolate</span><span class="w"> </span><span class="kn">import</span> <span class="n">BSpline</span><span class="p">,</span> <span class="n">make_interp_spline</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mpl_toolkits.mplot3d</span><span class="w"> </span><span class="kn">import</span> <span class="n">Axes3D</span>
+
+
+<div class="viewcode-block" id="DefocusBlur">
+<a class="viewcode-back" href="../../filters.html#filters.blur.DefocusBlur">[документация]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">DefocusBlur</span><span class="p">(</span><span class="n">FilterBase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Фильтр размытия вне фокуса, имитирующий эффект расфокусировки камеры.</span>
+<span class="sd">    </span>
+<span class="sd">    Создает 2D размытие в форме колокола с использованием настраиваемой PSF-функции.</span>
+<span class="sd">    </span>
+<span class="sd">    Атрибуты</span>
+<span class="sd">    --------</span>
+<span class="sd">    psf : Callable</span>
+<span class="sd">        Функция распределения точки (PSF), генерирующая ядро размытия.</span>
+<span class="sd">    param : float</span>
+<span class="sd">        Параметр интенсивности размытия.</span>
+<span class="sd">    kernel_size : Optional[int]</span>
+<span class="sd">        Фиксированный размер ядра размытия (None для автоопределения).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="DefocusBlur.__init__">
+<a class="viewcode-back" href="../../filters.html#filters.blur.DefocusBlur.__init__">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+                 <span class="n">psf</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span>
+                 <span class="n">param</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5.0</span><span class="p">,</span> 
+                 <span class="n">kernel_size</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Инициализация фильтра размытия вне фокуса.</span>
+<span class="sd">        </span>
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        psf : Callable</span>
+<span class="sd">            Функция, принимающая (radius, param) и возвращающая значения ядра.</span>
+<span class="sd">        param : float</span>
+<span class="sd">            Параметр контроля интенсивности размытия.</span>
+<span class="sd">        kernel_size : Optional[int]</span>
+<span class="sd">            Опциональный фиксированный размер ядра (должен быть нечетным).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">psf</span> <span class="o">=</span> <span class="n">psf</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">param</span> <span class="o">=</span> <span class="n">param</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">kernel_size</span> <span class="o">=</span> <span class="n">kernel_size</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">param</span><span class="p">,</span> <span class="s1">&#39;blur&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="DefocusBlur.description">
+<a class="viewcode-back" href="../../filters.html#filters.blur.DefocusBlur.description">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">description</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Возвращает название способа смаза и его параметры в файловой системе.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;|defocus_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">psf</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">param</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">kernel_size</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+
+<div class="viewcode-block" id="DefocusBlur.generate_kernel">
+<a class="viewcode-back" href="../../filters.html#filters.blur.DefocusBlur.generate_kernel">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">generate_kernel</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Генерация ядра размытия.&quot;&quot;&quot;</span>
+        <span class="n">size</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">kernel_size</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_calculate_kernel_size</span><span class="p">()</span>
+        <span class="n">y</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ogrid</span><span class="p">[</span><span class="o">-</span><span class="n">size</span><span class="o">//</span><span class="mi">2</span><span class="p">:</span><span class="n">size</span><span class="o">//</span><span class="mi">2</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="n">size</span><span class="o">//</span><span class="mi">2</span><span class="p">:</span><span class="n">size</span><span class="o">//</span><span class="mi">2</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">radius</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">x</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">y</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+
+        <span class="n">kernel</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">psf</span><span class="p">(</span><span class="n">radius</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">param</span><span class="p">)</span>
+        <span class="n">kernel</span><span class="p">[</span><span class="n">kernel</span> <span class="o">&lt;</span> <span class="n">np</span><span class="o">.</span><span class="n">finfo</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span><span class="o">.</span><span class="n">eps</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">return</span> <span class="n">kernel</span> <span class="o">/</span> <span class="n">kernel</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_calculate_kernel_size</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Вычисление оптимального размера ядра на основе параметра размытия.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="mi">6</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">param</span><span class="p">)</span> <span class="o">|</span> <span class="mi">1</span> 
+
+<div class="viewcode-block" id="DefocusBlur.filter">
+<a class="viewcode-back" href="../../filters.html#filters.blur.DefocusBlur.filter">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">filter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">image</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Применение размытия вне фокуса к изображению.</span>
+<span class="sd">        </span>
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        image : np.ndarray</span>
+<span class="sd">            Входное изображение для размытия.</span>
+<span class="sd">            </span>
+<span class="sd">        Возвращает</span>
+<span class="sd">        ----------</span>
+<span class="sd">        np.ndarray</span>
+<span class="sd">            Размытое изображение.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">cv</span><span class="o">.</span><span class="n">filter2D</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">generate_kernel</span><span class="p">())</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="MotionBlur">
+<a class="viewcode-back" href="../../filters.html#filters.blur.MotionBlur">[документация]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">MotionBlur</span><span class="p">(</span><span class="n">FilterBase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Фильтр размытия в движении, имитирующий линейное движение камеры.</span>
+<span class="sd">    </span>
+<span class="sd">    Создает одномерное направленное размытие, которое можно повернуть на любой угол.</span>
+<span class="sd">    </span>
+<span class="sd">    Атрибуты</span>
+<span class="sd">    --------</span>
+<span class="sd">    psf : Callable</span>
+<span class="sd">        PSF-функция для одномерного движения.</span>
+<span class="sd">    param : float</span>
+<span class="sd">        Параметр контроля длины/интенсивности размытия.</span>
+<span class="sd">    angle : float</span>
+<span class="sd">        Направление движения в градусах (0 = горизонтальное).</span>
+<span class="sd">    kernel_length : Optional[int]</span>
+<span class="sd">        Фиксированная длина ядра размытия.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+<div class="viewcode-block" id="MotionBlur.__init__">
+<a class="viewcode-back" href="../../filters.html#filters.blur.MotionBlur.__init__">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+                 <span class="n">psf</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span>
+                 <span class="n">param</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+                 <span class="n">angle</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+                 <span class="n">kernel_length</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Инициализация фильтра размытия в движении.</span>
+<span class="sd">        </span>
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        psf : Callable</span>
+<span class="sd">            Функция (x, param) -&gt; значения ядра, где x - 1D массив координат.</span>
+<span class="sd">        param : float</span>
+<span class="sd">            Параметр для PSF-функции.</span>
+<span class="sd">        angle : float</span>
+<span class="sd">            Угол направления размытия (в градусах).</span>
+<span class="sd">        kernel_length : Optional[int]</span>
+<span class="sd">            Длина размытия (нечетное число).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">psf</span> <span class="o">=</span> <span class="n">psf</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">param</span> <span class="o">=</span> <span class="n">param</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">angle</span> <span class="o">=</span> <span class="n">angle</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">kernel_length</span> <span class="o">=</span> <span class="n">kernel_length</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">param</span><span class="p">,</span> <span class="s1">&#39;blur&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MotionBlur.description">
+<a class="viewcode-back" href="../../filters.html#filters.blur.MotionBlur.description">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">description</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Возвращает название способа смаза и его параметры в файловой системе.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;|motion_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">psf</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">param</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">angle</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">kernel_length</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+
+<div class="viewcode-block" id="MotionBlur.generate_kernel">
+<a class="viewcode-back" href="../../filters.html#filters.blur.MotionBlur.generate_kernel">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">generate_kernel</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Генерация ядра размытия в движении.&quot;&quot;&quot;</span>
+        <span class="n">length</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">kernel_length</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_calculate_kernel_length</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">length</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Длина ядра должна быть нечетной&quot;</span><span class="p">)</span>
+
+        <span class="n">x_coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">-</span><span class="n">length</span><span class="o">//</span><span class="mi">2</span><span class="p">,</span> <span class="n">length</span><span class="o">//</span><span class="mi">2</span><span class="p">,</span> <span class="n">length</span><span class="p">)</span>
+        <span class="n">psf_1d</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">psf</span><span class="p">(</span><span class="n">x_coords</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">param</span><span class="p">)</span>
+        <span class="n">psf_1d</span> <span class="o">=</span> <span class="n">psf_1d</span> <span class="o">/</span> <span class="n">psf_1d</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+        
+        <span class="n">kernel</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">length</span><span class="p">,</span> <span class="n">length</span><span class="p">))</span>
+        <span class="n">center</span> <span class="o">=</span> <span class="n">length</span> <span class="o">//</span> <span class="mi">2</span>
+        <span class="n">kernel</span><span class="p">[</span><span class="n">center</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">psf_1d</span>
+
+        <span class="n">rotation_matrix</span> <span class="o">=</span> <span class="n">cv</span><span class="o">.</span><span class="n">getRotationMatrix2D</span><span class="p">((</span><span class="n">center</span><span class="p">,</span> <span class="n">center</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">angle</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">rotated_kernel</span> <span class="o">=</span> <span class="n">cv</span><span class="o">.</span><span class="n">warpAffine</span><span class="p">(</span><span class="n">kernel</span><span class="p">,</span> <span class="n">rotation_matrix</span><span class="p">,</span> <span class="p">(</span><span class="n">length</span><span class="p">,</span> <span class="n">length</span><span class="p">))</span>
+        
+        <span class="n">rotated_kernel</span><span class="p">[</span><span class="n">rotated_kernel</span> <span class="o">&lt;</span> <span class="n">np</span><span class="o">.</span><span class="n">finfo</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span><span class="o">.</span><span class="n">eps</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">return</span> <span class="n">rotated_kernel</span> <span class="o">/</span> <span class="n">rotated_kernel</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_calculate_kernel_length</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Вычисление длины ядра на основе параметра размытия.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="mi">4</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">param</span><span class="p">)</span> <span class="o">|</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span> 
+
+<div class="viewcode-block" id="MotionBlur.filter">
+<a class="viewcode-back" href="../../filters.html#filters.blur.MotionBlur.filter">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">filter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">image</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Применение размытия в движении к изображению.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">cv</span><span class="o">.</span><span class="n">filter2D</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">generate_kernel</span><span class="p">())</span></div>
+</div>
+
+    
+
+<div class="viewcode-block" id="BSpline_blur">
+<a class="viewcode-back" href="../../filters.html#filters.blur.BSpline_blur">[документация]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">BSpline_blur</span><span class="p">(</span><span class="n">FilterBase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Фильтр размытия в движении, имитирующий криволинейное неравномерное движение.</span>
+
+<span class="sd">    Создает 2D B-spline для моделирования сложных траекторий.</span>
+<span class="sd">    </span>
+<span class="sd">    Атрибуты</span>
+<span class="sd">    --------</span>
+<span class="sd">    shape_points : np.ndarray</span>
+<span class="sd">        Точки, задающие форму B-spline.</span>
+<span class="sd">    intensity_points : np.ndarray</span>
+<span class="sd">        Точки, задающие интенсивность.</span>
+<span class="sd">    output_size : Tuple[int, int]</span>
+<span class="sd">        Размер выходной матрицы PSF.</span>
+<span class="sd">    shape_degree : int</span>
+<span class="sd">        Степень B-spline для формы.</span>
+<span class="sd">    intensity_degree : int</span>
+<span class="sd">        Степень B-spline для интенсивности.</span>
+<span class="sd">    n_samples : int</span>
+<span class="sd">        Количество точек для дискретизации кривой.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="BSpline_blur.__init__">
+<a class="viewcode-back" href="../../filters.html#filters.blur.BSpline_blur.__init__">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+                 <span class="n">shape_points</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+                 <span class="n">intensity_points</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> 
+                 <span class="n">output_size</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="mi">15</span><span class="p">),</span> 
+                 <span class="n">shape_degree</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span> 
+                 <span class="n">intensity_degree</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span> 
+                 <span class="n">n_samples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Инициализация фильтра криволинейного движения.</span>
+<span class="sd">        </span>
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        shape_points : np.ndarray</span>
+<span class="sd">            Точки, задающие форму кривой [x, y].</span>
+<span class="sd">        intensity_points : np.ndarray</span>
+<span class="sd">            Точки, задающие интенсивность вдоль кривой.</span>
+<span class="sd">        output_size : Tuple[int, int]</span>
+<span class="sd">            (width, height) Размер выходной матрицы PSF.</span>
+<span class="sd">        shape_degree : int</span>
+<span class="sd">            Степень B-spline для формы.</span>
+<span class="sd">        intensity_degree : int</span>
+<span class="sd">            Степень B-spline для интенсивности.</span>
+<span class="sd">        n_samples : int</span>
+<span class="sd">            Количество точек для дискретизации кривой.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;blur&#39;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">shape_points</span> <span class="o">=</span> <span class="n">shape_points</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">intensity_points</span> <span class="o">=</span> <span class="n">intensity_points</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output_size</span> <span class="o">=</span> <span class="n">output_size</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">shape_degree</span> <span class="o">=</span> <span class="n">shape_degree</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">intensity_degree</span> <span class="o">=</span> <span class="n">intensity_degree</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_samples</span> <span class="o">=</span> <span class="n">n_samples</span></div>
+
+
+<div class="viewcode-block" id="BSpline_blur.filter">
+<a class="viewcode-back" href="../../filters.html#filters.blur.BSpline_blur.filter">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">filter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">image</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Применение размытия к изображению.&quot;&quot;&quot;</span>
+        <span class="n">kernel</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_dual_bspline_psf</span><span class="p">()</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">cv</span><span class="o">.</span><span class="n">filter2D</span><span class="p">(</span><span class="n">src</span><span class="o">=</span><span class="n">image</span><span class="p">,</span> <span class="n">ddepth</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">kernel</span><span class="o">=</span><span class="n">kernel</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">res</span></div>
+
+    
+<div class="viewcode-block" id="BSpline_blur.description">
+<a class="viewcode-back" href="../../filters.html#filters.blur.BSpline_blur.description">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">description</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Возвращает название способа смаза в файловой системе.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;|Bspline_motion_&quot;</span></div>
+
+    
+<div class="viewcode-block" id="BSpline_blur.create_dual_bspline_psf">
+<a class="viewcode-back" href="../../filters.html#filters.blur.BSpline_blur.create_dual_bspline_psf">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_dual_bspline_psf</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Создает PSF используя два B-spline: для формы и для интенсивности.&quot;&quot;&quot;</span>
+        <span class="n">shape_points</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shape_points</span><span class="p">)</span>
+        <span class="n">intensity_points</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">intensity_points</span><span class="p">)</span>
+        <span class="n">t_shape</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">shape_points</span><span class="p">))</span>
+        <span class="n">shape_spline_x</span> <span class="o">=</span> <span class="n">make_interp_spline</span><span class="p">(</span>
+                                        <span class="n">t_shape</span><span class="p">,</span> 
+                                        <span class="n">shape_points</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> 
+                                        <span class="n">k</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">shape_degree</span><span class="p">)</span>
+        <span class="n">shape_spline_y</span> <span class="o">=</span> <span class="n">make_interp_spline</span><span class="p">(</span>
+                                        <span class="n">t_shape</span><span class="p">,</span> 
+                                        <span class="n">shape_points</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> 
+                                        <span class="n">k</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">shape_degree</span><span class="p">)</span>
+        
+        <span class="n">t_intensity</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">intensity_points</span><span class="p">))</span>
+        <span class="n">intensity_spline</span> <span class="o">=</span> <span class="n">make_interp_spline</span><span class="p">(</span>
+                                    <span class="n">t_intensity</span><span class="p">,</span>
+                                    <span class="n">intensity_points</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> 
+                                    <span class="n">k</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">intensity_degree</span><span class="p">)</span>
+        
+        <span class="n">t_samples</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_samples</span><span class="p">)</span>
+        <span class="n">x_samples</span> <span class="o">=</span> <span class="n">shape_spline_x</span><span class="p">(</span><span class="n">t_samples</span><span class="p">)</span>
+        <span class="n">y_samples</span> <span class="o">=</span> <span class="n">shape_spline_y</span><span class="p">(</span><span class="n">t_samples</span><span class="p">)</span>
+        <span class="n">intensity_samples</span> <span class="o">=</span> <span class="n">intensity_spline</span><span class="p">(</span><span class="n">t_samples</span><span class="p">)</span>
+        
+        <span class="n">intensity_samples</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">intensity_samples</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        
+        <span class="n">width</span><span class="p">,</span> <span class="n">height</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_size</span>
+        
+        <span class="n">x_min</span><span class="p">,</span> <span class="n">x_max</span> <span class="o">=</span> <span class="n">x_samples</span><span class="o">.</span><span class="n">min</span><span class="p">(),</span> <span class="n">x_samples</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+        <span class="n">y_min</span><span class="p">,</span> <span class="n">y_max</span> <span class="o">=</span> <span class="n">y_samples</span><span class="o">.</span><span class="n">min</span><span class="p">(),</span> <span class="n">y_samples</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+        
+        <span class="n">x_scaled</span> <span class="o">=</span> <span class="p">(</span><span class="n">x_samples</span> <span class="o">-</span> <span class="n">x_min</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">x_max</span> <span class="o">-</span> <span class="n">x_min</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">width</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">y_scaled</span> <span class="o">=</span> <span class="p">(</span><span class="n">y_samples</span> <span class="o">-</span> <span class="n">y_min</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">y_max</span> <span class="o">-</span> <span class="n">y_min</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">height</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+        
+        <span class="n">psf</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_size</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">x_scaled</span><span class="p">)):</span>
+            <span class="n">x_idx</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">x_scaled</span><span class="p">[</span><span class="n">i</span><span class="p">]))</span>
+            <span class="n">y_idx</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">y_scaled</span><span class="p">[</span><span class="n">i</span><span class="p">]))</span>
+            <span class="k">if</span> <span class="mi">0</span> <span class="o">&lt;=</span> <span class="n">x_idx</span> <span class="o">&lt;</span> <span class="n">width</span> <span class="ow">and</span> <span class="mi">0</span> <span class="o">&lt;=</span> <span class="n">y_idx</span> <span class="o">&lt;</span> <span class="n">height</span><span class="p">:</span>
+                <span class="n">psf</span><span class="p">[</span><span class="n">y_idx</span><span class="p">,</span> <span class="n">x_idx</span><span class="p">]</span> <span class="o">+=</span> <span class="n">intensity_samples</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+
+        <span class="n">psf</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">psf</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">psf</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">psf</span> <span class="o">=</span> <span class="n">psf</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">psf</span><span class="p">)</span>
+        
+        <span class="k">return</span> <span class="n">psf</span></div>
+</div>
+
+    
+
+<div class="viewcode-block" id="Kernel_convolution">
+<a class="viewcode-back" href="../../filters.html#filters.blur.Kernel_convolution">[документация]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Kernel_convolution</span><span class="p">(</span><span class="n">FilterBase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Фильтр, значения матрицы которого сохранены в .npy файле.</span>
+
+<span class="sd">    Загружает и применяет эту матрицу к изображению.</span>
+
+<span class="sd">    Атрибуты</span>
+<span class="sd">    --------</span>
+<span class="sd">    npy_file_path : str</span>
+<span class="sd">        Путь до .npy файла с ядром.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="Kernel_convolution.__init__">
+<a class="viewcode-back" href="../../filters.html#filters.blur.Kernel_convolution.__init__">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">npy_file_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Инициализация сохраненного фильтра.</span>
+
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        npy_file_path : str</span>
+<span class="sd">            Путь до .npy файла с ядром.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">npy_file_path</span> <span class="o">=</span> <span class="n">npy_file_path</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;custom_kernel&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Kernel_convolution.description">
+<a class="viewcode-back" href="../../filters.html#filters.blur.Kernel_convolution.description">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">description</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Возвращает название способа смаза в файловой системе.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;|custom_kernel_&quot;</span></div>
+
+
+<div class="viewcode-block" id="Kernel_convolution.filter">
+<a class="viewcode-back" href="../../filters.html#filters.blur.Kernel_convolution.filter">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">filter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">image</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Применение фильтра к изображению.&quot;&quot;&quot;</span>
+        <span class="n">kernel</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">npy_file_path</span><span class="p">)</span>
+        <span class="n">blurred</span> <span class="o">=</span> <span class="n">cv</span><span class="o">.</span><span class="n">filter2D</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">kernel</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">blurred</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="Identical_kernel">
+<a class="viewcode-back" href="../../filters.html#filters.blur.Identical_kernel">[документация]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Identical_kernel</span><span class="p">(</span><span class="n">FilterBase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Фильтр единичной матрицы.</span>
+
+<span class="sd">    Фильтр, используемый при копировании оригинального изображения в буфер.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="Identical_kernel.__init__">
+<a class="viewcode-back" href="../../filters.html#filters.blur.Identical_kernel.__init__">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Инициализация идентичного фильтра.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;blur&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Identical_kernel.discription">
+<a class="viewcode-back" href="../../filters.html#filters.blur.Identical_kernel.discription">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">discription</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Возвращает название способа смаза в файловой системе.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;|I_&quot;</span></div>
+
+
+<div class="viewcode-block" id="Identical_kernel.filter">
+<a class="viewcode-back" href="../../filters.html#filters.blur.Identical_kernel.filter">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">filter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">image</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+        <span class="s2">&quot;Применение фильтра к изображению.&quot;</span>
+        <span class="k">return</span> <span class="n">image</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Авторские права 2024, Юров П.И., Беззаборов А.А., Куропатов К.Л., Малыш Я.В.. </p>
+  </div>
+
+  Собрано при помощи <a href="https://www.sphinx-doc.org/">Sphinx</a> с использованием
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">темы,</a>
+    предоставленной <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

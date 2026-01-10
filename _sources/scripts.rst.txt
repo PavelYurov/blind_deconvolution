@@ -1,0 +1,29 @@
+scripts package
+===============
+
+Submodules
+----------
+
+scripts.dataset\_generator module
+---------------------------------
+
+.. automodule:: scripts.dataset_generator
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+scripts.kernel\_generator module
+--------------------------------
+
+.. automodule:: scripts.kernel_generator
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: scripts
+   :members:
+   :undoc-members:
+   :show-inheritance:

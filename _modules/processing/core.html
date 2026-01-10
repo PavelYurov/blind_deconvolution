@@ -1,0 +1,617 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="ru" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>processing.core &mdash; документация BlindDeconvolution 1.0.0</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=e35015f7"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/translations.js?v=5b699b7f"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Алфавитный указатель" href="../../genindex.html" />
+    <link rel="search" title="Поиск" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            BlindDeconvolution
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Поиск в документации" aria-label="Поиск в документации" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Меню навигации">
+              <p class="caption" role="heading"><span class="caption-text">Содержание:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">blind_deconvolution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Меню навигации для мобильных устройств" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">BlindDeconvolution</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Навигация по страницам">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Код модуля</a></li>
+      <li class="breadcrumb-item active">processing.core</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Исходный код processing.core</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Основной модуль фреймворка обработки изображений.</span>
+
+<span class="sd">Содержит класс Processing для управления конвейером обработки изображений:</span>
+<span class="sd">загрузка, фильтрация, восстановление, анализ метрик.</span>
+
+<span class="sd">Авторы: Юров П.И., Беззаборов А.А., Куропатов К.Л.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.image</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mpimg</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Any</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">processing.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Image</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">filters.base</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">filters</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">algorithms.base</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">base</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">processing.extensions.hyperparameter_optimization</span><span class="w"> </span><span class="kn">import</span> <span class="n">HyperparameterOptimizer</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">processing.extensions.pareto_analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">ParetoFrontAnalyzer</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">processing.reader</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModuleReader</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">processing.display</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModuleDisplay</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">processing.preprocessing</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModulePreprocessing</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">processing.tables</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModuleData</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">processing.clear</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModuleClear</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">processing.applyfilter</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModuleFilter</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">processing.restore</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModuleProcess</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">processing.restorepipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModuleProcessPipeline</span>
+
+
+<div class="viewcode-block" id="Processing">
+<a class="viewcode-back" href="../../processing.html#processing.core.Processing">[документация]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Processing</span><span class="p">:</span>
+
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Фреймворк для обработки изображений.</span>
+<span class="sd">    </span>
+<span class="sd">    Предоставляет полный конвейер для работы с изображениями:</span>
+<span class="sd">    загрузка, применение фильтров, восстановление, анализ метрик.</span>
+
+<span class="sd">    Атрибуты</span>
+<span class="sd">    --------</span>
+<span class="sd">    color : bool</span>
+<span class="sd">        Тип загрузки изображений (цветное/черно-белое).</span>
+<span class="sd">    folder_path : Path</span>
+<span class="sd">        Директория с исходными изображениями.</span>
+<span class="sd">    folder_path_blurred : Path</span>
+<span class="sd">        Директория со смазанными изображениями.</span>
+<span class="sd">    folder_path_restored : Path</span>
+<span class="sd">        Директория с восстановленными изображениями.</span>
+<span class="sd">    data_path : Path</span>
+<span class="sd">        Директория для сохранения анализа данных.</span>
+<span class="sd">    images : np.ndarray</span>
+<span class="sd">        Массив связей изображений.</span>
+<span class="sd">    kernel_dir : Path</span>
+<span class="sd">        Директория для ядер.</span>
+<span class="sd">    dataset_path : Path</span>
+<span class="sd">        Директория для метаданных датасетов.</span>
+<span class="sd">    preprocess_dir: str</span>
+<span class="sd">        Директория для обработанных смазанных изображений.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+<div class="viewcode-block" id="Processing.__init__">
+<a class="viewcode-back" href="../../processing.html#processing.core.Processing.__init__">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+                 <span class="n">images_folder</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;images&#39;</span><span class="p">,</span>
+                 <span class="n">blurred_folder</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;blurred&#39;</span><span class="p">,</span> 
+                 <span class="n">restored_folder</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;restored&#39;</span><span class="p">,</span> 
+                 <span class="n">data_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;data&#39;</span><span class="p">,</span> 
+                 <span class="n">color</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> 
+                 <span class="n">kernel_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;kernels&#39;</span><span class="p">,</span>
+                 <span class="n">preprocess_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;preprocess&#39;</span><span class="p">,</span> 
+                 <span class="n">dataset_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;dataset&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Инициализация фреймворка.</span>
+
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        images_folder : str</span>
+<span class="sd">            Директория с исходными изображениями.</span>
+<span class="sd">        blurred_folder : str</span>
+<span class="sd">            Директория со смазанными изображениями.</span>
+<span class="sd">        restored_folder : str</span>
+<span class="sd">            Директория с восстановленными изображениями.</span>
+<span class="sd">        data_path : str</span>
+<span class="sd">            Директория для сохранения анализа данных.</span>
+<span class="sd">        color : bool</span>
+<span class="sd">            Тип загрузки изображений (True - цветное, False - ч/б).</span>
+<span class="sd">        kernel_dir : str</span>
+<span class="sd">            Директория для ядер.</span>
+<span class="sd">        dataset_path : str</span>
+<span class="sd">            Директория для метаданных датасетов.</span>
+<span class="sd">        preprocess_dir: str</span>
+<span class="sd">            Директория для обработанных смазанных изображений.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">color</span> <span class="o">=</span> <span class="n">color</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">folder_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">images_folder</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">folder_path_blurred</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">blurred_folder</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">folder_path_restored</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">restored_folder</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">data_path</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">images</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">amount_of_blurred</span> <span class="o">=</span> <span class="mi">1</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">optimizer</span> <span class="o">=</span> <span class="n">HyperparameterOptimizer</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">analyzer</span> <span class="o">=</span> <span class="n">ParetoFrontAnalyzer</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">reader</span> <span class="o">=</span> <span class="n">ModuleReader</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">display</span> <span class="o">=</span> <span class="n">ModuleDisplay</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">histogram</span> <span class="o">=</span> <span class="n">ModulePreprocessing</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tables</span> <span class="o">=</span> <span class="n">ModuleData</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">clear</span> <span class="o">=</span> <span class="n">ModuleClear</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">apply_filter</span> <span class="o">=</span> <span class="n">ModuleFilter</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">module_process</span> <span class="o">=</span> <span class="n">ModuleProcess</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">process_pipeline</span> <span class="o">=</span> <span class="n">ModuleProcessPipeline</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="c1">#разные, если дочерний будет переопределять методы из родительского.</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">kernel_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">kernel_dir</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dataset_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">dataset_path</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">preprocess_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">preprocess_dir</span><span class="p">)</span>
+        
+        <span class="k">for</span> <span class="n">folder</span> <span class="ow">in</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">folder_path</span><span class="p">,</span> 
+                       <span class="bp">self</span><span class="o">.</span><span class="n">folder_path_blurred</span><span class="p">,</span> 
+                       <span class="bp">self</span><span class="o">.</span><span class="n">folder_path_restored</span><span class="p">,</span> 
+                       <span class="bp">self</span><span class="o">.</span><span class="n">data_path</span><span class="p">,</span> 
+                       <span class="bp">self</span><span class="o">.</span><span class="n">kernel_dir</span><span class="p">,</span> 
+                       <span class="bp">self</span><span class="o">.</span><span class="n">dataset_path</span><span class="p">,</span> 
+                       <span class="bp">self</span><span class="o">.</span><span class="n">preprocess_dir</span><span class="p">]:</span>
+            <span class="n">folder</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Processing.changescale">
+<a class="viewcode-back" href="../../processing.html#processing.core.Processing.changescale">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">changescale</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">color</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Изменение способа загрузки изображений.</span>
+<span class="sd">        </span>
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        color : bool</span>
+<span class="sd">            True - цветное, False - черно-белое.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">color</span> <span class="o">=</span> <span class="n">color</span></div>
+
+
+<div class="viewcode-block" id="Processing.read_all">
+<a class="viewcode-back" href="../../processing.html#processing.core.Processing.read_all">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">read_all</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Загрузка всех изображений из директории.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">reader</span><span class="o">.</span><span class="n">read_all</span><span class="p">()</span></div>
+
+    
+<div class="viewcode-block" id="Processing.read_one">
+<a class="viewcode-back" href="../../processing.html#processing.core.Processing.read_one">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">read_one</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Загрузка одного изображения.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">reader</span><span class="o">.</span><span class="n">read_one</span><span class="p">(</span><span class="n">path</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Processing.show">
+<a class="viewcode-back" href="../../processing.html#processing.core.Processing.show">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">show</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+             <span class="n">size</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> 
+             <span class="n">kernel_intencity_scale</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> 
+             <span class="n">kernel_size</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Вывод всех изображений: оригинал, размытые, восстановленные + метрики.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">display</span><span class="o">.</span><span class="n">show</span><span class="p">(</span><span class="n">size</span><span class="p">,</span> <span class="n">kernel_intencity_scale</span><span class="p">,</span> <span class="n">kernel_size</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="Processing.histogram_equalization">
+<a class="viewcode-back" href="../../processing.html#processing.core.Processing.histogram_equalization">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">histogram_equalization</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">view_histogram</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Выполняет выравнивание гистограмм.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">histogram</span><span class="o">.</span><span class="n">histogram_equalization</span><span class="p">(</span><span class="n">view_histogram</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Processing.histogram_equalization_CLAHE">
+<a class="viewcode-back" href="../../processing.html#processing.core.Processing.histogram_equalization_CLAHE">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">histogram_equalization_CLAHE</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+                                     <span class="n">view_histogram</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> 
+                                     <span class="n">clip_limit</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.01</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Выполняет адаптивное выравнивание гистограмм с ограничением контрастности.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">histogram</span><span class="o">.</span><span class="n">histogram_equalization_CLAHE</span><span class="p">(</span><span class="n">view_histogram</span><span class="p">,</span> <span class="n">clip_limit</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="Processing.inverse_histogram_equalization">
+<a class="viewcode-back" href="../../processing.html#processing.core.Processing.inverse_histogram_equalization">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">inverse_histogram_equalization</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">view_histogram</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Обращает выравнивание гистограмм.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">histogram</span><span class="o">.</span><span class="n">inverse_histogram_equalization</span><span class="p">(</span><span class="n">view_histogram</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="Processing.get_table">
+<a class="viewcode-back" href="../../processing.html#processing.core.Processing.get_table">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_table</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+                   <span class="n">table_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> 
+                   <span class="n">display_table</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Получение метрик в структурированном виде.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tables</span><span class="o">.</span><span class="n">get_table</span><span class="p">(</span><span class="n">table_path</span><span class="p">,</span> <span class="n">display_table</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Processing.clear_input">
+<a class="viewcode-back" href="../../processing.html#processing.core.Processing.clear_input">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">clear_input</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Убирает привязку ко всем загруженным изображениям.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">clear</span><span class="o">.</span><span class="n">clear_input</span><span class="p">()</span></div>
+
+    
+<div class="viewcode-block" id="Processing.reset">
+<a class="viewcode-back" href="../../processing.html#processing.core.Processing.reset">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">reset</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Сброс состояний всех изображений до исходного.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">clear</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span></div>
+
+    
+<div class="viewcode-block" id="Processing.clear_output">
+<a class="viewcode-back" href="../../processing.html#processing.core.Processing.clear_output">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">clear_output</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Удаление всех сгенерированных файлов.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">clear</span><span class="o">.</span><span class="n">clear_output</span><span class="p">()</span></div>
+
+   
+<div class="viewcode-block" id="Processing.clear_output_directory">
+<a class="viewcode-back" href="../../processing.html#processing.core.Processing.clear_output_directory">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">clear_output_directory</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">warning</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;IT WILL DELETE EVERYTHING!&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Полная очистка выходных директорий.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">clear</span><span class="o">.</span><span class="n">clear_output_directory</span><span class="p">(</span><span class="n">warning</span><span class="p">)</span>  </div>
+
+    
+<div class="viewcode-block" id="Processing.clear_restored">
+<a class="viewcode-back" href="../../processing.html#processing.core.Processing.clear_restored">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">clear_restored</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Удаляет восстановленные изображения из каждой связи.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">clear</span><span class="o">.</span><span class="n">clear_restored</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="Processing.unbind_restored">
+<a class="viewcode-back" href="../../processing.html#processing.core.Processing.unbind_restored">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">unbind_restored</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Разрывает связь, убирая все восстановленные.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">clear</span><span class="o">.</span><span class="n">unbind_restored</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="Processing.clear_all">
+<a class="viewcode-back" href="../../processing.html#processing.core.Processing.clear_all">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">clear_all</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Полная очистка: файлы + состояния + загруженные изображения.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">clear</span><span class="o">.</span><span class="n">clear_all</span><span class="p">()</span></div>
+
+    
+<div class="viewcode-block" id="Processing.bind">
+<a class="viewcode-back" href="../../processing.html#processing.core.Processing.bind">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">bind</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+             <span class="n">original_image_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> 
+             <span class="n">blurred_image_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> 
+             <span class="n">original_kernel_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> 
+             <span class="n">filter_description</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;unknown&quot;</span><span class="p">,</span> 
+             <span class="n">color</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Image</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Связывает оригинальное изображение с искаженной версией.</span>
+<span class="sd">        </span>
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        original_image_path : Path</span>
+<span class="sd">            Путь к оригинальному изображению.</span>
+<span class="sd">        blurred_image_path : Path</span>
+<span class="sd">            Путь к смазанному изображению.</span>
+<span class="sd">        original_kernel_path : Optional[Path]</span>
+<span class="sd">            Путь к ядру размытия.</span>
+<span class="sd">        filter_description : str</span>
+<span class="sd">            Описание примененного фильтра.</span>
+<span class="sd">        color : bool</span>
+<span class="sd">            Способ загрузки (True - цветное, False - ч/б).</span>
+<span class="sd">            </span>
+<span class="sd">        Возвращает</span>
+<span class="sd">        ----------</span>
+<span class="sd">        Image</span>
+<span class="sd">            Объект связи изображений.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">reader</span><span class="o">.</span><span class="n">bind</span><span class="p">(</span><span class="n">original_image_path</span><span class="p">,</span> 
+                                <span class="n">blurred_image_path</span><span class="p">,</span> 
+                                <span class="n">original_kernel_path</span><span class="p">,</span> 
+                                <span class="n">filter_description</span><span class="p">,</span> 
+                                <span class="n">color</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Processing.save_bind_state">
+<a class="viewcode-back" href="../../processing.html#processing.core.Processing.save_bind_state">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">save_bind_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">file_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Сохраняет состояние связей в JSON файл.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">reader</span><span class="o">.</span><span class="n">save_bind_state</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Processing.load_bind_state">
+<a class="viewcode-back" href="../../processing.html#processing.core.Processing.load_bind_state">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load_bind_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bind_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Загружает состояние связей из JSON файла.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">reader</span><span class="o">.</span><span class="n">load_bind_state</span><span class="p">(</span><span class="n">bind_path</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Processing.custom_filter">
+<a class="viewcode-back" href="../../processing.html#processing.core.Processing.custom_filter">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">custom_filter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+                      <span class="n">kernel_image_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> 
+                      <span class="n">kernel_npy_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Применение созданного фильтра ко всем оригинальным изображениям.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">apply_filter</span><span class="o">.</span><span class="n">custom_filter</span><span class="p">(</span><span class="n">kernel_image_path</span><span class="p">,</span> <span class="n">kernel_npy_path</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Processing.show_line">
+<a class="viewcode-back" href="../../processing.html#processing.core.Processing.show_line">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">show_line</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">window_scale</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">fontsize</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">8</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Вывод изображений в строчку.</span>
+<span class="sd">        </span>
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        window_scale : float</span>
+<span class="sd">            Регулирует размер окна.</span>
+<span class="sd">        fontsize : int</span>
+<span class="sd">            Размер шрифта.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">display</span><span class="o">.</span><span class="n">show_line</span><span class="p">(</span><span class="n">window_scale</span><span class="p">,</span> <span class="n">fontsize</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="Processing.filter">
+<a class="viewcode-back" href="../../processing.html#processing.core.Processing.filter">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">filter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filter_processor</span><span class="p">:</span> <span class="n">filters</span><span class="o">.</span><span class="n">FilterBase</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Применение фильтра ко всем изображениям.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">apply_filter</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">filter_processor</span><span class="p">)</span></div>
+
+   
+<div class="viewcode-block" id="Processing.save_filter">
+<a class="viewcode-back" href="../../processing.html#processing.core.Processing.save_filter">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">save_filter</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Сохранение текущего состояния фильтров в список.&quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">img_obj</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">images</span><span class="p">:</span>
+            <span class="n">img_obj</span><span class="o">.</span><span class="n">save_filter</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">amount_of_blurred</span> <span class="o">+=</span> <span class="mi">1</span></div>
+
+
+<div class="viewcode-block" id="Processing.load_filter">
+<a class="viewcode-back" href="../../processing.html#processing.core.Processing.load_filter">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load_filter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Загрузка состояния фильтров из списка.</span>
+<span class="sd">        </span>
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        index : int</span>
+<span class="sd">            Индекс доставаемого изображения.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">img_obj</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">images</span><span class="p">:</span>
+            <span class="n">img_obj</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">index</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">amount_of_blurred</span> <span class="o">-=</span> <span class="mi">1</span></div>
+
+
+<div class="viewcode-block" id="Processing.len_blur">
+<a class="viewcode-back" href="../../processing.html#processing.core.Processing.len_blur">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">len_blur</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Количество вариантов размытия.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">amount_of_blurred</span></div>
+
+    
+<div class="viewcode-block" id="Processing.process">
+<a class="viewcode-back" href="../../processing.html#processing.core.Processing.process">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">process</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+                <span class="n">algorithm_processor</span><span class="p">:</span> <span class="n">base</span><span class="o">.</span><span class="n">DeconvolutionAlgorithm</span><span class="p">,</span> 
+                <span class="n">metadata</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> 
+                <span class="n">unique_path</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Восстановление всех изображений.</span>
+<span class="sd">        </span>
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        algorithm_processor : DeconvolutionAlgorithm</span>
+<span class="sd">            Метод восстановления изображения.</span>
+<span class="sd">        metadata : bool</span>
+<span class="sd">            Сохранять метаданные или нет.</span>
+<span class="sd">        unique_path : bool</span>
+<span class="sd">            Генерировать уникальные пути.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">module_process</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">algorithm_processor</span><span class="p">,</span> 
+                                   <span class="n">metadata</span><span class="p">,</span> 
+                                   <span class="n">unique_path</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="Processing.full_process">
+<a class="viewcode-back" href="../../processing.html#processing.core.Processing.full_process">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">full_process</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+                     <span class="n">filters</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> 
+                     <span class="n">methods</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> 
+                     <span class="n">size</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.75</span><span class="p">,</span> 
+                     <span class="n">kernel_intencity_scale</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">10.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Пайплайн применения фильтров с последующим восстановлением.</span>
+<span class="sd">        </span>
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        filters : list</span>
+<span class="sd">            Массив массивов объектов FilterBase [[],[]].</span>
+<span class="sd">        methods : list</span>
+<span class="sd">            Массив объектов DeconvolutionAlgorithm.</span>
+<span class="sd">        size : float</span>
+<span class="sd">            Размер таблицы.</span>
+<span class="sd">        kernel_intencity_scale : float</span>
+<span class="sd">            Цвет пикселей PSF при выводе.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">process_pipeline</span><span class="o">.</span><span class="n">full_process</span><span class="p">(</span><span class="n">filters</span><span class="p">,</span> 
+                                           <span class="n">methods</span><span class="p">,</span> 
+                                           <span class="n">size</span><span class="p">,</span> 
+                                           <span class="n">kernel_intencity_scale</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Processing.process_hyperparameter_optimization">
+<a class="viewcode-back" href="../../processing.html#processing.core.Processing.process_hyperparameter_optimization">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">process_hyperparameter_optimization</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Запуск оптимизации гиперпараметров.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">optimizer</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="Processing.pareto">
+<a class="viewcode-back" href="../../processing.html#processing.core.Processing.pareto">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">pareto</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Построение фронта Парето.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">analyzer</span><span class="o">.</span><span class="n">execute</span><span class="p">()</span></div>
+</div>
+
+    
+    
+
+
+<div class="viewcode-block" id="merge">
+<a class="viewcode-back" href="../../processing.html#processing.core.merge">[документация]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">merge</span><span class="p">(</span><span class="n">frame1</span><span class="p">:</span> <span class="n">Processing</span><span class="p">,</span> <span class="n">frame2</span><span class="p">:</span> <span class="n">Processing</span><span class="p">)</span><span class="o">-&gt;</span><span class="n">Processing</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Объединяет массивы обработанных изображений.</span>
+<span class="sd">        </span>
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        frame1 : Processing</span>
+<span class="sd">            Первый фреймворк.</span>
+<span class="sd">        frame2 : Processing</span>
+<span class="sd">            Второй фреймворк.</span>
+<span class="sd">            </span>
+<span class="sd">        Возвращает</span>
+<span class="sd">        ----------</span>
+<span class="sd">        Processing</span>
+<span class="sd">            Объединённый фреймворк.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">frame_res</span> <span class="o">=</span> <span class="n">Processing</span><span class="p">(</span><span class="n">images_folder</span><span class="o">=</span><span class="n">frame1</span><span class="o">.</span><span class="n">folder_path</span><span class="p">,</span>
+                                <span class="n">blurred_folder</span><span class="o">=</span><span class="n">frame1</span><span class="o">.</span><span class="n">folder_path_blurred</span><span class="p">,</span>
+                                <span class="n">restored_folder</span><span class="o">=</span><span class="n">frame1</span><span class="o">.</span><span class="n">folder_path_restored</span><span class="p">,</span>
+                                <span class="n">data_path</span><span class="o">=</span><span class="n">frame1</span><span class="o">.</span><span class="n">data_path</span><span class="p">,</span>
+                                <span class="n">color</span><span class="o">=</span><span class="n">frame1</span><span class="o">.</span><span class="n">color</span><span class="p">,</span>
+                                <span class="n">kernel_dir</span><span class="o">=</span><span class="n">frame1</span><span class="o">.</span><span class="n">kernel_dir</span><span class="p">,</span>
+                                <span class="n">dataset_path</span> <span class="o">=</span> <span class="n">frame1</span><span class="o">.</span><span class="n">dataset_path</span><span class="p">)</span>
+        <span class="n">frame_res</span><span class="o">.</span><span class="n">images</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">frame1</span><span class="o">.</span><span class="n">images</span><span class="o">.</span><span class="n">copy</span><span class="p">(),</span><span class="n">frame2</span><span class="o">.</span><span class="n">images</span><span class="o">.</span><span class="n">copy</span><span class="p">())</span>
+        <span class="k">return</span> <span class="n">frame_res</span></div>
+
+
+<div class="viewcode-block" id="show_from_table">
+<a class="viewcode-back" href="../../processing.html#processing.core.show_from_table">[документация]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">show_from_table</span><span class="p">(</span><span class="n">table_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">alg_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">window_scale</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Выводит сетку из смазанных и восстановленных изображений.</span>
+<span class="sd">    </span>
+<span class="sd">    Параметры</span>
+<span class="sd">    ---------</span>
+<span class="sd">    table_path : str</span>
+<span class="sd">        Путь к .csv файлу.</span>
+<span class="sd">    alg_name : str</span>
+<span class="sd">        Имя алгоритма для визуализации.</span>
+<span class="sd">    window_scale : float</span>
+<span class="sd">        Регулирует размер окна.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">table_path</span><span class="p">)</span>
+    <span class="n">h</span><span class="p">,</span> <span class="n">w</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">shape</span>
+    <span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">h</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span> <span class="o">*</span> <span class="n">h</span> <span class="o">*</span> <span class="nb">max</span><span class="p">(</span><span class="n">window_scale</span><span class="p">,</span><span class="mf">0.1</span><span class="p">),</span> 
+                                            <span class="mi">18</span><span class="o">*</span><span class="nb">max</span><span class="p">(</span><span class="n">window_scale</span><span class="p">,</span><span class="mf">0.1</span><span class="p">)))</span>
+    <span class="n">axes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">atleast_2d</span><span class="p">(</span><span class="n">axes</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">line</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">iloc</span><span class="p">):</span>
+        <span class="n">paths</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;Original&quot;</span><span class="p">:</span> <span class="n">line</span><span class="p">[</span><span class="s1">&#39;blurred&#39;</span><span class="p">],</span>
+            <span class="s2">&quot;Restored&quot;</span><span class="p">:</span> <span class="n">line</span><span class="p">[</span><span class="n">alg_name</span><span class="p">],</span>
+            <span class="s2">&quot;Estimated Kernel&quot;</span><span class="p">:</span> <span class="n">line</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;kernel_</span><span class="si">{</span><span class="n">alg_name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">],</span>
+            <span class="s2">&quot;Ground Truth Kernel&quot;</span><span class="p">:</span> <span class="n">line</span><span class="p">[</span><span class="s1">&#39;kernel blur&#39;</span><span class="p">]</span>
+        <span class="p">}</span>
+        <span class="n">images</span> <span class="o">=</span> <span class="p">{}</span>
+        
+        <span class="k">for</span> <span class="n">title</span><span class="p">,</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">paths</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+                <span class="n">images</span><span class="p">[</span><span class="n">title</span><span class="p">]</span> <span class="o">=</span> <span class="n">mpimg</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot; Файл не найден: </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">images</span><span class="p">[</span><span class="n">title</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">100</span><span class="p">,</span> <span class="mi">100</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span> <span class="c1"># Черный квадрат-заглушка</span>
+        <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="n">idx</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">images</span><span class="p">[</span><span class="s2">&quot;Original&quot;</span><span class="p">],</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">)</span>
+
+        <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="n">idx</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">images</span><span class="p">[</span><span class="s2">&quot;Restored&quot;</span><span class="p">],</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">)</span>
+
+        <span class="n">axes</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="n">idx</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">images</span><span class="p">[</span><span class="s2">&quot;Estimated Kernel&quot;</span><span class="p">],</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">)</span>
+
+        <span class="n">axes</span><span class="p">[</span><span class="mi">3</span><span class="p">,</span> <span class="n">idx</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">images</span><span class="p">[</span><span class="s2">&quot;Ground Truth Kernel&quot;</span><span class="p">],</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">4</span><span class="p">):</span>
+            <span class="n">axes</span><span class="p">[</span><span class="n">row</span><span class="p">,</span> <span class="n">idx</span><span class="p">]</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s1">&#39;off&#39;</span><span class="p">)</span>
+    <span class="n">fig</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Сравнение результатов восстановления изображений (</span><span class="si">{</span><span class="n">alg_name</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">0.97</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">(</span><span class="n">rect</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mf">0.95</span><span class="p">])</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span></div>
+
+        
+
+        
+
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Авторские права 2024, Юров П.И., Беззаборов А.А., Куропатов К.Л., Малыш Я.В.. </p>
+  </div>
+
+  Собрано при помощи <a href="https://www.sphinx-doc.org/">Sphinx</a> с использованием
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">темы,</a>
+    предоставленной <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

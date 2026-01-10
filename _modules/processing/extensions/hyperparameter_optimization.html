@@ -1,0 +1,615 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="ru" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>processing.extensions.hyperparameter_optimization &mdash; документация BlindDeconvolution 1.0.0</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=e35015f7"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/translations.js?v=5b699b7f"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Алфавитный указатель" href="../../../genindex.html" />
+    <link rel="search" title="Поиск" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            BlindDeconvolution
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Поиск в документации" aria-label="Поиск в документации" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Меню навигации">
+              <p class="caption" role="heading"><span class="caption-text">Содержание:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">blind_deconvolution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Меню навигации для мобильных устройств" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">BlindDeconvolution</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Навигация по страницам">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Код модуля</a></li>
+      <li class="breadcrumb-item active">processing.extensions.hyperparameter_optimization</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Исходный код processing.extensions.hyperparameter_optimization</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Модуль оптимизации гиперпараметров.</span>
+
+<span class="sd">Реализует оптимизацию гиперпараметров алгоритмов слепой деконволюции</span>
+<span class="sd">с использованием байесовских методов оптимизации.</span>
+
+<span class="sd">Поддерживаемые методы:</span>
+<span class="sd">    - TPE (Tree-structured Parzen Estimator)</span>
+<span class="sd">    - Случайный поиск</span>
+<span class="sd">    - Гауссовские процессы</span>
+<span class="sd">    - NSGA-II для многокритериальной оптимизации</span>
+
+<span class="sd">Автор: Беззаборов А.А.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Union</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">cv2</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">cv</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">optuna</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">optuna.samplers</span><span class="w"> </span><span class="kn">import</span> <span class="n">TPESampler</span><span class="p">,</span> <span class="n">RandomSampler</span><span class="p">,</span> <span class="n">NSGAIISampler</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">optuna.pruners</span><span class="w"> </span><span class="kn">import</span> <span class="n">MedianPruner</span>
+    <span class="n">OPTUNA_AVAILABLE</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="n">OPTUNA_AVAILABLE</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;Optuna not available. Hyperparameter optimization disabled.&quot;</span><span class="p">)</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">optuna.integration</span><span class="w"> </span><span class="kn">import</span> <span class="n">BoTorchSampler</span>
+    <span class="n">BOTORCH_AVAILABLE</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="n">BOTORCH_AVAILABLE</span> <span class="o">=</span> <span class="kc">False</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">algorithms.base</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">base</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">processing.metrics</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">metrics</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">processing.extensions.base</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ProcessingExtension</span><span class="p">,</span>
+    <span class="n">OptimizationResult</span><span class="p">,</span>
+    <span class="n">OptimizationMethod</span><span class="p">,</span>
+    <span class="n">logger</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="HyperparameterOptimizer">
+<a class="viewcode-back" href="../../../processing.extensions.html#processing.extensions.hyperparameter_optimization.HyperparameterOptimizer">[документация]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">HyperparameterOptimizer</span><span class="p">(</span><span class="n">ProcessingExtension</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Оптимизация гиперпараметров с использованием байесовской оптимизации.</span>
+<span class="sd">    </span>
+<span class="sd">    Реализует эффективный поиск гиперпараметров для алгоритмов слепой </span>
+<span class="sd">    деконволюции с использованием фреймворка Optuna.</span>
+<span class="sd">    </span>
+<span class="sd">    Поддерживаемые стратегии оптимизации:</span>
+<span class="sd">        - TPE (Tree-structured Parzen Estimator)</span>
+<span class="sd">        - Случайный поиск</span>
+<span class="sd">        - Гауссовские процессы (при наличии BoTorch)</span>
+<span class="sd">        - NSGA-II для многокритериальной оптимизации</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+<div class="viewcode-block" id="HyperparameterOptimizer.__init__">
+<a class="viewcode-back" href="../../../processing.extensions.html#processing.extensions.hyperparameter_optimization.HyperparameterOptimizer.__init__">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">processing_instance</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">output_folder</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;parameters&quot;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Инициализация оптимизатора.</span>
+<span class="sd">        </span>
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        processing_instance : Any</span>
+<span class="sd">            Ссылка на объект Processing с изображениями.</span>
+<span class="sd">        output_folder : str</span>
+<span class="sd">            Директория для сохранения результатов оптимизации.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">processing_instance</span><span class="p">,</span> <span class="n">output_folder</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">OPTUNA_AVAILABLE</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
+                <span class="s2">&quot;Optuna is required for hyperparameter optimization. &quot;</span>
+                <span class="s2">&quot;Install via: pip install optuna&quot;</span>
+            <span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="HyperparameterOptimizer.execute">
+<a class="viewcode-back" href="../../../processing.extensions.html#processing.extensions.hyperparameter_optimization.HyperparameterOptimizer.execute">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">execute</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">algorithm_processor</span><span class="p">:</span> <span class="n">base</span><span class="o">.</span><span class="n">DeconvolutionAlgorithm</span><span class="p">,</span>
+        <span class="n">param_ranges</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]],</span>
+        <span class="n">n_trials</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span>
+        <span class="n">metric</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;PSNR&#39;</span><span class="p">,</span>
+        <span class="n">timeout</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="mi">3600</span><span class="p">,</span>
+        <span class="n">method</span><span class="p">:</span> <span class="n">OptimizationMethod</span> <span class="o">=</span> <span class="n">OptimizationMethod</span><span class="o">.</span><span class="n">TPE</span><span class="p">,</span>
+        <span class="n">n_jobs</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">42</span><span class="p">,</span>
+        <span class="n">show_progress</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">save_results</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">OptimizationResult</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Оптимизация гиперпараметров для заданного алгоритма.</span>
+<span class="sd">        </span>
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        algorithm_processor : DeconvolutionAlgorithm</span>
+<span class="sd">            Алгоритм деконволюции для оптимизации.</span>
+<span class="sd">        param_ranges : Dict[str, Tuple]</span>
+<span class="sd">            Словарь соответствия имен параметров кортежам (min, max).</span>
+<span class="sd">        n_trials : int, по умолчанию 50</span>
+<span class="sd">            Количество испытаний оптимизации.</span>
+<span class="sd">        metric : str, по умолчанию &#39;PSNR&#39;</span>
+<span class="sd">            Метрика оптимизации: &#39;PSNR&#39;, &#39;SSIM&#39; или &#39;SHARPNESS&#39;.</span>
+<span class="sd">        timeout : Optional[int], по умолчанию 3600</span>
+<span class="sd">            Максимальное время оптимизации в секундах (None без ограничения).</span>
+<span class="sd">        method : OptimizationMethod, по умолчанию TPE</span>
+<span class="sd">            Метод оптимизации.</span>
+<span class="sd">        n_jobs : int, по умолчанию 1</span>
+<span class="sd">            Количество параллельных задач (-1 для всех ядер).</span>
+<span class="sd">        seed : int, по умолчанию 42</span>
+<span class="sd">            Seed для воспроизводимости.</span>
+<span class="sd">        show_progress : bool, по умолчанию True</span>
+<span class="sd">            Отображать индикатор прогресса.</span>
+<span class="sd">        save_results : bool, по умолчанию True</span>
+<span class="sd">            Сохранять лучшие параметры в JSON-файл.</span>
+<span class="sd">            </span>
+<span class="sd">        Возвращает</span>
+<span class="sd">        ----------</span>
+<span class="sd">        OptimizationResult</span>
+<span class="sd">            Контейнер с лучшими параметрами и историей оптимизации.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">start_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+        <span class="n">algorithm_name</span> <span class="o">=</span> <span class="n">algorithm_processor</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span>
+        
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Starting hyperparameter optimization for </span><span class="si">{</span><span class="n">algorithm_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Method: </span><span class="si">{</span><span class="n">method</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">, Trials: </span><span class="si">{</span><span class="n">n_trials</span><span class="si">}</span><span class="s2">, Metric: </span><span class="si">{</span><span class="n">metric</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        
+        <span class="n">sampler</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_sampler</span><span class="p">(</span><span class="n">method</span><span class="p">,</span> <span class="n">seed</span><span class="p">)</span>
+        <span class="n">pruner</span> <span class="o">=</span> <span class="n">MedianPruner</span><span class="p">(</span><span class="n">n_startup_trials</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">n_warmup_steps</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+        
+        <span class="n">study</span> <span class="o">=</span> <span class="n">optuna</span><span class="o">.</span><span class="n">create_study</span><span class="p">(</span>
+            <span class="n">direction</span><span class="o">=</span><span class="s2">&quot;maximize&quot;</span><span class="p">,</span>
+            <span class="n">sampler</span><span class="o">=</span><span class="n">sampler</span><span class="p">,</span>
+            <span class="n">pruner</span><span class="o">=</span><span class="n">pruner</span><span class="p">,</span>
+            <span class="n">study_name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">algorithm_name</span><span class="si">}</span><span class="s2">_optimization&quot;</span>
+        <span class="p">)</span>
+        
+        <span class="n">objective</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_objective</span><span class="p">(</span><span class="n">algorithm_processor</span><span class="p">,</span> <span class="n">param_ranges</span><span class="p">,</span> <span class="n">metric</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">show_progress</span><span class="p">:</span>
+            <span class="n">optuna</span><span class="o">.</span><span class="n">logging</span><span class="o">.</span><span class="n">set_verbosity</span><span class="p">(</span><span class="n">optuna</span><span class="o">.</span><span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">)</span>
+        
+        <span class="n">study</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span>
+            <span class="n">objective</span><span class="p">,</span>
+            <span class="n">n_trials</span><span class="o">=</span><span class="n">n_trials</span><span class="p">,</span>
+            <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span>
+            <span class="n">n_jobs</span><span class="o">=</span><span class="n">n_jobs</span><span class="p">,</span>
+            <span class="n">show_progress_bar</span><span class="o">=</span><span class="n">show_progress</span>
+        <span class="p">)</span>
+        
+        <span class="n">elapsed_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start_time</span>
+        
+        <span class="n">result</span> <span class="o">=</span> <span class="n">OptimizationResult</span><span class="p">(</span>
+            <span class="n">best_params</span><span class="o">=</span><span class="n">study</span><span class="o">.</span><span class="n">best_params</span><span class="p">,</span>
+            <span class="n">best_value</span><span class="o">=</span><span class="n">study</span><span class="o">.</span><span class="n">best_value</span><span class="p">,</span>
+            <span class="n">n_trials</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">study</span><span class="o">.</span><span class="n">trials</span><span class="p">),</span>
+            <span class="n">study</span><span class="o">=</span><span class="n">study</span><span class="p">,</span>
+            <span class="n">history</span><span class="o">=</span><span class="p">[</span>
+                <span class="p">{</span><span class="s1">&#39;params&#39;</span><span class="p">:</span> <span class="n">t</span><span class="o">.</span><span class="n">params</span><span class="p">,</span> <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="n">t</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">t</span><span class="o">.</span><span class="n">state</span><span class="p">)}</span>
+                <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">study</span><span class="o">.</span><span class="n">trials</span>
+            <span class="p">],</span>
+            <span class="n">elapsed_time</span><span class="o">=</span><span class="n">elapsed_time</span>
+        <span class="p">)</span>
+        
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;OPTIMIZATION COMPLETE&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Best </span><span class="si">{</span><span class="n">metric</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">best_value</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Best parameters:&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">param</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">best_params</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">param</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total trials: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">n_trials</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Elapsed time: </span><span class="si">{</span><span class="n">elapsed_time</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> s&quot;</span><span class="p">)</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">_apply_and_process</span><span class="p">(</span><span class="n">algorithm_processor</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">best_params</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="n">save_results</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_save_results</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="p">)</span>
+        
+        <span class="k">return</span> <span class="n">result</span></div>
+
+    
+    <span class="k">def</span><span class="w"> </span><span class="nf">_create_sampler</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> 
+        <span class="n">method</span><span class="p">:</span> <span class="n">OptimizationMethod</span><span class="p">,</span> 
+        <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">optuna</span><span class="o">.</span><span class="n">samplers</span><span class="o">.</span><span class="n">BaseSampler</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Создание семплера Optuna на основе метода оптимизации.</span>
+<span class="sd">        </span>
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        method : OptimizationMethod</span>
+<span class="sd">            Выбранный метод оптимизации.</span>
+<span class="sd">        seed : int</span>
+<span class="sd">            Seed для генератора случайных чисел.</span>
+<span class="sd">            </span>
+<span class="sd">        Возвращает</span>
+<span class="sd">        ----------</span>
+<span class="sd">        BaseSampler</span>
+<span class="sd">            Настроенный семплер Optuna.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="n">OptimizationMethod</span><span class="o">.</span><span class="n">TPE</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">TPESampler</span><span class="p">(</span>
+                <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">,</span>
+                <span class="n">n_startup_trials</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+                <span class="n">multivariate</span><span class="o">=</span><span class="kc">True</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">method</span> <span class="o">==</span> <span class="n">OptimizationMethod</span><span class="o">.</span><span class="n">RANDOM</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">RandomSampler</span><span class="p">(</span><span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">method</span> <span class="o">==</span> <span class="n">OptimizationMethod</span><span class="o">.</span><span class="n">GP</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">BOTORCH_AVAILABLE</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;BoTorch not available, falling back to TPE&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">TPESampler</span><span class="p">(</span><span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">BoTorchSampler</span><span class="p">(</span><span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">method</span> <span class="o">==</span> <span class="n">OptimizationMethod</span><span class="o">.</span><span class="n">NSGA2</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">NSGAIISampler</span><span class="p">(</span><span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown optimization method: </span><span class="si">{</span><span class="n">method</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    
+    <span class="k">def</span><span class="w"> </span><span class="nf">_create_objective</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">algorithm_processor</span><span class="p">:</span> <span class="n">base</span><span class="o">.</span><span class="n">DeconvolutionAlgorithm</span><span class="p">,</span>
+        <span class="n">param_ranges</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">],</span>
+        <span class="n">metric</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Создание целевой функции для Optuna.</span>
+<span class="sd">        </span>
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        algorithm_processor : DeconvolutionAlgorithm</span>
+<span class="sd">            Алгоритм для оптимизации.</span>
+<span class="sd">        param_ranges : Dict</span>
+<span class="sd">            Диапазоны поиска параметров.</span>
+<span class="sd">        metric : str</span>
+<span class="sd">            Целевая метрика.</span>
+<span class="sd">            </span>
+<span class="sd">        Возвращает</span>
+<span class="sd">        ----------</span>
+<span class="sd">        Callable</span>
+<span class="sd">            Целевая функция для Optuna.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">objective</span><span class="p">(</span><span class="n">trial</span><span class="p">:</span> <span class="n">optuna</span><span class="o">.</span><span class="n">Trial</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+            <span class="n">params</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">param_name</span><span class="p">,</span> <span class="p">(</span><span class="n">min_val</span><span class="p">,</span> <span class="n">max_val</span><span class="p">)</span> <span class="ow">in</span> <span class="n">param_ranges</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">min_val</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">max_val</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+                    <span class="n">params</span><span class="p">[</span><span class="n">param_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">trial</span><span class="o">.</span><span class="n">suggest_int</span><span class="p">(</span><span class="n">param_name</span><span class="p">,</span> <span class="n">min_val</span><span class="p">,</span> <span class="n">max_val</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">min_val</span><span class="p">,</span> <span class="nb">float</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">max_val</span><span class="p">,</span> <span class="nb">float</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="n">max_val</span> <span class="o">/</span> <span class="nb">max</span><span class="p">(</span><span class="n">min_val</span><span class="p">,</span> <span class="mf">1e-10</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">100</span><span class="p">:</span>
+                        <span class="n">params</span><span class="p">[</span><span class="n">param_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">trial</span><span class="o">.</span><span class="n">suggest_float</span><span class="p">(</span>
+                            <span class="n">param_name</span><span class="p">,</span> <span class="n">min_val</span><span class="p">,</span> <span class="n">max_val</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">True</span>
+                        <span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">params</span><span class="p">[</span><span class="n">param_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">trial</span><span class="o">.</span><span class="n">suggest_float</span><span class="p">(</span>
+                            <span class="n">param_name</span><span class="p">,</span> <span class="n">min_val</span><span class="p">,</span> <span class="n">max_val</span>
+                        <span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">params</span><span class="p">[</span><span class="n">param_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">trial</span><span class="o">.</span><span class="n">suggest_categorical</span><span class="p">(</span>
+                        <span class="n">param_name</span><span class="p">,</span> <span class="p">[</span><span class="n">min_val</span><span class="p">,</span> <span class="n">max_val</span><span class="p">]</span>
+                    <span class="p">)</span>
+            
+            <span class="n">algorithm_processor</span><span class="o">.</span><span class="n">change_param</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+            
+            <span class="n">total_score</span> <span class="o">=</span> <span class="mf">0.0</span>
+            <span class="n">n_images</span> <span class="o">=</span> <span class="mi">0</span>
+            
+            <span class="k">for</span> <span class="n">img_obj</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">processing</span><span class="o">.</span><span class="n">images</span><span class="p">:</span>
+                <span class="n">original</span> <span class="o">=</span> <span class="n">img_obj</span><span class="o">.</span><span class="n">get_original_image</span><span class="p">()</span>
+                <span class="n">blurred</span> <span class="o">=</span> <span class="n">img_obj</span><span class="o">.</span><span class="n">get_blurred_image</span><span class="p">()</span>
+                
+                <span class="k">if</span> <span class="n">blurred</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">blurred</span> <span class="o">=</span> <span class="n">original</span>
+                <span class="k">if</span> <span class="n">original</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">restored</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">algorithm_processor</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">blurred</span><span class="p">)</span>
+                    
+                    <span class="n">original_prep</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_image</span><span class="p">(</span><span class="n">original</span><span class="p">)</span>
+                    <span class="n">restored_prep</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_image</span><span class="p">(</span><span class="n">restored</span><span class="p">)</span>
+                    
+                    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">restored_prep</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">1e-6</span><span class="p">:</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Degenerate solution detected (near-zero image)&quot;</span><span class="p">)</span>
+                        <span class="k">continue</span>
+                    
+                    <span class="n">score</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_metric</span><span class="p">(</span><span class="n">original_prep</span><span class="p">,</span> <span class="n">restored_prep</span><span class="p">,</span> <span class="n">metric</span><span class="p">)</span>
+                    <span class="n">total_score</span> <span class="o">+=</span> <span class="n">score</span>
+                    <span class="n">n_images</span> <span class="o">+=</span> <span class="mi">1</span>
+                    
+                <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error evaluating parameters </span><span class="si">{</span><span class="n">params</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="k">continue</span>
+            
+            <span class="k">if</span> <span class="n">n_images</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="s1">&#39;-inf&#39;</span><span class="p">)</span>
+            
+            <span class="k">return</span> <span class="n">total_score</span> <span class="o">/</span> <span class="n">n_images</span>
+        
+        <span class="k">return</span> <span class="n">objective</span>
+    
+    <span class="k">def</span><span class="w"> </span><span class="nf">_compute_metric</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> 
+        <span class="n">original</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> 
+        <span class="n">restored</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> 
+        <span class="n">metric</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Вычисление метрики качества.</span>
+<span class="sd">        </span>
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        original : np.ndarray</span>
+<span class="sd">            Оригинальное изображение.</span>
+<span class="sd">        restored : np.ndarray</span>
+<span class="sd">            Восстановленное изображение.</span>
+<span class="sd">        metric : str</span>
+<span class="sd">            Название метрики.</span>
+<span class="sd">            </span>
+<span class="sd">        Возвращает</span>
+<span class="sd">        ----------</span>
+<span class="sd">        float</span>
+<span class="sd">            Значение метрики (большее значение лучше).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">metric_upper</span> <span class="o">=</span> <span class="n">metric</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+        
+        <span class="k">if</span> <span class="n">metric_upper</span> <span class="o">==</span> <span class="s1">&#39;PSNR&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">metrics</span><span class="o">.</span><span class="n">PSNR</span><span class="p">(</span><span class="n">original</span><span class="p">,</span> <span class="n">restored</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">metric_upper</span> <span class="o">==</span> <span class="s1">&#39;SSIM&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">metrics</span><span class="o">.</span><span class="n">SSIM</span><span class="p">(</span><span class="n">original</span><span class="p">,</span> <span class="n">restored</span><span class="p">,</span> <span class="n">data_range</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">metric_upper</span> <span class="o">==</span> <span class="s1">&#39;SHARPNESS&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">metrics</span><span class="o">.</span><span class="n">Sharpness</span><span class="p">(</span><span class="n">restored</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown metric: </span><span class="si">{</span><span class="n">metric</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    
+    <span class="k">def</span><span class="w"> </span><span class="nf">_apply_and_process</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">algorithm_processor</span><span class="p">:</span> <span class="n">base</span><span class="o">.</span><span class="n">DeconvolutionAlgorithm</span><span class="p">,</span>
+        <span class="n">best_params</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+        <span class="n">algorithm_name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Применение лучших параметров и обработка всех изображений.</span>
+<span class="sd">        </span>
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        algorithm_processor : DeconvolutionAlgorithm</span>
+<span class="sd">            Алгоритм для применения.</span>
+<span class="sd">        best_params : Dict</span>
+<span class="sd">            Лучшие гиперпараметры.</span>
+<span class="sd">        algorithm_name : str</span>
+<span class="sd">            Имя алгоритма для именования файлов.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">algorithm_processor</span><span class="o">.</span><span class="n">change_param</span><span class="p">(</span><span class="n">best_params</span><span class="p">)</span>
+        
+        <span class="k">for</span> <span class="n">img_obj</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">processing</span><span class="o">.</span><span class="n">images</span><span class="p">:</span>
+            <span class="n">original</span> <span class="o">=</span> <span class="n">img_obj</span><span class="o">.</span><span class="n">get_original_image</span><span class="p">()</span>
+            <span class="n">blurred</span> <span class="o">=</span> <span class="n">img_obj</span><span class="o">.</span><span class="n">get_blurred_image</span><span class="p">()</span>
+            
+            <span class="k">if</span> <span class="n">blurred</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">blurred</span> <span class="o">=</span> <span class="n">original</span>
+            <span class="k">if</span> <span class="n">original</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">continue</span>
+            
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">restored</span><span class="p">,</span> <span class="n">kernel</span> <span class="o">=</span> <span class="n">algorithm_processor</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">blurred</span><span class="p">)</span>
+                
+                <span class="n">restored_path</span><span class="p">,</span> <span class="n">kernel_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_generate_output_paths</span><span class="p">(</span>
+                    <span class="n">img_obj</span><span class="p">,</span> <span class="n">algorithm_name</span>
+                <span class="p">)</span>
+                
+                <span class="n">cv</span><span class="o">.</span><span class="n">imwrite</span><span class="p">(</span><span class="n">restored_path</span><span class="p">,</span> <span class="n">restored</span><span class="p">)</span>
+                <span class="n">cv</span><span class="o">.</span><span class="n">imwrite</span><span class="p">(</span><span class="n">kernel_path</span><span class="p">,</span> <span class="n">kernel</span><span class="p">)</span>
+                
+                <span class="bp">self</span><span class="o">.</span><span class="n">_save_metrics</span><span class="p">(</span>
+                    <span class="n">img_obj</span><span class="p">,</span> <span class="n">original</span><span class="p">,</span> <span class="n">restored</span><span class="p">,</span>
+                    <span class="n">restored_path</span><span class="p">,</span> <span class="n">kernel_path</span><span class="p">,</span> <span class="n">algorithm_name</span>
+                <span class="p">)</span>
+                
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error processing with optimized params: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    
+    <span class="k">def</span><span class="w"> </span><span class="nf">_generate_output_paths</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> 
+        <span class="n">img_obj</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> 
+        <span class="n">algorithm_name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Генерация уникальных путей для выходных файлов.</span>
+<span class="sd">        </span>
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        img_obj : Any</span>
+<span class="sd">            Объект изображения.</span>
+<span class="sd">        algorithm_name : str</span>
+<span class="sd">            Имя алгоритма.</span>
+<span class="sd">            </span>
+<span class="sd">        Возвращает</span>
+<span class="sd">        ----------</span>
+<span class="sd">        Tuple[str, str]</span>
+<span class="sd">            Пути для восстановленного изображения и ядра.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">base_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">img_obj</span><span class="o">.</span><span class="n">get_blurred</span><span class="p">()</span> <span class="ow">or</span> <span class="n">img_obj</span><span class="o">.</span><span class="n">get_original</span><span class="p">())</span>
+        <span class="n">base_name</span> <span class="o">=</span> <span class="n">base_path</span><span class="o">.</span><span class="n">stem</span>
+        <span class="n">suffix</span> <span class="o">=</span> <span class="n">base_path</span><span class="o">.</span><span class="n">suffix</span>
+        
+        <span class="n">restored_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">processing</span><span class="o">.</span><span class="n">_generate_unique_file_path</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">processing</span><span class="o">.</span><span class="n">folder_path_restored</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">base_name</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">algorithm_name</span><span class="si">}</span><span class="s2">_optimized</span><span class="si">{</span><span class="n">suffix</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+        
+        <span class="n">kernel_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">processing</span><span class="o">.</span><span class="n">_generate_unique_file_path</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">processing</span><span class="o">.</span><span class="n">folder_path_restored</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">base_name</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">algorithm_name</span><span class="si">}</span><span class="s2">_optimized_kernel</span><span class="si">{</span><span class="n">suffix</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+        
+        <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">restored_path</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">kernel_path</span><span class="p">)</span>
+    
+    <span class="k">def</span><span class="w"> </span><span class="nf">_save_metrics</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">img_obj</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">original</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+        <span class="n">restored</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+        <span class="n">restored_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">kernel_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">algorithm_name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Вычисление и сохранение метрик качества.</span>
+<span class="sd">        </span>
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        img_obj : Any</span>
+<span class="sd">            Объект изображения.</span>
+<span class="sd">        original : np.ndarray</span>
+<span class="sd">            Оригинальное изображение.</span>
+<span class="sd">        restored : np.ndarray</span>
+<span class="sd">            Восстановленное изображение.</span>
+<span class="sd">        restored_path : str</span>
+<span class="sd">            Путь к сохраненному восстановленному изображению.</span>
+<span class="sd">        kernel_path : str</span>
+<span class="sd">            Путь к сохраненному ядру.</span>
+<span class="sd">        algorithm_name : str</span>
+<span class="sd">            Имя алгоритма.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">original_prep</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_image</span><span class="p">(</span><span class="n">original</span><span class="p">)</span>
+        <span class="n">restored_prep</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_image</span><span class="p">(</span><span class="n">restored</span><span class="p">)</span>
+        
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">psnr_val</span> <span class="o">=</span> <span class="n">metrics</span><span class="o">.</span><span class="n">PSNR</span><span class="p">(</span><span class="n">original_prep</span><span class="p">,</span> <span class="n">restored_prep</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;PSNR calculation failed: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">psnr_val</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="s1">&#39;nan&#39;</span><span class="p">)</span>
+        
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">ssim_val</span> <span class="o">=</span> <span class="n">metrics</span><span class="o">.</span><span class="n">SSIM</span><span class="p">(</span><span class="n">original_prep</span><span class="p">,</span> <span class="n">restored_prep</span><span class="p">,</span> <span class="n">data_range</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;SSIM calculation failed: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">ssim_val</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="s1">&#39;nan&#39;</span><span class="p">)</span>
+        
+        <span class="n">blurred_ref</span> <span class="o">=</span> <span class="n">img_obj</span><span class="o">.</span><span class="n">get_blurred</span><span class="p">()</span>
+        <span class="n">img_obj</span><span class="o">.</span><span class="n">add_PSNR</span><span class="p">(</span><span class="n">psnr_val</span><span class="p">,</span> <span class="n">blurred_ref</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="p">)</span>
+        <span class="n">img_obj</span><span class="o">.</span><span class="n">add_SSIM</span><span class="p">(</span><span class="n">ssim_val</span><span class="p">,</span> <span class="n">blurred_ref</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="p">)</span>
+        <span class="n">img_obj</span><span class="o">.</span><span class="n">add_algorithm</span><span class="p">(</span><span class="n">algorithm_name</span><span class="p">)</span>
+        <span class="n">img_obj</span><span class="o">.</span><span class="n">add_restored</span><span class="p">(</span><span class="n">restored_path</span><span class="p">,</span> <span class="n">blurred_ref</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="p">)</span>
+        <span class="n">img_obj</span><span class="o">.</span><span class="n">add_kernel</span><span class="p">(</span><span class="n">kernel_path</span><span class="p">,</span> <span class="n">blurred_ref</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="p">)</span>
+        
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Optimized: </span><span class="si">{</span><span class="n">Path</span><span class="p">(</span><span class="n">restored_path</span><span class="p">)</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;PSNR: </span><span class="si">{</span><span class="n">psnr_val</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> dB, SSIM: </span><span class="si">{</span><span class="n">ssim_val</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    
+    <span class="k">def</span><span class="w"> </span><span class="nf">_save_results</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> 
+        <span class="n">result</span><span class="p">:</span> <span class="n">OptimizationResult</span><span class="p">,</span> 
+        <span class="n">algorithm_name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Сохранение результатов оптимизации в JSON-файл.</span>
+<span class="sd">        </span>
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        result : OptimizationResult</span>
+<span class="sd">            Результаты оптимизации.</span>
+<span class="sd">        algorithm_name : str</span>
+<span class="sd">            Имя алгоритма.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">output_data</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;algorithm&#39;</span><span class="p">:</span> <span class="n">algorithm_name</span><span class="p">,</span>
+            <span class="s1">&#39;best_params&#39;</span><span class="p">:</span> <span class="n">result</span><span class="o">.</span><span class="n">best_params</span><span class="p">,</span>
+            <span class="s1">&#39;best_value&#39;</span><span class="p">:</span> <span class="n">result</span><span class="o">.</span><span class="n">best_value</span><span class="p">,</span>
+            <span class="s1">&#39;n_trials&#39;</span><span class="p">:</span> <span class="n">result</span><span class="o">.</span><span class="n">n_trials</span><span class="p">,</span>
+            <span class="s1">&#39;elapsed_time&#39;</span><span class="p">:</span> <span class="n">result</span><span class="o">.</span><span class="n">elapsed_time</span>
+        <span class="p">}</span>
+        
+        <span class="n">filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_folder</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">algorithm_name</span><span class="si">}</span><span class="s2">_optimal_params.json&quot;</span>
+        
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">output_data</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">ensure_ascii</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+        
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Results saved to </span><span class="si">{</span><span class="n">filepath</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Авторские права 2024, Юров П.И., Беззаборов А.А., Куропатов К.Л., Малыш Я.В.. </p>
+  </div>
+
+  Собрано при помощи <a href="https://www.sphinx-doc.org/">Sphinx</a> с использованием
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">темы,</a>
+    предоставленной <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

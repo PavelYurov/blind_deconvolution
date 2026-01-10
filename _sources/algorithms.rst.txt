@@ -1,0 +1,29 @@
+algorithms package
+==================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   algorithms.implementations
+
+Submodules
+----------
+
+algorithms.base module
+----------------------
+
+.. automodule:: algorithms.base
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: algorithms
+   :members:
+   :undoc-members:
+   :show-inheritance:

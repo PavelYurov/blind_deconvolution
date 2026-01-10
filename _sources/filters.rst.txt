@@ -1,0 +1,69 @@
+filters package
+===============
+
+Submodules
+----------
+
+filters.base module
+-------------------
+
+.. automodule:: filters.base
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+filters.blur module
+-------------------
+
+.. automodule:: filters.blur
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+filters.colored\_noise module
+-----------------------------
+
+.. automodule:: filters.colored_noise
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+filters.denoise module
+----------------------
+
+.. automodule:: filters.denoise
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+filters.distributions module
+----------------------------
+
+.. automodule:: filters.distributions
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+filters.noise module
+--------------------
+
+.. automodule:: filters.noise
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+filters.smooth module
+---------------------
+
+.. automodule:: filters.smooth
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: filters
+   :members:
+   :undoc-members:
+   :show-inheritance:

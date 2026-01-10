@@ -1,0 +1,10 @@
+algorithms.implementations package
+==================================
+
+Module contents
+---------------
+
+.. automodule:: algorithms.implementations
+   :members:
+   :undoc-members:
+   :show-inheritance:

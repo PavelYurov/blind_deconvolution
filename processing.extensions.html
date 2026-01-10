@@ -1,0 +1,1112 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="ru" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>processing.extensions package &mdash; документация BlindDeconvolution 1.0.0</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=e35015f7"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/translations.js?v=5b699b7f"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Алфавитный указатель" href="genindex.html" />
+    <link rel="search" title="Поиск" href="search.html" />
+    <link rel="next" title="scripts package" href="scripts.html" />
+    <link rel="prev" title="processing package" href="processing.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            BlindDeconvolution
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Поиск в документации" aria-label="Поиск в документации" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Меню навигации">
+              <p class="caption" role="heading"><span class="caption-text">Содержание:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">blind_deconvolution</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="algorithms.html">algorithms package</a></li>
+<li class="toctree-l2"><a class="reference internal" href="filters.html">filters package</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="processing.html">processing package</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="processing.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l4 current"><a class="current reference internal" href="#">processing.extensions package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#submodules">Submodules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#module-processing.applyfilter">processing.applyfilter module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#module-processing.clear">processing.clear module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#module-processing.core">processing.core module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#module-processing.display">processing.display module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#module-processing.metrics">processing.metrics module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#module-processing.preprocessing">processing.preprocessing module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#module-processing.reader">processing.reader module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#module-processing.restore">processing.restore module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#module-processing.restorepipeline">processing.restorepipeline module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#module-processing.tables">processing.tables module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#module-processing.utils">processing.utils module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="processing.html#module-processing">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="scripts.html">scripts package</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Меню навигации для мобильных устройств" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">BlindDeconvolution</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Навигация по страницам">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="modules.html">blind_deconvolution</a></li>
+          <li class="breadcrumb-item"><a href="processing.html">processing package</a></li>
+      <li class="breadcrumb-item active">processing.extensions package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/processing.extensions.rst.txt" rel="nofollow"> Просмотреть исходный код страницы</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="processing-extensions-package">
+<h1>processing.extensions package<a class="headerlink" href="#processing-extensions-package" title="Ссылка на этот заголовок"></a></h1>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Ссылка на этот заголовок"></a></h2>
+</section>
+<section id="module-processing.extensions.base">
+<span id="processing-extensions-base-module"></span><h2>processing.extensions.base module<a class="headerlink" href="#module-processing.extensions.base" title="Ссылка на этот заголовок"></a></h2>
+<p>Базовые классы и типы для пакета расширений.</p>
+<dl class="simple">
+<dt>Содержит:</dt><dd><ul class="simple">
+<li><p>Абстрактный базовый класс ProcessingExtension</p></li>
+<li><p>Классы данных для параметров и результатов</p></li>
+<li><p>Перечисления для методов оптимизации и метрик</p></li>
+</ul>
+</dd>
+</dl>
+<p>Автор: Беззаборов А.А.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="processing.extensions.base.MetricType">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">processing.extensions.base.</span></span><span class="sig-name descname"><span class="pre">MetricType</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/processing/extensions/base.html#MetricType"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.base.MetricType" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></p>
+<p>Метрики качества для оценки восстановления изображений.</p>
+<p>Для всех метрик большее значение соответствует лучшему качеству.</p>
+<p>PSNR - пиковое отношение сигнал-шум (дБ)
+SSIM - индекс структурного сходства
+SHARPNESS - мера резкости на основе лапласиана</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.base.MetricType.PSNR">
+<span class="sig-name descname"><span class="pre">PSNR</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'psnr'</span></em><a class="headerlink" href="#processing.extensions.base.MetricType.PSNR" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.base.MetricType.SHARPNESS">
+<span class="sig-name descname"><span class="pre">SHARPNESS</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'sharpness'</span></em><a class="headerlink" href="#processing.extensions.base.MetricType.SHARPNESS" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.base.MetricType.SSIM">
+<span class="sig-name descname"><span class="pre">SSIM</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'ssim'</span></em><a class="headerlink" href="#processing.extensions.base.MetricType.SSIM" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="processing.extensions.base.MetricType.from_string">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_string</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#processing.extensions.base.MetricType" title="processing.extensions.base.MetricType"><span class="pre">MetricType</span></a></span></span><a class="reference internal" href="_modules/processing/extensions/base.html#MetricType.from_string"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.base.MetricType.from_string" title="Ссылка на это определение"></a></dt>
+<dd><p>Создание из строкового представления.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="processing.extensions.base.OptimizationMethod">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">processing.extensions.base.</span></span><span class="sig-name descname"><span class="pre">OptimizationMethod</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/processing/extensions/base.html#OptimizationMethod"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.base.OptimizationMethod" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></p>
+<p>Поддерживаемые методы оптимизации.</p>
+<dl class="simple">
+<dt>TPE<span class="classifier">str</span></dt><dd><p>Tree-structured Parzen Estimator (байесовская оптимизация).
+Рекомендуется для общей настройки гиперпараметров.</p>
+</dd>
+<dt>RANDOM<span class="classifier">str</span></dt><dd><p>Случайный поиск.
+Эффективен для многомерных пространств и параллельных вычислений.</p>
+</dd>
+<dt>GP<span class="classifier">str</span></dt><dd><p>Гауссовские процессы (требует BoTorch).
+Оптимален для дорогостоящих вычислений в малоразмерных пространствах.</p>
+</dd>
+<dt>NSGA2<span class="classifier">str</span></dt><dd><p>Non-dominated Sorting Genetic Algorithm II.
+Предназначен для многокритериальной оптимизации.</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.base.OptimizationMethod.GP">
+<span class="sig-name descname"><span class="pre">GP</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'gp'</span></em><a class="headerlink" href="#processing.extensions.base.OptimizationMethod.GP" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.base.OptimizationMethod.NSGA2">
+<span class="sig-name descname"><span class="pre">NSGA2</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'nsga2'</span></em><a class="headerlink" href="#processing.extensions.base.OptimizationMethod.NSGA2" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.base.OptimizationMethod.RANDOM">
+<span class="sig-name descname"><span class="pre">RANDOM</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'random'</span></em><a class="headerlink" href="#processing.extensions.base.OptimizationMethod.RANDOM" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.base.OptimizationMethod.TPE">
+<span class="sig-name descname"><span class="pre">TPE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'tpe'</span></em><a class="headerlink" href="#processing.extensions.base.OptimizationMethod.TPE" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="processing.extensions.base.OptimizationMethod.from_string">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_string</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#processing.extensions.base.OptimizationMethod" title="processing.extensions.base.OptimizationMethod"><span class="pre">OptimizationMethod</span></a></span></span><a class="reference internal" href="_modules/processing/extensions/base.html#OptimizationMethod.from_string"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.base.OptimizationMethod.from_string" title="Ссылка на это определение"></a></dt>
+<dd><p>Создание из строкового представления.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="processing.extensions.base.OptimizationResult">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">processing.extensions.base.</span></span><span class="sig-name descname"><span class="pre">OptimizationResult</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">best_params:</span> <span class="pre">~typing.Dict[str,</span> <span class="pre">~typing.Any],</span> <span class="pre">best_value:</span> <span class="pre">float,</span> <span class="pre">n_trials:</span> <span class="pre">int,</span> <span class="pre">study:</span> <span class="pre">~typing.Any</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None,</span> <span class="pre">history:</span> <span class="pre">~typing.List[~typing.Dict[str,</span> <span class="pre">~typing.Any]]</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;,</span> <span class="pre">elapsed_time:</span> <span class="pre">float</span> <span class="pre">=</span> <span class="pre">0.0</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/processing/extensions/base.html#OptimizationResult"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.base.OptimizationResult" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Контейнер для результатов оптимизации.</p>
+<section id="id1">
+<h3>Атрибуты<a class="headerlink" href="#id1" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>best_params<span class="classifier">Dict[str, Any]</span></dt><dd><p>Лучшие найденные гиперпараметры.</p>
+</dd>
+<dt>best_value<span class="classifier">float</span></dt><dd><p>Лучшее достигнутое значение целевой функции.</p>
+</dd>
+<dt>n_trials<span class="classifier">int</span></dt><dd><p>Количество выполненных испытаний.</p>
+</dd>
+<dt>study<span class="classifier">Optional[Any]</span></dt><dd><p>Объект исследования Optuna для дальнейшего анализа.</p>
+</dd>
+<dt>history<span class="classifier">List[Dict[str, Any]]</span></dt><dd><p>История испытаний с параметрами и оценками.</p>
+</dd>
+<dt>elapsed_time<span class="classifier">float</span></dt><dd><p>Затраченное время в секундах.</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.base.OptimizationResult.best_params">
+<span class="sig-name descname"><span class="pre">best_params</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#processing.extensions.base.OptimizationResult.best_params" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.base.OptimizationResult.best_value">
+<span class="sig-name descname"><span class="pre">best_value</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#processing.extensions.base.OptimizationResult.best_value" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.base.OptimizationResult.elapsed_time">
+<span class="sig-name descname"><span class="pre">elapsed_time</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.0</span></em><a class="headerlink" href="#processing.extensions.base.OptimizationResult.elapsed_time" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.base.OptimizationResult.history">
+<span class="sig-name descname"><span class="pre">history</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#processing.extensions.base.OptimizationResult.history" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.base.OptimizationResult.n_trials">
+<span class="sig-name descname"><span class="pre">n_trials</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#processing.extensions.base.OptimizationResult.n_trials" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.base.OptimizationResult.study">
+<span class="sig-name descname"><span class="pre">study</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Any</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#processing.extensions.base.OptimizationResult.study" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="processing.extensions.base.OptimizationResult.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/processing/extensions/base.html#OptimizationResult.to_dict"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.base.OptimizationResult.to_dict" title="Ссылка на это определение"></a></dt>
+<dd><p>Преобразование результатов в словарь.</p>
+</dd></dl>
+
+</section>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="processing.extensions.base.ParameterRange">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">processing.extensions.base.</span></span><span class="sig-name descname"><span class="pre">ParameterRange</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_scale</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">step</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/processing/extensions/base.html#ParameterRange"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.base.ParameterRange" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Диапазон поиска гиперпараметра.</p>
+<section id="id2">
+<h3>Атрибуты<a class="headerlink" href="#id2" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>name<span class="classifier">str</span></dt><dd><p>Имя параметра.</p>
+</dd>
+<dt>min_value<span class="classifier">Union[int, float]</span></dt><dd><p>Минимальное значение диапазона.</p>
+</dd>
+<dt>max_value<span class="classifier">Union[int, float]</span></dt><dd><p>Максимальное значение диапазона.</p>
+</dd>
+<dt>log_scale<span class="classifier">bool</span></dt><dd><p>Использовать логарифмическую шкалу для параметров,
+охватывающих несколько порядков величины.</p>
+</dd>
+<dt>step<span class="classifier">Optional[float]</span></dt><dd><p>Размер дискретного шага (None для непрерывных параметров).</p>
+</dd>
+</dl>
+<dl class="py property">
+<dt class="sig sig-object py" id="processing.extensions.base.ParameterRange.is_integer">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">is_integer</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#processing.extensions.base.ParameterRange.is_integer" title="Ссылка на это определение"></a></dt>
+<dd><p>Проверка, является ли параметр целочисленным.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.base.ParameterRange.log_scale">
+<span class="sig-name descname"><span class="pre">log_scale</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></em><a class="headerlink" href="#processing.extensions.base.ParameterRange.log_scale" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.base.ParameterRange.max_value">
+<span class="sig-name descname"><span class="pre">max_value</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#processing.extensions.base.ParameterRange.max_value" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.base.ParameterRange.min_value">
+<span class="sig-name descname"><span class="pre">min_value</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#processing.extensions.base.ParameterRange.min_value" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.base.ParameterRange.name">
+<span class="sig-name descname"><span class="pre">name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#processing.extensions.base.ParameterRange.name" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.base.ParameterRange.step">
+<span class="sig-name descname"><span class="pre">step</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#processing.extensions.base.ParameterRange.step" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="processing.extensions.base.ParameterRange.validate">
+<span class="sig-name descname"><span class="pre">validate</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/processing/extensions/base.html#ParameterRange.validate"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.base.ParameterRange.validate" title="Ссылка на это определение"></a></dt>
+<dd><p>Проверка корректности диапазона.</p>
+</dd></dl>
+
+</section>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="processing.extensions.base.ParetoPoint">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">processing.extensions.base.</span></span><span class="sig-name descname"><span class="pre">ParetoPoint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">objectives:</span> <span class="pre">~typing.Dict[str,</span> <span class="pre">float],</span> <span class="pre">parameters:</span> <span class="pre">~typing.Dict[str,</span> <span class="pre">~typing.Any],</span> <span class="pre">metadata:</span> <span class="pre">~typing.Dict[str,</span> <span class="pre">~typing.Any]</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;,</span> <span class="pre">is_pareto_optimal:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/processing/extensions/base.html#ParetoPoint"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.base.ParetoPoint" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Точка в многокритериальном пространстве.</p>
+<section id="id3">
+<h3>Атрибуты<a class="headerlink" href="#id3" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>objectives<span class="classifier">Dict[str, float]</span></dt><dd><p>Значения целевых функций (например, {„psnr“: 25.0, „time“: 1.5}).</p>
+</dd>
+<dt>parameters<span class="classifier">Dict[str, Any]</span></dt><dd><p>Связанные гиперпараметры.</p>
+</dd>
+<dt>metadata<span class="classifier">Dict[str, Any]</span></dt><dd><p>Дополнительная информация (имя алгоритма, изображение и т.д.).</p>
+</dd>
+<dt>is_pareto_optimal<span class="classifier">bool</span></dt><dd><p>Принадлежит ли точка фронту Парето.</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="processing.extensions.base.ParetoPoint.dominates">
+<span class="sig-name descname"><span class="pre">dominates</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">other</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#processing.extensions.base.ParetoPoint" title="processing.extensions.base.ParetoPoint"><span class="pre">ParetoPoint</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">maximize</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/processing/extensions/base.html#ParetoPoint.dominates"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.base.ParetoPoint.dominates" title="Ссылка на это определение"></a></dt>
+<dd><p>Проверка доминирования текущей точки над другой.</p>
+<section id="id4">
+<h4>Параметры<a class="headerlink" href="#id4" title="Ссылка на этот заголовок"></a></h4>
+<dl class="simple">
+<dt>other<span class="classifier">ParetoPoint</span></dt><dd><p>Другая точка для сравнения.</p>
+</dd>
+<dt>maximize<span class="classifier">List[str]</span></dt><dd><p>Список критериев для максимизации.</p>
+</dd>
+</dl>
+</section>
+<section id="id5">
+<h4>Возвращает<a class="headerlink" href="#id5" title="Ссылка на этот заголовок"></a></h4>
+<dl class="simple">
+<dt>bool</dt><dd><p>True если текущая точка доминирует над other.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.base.ParetoPoint.is_pareto_optimal">
+<span class="sig-name descname"><span class="pre">is_pareto_optimal</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></em><a class="headerlink" href="#processing.extensions.base.ParetoPoint.is_pareto_optimal" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.base.ParetoPoint.metadata">
+<span class="sig-name descname"><span class="pre">metadata</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#processing.extensions.base.ParetoPoint.metadata" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.base.ParetoPoint.objectives">
+<span class="sig-name descname"><span class="pre">objectives</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#processing.extensions.base.ParetoPoint.objectives" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.base.ParetoPoint.parameters">
+<span class="sig-name descname"><span class="pre">parameters</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#processing.extensions.base.ParetoPoint.parameters" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+</section>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="processing.extensions.base.ProcessingExtension">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">processing.extensions.base.</span></span><span class="sig-name descname"><span class="pre">ProcessingExtension</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">processing_instance</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_folder</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'output'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/processing/extensions/base.html#ProcessingExtension"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.base.ProcessingExtension" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></p>
+<p>Абстрактный базовый класс для расширений обработки.</p>
+<p>Предоставляет общий функционал для расширений,
+дополняющих основной конвейер обработки изображений.</p>
+<section id="id6">
+<h3>Атрибуты<a class="headerlink" href="#id6" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>processing<span class="classifier">Any</span></dt><dd><p>Ссылка на основной экземпляр обработки.</p>
+</dd>
+<dt>output_folder<span class="classifier">Path</span></dt><dd><p>Директория для сохранения результатов.</p>
+</dd>
+<dt>logger<span class="classifier">logging.Logger</span></dt><dd><p>Логгер для данного расширения.</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="processing.extensions.base.ProcessingExtension.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">processing_instance</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_folder</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'output'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/processing/extensions/base.html#ProcessingExtension.__init__"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.base.ProcessingExtension.__init__" title="Ссылка на это определение"></a></dt>
+<dd><p>Инициализация расширения.</p>
+<section id="id7">
+<h4>Параметры<a class="headerlink" href="#id7" title="Ссылка на этот заголовок"></a></h4>
+<dl class="simple">
+<dt>processing_instance<span class="classifier">Any</span></dt><dd><p>Ссылка на объект Processing.</p>
+</dd>
+<dt>output_folder<span class="classifier">str</span></dt><dd><p>Директория для сохранения результатов.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="processing.extensions.base.ProcessingExtension.execute">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Any</span></span></span><a class="reference internal" href="_modules/processing/extensions/base.html#ProcessingExtension.execute"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.base.ProcessingExtension.execute" title="Ссылка на это определение"></a></dt>
+<dd><p>Выполнение основного функционала расширения.</p>
+<p>Должен быть реализован в подклассах.</p>
+</dd></dl>
+
+</section>
+</dd></dl>
+
+</section>
+<section id="module-processing.extensions.hyperparameter_optimization">
+<span id="processing-extensions-hyperparameter-optimization-module"></span><h2>processing.extensions.hyperparameter_optimization module<a class="headerlink" href="#module-processing.extensions.hyperparameter_optimization" title="Ссылка на этот заголовок"></a></h2>
+<p>Модуль оптимизации гиперпараметров.</p>
+<p>Реализует оптимизацию гиперпараметров алгоритмов слепой деконволюции
+с использованием байесовских методов оптимизации.</p>
+<dl class="simple">
+<dt>Поддерживаемые методы:</dt><dd><ul class="simple">
+<li><p>TPE (Tree-structured Parzen Estimator)</p></li>
+<li><p>Случайный поиск</p></li>
+<li><p>Гауссовские процессы</p></li>
+<li><p>NSGA-II для многокритериальной оптимизации</p></li>
+</ul>
+</dd>
+</dl>
+<p>Автор: Беззаборов А.А.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="processing.extensions.hyperparameter_optimization.HyperparameterOptimizer">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">processing.extensions.hyperparameter_optimization.</span></span><span class="sig-name descname"><span class="pre">HyperparameterOptimizer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">processing_instance</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_folder</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'parameters'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/processing/extensions/hyperparameter_optimization.html#HyperparameterOptimizer"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.hyperparameter_optimization.HyperparameterOptimizer" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <a class="reference internal" href="#processing.extensions.base.ProcessingExtension" title="processing.extensions.base.ProcessingExtension"><code class="xref py py-class docutils literal notranslate"><span class="pre">ProcessingExtension</span></code></a></p>
+<p>Оптимизация гиперпараметров с использованием байесовской оптимизации.</p>
+<p>Реализует эффективный поиск гиперпараметров для алгоритмов слепой
+деконволюции с использованием фреймворка Optuna.</p>
+<dl class="simple">
+<dt>Поддерживаемые стратегии оптимизации:</dt><dd><ul class="simple">
+<li><p>TPE (Tree-structured Parzen Estimator)</p></li>
+<li><p>Случайный поиск</p></li>
+<li><p>Гауссовские процессы (при наличии BoTorch)</p></li>
+<li><p>NSGA-II для многокритериальной оптимизации</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="processing.extensions.hyperparameter_optimization.HyperparameterOptimizer.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">processing_instance</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_folder</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'parameters'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/processing/extensions/hyperparameter_optimization.html#HyperparameterOptimizer.__init__"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.hyperparameter_optimization.HyperparameterOptimizer.__init__" title="Ссылка на это определение"></a></dt>
+<dd><p>Инициализация оптимизатора.</p>
+<section id="id8">
+<h3>Параметры<a class="headerlink" href="#id8" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>processing_instance<span class="classifier">Any</span></dt><dd><p>Ссылка на объект Processing с изображениями.</p>
+</dd>
+<dt>output_folder<span class="classifier">str</span></dt><dd><p>Директория для сохранения результатов оптимизации.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="processing.extensions.hyperparameter_optimization.HyperparameterOptimizer.execute">
+<span class="sig-name descname"><span class="pre">execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">algorithm_processor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="algorithms.html#algorithms.base.DeconvolutionAlgorithm" title="algorithms.base.DeconvolutionAlgorithm"><span class="pre">DeconvolutionAlgorithm</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">param_ranges</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">float</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">float</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_trials</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">50</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metric</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'PSNR'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timeout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">3600</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#processing.extensions.base.OptimizationMethod" title="processing.extensions.base.OptimizationMethod"><span class="pre">OptimizationMethod</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">OptimizationMethod.TPE</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_jobs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">42</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_progress</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_results</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#processing.extensions.base.OptimizationResult" title="processing.extensions.base.OptimizationResult"><span class="pre">OptimizationResult</span></a></span></span><a class="reference internal" href="_modules/processing/extensions/hyperparameter_optimization.html#HyperparameterOptimizer.execute"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.hyperparameter_optimization.HyperparameterOptimizer.execute" title="Ссылка на это определение"></a></dt>
+<dd><p>Оптимизация гиперпараметров для заданного алгоритма.</p>
+<section id="id9">
+<h3>Параметры<a class="headerlink" href="#id9" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>algorithm_processor<span class="classifier">DeconvolutionAlgorithm</span></dt><dd><p>Алгоритм деконволюции для оптимизации.</p>
+</dd>
+<dt>param_ranges<span class="classifier">Dict[str, Tuple]</span></dt><dd><p>Словарь соответствия имен параметров кортежам (min, max).</p>
+</dd>
+<dt>n_trials<span class="classifier">int, по умолчанию 50</span></dt><dd><p>Количество испытаний оптимизации.</p>
+</dd>
+<dt>metric<span class="classifier">str, по умолчанию „PSNR“</span></dt><dd><p>Метрика оптимизации: „PSNR“, „SSIM“ или „SHARPNESS“.</p>
+</dd>
+<dt>timeout<span class="classifier">Optional[int], по умолчанию 3600</span></dt><dd><p>Максимальное время оптимизации в секундах (None без ограничения).</p>
+</dd>
+<dt>method<span class="classifier">OptimizationMethod, по умолчанию TPE</span></dt><dd><p>Метод оптимизации.</p>
+</dd>
+<dt>n_jobs<span class="classifier">int, по умолчанию 1</span></dt><dd><p>Количество параллельных задач (-1 для всех ядер).</p>
+</dd>
+<dt>seed<span class="classifier">int, по умолчанию 42</span></dt><dd><p>Seed для воспроизводимости.</p>
+</dd>
+<dt>show_progress<span class="classifier">bool, по умолчанию True</span></dt><dd><p>Отображать индикатор прогресса.</p>
+</dd>
+<dt>save_results<span class="classifier">bool, по умолчанию True</span></dt><dd><p>Сохранять лучшие параметры в JSON-файл.</p>
+</dd>
+</dl>
+</section>
+<section id="id10">
+<h3>Возвращает<a class="headerlink" href="#id10" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>OptimizationResult</dt><dd><p>Контейнер с лучшими параметрами и историей оптимизации.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-processing.extensions.pareto_analysis">
+<span id="processing-extensions-pareto-analysis-module"></span><h2>processing.extensions.pareto_analysis module<a class="headerlink" href="#module-processing.extensions.pareto_analysis" title="Ссылка на этот заголовок"></a></h2>
+<p>Модуль многокритериального анализа на основе фронта Парето.</p>
+<p>Реализует анализ производительности алгоритмов слепой деконволюции
+по множеству критериев с построением и визуализацией фронта Парето.</p>
+<dl class="simple">
+<dt>Возможности:</dt><dd><ul class="simple">
+<li><p>3D визуализация поверхности Парето</p></li>
+<li><p>2D проекции для попарного анализа критериев</p></li>
+<li><p>Статистическое сравнение алгоритмов</p></li>
+<li><p>Тепловые карты производительности</p></li>
+</ul>
+</dd>
+</dl>
+<p>Автор: Беззаборов А.А.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="processing.extensions.pareto_analysis.ParetoFrontAnalyzer">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">processing.extensions.pareto_analysis.</span></span><span class="sig-name descname"><span class="pre">ParetoFrontAnalyzer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">processing_instance</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_folder</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'pareto_analysis'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/processing/extensions/pareto_analysis.html#ParetoFrontAnalyzer"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.pareto_analysis.ParetoFrontAnalyzer" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <a class="reference internal" href="#processing.extensions.base.ProcessingExtension" title="processing.extensions.base.ProcessingExtension"><code class="xref py py-class docutils literal notranslate"><span class="pre">ProcessingExtension</span></code></a></p>
+<p>Многокритериальный анализ производительности с построением фронта Парето.</p>
+<p>Предоставляет комплексный анализ производительности алгоритмов
+по нескольким конкурирующим критериям (качество vs скорость,
+устойчивость к шуму vs размытию).</p>
+<p>Фронт Парето представляет множество недоминируемых решений, где
+ни один критерий не может быть улучшен без ухудшения другого.</p>
+<dl class="simple">
+<dt>Возможности:</dt><dd><ul class="simple">
+<li><p>3D визуализация поверхности Парето (шум x размытие x качество)</p></li>
+<li><p>2D проекции для попарного анализа критериев</p></li>
+<li><p>Статистическое сравнение алгоритмов</p></li>
+<li><p>Тепловые карты производительности</p></li>
+</ul>
+</dd>
+</dl>
+<p>Точка x* является Парето-оптимальной, если не существует другой точки x,
+такой что f_i(x) &gt;= f_i(x*) для всех критериев i, и f_j(x) &gt; f_j(x*)
+хотя бы для одного критерия j.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.pareto_analysis.ParetoFrontAnalyzer.ALPHA">
+<span class="sig-name descname"><span class="pre">ALPHA</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.7</span></em><a class="headerlink" href="#processing.extensions.pareto_analysis.ParetoFrontAnalyzer.ALPHA" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.pareto_analysis.ParetoFrontAnalyzer.COLORMAP">
+<span class="sig-name descname"><span class="pre">COLORMAP</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'viridis'</span></em><a class="headerlink" href="#processing.extensions.pareto_analysis.ParetoFrontAnalyzer.COLORMAP" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.pareto_analysis.ParetoFrontAnalyzer.FIGURE_DPI">
+<span class="sig-name descname"><span class="pre">FIGURE_DPI</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">300</span></em><a class="headerlink" href="#processing.extensions.pareto_analysis.ParetoFrontAnalyzer.FIGURE_DPI" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.pareto_analysis.ParetoFrontAnalyzer.LINE_WIDTH">
+<span class="sig-name descname"><span class="pre">LINE_WIDTH</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">2</span></em><a class="headerlink" href="#processing.extensions.pareto_analysis.ParetoFrontAnalyzer.LINE_WIDTH" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.pareto_analysis.ParetoFrontAnalyzer.MARKER_SIZE">
+<span class="sig-name descname"><span class="pre">MARKER_SIZE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">60</span></em><a class="headerlink" href="#processing.extensions.pareto_analysis.ParetoFrontAnalyzer.MARKER_SIZE" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="processing.extensions.pareto_analysis.ParetoFrontAnalyzer.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">processing_instance</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_folder</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'pareto_analysis'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/processing/extensions/pareto_analysis.html#ParetoFrontAnalyzer.__init__"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.pareto_analysis.ParetoFrontAnalyzer.__init__" title="Ссылка на это определение"></a></dt>
+<dd><p>Инициализация анализатора Парето.</p>
+<section id="id11">
+<h3>Параметры<a class="headerlink" href="#id11" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>processing_instance<span class="classifier">Any</span></dt><dd><p>Ссылка на объект Processing.</p>
+</dd>
+<dt>output_folder<span class="classifier">str</span></dt><dd><p>Директория для сохранения результатов анализа.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="processing.extensions.pareto_analysis.ParetoFrontAnalyzer.execute">
+<span class="sig-name descname"><span class="pre">execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">save_figures</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="reference internal" href="_modules/processing/extensions/pareto_analysis.html#ParetoFrontAnalyzer.execute"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.pareto_analysis.ParetoFrontAnalyzer.execute" title="Ссылка на это определение"></a></dt>
+<dd><p>Выполнение комплексного анализа фронта Парето.</p>
+<section id="id12">
+<h3>Параметры<a class="headerlink" href="#id12" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>save_figures<span class="classifier">bool, по умолчанию True</span></dt><dd><p>Сохранять сгенерированные графики.</p>
+</dd>
+</dl>
+</section>
+<section id="id13">
+<h3>Возвращает<a class="headerlink" href="#id13" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>pd.DataFrame</dt><dd><p>DataFrame со всеми данными анализа.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-processing.extensions">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-processing.extensions" title="Ссылка на этот заголовок"></a></h2>
+<p>Пакет расширений для фреймворка слепой деконволюции изображений.</p>
+<dl class="simple">
+<dt>Модули:</dt><dd><p>base: Базовые классы и интерфейсы
+hyperparameter_optimization: Оптимизация гиперпараметров
+pareto_analysis: Анализ фронта Парето</p>
+</dd>
+</dl>
+<p>Автор: Беззаборов А.А.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="processing.extensions.HyperparameterOptimizer">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">processing.extensions.</span></span><span class="sig-name descname"><span class="pre">HyperparameterOptimizer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">processing_instance</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_folder</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'parameters'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/processing/extensions/hyperparameter_optimization.html#HyperparameterOptimizer"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.HyperparameterOptimizer" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <a class="reference internal" href="#processing.extensions.base.ProcessingExtension" title="processing.extensions.base.ProcessingExtension"><code class="xref py py-class docutils literal notranslate"><span class="pre">ProcessingExtension</span></code></a></p>
+<p>Оптимизация гиперпараметров с использованием байесовской оптимизации.</p>
+<p>Реализует эффективный поиск гиперпараметров для алгоритмов слепой
+деконволюции с использованием фреймворка Optuna.</p>
+<dl class="simple">
+<dt>Поддерживаемые стратегии оптимизации:</dt><dd><ul class="simple">
+<li><p>TPE (Tree-structured Parzen Estimator)</p></li>
+<li><p>Случайный поиск</p></li>
+<li><p>Гауссовские процессы (при наличии BoTorch)</p></li>
+<li><p>NSGA-II для многокритериальной оптимизации</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="processing.extensions.HyperparameterOptimizer.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">processing_instance</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_folder</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'parameters'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/processing/extensions/hyperparameter_optimization.html#HyperparameterOptimizer.__init__"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.HyperparameterOptimizer.__init__" title="Ссылка на это определение"></a></dt>
+<dd><p>Инициализация оптимизатора.</p>
+<section id="id14">
+<h3>Параметры<a class="headerlink" href="#id14" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>processing_instance<span class="classifier">Any</span></dt><dd><p>Ссылка на объект Processing с изображениями.</p>
+</dd>
+<dt>output_folder<span class="classifier">str</span></dt><dd><p>Директория для сохранения результатов оптимизации.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="processing.extensions.HyperparameterOptimizer.execute">
+<span class="sig-name descname"><span class="pre">execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">algorithm_processor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="algorithms.html#algorithms.base.DeconvolutionAlgorithm" title="algorithms.base.DeconvolutionAlgorithm"><span class="pre">DeconvolutionAlgorithm</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">param_ranges</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">float</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">float</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_trials</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">50</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metric</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'PSNR'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timeout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">3600</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#processing.extensions.base.OptimizationMethod" title="processing.extensions.base.OptimizationMethod"><span class="pre">OptimizationMethod</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">OptimizationMethod.TPE</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_jobs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">42</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_progress</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_results</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#processing.extensions.base.OptimizationResult" title="processing.extensions.base.OptimizationResult"><span class="pre">OptimizationResult</span></a></span></span><a class="reference internal" href="_modules/processing/extensions/hyperparameter_optimization.html#HyperparameterOptimizer.execute"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.HyperparameterOptimizer.execute" title="Ссылка на это определение"></a></dt>
+<dd><p>Оптимизация гиперпараметров для заданного алгоритма.</p>
+<section id="id15">
+<h3>Параметры<a class="headerlink" href="#id15" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>algorithm_processor<span class="classifier">DeconvolutionAlgorithm</span></dt><dd><p>Алгоритм деконволюции для оптимизации.</p>
+</dd>
+<dt>param_ranges<span class="classifier">Dict[str, Tuple]</span></dt><dd><p>Словарь соответствия имен параметров кортежам (min, max).</p>
+</dd>
+<dt>n_trials<span class="classifier">int, по умолчанию 50</span></dt><dd><p>Количество испытаний оптимизации.</p>
+</dd>
+<dt>metric<span class="classifier">str, по умолчанию „PSNR“</span></dt><dd><p>Метрика оптимизации: „PSNR“, „SSIM“ или „SHARPNESS“.</p>
+</dd>
+<dt>timeout<span class="classifier">Optional[int], по умолчанию 3600</span></dt><dd><p>Максимальное время оптимизации в секундах (None без ограничения).</p>
+</dd>
+<dt>method<span class="classifier">OptimizationMethod, по умолчанию TPE</span></dt><dd><p>Метод оптимизации.</p>
+</dd>
+<dt>n_jobs<span class="classifier">int, по умолчанию 1</span></dt><dd><p>Количество параллельных задач (-1 для всех ядер).</p>
+</dd>
+<dt>seed<span class="classifier">int, по умолчанию 42</span></dt><dd><p>Seed для воспроизводимости.</p>
+</dd>
+<dt>show_progress<span class="classifier">bool, по умолчанию True</span></dt><dd><p>Отображать индикатор прогресса.</p>
+</dd>
+<dt>save_results<span class="classifier">bool, по умолчанию True</span></dt><dd><p>Сохранять лучшие параметры в JSON-файл.</p>
+</dd>
+</dl>
+</section>
+<section id="id16">
+<h3>Возвращает<a class="headerlink" href="#id16" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>OptimizationResult</dt><dd><p>Контейнер с лучшими параметрами и историей оптимизации.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="processing.extensions.MetricType">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">processing.extensions.</span></span><span class="sig-name descname"><span class="pre">MetricType</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/processing/extensions/base.html#MetricType"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.MetricType" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></p>
+<p>Метрики качества для оценки восстановления изображений.</p>
+<p>Для всех метрик большее значение соответствует лучшему качеству.</p>
+<p>PSNR - пиковое отношение сигнал-шум (дБ)
+SSIM - индекс структурного сходства
+SHARPNESS - мера резкости на основе лапласиана</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.MetricType.PSNR">
+<span class="sig-name descname"><span class="pre">PSNR</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'psnr'</span></em><a class="headerlink" href="#processing.extensions.MetricType.PSNR" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.MetricType.SHARPNESS">
+<span class="sig-name descname"><span class="pre">SHARPNESS</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'sharpness'</span></em><a class="headerlink" href="#processing.extensions.MetricType.SHARPNESS" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.MetricType.SSIM">
+<span class="sig-name descname"><span class="pre">SSIM</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'ssim'</span></em><a class="headerlink" href="#processing.extensions.MetricType.SSIM" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="processing.extensions.MetricType.from_string">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_string</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#processing.extensions.base.MetricType" title="processing.extensions.base.MetricType"><span class="pre">MetricType</span></a></span></span><a class="reference internal" href="_modules/processing/extensions/base.html#MetricType.from_string"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.MetricType.from_string" title="Ссылка на это определение"></a></dt>
+<dd><p>Создание из строкового представления.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="processing.extensions.OptimizationMethod">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">processing.extensions.</span></span><span class="sig-name descname"><span class="pre">OptimizationMethod</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/processing/extensions/base.html#OptimizationMethod"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.OptimizationMethod" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></p>
+<p>Поддерживаемые методы оптимизации.</p>
+<dl class="simple">
+<dt>TPE<span class="classifier">str</span></dt><dd><p>Tree-structured Parzen Estimator (байесовская оптимизация).
+Рекомендуется для общей настройки гиперпараметров.</p>
+</dd>
+<dt>RANDOM<span class="classifier">str</span></dt><dd><p>Случайный поиск.
+Эффективен для многомерных пространств и параллельных вычислений.</p>
+</dd>
+<dt>GP<span class="classifier">str</span></dt><dd><p>Гауссовские процессы (требует BoTorch).
+Оптимален для дорогостоящих вычислений в малоразмерных пространствах.</p>
+</dd>
+<dt>NSGA2<span class="classifier">str</span></dt><dd><p>Non-dominated Sorting Genetic Algorithm II.
+Предназначен для многокритериальной оптимизации.</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.OptimizationMethod.GP">
+<span class="sig-name descname"><span class="pre">GP</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'gp'</span></em><a class="headerlink" href="#processing.extensions.OptimizationMethod.GP" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.OptimizationMethod.NSGA2">
+<span class="sig-name descname"><span class="pre">NSGA2</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'nsga2'</span></em><a class="headerlink" href="#processing.extensions.OptimizationMethod.NSGA2" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.OptimizationMethod.RANDOM">
+<span class="sig-name descname"><span class="pre">RANDOM</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'random'</span></em><a class="headerlink" href="#processing.extensions.OptimizationMethod.RANDOM" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.OptimizationMethod.TPE">
+<span class="sig-name descname"><span class="pre">TPE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'tpe'</span></em><a class="headerlink" href="#processing.extensions.OptimizationMethod.TPE" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="processing.extensions.OptimizationMethod.from_string">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_string</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#processing.extensions.base.OptimizationMethod" title="processing.extensions.base.OptimizationMethod"><span class="pre">OptimizationMethod</span></a></span></span><a class="reference internal" href="_modules/processing/extensions/base.html#OptimizationMethod.from_string"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.OptimizationMethod.from_string" title="Ссылка на это определение"></a></dt>
+<dd><p>Создание из строкового представления.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="processing.extensions.OptimizationResult">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">processing.extensions.</span></span><span class="sig-name descname"><span class="pre">OptimizationResult</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">best_params:</span> <span class="pre">~typing.Dict[str,</span> <span class="pre">~typing.Any],</span> <span class="pre">best_value:</span> <span class="pre">float,</span> <span class="pre">n_trials:</span> <span class="pre">int,</span> <span class="pre">study:</span> <span class="pre">~typing.Any</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None,</span> <span class="pre">history:</span> <span class="pre">~typing.List[~typing.Dict[str,</span> <span class="pre">~typing.Any]]</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;,</span> <span class="pre">elapsed_time:</span> <span class="pre">float</span> <span class="pre">=</span> <span class="pre">0.0</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/processing/extensions/base.html#OptimizationResult"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.OptimizationResult" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Контейнер для результатов оптимизации.</p>
+<section id="id17">
+<h3>Атрибуты<a class="headerlink" href="#id17" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>best_params<span class="classifier">Dict[str, Any]</span></dt><dd><p>Лучшие найденные гиперпараметры.</p>
+</dd>
+<dt>best_value<span class="classifier">float</span></dt><dd><p>Лучшее достигнутое значение целевой функции.</p>
+</dd>
+<dt>n_trials<span class="classifier">int</span></dt><dd><p>Количество выполненных испытаний.</p>
+</dd>
+<dt>study<span class="classifier">Optional[Any]</span></dt><dd><p>Объект исследования Optuna для дальнейшего анализа.</p>
+</dd>
+<dt>history<span class="classifier">List[Dict[str, Any]]</span></dt><dd><p>История испытаний с параметрами и оценками.</p>
+</dd>
+<dt>elapsed_time<span class="classifier">float</span></dt><dd><p>Затраченное время в секундах.</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.OptimizationResult.best_params">
+<span class="sig-name descname"><span class="pre">best_params</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#processing.extensions.OptimizationResult.best_params" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.OptimizationResult.best_value">
+<span class="sig-name descname"><span class="pre">best_value</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#processing.extensions.OptimizationResult.best_value" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.OptimizationResult.elapsed_time">
+<span class="sig-name descname"><span class="pre">elapsed_time</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.0</span></em><a class="headerlink" href="#processing.extensions.OptimizationResult.elapsed_time" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.OptimizationResult.history">
+<span class="sig-name descname"><span class="pre">history</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#processing.extensions.OptimizationResult.history" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.OptimizationResult.n_trials">
+<span class="sig-name descname"><span class="pre">n_trials</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#processing.extensions.OptimizationResult.n_trials" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.OptimizationResult.study">
+<span class="sig-name descname"><span class="pre">study</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Any</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#processing.extensions.OptimizationResult.study" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="processing.extensions.OptimizationResult.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/processing/extensions/base.html#OptimizationResult.to_dict"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.OptimizationResult.to_dict" title="Ссылка на это определение"></a></dt>
+<dd><p>Преобразование результатов в словарь.</p>
+</dd></dl>
+
+</section>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="processing.extensions.ParameterRange">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">processing.extensions.</span></span><span class="sig-name descname"><span class="pre">ParameterRange</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_scale</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">step</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/processing/extensions/base.html#ParameterRange"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.ParameterRange" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Диапазон поиска гиперпараметра.</p>
+<section id="id18">
+<h3>Атрибуты<a class="headerlink" href="#id18" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>name<span class="classifier">str</span></dt><dd><p>Имя параметра.</p>
+</dd>
+<dt>min_value<span class="classifier">Union[int, float]</span></dt><dd><p>Минимальное значение диапазона.</p>
+</dd>
+<dt>max_value<span class="classifier">Union[int, float]</span></dt><dd><p>Максимальное значение диапазона.</p>
+</dd>
+<dt>log_scale<span class="classifier">bool</span></dt><dd><p>Использовать логарифмическую шкалу для параметров,
+охватывающих несколько порядков величины.</p>
+</dd>
+<dt>step<span class="classifier">Optional[float]</span></dt><dd><p>Размер дискретного шага (None для непрерывных параметров).</p>
+</dd>
+</dl>
+<dl class="py property">
+<dt class="sig sig-object py" id="processing.extensions.ParameterRange.is_integer">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">is_integer</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#processing.extensions.ParameterRange.is_integer" title="Ссылка на это определение"></a></dt>
+<dd><p>Проверка, является ли параметр целочисленным.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.ParameterRange.log_scale">
+<span class="sig-name descname"><span class="pre">log_scale</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></em><a class="headerlink" href="#processing.extensions.ParameterRange.log_scale" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.ParameterRange.max_value">
+<span class="sig-name descname"><span class="pre">max_value</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#processing.extensions.ParameterRange.max_value" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.ParameterRange.min_value">
+<span class="sig-name descname"><span class="pre">min_value</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#processing.extensions.ParameterRange.min_value" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.ParameterRange.name">
+<span class="sig-name descname"><span class="pre">name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#processing.extensions.ParameterRange.name" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.ParameterRange.step">
+<span class="sig-name descname"><span class="pre">step</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#processing.extensions.ParameterRange.step" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="processing.extensions.ParameterRange.validate">
+<span class="sig-name descname"><span class="pre">validate</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/processing/extensions/base.html#ParameterRange.validate"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.ParameterRange.validate" title="Ссылка на это определение"></a></dt>
+<dd><p>Проверка корректности диапазона.</p>
+</dd></dl>
+
+</section>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="processing.extensions.ParetoFrontAnalyzer">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">processing.extensions.</span></span><span class="sig-name descname"><span class="pre">ParetoFrontAnalyzer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">processing_instance</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_folder</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'pareto_analysis'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/processing/extensions/pareto_analysis.html#ParetoFrontAnalyzer"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.ParetoFrontAnalyzer" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <a class="reference internal" href="#processing.extensions.base.ProcessingExtension" title="processing.extensions.base.ProcessingExtension"><code class="xref py py-class docutils literal notranslate"><span class="pre">ProcessingExtension</span></code></a></p>
+<p>Многокритериальный анализ производительности с построением фронта Парето.</p>
+<p>Предоставляет комплексный анализ производительности алгоритмов
+по нескольким конкурирующим критериям (качество vs скорость,
+устойчивость к шуму vs размытию).</p>
+<p>Фронт Парето представляет множество недоминируемых решений, где
+ни один критерий не может быть улучшен без ухудшения другого.</p>
+<dl class="simple">
+<dt>Возможности:</dt><dd><ul class="simple">
+<li><p>3D визуализация поверхности Парето (шум x размытие x качество)</p></li>
+<li><p>2D проекции для попарного анализа критериев</p></li>
+<li><p>Статистическое сравнение алгоритмов</p></li>
+<li><p>Тепловые карты производительности</p></li>
+</ul>
+</dd>
+</dl>
+<p>Точка x* является Парето-оптимальной, если не существует другой точки x,
+такой что f_i(x) &gt;= f_i(x*) для всех критериев i, и f_j(x) &gt; f_j(x*)
+хотя бы для одного критерия j.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.ParetoFrontAnalyzer.ALPHA">
+<span class="sig-name descname"><span class="pre">ALPHA</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.7</span></em><a class="headerlink" href="#processing.extensions.ParetoFrontAnalyzer.ALPHA" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.ParetoFrontAnalyzer.COLORMAP">
+<span class="sig-name descname"><span class="pre">COLORMAP</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'viridis'</span></em><a class="headerlink" href="#processing.extensions.ParetoFrontAnalyzer.COLORMAP" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.ParetoFrontAnalyzer.FIGURE_DPI">
+<span class="sig-name descname"><span class="pre">FIGURE_DPI</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">300</span></em><a class="headerlink" href="#processing.extensions.ParetoFrontAnalyzer.FIGURE_DPI" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.ParetoFrontAnalyzer.LINE_WIDTH">
+<span class="sig-name descname"><span class="pre">LINE_WIDTH</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">2</span></em><a class="headerlink" href="#processing.extensions.ParetoFrontAnalyzer.LINE_WIDTH" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.ParetoFrontAnalyzer.MARKER_SIZE">
+<span class="sig-name descname"><span class="pre">MARKER_SIZE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">60</span></em><a class="headerlink" href="#processing.extensions.ParetoFrontAnalyzer.MARKER_SIZE" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="processing.extensions.ParetoFrontAnalyzer.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">processing_instance</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_folder</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'pareto_analysis'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/processing/extensions/pareto_analysis.html#ParetoFrontAnalyzer.__init__"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.ParetoFrontAnalyzer.__init__" title="Ссылка на это определение"></a></dt>
+<dd><p>Инициализация анализатора Парето.</p>
+<section id="id19">
+<h3>Параметры<a class="headerlink" href="#id19" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>processing_instance<span class="classifier">Any</span></dt><dd><p>Ссылка на объект Processing.</p>
+</dd>
+<dt>output_folder<span class="classifier">str</span></dt><dd><p>Директория для сохранения результатов анализа.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="processing.extensions.ParetoFrontAnalyzer.execute">
+<span class="sig-name descname"><span class="pre">execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">save_figures</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="reference internal" href="_modules/processing/extensions/pareto_analysis.html#ParetoFrontAnalyzer.execute"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.ParetoFrontAnalyzer.execute" title="Ссылка на это определение"></a></dt>
+<dd><p>Выполнение комплексного анализа фронта Парето.</p>
+<section id="id20">
+<h3>Параметры<a class="headerlink" href="#id20" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>save_figures<span class="classifier">bool, по умолчанию True</span></dt><dd><p>Сохранять сгенерированные графики.</p>
+</dd>
+</dl>
+</section>
+<section id="id21">
+<h3>Возвращает<a class="headerlink" href="#id21" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>pd.DataFrame</dt><dd><p>DataFrame со всеми данными анализа.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="processing.extensions.ParetoPoint">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">processing.extensions.</span></span><span class="sig-name descname"><span class="pre">ParetoPoint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">objectives:</span> <span class="pre">~typing.Dict[str,</span> <span class="pre">float],</span> <span class="pre">parameters:</span> <span class="pre">~typing.Dict[str,</span> <span class="pre">~typing.Any],</span> <span class="pre">metadata:</span> <span class="pre">~typing.Dict[str,</span> <span class="pre">~typing.Any]</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;,</span> <span class="pre">is_pareto_optimal:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/processing/extensions/base.html#ParetoPoint"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.ParetoPoint" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Точка в многокритериальном пространстве.</p>
+<section id="id22">
+<h3>Атрибуты<a class="headerlink" href="#id22" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>objectives<span class="classifier">Dict[str, float]</span></dt><dd><p>Значения целевых функций (например, {„psnr“: 25.0, „time“: 1.5}).</p>
+</dd>
+<dt>parameters<span class="classifier">Dict[str, Any]</span></dt><dd><p>Связанные гиперпараметры.</p>
+</dd>
+<dt>metadata<span class="classifier">Dict[str, Any]</span></dt><dd><p>Дополнительная информация (имя алгоритма, изображение и т.д.).</p>
+</dd>
+<dt>is_pareto_optimal<span class="classifier">bool</span></dt><dd><p>Принадлежит ли точка фронту Парето.</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="processing.extensions.ParetoPoint.dominates">
+<span class="sig-name descname"><span class="pre">dominates</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">other</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#processing.extensions.base.ParetoPoint" title="processing.extensions.base.ParetoPoint"><span class="pre">ParetoPoint</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">maximize</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/processing/extensions/base.html#ParetoPoint.dominates"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.ParetoPoint.dominates" title="Ссылка на это определение"></a></dt>
+<dd><p>Проверка доминирования текущей точки над другой.</p>
+<section id="id23">
+<h4>Параметры<a class="headerlink" href="#id23" title="Ссылка на этот заголовок"></a></h4>
+<dl class="simple">
+<dt>other<span class="classifier">ParetoPoint</span></dt><dd><p>Другая точка для сравнения.</p>
+</dd>
+<dt>maximize<span class="classifier">List[str]</span></dt><dd><p>Список критериев для максимизации.</p>
+</dd>
+</dl>
+</section>
+<section id="id24">
+<h4>Возвращает<a class="headerlink" href="#id24" title="Ссылка на этот заголовок"></a></h4>
+<dl class="simple">
+<dt>bool</dt><dd><p>True если текущая точка доминирует над other.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.ParetoPoint.is_pareto_optimal">
+<span class="sig-name descname"><span class="pre">is_pareto_optimal</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></em><a class="headerlink" href="#processing.extensions.ParetoPoint.is_pareto_optimal" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.ParetoPoint.metadata">
+<span class="sig-name descname"><span class="pre">metadata</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#processing.extensions.ParetoPoint.metadata" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.ParetoPoint.objectives">
+<span class="sig-name descname"><span class="pre">objectives</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#processing.extensions.ParetoPoint.objectives" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="processing.extensions.ParetoPoint.parameters">
+<span class="sig-name descname"><span class="pre">parameters</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#processing.extensions.ParetoPoint.parameters" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+</section>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="processing.extensions.ProcessingExtension">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">processing.extensions.</span></span><span class="sig-name descname"><span class="pre">ProcessingExtension</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">processing_instance</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_folder</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'output'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/processing/extensions/base.html#ProcessingExtension"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.ProcessingExtension" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></p>
+<p>Абстрактный базовый класс для расширений обработки.</p>
+<p>Предоставляет общий функционал для расширений,
+дополняющих основной конвейер обработки изображений.</p>
+<section id="id25">
+<h3>Атрибуты<a class="headerlink" href="#id25" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>processing<span class="classifier">Any</span></dt><dd><p>Ссылка на основной экземпляр обработки.</p>
+</dd>
+<dt>output_folder<span class="classifier">Path</span></dt><dd><p>Директория для сохранения результатов.</p>
+</dd>
+<dt>logger<span class="classifier">logging.Logger</span></dt><dd><p>Логгер для данного расширения.</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="processing.extensions.ProcessingExtension.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">processing_instance</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_folder</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'output'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/processing/extensions/base.html#ProcessingExtension.__init__"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.ProcessingExtension.__init__" title="Ссылка на это определение"></a></dt>
+<dd><p>Инициализация расширения.</p>
+<section id="id26">
+<h4>Параметры<a class="headerlink" href="#id26" title="Ссылка на этот заголовок"></a></h4>
+<dl class="simple">
+<dt>processing_instance<span class="classifier">Any</span></dt><dd><p>Ссылка на объект Processing.</p>
+</dd>
+<dt>output_folder<span class="classifier">str</span></dt><dd><p>Директория для сохранения результатов.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="processing.extensions.ProcessingExtension.execute">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Any</span></span></span><a class="reference internal" href="_modules/processing/extensions/base.html#ProcessingExtension.execute"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#processing.extensions.ProcessingExtension.execute" title="Ссылка на это определение"></a></dt>
+<dd><p>Выполнение основного функционала расширения.</p>
+<p>Должен быть реализован в подклассах.</p>
+</dd></dl>
+
+</section>
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Нижняя область">
+        <a href="processing.html" class="btn btn-neutral float-left" title="processing package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Предыдущая</a>
+        <a href="scripts.html" class="btn btn-neutral float-right" title="scripts package" accesskey="n" rel="next">Следующая <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Авторские права 2024, Юров П.И., Беззаборов А.А., Куропатов К.Л., Малыш Я.В.. </p>
+  </div>
+
+  Собрано при помощи <a href="https://www.sphinx-doc.org/">Sphinx</a> с использованием
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">темы,</a>
+    предоставленной <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

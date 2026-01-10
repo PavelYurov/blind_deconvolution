@@ -1,0 +1,459 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="ru" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>scripts.kernel_generator &mdash; документация BlindDeconvolution 1.0.0</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=e35015f7"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/translations.js?v=5b699b7f"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Алфавитный указатель" href="../../genindex.html" />
+    <link rel="search" title="Поиск" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            BlindDeconvolution
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Поиск в документации" aria-label="Поиск в документации" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Меню навигации">
+              <p class="caption" role="heading"><span class="caption-text">Содержание:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">blind_deconvolution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Меню навигации для мобильных устройств" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">BlindDeconvolution</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Навигация по страницам">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Код модуля</a></li>
+      <li class="breadcrumb-item active">scripts.kernel_generator</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Исходный код scripts.kernel_generator</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Модуль генерации ядер размытия (PSF) для экспериментов.</span>
+
+<span class="sd">Авторы: Куропатов К.Л.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">cv2</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Optional</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">filters.blur</span><span class="w"> </span><span class="kn">import</span> <span class="n">DefocusBlur</span><span class="p">,</span> <span class="n">MotionBlur</span><span class="p">,</span> <span class="n">BSpline_blur</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">filters.distributions</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">gaussian_distribution</span><span class="p">,</span>
+    <span class="n">uniform_distribution</span><span class="p">,</span>
+    <span class="n">ring_distribution</span><span class="p">,</span>
+    <span class="n">exponential_decay_distribution</span><span class="p">,</span>
+    <span class="n">generate_bspline_motion_kernel</span><span class="p">,</span>
+    <span class="n">generate_multivariate_normal_kernel</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="KernelGenerator">
+<a class="viewcode-back" href="../../scripts.html#scripts.kernel_generator.KernelGenerator">[документация]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">KernelGenerator</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Генератор ядер размытия (PSF) для экспериментов по деконволюции.</span>
+
+<span class="sd">    Параметры</span>
+<span class="sd">    ---------</span>
+<span class="sd">    kernel_dir : str</span>
+<span class="sd">        Путь для сохранения PNG-изображений ядер.</span>
+<span class="sd">    kernel_data_dir : str</span>
+<span class="sd">        Путь для сохранения NPY-файлов ядер.</span>
+<span class="sd">    kernel_size : int</span>
+<span class="sd">        Размер генерируемых ядер.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">kernel_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;images_dataset/ground_truth_filters&#39;</span><span class="p">,</span>
+        <span class="n">kernel_data_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;images_dataset/kernel_data&#39;</span><span class="p">,</span>
+        <span class="n">kernel_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">51</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">kernel_dir</span> <span class="o">=</span> <span class="n">kernel_dir</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">kernel_data_dir</span> <span class="o">=</span> <span class="n">kernel_data_dir</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">kernel_size</span> <span class="o">=</span> <span class="n">kernel_size</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_kernel_size</span> <span class="o">=</span> <span class="mi">51</span>
+
+        <span class="c1"># Базовые конфигурации для составных ядер</span>
+        <span class="n">_defocus_disk_config</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;defocusdisk&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;class&#39;</span><span class="p">:</span> <span class="n">DefocusBlur</span><span class="p">,</span>
+            <span class="s1">&#39;params&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;psf&#39;</span><span class="p">:</span> <span class="n">uniform_distribution</span><span class="p">,</span> <span class="s1">&#39;param&#39;</span><span class="p">:</span> <span class="mf">4.0</span><span class="p">}</span>
+        <span class="p">}</span>
+        <span class="n">_motion_linear_config</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;motionlinearuniform&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;class&#39;</span><span class="p">:</span> <span class="n">MotionBlur</span><span class="p">,</span>
+            <span class="s1">&#39;params&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;psf&#39;</span><span class="p">:</span> <span class="n">uniform_distribution</span><span class="p">,</span> <span class="s1">&#39;param&#39;</span><span class="p">:</span> <span class="mf">7.0</span><span class="p">,</span> <span class="s1">&#39;angle&#39;</span><span class="p">:</span> <span class="mi">30</span><span class="p">}</span>
+        <span class="p">}</span>
+        <span class="n">_bspline_config</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;motionbsplinesimplecurve&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;generator_func&#39;</span><span class="p">:</span> <span class="n">generate_bspline_motion_kernel</span><span class="p">,</span>
+            <span class="s1">&#39;params&#39;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s1">&#39;ksize&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">kernel_size</span><span class="p">,</span>
+                <span class="s1">&#39;thickness&#39;</span><span class="p">:</span> <span class="mi">3</span><span class="p">,</span>
+                <span class="s1">&#39;points&#39;</span><span class="p">:</span> <span class="p">[(</span><span class="o">-</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">5</span><span class="p">),</span> <span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">)]</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+
+        <span class="c1"># Конфигурации ядер</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">kernel_configs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="c1"># Расфокус</span>
+            <span class="p">{</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;defocusgaussian&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;class&#39;</span><span class="p">:</span> <span class="n">DefocusBlur</span><span class="p">,</span>
+                <span class="s1">&#39;params&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;psf&#39;</span><span class="p">:</span> <span class="n">gaussian_distribution</span><span class="p">,</span> <span class="s1">&#39;param&#39;</span><span class="p">:</span> <span class="mf">2.0</span><span class="p">}</span>
+            <span class="p">},</span>
+            <span class="p">{</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;defocusdisk&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;class&#39;</span><span class="p">:</span> <span class="n">DefocusBlur</span><span class="p">,</span>
+                <span class="s1">&#39;params&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;psf&#39;</span><span class="p">:</span> <span class="n">uniform_distribution</span><span class="p">,</span> <span class="s1">&#39;param&#39;</span><span class="p">:</span> <span class="mf">4.0</span><span class="p">}</span>
+            <span class="p">},</span>
+            <span class="p">{</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;defocusring&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;class&#39;</span><span class="p">:</span> <span class="n">DefocusBlur</span><span class="p">,</span>
+                <span class="s1">&#39;params&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;psf&#39;</span><span class="p">:</span> <span class="n">ring_distribution</span><span class="p">,</span> <span class="s1">&#39;param&#39;</span><span class="p">:</span> <span class="mf">4.0</span><span class="p">}</span>
+            <span class="p">},</span>
+            <span class="c1"># Motion blur</span>
+            <span class="p">{</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;motionlinearuniform&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;class&#39;</span><span class="p">:</span> <span class="n">MotionBlur</span><span class="p">,</span>
+                <span class="s1">&#39;params&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;psf&#39;</span><span class="p">:</span> <span class="n">uniform_distribution</span><span class="p">,</span> <span class="s1">&#39;param&#39;</span><span class="p">:</span> <span class="mf">7.0</span><span class="p">,</span> <span class="s1">&#39;angle&#39;</span><span class="p">:</span> <span class="mi">30</span><span class="p">}</span>
+            <span class="p">},</span>
+            <span class="p">{</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;motionlinearexp&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;class&#39;</span><span class="p">:</span> <span class="n">MotionBlur</span><span class="p">,</span>
+                <span class="s1">&#39;params&#39;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s1">&#39;psf&#39;</span><span class="p">:</span> <span class="n">exponential_decay_distribution</span><span class="p">,</span>
+                    <span class="s1">&#39;param&#39;</span><span class="p">:</span> <span class="mf">7.0</span><span class="p">,</span>
+                    <span class="s1">&#39;angle&#39;</span><span class="p">:</span> <span class="mi">120</span>
+                <span class="p">}</span>
+            <span class="p">},</span>
+            <span class="c1"># B-spline траектория</span>
+            <span class="p">{</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;motionbsplinesimplecurve&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;generator_func&#39;</span><span class="p">:</span> <span class="n">generate_bspline_motion_kernel</span><span class="p">,</span>
+                <span class="s1">&#39;params&#39;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s1">&#39;ksize&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">kernel_size</span><span class="p">,</span>
+                    <span class="s1">&#39;thickness&#39;</span><span class="p">:</span> <span class="mi">3</span><span class="p">,</span>
+                    <span class="s1">&#39;points&#39;</span><span class="p">:</span> <span class="p">[(</span><span class="o">-</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">5</span><span class="p">),</span> <span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">)]</span>
+                <span class="p">}</span>
+            <span class="p">},</span>
+            <span class="c1"># Многомерное нормальное распределение (эллипс)</span>
+            <span class="p">{</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;mvnellipse45deg&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;generator_func&#39;</span><span class="p">:</span> <span class="n">generate_multivariate_normal_kernel</span><span class="p">,</span>
+                <span class="s1">&#39;params&#39;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s1">&#39;ksize&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">kernel_size</span><span class="p">,</span>
+                    <span class="s1">&#39;cov&#39;</span><span class="p">:</span> <span class="p">[[</span><span class="mf">40.0</span><span class="p">,</span> <span class="mf">25.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">25.0</span><span class="p">,</span> <span class="mf">40.0</span><span class="p">]]</span>
+                <span class="p">}</span>
+            <span class="p">},</span>
+            <span class="c1"># Составное ядро</span>
+            <span class="p">{</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;convolved_kernel&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;generator_func&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_generate_convolved_kernel</span><span class="p">,</span>
+                <span class="s1">&#39;params&#39;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s1">&#39;ksize&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">kernel_size</span><span class="p">,</span>
+                    <span class="s1">&#39;configs&#39;</span><span class="p">:</span> <span class="p">[</span>
+                        <span class="n">_defocus_disk_config</span><span class="p">,</span>
+                        <span class="n">_motion_linear_config</span><span class="p">,</span>
+                        <span class="n">_bspline_config</span>
+                    <span class="p">]</span>
+                <span class="p">}</span>
+            <span class="p">},</span>
+        <span class="p">]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_generate_convolved_kernel</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">ksize</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">configs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">],</span>
+        <span class="o">**</span><span class="n">kwargs</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Генерация составного ядра путём свёртки нескольких базовых ядер.</span>
+
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        ksize : int</span>
+<span class="sd">            Размер выходного ядра.</span>
+<span class="sd">        configs : List[Dict]</span>
+<span class="sd">            Список конфигураций базовых ядер.</span>
+
+<span class="sd">        Возвращает</span>
+<span class="sd">        ----------</span>
+<span class="sd">        np.ndarray</span>
+<span class="sd">            Нормализованное составное ядро.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">base_kernels</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">total_size</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="k">for</span> <span class="n">config</span> <span class="ow">in</span> <span class="n">configs</span><span class="p">:</span>
+            <span class="n">kernel</span> <span class="o">=</span> <span class="kc">None</span>
+
+            <span class="k">if</span> <span class="s1">&#39;generator_func&#39;</span> <span class="ow">in</span> <span class="n">config</span><span class="p">:</span>
+                <span class="n">config</span><span class="p">[</span><span class="s1">&#39;params&#39;</span><span class="p">][</span><span class="s1">&#39;ksize&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span>
+                    <span class="n">config</span><span class="p">[</span><span class="s1">&#39;params&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;ksize&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="n">ksize</span>
+                <span class="p">)</span>
+                <span class="n">kernel</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;generator_func&#39;</span><span class="p">](</span><span class="o">**</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;params&#39;</span><span class="p">])</span>
+
+            <span class="k">elif</span> <span class="s1">&#39;class&#39;</span> <span class="ow">in</span> <span class="n">config</span><span class="p">:</span>
+                <span class="n">blur_filter</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;class&#39;</span><span class="p">](</span><span class="o">**</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;params&#39;</span><span class="p">])</span>
+                <span class="n">kernel</span> <span class="o">=</span> <span class="n">blur_filter</span><span class="o">.</span><span class="n">generate_kernel</span><span class="p">()</span>
+
+            <span class="k">if</span> <span class="n">kernel</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">base_kernels</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">kernel</span><span class="p">)</span>
+                <span class="n">total_size</span> <span class="o">+=</span> <span class="n">kernel</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">base_kernels</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">ksize</span><span class="p">,</span> <span class="n">ksize</span><span class="p">))</span>
+
+        <span class="c1"># Свёртка всех ядер</span>
+        <span class="n">convolved_kernel</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">total_size</span><span class="p">,</span> <span class="n">total_size</span><span class="p">))</span>
+        <span class="n">center</span> <span class="o">=</span> <span class="n">total_size</span> <span class="o">//</span> <span class="mi">2</span>
+        <span class="n">convolved_kernel</span><span class="p">[</span><span class="n">center</span><span class="p">,</span> <span class="n">center</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span>
+
+        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">base_kernels</span><span class="p">:</span>
+            <span class="n">convolved_kernel</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">filter2D</span><span class="p">(</span><span class="n">convolved_kernel</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span>
+
+        <span class="c1"># Обрезка до нужного размера</span>
+        <span class="n">start</span> <span class="o">=</span> <span class="n">center</span> <span class="o">-</span> <span class="p">(</span><span class="n">ksize</span> <span class="o">//</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="n">end</span> <span class="o">=</span> <span class="n">start</span> <span class="o">+</span> <span class="n">ksize</span>
+        <span class="n">final_kernel</span> <span class="o">=</span> <span class="n">convolved_kernel</span><span class="p">[</span><span class="n">start</span><span class="p">:</span><span class="n">end</span><span class="p">,</span> <span class="n">start</span><span class="p">:</span><span class="n">end</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">final_kernel</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">final_kernel</span> <span class="o">/</span> <span class="n">final_kernel</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">final_kernel</span>
+
+<div class="viewcode-block" id="KernelGenerator.generate_all">
+<a class="viewcode-back" href="../../scripts.html#scripts.kernel_generator.KernelGenerator.generate_all">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">generate_all</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Генерация всех ядер согласно конфигурациям.</span>
+
+<span class="sd">        Возвращает</span>
+<span class="sd">        ----------</span>
+<span class="sd">        Dict[str, np.ndarray]</span>
+<span class="sd">            Словарь {имя_ядра: массив_ядра}.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">kernels</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="k">for</span> <span class="n">config</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">kernel_configs</span><span class="p">:</span>
+            <span class="n">name</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
+            <span class="n">kernel</span> <span class="o">=</span> <span class="kc">None</span>
+
+            <span class="k">if</span> <span class="s1">&#39;generator_func&#39;</span> <span class="ow">in</span> <span class="n">config</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;generator_func&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">_generate_convolved_kernel</span><span class="p">:</span>
+                    <span class="n">kernel</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_generate_convolved_kernel</span><span class="p">(</span><span class="o">**</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;params&#39;</span><span class="p">])</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">kernel</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;generator_func&#39;</span><span class="p">](</span><span class="o">**</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;params&#39;</span><span class="p">])</span>
+
+            <span class="k">elif</span> <span class="s1">&#39;class&#39;</span> <span class="ow">in</span> <span class="n">config</span><span class="p">:</span>
+                <span class="n">params</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;params&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+                <span class="n">blur_class</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;class&#39;</span><span class="p">]</span>
+
+                <span class="k">if</span> <span class="n">blur_class</span> <span class="o">==</span> <span class="n">DefocusBlur</span><span class="p">:</span>
+                    <span class="n">ksize</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="mi">6</span> <span class="o">*</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;param&#39;</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">))</span> <span class="o">|</span> <span class="mi">1</span>
+                    <span class="n">params</span><span class="p">[</span><span class="s1">&#39;kernel_size&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">ksize</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_kernel_size</span><span class="p">)</span>
+                    <span class="n">kernel</span> <span class="o">=</span> <span class="n">blur_class</span><span class="p">(</span><span class="o">**</span><span class="n">params</span><span class="p">)</span><span class="o">.</span><span class="n">generate_kernel</span><span class="p">()</span>
+
+                <span class="k">elif</span> <span class="n">blur_class</span> <span class="o">==</span> <span class="n">MotionBlur</span><span class="p">:</span>
+                    <span class="n">ksize</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="mi">4</span> <span class="o">*</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;param&#39;</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">))</span> <span class="o">|</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+                    <span class="n">params</span><span class="p">[</span><span class="s1">&#39;kernel_length&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">ksize</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_kernel_size</span><span class="p">)</span>
+                    <span class="n">kernel</span> <span class="o">=</span> <span class="n">blur_class</span><span class="p">(</span><span class="o">**</span><span class="n">params</span><span class="p">)</span><span class="o">.</span><span class="n">generate_kernel</span><span class="p">()</span>
+
+            <span class="k">if</span> <span class="n">kernel</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">kernels</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">kernel</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Сгенерировано: </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">kernel</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">x</span><span class="si">{</span><span class="n">kernel</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">kernels</span></div>
+
+
+<div class="viewcode-block" id="KernelGenerator.save">
+<a class="viewcode-back" href="../../scripts.html#scripts.kernel_generator.KernelGenerator.save">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">kernels</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Сохранение ядер в файлы.</span>
+
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        kernels : Dict[str, np.ndarray]</span>
+<span class="sd">            Словарь ядер для сохранения.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Создание директорий</span>
+        <span class="k">for</span> <span class="n">directory</span> <span class="ow">in</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">kernel_dir</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">kernel_data_dir</span><span class="p">]:</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">directory</span><span class="p">):</span>
+                <span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">(</span><span class="n">directory</span><span class="p">)</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">directory</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Создана папка: </span><span class="si">{</span><span class="n">directory</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Сохранение</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">kernel</span> <span class="ow">in</span> <span class="n">kernels</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="c1"># NPY</span>
+            <span class="n">npy_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">kernel_data_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">.npy&quot;</span><span class="p">)</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">npy_path</span><span class="p">,</span> <span class="n">kernel</span><span class="p">)</span>
+
+            <span class="c1"># PNG</span>
+            <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">kernel</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">kernel_img</span> <span class="o">=</span> <span class="p">(</span><span class="n">kernel</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">kernel</span><span class="p">))</span> <span class="o">*</span> <span class="mi">255</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">kernel_img</span> <span class="o">=</span> <span class="n">kernel</span>
+            <span class="n">kernel_img</span> <span class="o">=</span> <span class="n">kernel_img</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+            <span class="n">png_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">kernel_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">.png&quot;</span><span class="p">)</span>
+            <span class="n">cv2</span><span class="o">.</span><span class="n">imwrite</span><span class="p">(</span><span class="n">png_path</span><span class="p">,</span> <span class="n">kernel_img</span><span class="p">)</span>
+
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Сохранено: </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="KernelGenerator.visualize">
+<a class="viewcode-back" href="../../scripts.html#scripts.kernel_generator.KernelGenerator.visualize">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">visualize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">kernels</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Визуализация ядер.</span>
+
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        kernels : Dict[str, np.ndarray]</span>
+<span class="sd">            Словарь ядер для визуализации.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">num_kernels</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">kernels</span><span class="p">)</span>
+        <span class="n">cols</span> <span class="o">=</span> <span class="mi">4</span>
+        <span class="n">rows</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">num_kernels</span> <span class="o">/</span> <span class="n">cols</span><span class="p">)</span>
+
+        <span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">rows</span><span class="p">,</span> <span class="n">cols</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="n">cols</span> <span class="o">*</span> <span class="mi">4</span><span class="p">,</span> <span class="n">rows</span> <span class="o">*</span> <span class="mi">4</span><span class="p">))</span>
+        <span class="n">fig</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s1">&#39;Сгенерированные ядра размытия (PSF)&#39;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">16</span><span class="p">)</span>
+        <span class="n">axes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">axes</span><span class="p">)</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>
+
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">kernel</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">kernels</span><span class="o">.</span><span class="n">items</span><span class="p">()):</span>
+            <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">kernel</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">)</span>
+            <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="se">\n</span><span class="s2">(</span><span class="si">{</span><span class="n">kernel</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">x</span><span class="si">{</span><span class="n">kernel</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+            <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s1">&#39;off&#39;</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_kernels</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">axes</span><span class="p">)):</span>
+            <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s1">&#39;off&#39;</span><span class="p">)</span>
+
+        <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">(</span><span class="n">rect</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mf">0.03</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mf">0.95</span><span class="p">])</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="KernelGenerator.run">
+<a class="viewcode-back" href="../../scripts.html#scripts.kernel_generator.KernelGenerator.run">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">save</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">visualize</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Запуск генерации ядер.</span>
+
+<span class="sd">        Параметры</span>
+<span class="sd">        ---------</span>
+<span class="sd">        save : bool</span>
+<span class="sd">            Сохранять ли ядра в файлы.</span>
+<span class="sd">        visualize : bool</span>
+<span class="sd">            Показывать ли визуализацию.</span>
+
+<span class="sd">        Возвращает</span>
+<span class="sd">        ----------</span>
+<span class="sd">        Dict[str, np.ndarray]</span>
+<span class="sd">            Сгенерированные ядра.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot; Генерация ядер &quot;</span><span class="p">)</span>
+        <span class="n">kernels</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generate_all</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">save</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2"> Сохранение ядер &quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">kernels</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">visualize</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2"> Визуализация &quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">visualize</span><span class="p">(</span><span class="n">kernels</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">kernels</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="main">
+<a class="viewcode-back" href="../../scripts.html#scripts.kernel_generator.main">[документация]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">generator</span> <span class="o">=</span> <span class="n">KernelGenerator</span><span class="p">()</span>
+    <span class="n">generator</span><span class="o">.</span><span class="n">run</span><span class="p">()</span></div>
+
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Авторские права 2024, Юров П.И., Беззаборов А.А., Куропатов К.Л., Малыш Я.В.. </p>
+  </div>
+
+  Собрано при помощи <a href="https://www.sphinx-doc.org/">Sphinx</a> с использованием
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">темы,</a>
+    предоставленной <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

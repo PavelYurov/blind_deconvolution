@@ -1,0 +1,37 @@
+processing.extensions package
+=============================
+
+Submodules
+----------
+
+processing.extensions.base module
+---------------------------------
+
+.. automodule:: processing.extensions.base
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+processing.extensions.hyperparameter\_optimization module
+---------------------------------------------------------
+
+.. automodule:: processing.extensions.hyperparameter_optimization
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+processing.extensions.pareto\_analysis module
+---------------------------------------------
+
+.. automodule:: processing.extensions.pareto_analysis
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: processing.extensions
+   :members:
+   :undoc-members:
+   :show-inheritance:

@@ -1,0 +1,276 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="ru" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>processing.metrics &mdash; документация BlindDeconvolution 1.0.0</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=e35015f7"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/translations.js?v=5b699b7f"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Алфавитный указатель" href="../../genindex.html" />
+    <link rel="search" title="Поиск" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            BlindDeconvolution
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Поиск в документации" aria-label="Поиск в документации" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Меню навигации">
+              <p class="caption" role="heading"><span class="caption-text">Содержание:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">blind_deconvolution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Меню навигации для мобильных устройств" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">BlindDeconvolution</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Навигация по страницам">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Код модуля</a></li>
+      <li class="breadcrumb-item active">processing.metrics</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Исходный код processing.metrics</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">cv2</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">cv</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skimage.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">peak_signal_noise_ratio</span><span class="p">,</span> <span class="n">structural_similarity</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span>
+
+<div class="viewcode-block" id="PSNR">
+<a class="viewcode-back" href="../../processing.html#processing.metrics.PSNR">[документация]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">PSNR</span><span class="p">(</span><span class="n">original</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> 
+         <span class="n">restored</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Вычисляет отношение пикового сигнала к шуму (PSNR) между изображениями.</span>
+
+<span class="sd">    Авторы: Юров П.И.</span>
+
+<span class="sd">    Аргументы:</span>
+<span class="sd">        original (ndarray): Исходное изображение</span>
+<span class="sd">        restored (ndarray): Восстановленное/обработанное изображение</span>
+
+<span class="sd">    Возвращает:</span>
+<span class="sd">        Значение PSNR в децибелах (dB)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">return</span> <span class="n">peak_signal_noise_ratio</span><span class="p">(</span><span class="n">original</span><span class="p">,</span> <span class="n">restored</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="SSIM">
+<a class="viewcode-back" href="../../processing.html#processing.metrics.SSIM">[документация]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">SSIM</span><span class="p">(</span><span class="n">original</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> 
+         <span class="n">restored</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> 
+         <span class="n">data_range</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Вычисляет индекс структурного сходства (SSIM) между изображениями.</span>
+
+<span class="sd">    Авторы: Юров П.И.</span>
+
+<span class="sd">    Аргументы:</span>
+<span class="sd">        original: Исходное изображение</span>
+<span class="sd">        restored: Восстановленное/обработанное изображение</span>
+<span class="sd">        data_range (Optional[float]): Верхний предел значений</span>
+
+<span class="sd">    Возвращает:</span>
+<span class="sd">        Значение SSIM в диапазоне от 0 до 1</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">return</span> <span class="n">structural_similarity</span><span class="p">(</span><span class="n">original</span><span class="p">,</span> <span class="n">restored</span><span class="p">,</span> <span class="n">data_range</span><span class="o">=</span><span class="n">data_range</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="calculate_sml">
+<a class="viewcode-back" href="../../processing.html#processing.metrics.calculate_sml">[документация]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">calculate_sml</span><span class="p">(</span><span class="n">image</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Вычисляет Sum of Modified Laplacian (SML) для изображения.</span>
+
+<span class="sd">    Авторы: Беззаборов А.А.</span>
+<span class="sd">    Мера общей резкости/количества краев.</span>
+
+<span class="sd">    Аргументы:</span>
+<span class="sd">        image (ndarray): Входное изображение (grayscale или color)</span>
+
+<span class="sd">    Возвращает:</span>
+<span class="sd">        Сумма модифицированного лапласиана</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">image</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="n">image</span> <span class="o">=</span> <span class="n">cv</span><span class="o">.</span><span class="n">cvtColor</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">cv</span><span class="o">.</span><span class="n">COLOR_BGR2GRAY</span><span class="p">)</span>
+    <span class="n">kernel_x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+    <span class="n">kernel_y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+    <span class="n">ml_x</span> <span class="o">=</span> <span class="n">cv</span><span class="o">.</span><span class="n">filter2D</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">kernel_x</span><span class="p">)</span>
+    <span class="n">ml_y</span> <span class="o">=</span> <span class="n">cv</span><span class="o">.</span><span class="n">filter2D</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">kernel_y</span><span class="p">)</span>
+    <span class="n">ml</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">ml_x</span><span class="p">)</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">ml_y</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">ml</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="Sharpness">
+<a class="viewcode-back" href="../../processing.html#processing.metrics.Sharpness">[документация]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">Sharpness</span><span class="p">(</span><span class="n">image</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Подсчет резкости через дисперсию Лапласа.</span>
+
+<span class="sd">    Авторы: Юров П.И.</span>
+<span class="sd">    Более высокое значение указывает на большую резкость.</span>
+
+<span class="sd">    Аргументы:</span>
+<span class="sd">        image (ndarray): Входное изображение</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="k">return</span> <span class="n">cv</span><span class="o">.</span><span class="n">Laplacian</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">var</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="blur_complexity">
+<a class="viewcode-back" href="../../processing.html#processing.metrics.blur_complexity">[документация]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">blur_complexity</span><span class="p">(</span><span class="n">original</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> 
+                    <span class="n">blurred</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Вычисляет нормированную меру сложности смаза [0, 1] на основе SML.</span>
+
+<span class="sd">    Авторы: Беззаборов А.А.</span>
+
+<span class="sd">    Аргументы:</span>
+<span class="sd">        original: Исходное резкое изображение</span>
+<span class="sd">        blurred: Смазанное изображение</span>
+
+<span class="sd">    Возвращает:</span>
+<span class="sd">        Нормированная мера смаза:</span>
+<span class="sd">        0 - нет смаза (идеально резкое)</span>
+<span class="sd">        1 - максимальный смаз (полностью размытое)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">sml_orig</span> <span class="o">=</span> <span class="n">calculate_sml</span><span class="p">(</span><span class="n">original</span><span class="p">)</span>
+    <span class="n">sml_blur</span> <span class="o">=</span> <span class="n">calculate_sml</span><span class="p">(</span><span class="n">blurred</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">sml_orig</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mf">1.0</span>
+    <span class="n">blur_measure</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">-</span> <span class="p">(</span><span class="n">sml_blur</span> <span class="o">/</span> <span class="n">sml_orig</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">blur_measure</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="calculate_snr">
+<a class="viewcode-back" href="../../processing.html#processing.metrics.calculate_snr">[документация]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">calculate_snr</span><span class="p">(</span><span class="n">signal</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> 
+                  <span class="n">noise</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Вычисляет отношение сигнал-шум (SNR) в dB.</span>
+
+<span class="sd">    Авторы: Беззаборов А.А.</span>
+
+<span class="sd">    Аргументы:</span>
+<span class="sd">        signal: Сигнал (смазанное изображение без шума)</span>
+<span class="sd">        noise: Матрица добавленного шума</span>
+
+<span class="sd">    Возвращает:</span>
+<span class="sd">        SNR в децибелах (dB)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">signal_power</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">signal</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">noise_power</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">noise</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">noise_power</span> <span class="o">&lt;</span> <span class="mf">1e-10</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="mf">10.0</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">signal_power</span> <span class="o">/</span> <span class="n">noise_power</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="noise_complexity">
+<a class="viewcode-back" href="../../processing.html#processing.metrics.noise_complexity">[документация]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">noise_complexity</span><span class="p">(</span><span class="n">signal</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> 
+                     <span class="n">noise</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> 
+                     <span class="n">min_snr</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> 
+                     <span class="n">max_snr</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">50.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Вычисляет нормированную меру сложности шума [0, 1] на основе SNR.</span>
+
+<span class="sd">    Авторы: Беззаборов А.А.</span>
+
+<span class="sd">    Аргументы:</span>
+<span class="sd">        signal: Сигнал (смазанное изображение без шума)</span>
+<span class="sd">        noise: Матрица добавленного шума</span>
+<span class="sd">        min_snr: Минимальный SNR (соответствует сложности 1)</span>
+<span class="sd">        max_snr: Максимальный SNR (соответствует сложности 0)</span>
+
+<span class="sd">    Возвращает:</span>
+<span class="sd">        Нормированная мера шума:</span>
+<span class="sd">        0 - нет шума (SNR = ∞)</span>
+<span class="sd">        1 - максимальный шум (SNR → 0)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">snr_db</span> <span class="o">=</span> <span class="n">calculate_snr</span><span class="p">(</span><span class="n">signal</span><span class="p">,</span> <span class="n">noise</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="n">snr_db</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mf">0.0</span>
+    <span class="n">noise_measure</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">-</span> <span class="p">((</span><span class="n">snr_db</span> <span class="o">-</span> <span class="n">min_snr</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">max_snr</span> <span class="o">-</span> <span class="n">min_snr</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">noise_measure</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Авторские права 2024, Юров П.И., Беззаборов А.А., Куропатов К.Л., Малыш Я.В.. </p>
+  </div>
+
+  Собрано при помощи <a href="https://www.sphinx-doc.org/">Sphinx</a> с использованием
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">темы,</a>
+    предоставленной <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
