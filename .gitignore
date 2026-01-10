@@ -144,3 +144,14 @@ Desktop.ini
 /main6.ipynb
 /extensions.py
 /prompt.txt
+
+# Лишние медиа
+/algorithms/**/*.png
+/algorithms/**/*.jpg
+/algorithms/**/*.jpeg
+/algorithms/**/*.bmp
+/algorithms/**/*.tif
+/algorithms/**/*.tiff
+/algorithms/**/*.gif
+/algorithms/**/*.webp
+/algorithms/**/*.svg
