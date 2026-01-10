@@ -2,34 +2,36 @@
 
 ## Собственные реализации
 
-Сгруппированы по типу подхода в `blind_deconvolution/implementations/`:
+Методы сгруппированы по типу подхода
 
-### `classic/` — классические итеративные методы
+### `blind_deconvolution/implementations/`
 
-- [`richardson_lucy.py`](blind_deconvolution/implementations/classic/richardson_lucy.py) — Richardson–Lucy (blind/non-blind; пуассоновское MLE) [2][3]
-- [`alternating_minimization.py`](blind_deconvolution/implementations/classic/alternating_minimization.py) — MAP blind deconvolution с Huber-регуляризацией, alternating minimization [8][21][30]
+#### `classic/` — классические итеративные методы
+
+- [`richardson_lucy.py`](blind_deconvolution/implementations/classic/richardson_lucy.py) — Richardson–Lucy (blind/non-blind; пуассоновское Maximum Likelihood Estimation) [2][3]
+- [`alternating_minimization.py`](blind_deconvolution/implementations/classic/alternating_minimization.py) — Maximum A Posteriori blind deconvolution с Huber-регуляризацией, alternating minimization [8][21][30]
 - [`expectation_maximization.py`](blind_deconvolution/implementations/classic/expectation_maximization.py) — EM для идентификации blur/восстановления изображения [18][19]
 
-### `bayesian/` — байесовские методы
+#### `bayesian/` — байесовские методы
 
 - [`vbbid_tv.py`](blind_deconvolution/implementations/bayesian/vbbid_tv.py) — Variational Bayesian blind deconvolution с TV prior [10]
 - [`bbd_deip.py`](blind_deconvolution/implementations/bayesian/bbd_deip.py) — Bayesian blind deconvolution по паре изображений с разной экспозицией [11]
 - [`sb_bid_pe.py`](blind_deconvolution/implementations/bayesian/sb_bid_pe.py) — Sparse Bayesian blind deconvolution с оценкой параметров [12]
 
-### `variational/` — вариационные методы
+#### `variational/` — вариационные методы
 
 - [`vabid.py`](blind_deconvolution/implementations/variational/vabid.py) — Variational Bayes blind deconvolution (VAR3, alternating variational) [14]
 - [`vapibe.py`](blind_deconvolution/implementations/variational/vapibe.py) — Variational Bayes для совместной оценки параметров/изображения/blur [15]
 - [`vbsk_sid_st.py`](blind_deconvolution/implementations/variational/vbsk_sid_st.py) — VB sparse kernel-based blind deconvolution со Student’s-t priors [16]
 
-### `sparse/` — разреженные/TV-подобные регуляризации
+#### `sparse/` — разреженные/TV-подобные регуляризации
 
 - [`vbc_bid.py`](blind_deconvolution/implementations/sparse/vbc_bid.py) — VB compressive blind image deconvolution (VB-ADMM, wavelet sparsity) [13]
 - [`pbtvgr.py`](blind_deconvolution/implementations/sparse/pbtvgr.py) — blind deconvolution для Poisson noise: TV + L0 gradient regularization [24]
 
 ## Внешние обёртки и источники
 
-Ниже — алгоритмы, которые взяты из других репозиториев.
+Алгоритмы, заимствованные из внешних репозиториев
 
 ### `blind_deconvolution/external/`
 
@@ -39,7 +41,7 @@
 - [`TobiasWolf_math_Blind_Deconvolution_MHDM`](blind_deconvolution/external/TobiasWolf_math_Blind_Deconvolution_MHDM) — repo: https://github.com/TobiasWolf-math/Blind-Deconvolution-MHDM — multiscale hierarchical decomposition method (MHDM) для blind deconvolution [6][8]
 - [`Youngforgithub_Deblurring_Text_Images_via_L0_Regularized_Intensity_and_Gradient`](blind_deconvolution/external/Youngforgithub_Deblurring_Text_Images_via_L0_Regularized_Intensity_and_Gradient) — repo: https://github.com/Youngforgithub/Deblurring-Text-Images-via-L0-Regularized-Intensity-and-Gradient — L0-regularized intensity+gradient + TV prior (text deblurring) [20][23]
 - [`adamalavi_Blind_motion_deblurring_for_license_plates`](blind_deconvolution/external/adamalavi_Blind_motion_deblurring_for_license_plates) — repo: https://github.com/ankitVP77/Blind-Motion-Deblurring-for-Legible-License-Plates-using-Deep-Learning — CNN-оценка параметров motion PSF (длина/угол по FFT) + Wiener deconvolution [1][5]
-- [`alexis_mignon_pydeconv`](blind_deconvolution/external/alexis_mignon_pydeconv) — repo: https://github.com/alexis-mignon/pydeconv — MAP blind deconvolution с priors на градиенты (global/local), оптимизация по изображению и PSF [8][9]
+- [`alexis_mignon_pydeconv`](blind_deconvolution/external/alexis_mignon_pydeconv) — repo: https://github.com/alexis-mignon/pydeconv — Maximum A Posteriori blind deconvolution с priors на градиенты (global/local), оптимизация по изображению и PSF [8][9]
 - [`ceciledellavalle_BlindDeconvolution`](blind_deconvolution/external/ceciledellavalle_BlindDeconvolution) — repo: https://github.com/ceciledellavalle/BlindDeconvolution — классический blind deconvolution (итеративная оптимизация по изображению и PSF) [6][8]
 - [`crewleader_BlindDeconvolutionLowRank`](blind_deconvolution/external/crewleader_BlindDeconvolutionLowRank) — repo: https://github.com/crewleader/BlindDeconvolutionLowRank — multi-image blind deconvolution через low-rank representation [36]
 - [`dragos2001_Total_Variation_Blind_Deconvolution`](blind_deconvolution/external/dragos2001_Total_Variation_Blind_Deconvolution) — repo: https://github.com/dragos2001/Total_Variation_Blind_Deconvolution — Total Variation blind deconvolution (Chan–Wong PCG / Perrone–Favaro GD-вариант) [20][21][37]
