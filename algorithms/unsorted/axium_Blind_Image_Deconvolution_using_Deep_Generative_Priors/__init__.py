@@ -1,4 +1,46 @@
-# https://github.com/axium/Blind-Image-Deconvolution-using-Deep-Generative-Priors
+"""
+AxiumBlindImageDeconvolutionUsingDeepGenerativePriors - Python Wrapper
+
+Original Implementation:
+    axium (GitHub)
+    GitHub Repository: https://github.com/axium/Blind-Image-Deconvolution-using-Deep-Generative-Priors
+    Language/Framework: Python + MATLAB
+
+Reference Paper (if applicable):
+    both algorithm 1 and 2 (proposed in paper) have been made available, along with pre-trained generative models for both image datasets and blurs. Code for algori
+
+Algorithm Description:
+    - Iterative alternation between latent image and blur kernel (PSF) updates
+    - Uses regularization/prior terms to stabilize deconvolution
+    - Outputs a restored image (and kernel estimate when available)
+
+This Python Wrapper Provides:
+    - DeconvolutionAlgorithm-compatible Python class
+    - Bridges and calls bundled original implementation
+    - Basic parameter coercion and sanity checks
+
+Wrapper Features:
+    - Works with NumPy arrays and common image dtypes
+    - Integrates into the BlindDeconvolution algorithm registry
+    - Keeps bundled original source code untouched
+
+Example:
+    >>> from my_wrappers import AxiumBlindImageDeconvolutionUsingDeepGenerativePriors
+    >>> processor = AxiumBlindImageDeconvolutionUsingDeepGenerativePriors()
+    >>> result = processor.process(input_image)
+
+Important Notes:
+    1. Requires: numpy, opencv-python (cv2), tensorflow
+    2. Original Python + MATLAB code remains unchanged
+    3. This is purely an interface wrapper
+    4. Check original repository for license information
+
+Author: AUTHOR_PROJECT
+Wrapper Version: 1.0.0
+Original Author: axium
+Original License: Unknown (check repository)
+"""
+
 from __future__ import annotations
 import os
 import sys
