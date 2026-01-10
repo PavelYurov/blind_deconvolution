@@ -145,7 +145,7 @@
     ([DOI](https://doi.org/10.1109/TIP.2006.881972), [ResearchGate](https://www.researchgate.net/publication/6645275_Blind_Deconvolution_Using_a_Variational_Approach_to_Parameter_Image_and_Blur_Estimation), [читать](<../references/Blind Deconvolution Using a Variational Approach to Parameter, Image, and Blur Estimation.pdf>))
 
 16. **Tzikas, D. G.; Likas, A. C.; Galatsanos, N. P. (2009)** — *Variational Bayesian Sparse Kernel-Based Blind Image Deconvolution With Student's-t Priors*  
-    ([DOI](https://doi.org/10.1109/TIP.2008.2011757), [PubMed](https://pubmed.ncbi.nlm.nih.gov/19278919/), [Semantic Scholar](https://www.semanticscholar.org/paper/ac9c1ac6c8d14bf5618d1858a35b1e6fb5959965))
+    ([DOI](https://doi.org/10.1109/TIP.2008.2011757), [PubMed](https://pubmed.ncbi.nlm.nih.gov/19278919/), [Semantic Scholar](https://www.semanticscholar.org/paper/ac9c1ac6c8d14bf5618d1858a35b1e6fb5959965), [читать](<../references/Blind Deconvolution Using a Variational Approach to Parameter, Image, and Blur Estimation.pdf>))
 
 17. **Dempster, A. P.; Laird, N. M.; Rubin, D. B.** — *Maximum Likelihood from Incomplete Data via the EM Algorithm*  
     ([academic.oup.com](https://academic.oup.com/jrsssb/article/39/1/1/7027539), [doi.org](https://doi.org/10.1111/j.2517-6161.1977.tb01600.x), [читать](<../references/Maximum Likelihood from Incomplete Data via the EM Algorithm.pdf>))
@@ -210,8 +210,8 @@
 35. **Kheradmand, A.; Milanfar, P.** — *A General Framework for Regularized, Similarity-Based Image Restoration*  
     ([doi.org](https://doi.org/10.1109/TIP.2014.2362059), [ucsc.edu](https://users.soe.ucsc.edu/~milanfar/publications/journal/TIP_Amin_Final.pdf>), [читать](<../references/A General Framework for Regularized, Similarity-Based Image Restoration.pdf>))
 
-36. **Ji, H.; Liu, C.; Shen, Z.** — *Blind Motion Deblurring Using Low-Rank Image Priors*  
-    ([ieeexplore.ieee.org](https://ieeexplore.ieee.org/document/5206514))
+36. **Ji, H.; Liu, C.; Shen, Z.** — *Blind image deblurring using class-adapted image priors*  
+    ([ieeexplore.ieee.org](https://www.researchgate.net/publication/319524652_Blind_image_deblurring_using_class-adapted_image_priors), [читать](<../references/Blind image deblurring using class-adapted image priors.pdf>))
 
 37. **Perrone, D.; Favaro, P.** — *A Clearer Picture of Blind Deconvolution*  
     ([arxiv.org](https://arxiv.org/abs/1412.0251), [читать](<../references/A Clearer Picture of Blind Deconvolution.pdf>))
