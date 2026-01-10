@@ -121,6 +121,7 @@ Desktop.ini
 /alg_test/
 /pareto_analysis/
 /preprocess/
+/docs/_build/
 
 # Прочие файлы
 /benchmark_generation.ipynb

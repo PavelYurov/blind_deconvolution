@@ -1,7 +1,7 @@
 from pathlib import Path
 import subprocess
 
-DOCSRC = Path(__file__).resolve().parents[1] / "docsrc"
+DOCSRC = Path(__file__).resolve().parents[1] / "source"
 BUILD = Path(__file__).resolve().parents[1] / "_build" / "html"
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
