@@ -38,3 +38,15 @@ dev = [
 
 [tool.setuptools]
 packages = ["blind_deconvolution"]
+
+[tool.preflight]
+default-profile = "base"
+
+[tool.preflight.profiles.base]
+dependencies = "project.dependencies"
+
+[tool.preflight.profiles.full]
+dependencies = "project.optional-dependencies.full"
+
+[tool.preflight.profiles.dev]
+dependencies = "project.optional-dependencies.dev"
