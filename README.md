@@ -123,7 +123,7 @@ python install.py --venv .venv install base
 
 ## Структура проекта
 
-Подробнее об алгоритмах: [Путеводитель по алгоритмам](algorithms/README.md)
+Подробнее об алгоритмах: [Путеводитель по алгоритмам](src/algorithms/README.md)
 
 ```
 blind_deconvolution/
