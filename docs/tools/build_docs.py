@@ -3,7 +3,7 @@ import subprocess
 
 DOCSRC = Path(__file__).resolve().parents[1] / "source"
 BUILD = Path(__file__).resolve().parents[1] / "_build" / "html"
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = Path(__file__).resolve().parents[2] / "src"
 
 def generate_rst():
     print("Generate API")
@@ -13,6 +13,7 @@ def generate_rst():
 
     cmd = [
         "sphinx-apidoc",
+        "--separate",
         "-o", str(DOCSRC),
         str(PROJECT_ROOT),
     ]

@@ -26,7 +26,7 @@ from typing import Any, Dict, Tuple
 
 import numpy as np
 
-from src.algorithms.base import DeconvolutionAlgorithm
+from ...base import DeconvolutionAlgorithm
 from .convolve import create_line_psf
 from .deblur import computeLocalPrior, updatePsi, computeL, updatef
 

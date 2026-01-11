@@ -6,10 +6,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 def validate_octave_path(v: Optional[str]) -> Optional[str]:
     if v is None:
-        raise ValueError(
-            "Octave executable not found. Please install Octave or set "
-            "OCTAVE_EXECUTABLE in your .env file."
+        print(
+            "Warning: Octave executable not found. "
+            "Some of algorithms may not work. "
+            "Please install Octave or set "
+            "OCTAVE_EXECUTABLE in your .env file. "
         )
+        return v
     if not os.path.isfile(v):
         raise ValueError(f"The path provided for Octave does not exist: {v}")
     
