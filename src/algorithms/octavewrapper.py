@@ -29,15 +29,5 @@ class OctaveEngine:
             
         except Exception as e:
             cls._instance = None
-            platform_msg = ""
-            if sys.platform.startswith("win"):
-                platform_msg = "Ensure 'octave-cli.exe' is used, NOT 'octave.exe' or 'octave-gui.exe'."
-            else:
-                platform_msg = "Ensure the path in .env is correct and has execution permissions."
-            raise RuntimeError(
-                f"Failed to initialize Octave Engine.\n"
-                f"Path: {executable}\n"
-                f"Hint: {platform_msg}\n"
-                f"Error details: {e}"
-            ) from e
+            print("Warning: Failed to initialize Octave Engine, may not able to run some algorithms")
         return cls._instance
