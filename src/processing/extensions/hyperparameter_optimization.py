@@ -39,10 +39,10 @@ try:
 except ImportError:
     BOTORCH_AVAILABLE = False
 
-import algorithms.base as base
-import processing.metrics as metrics
+import src.algorithms.base as base
+import src.processing.metrics as metrics
 
-from processing.extensions.base import (
+from src.processing.extensions.base import (
     ProcessingExtension,
     OptimizationResult,
     OptimizationMethod,

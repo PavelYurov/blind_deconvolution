@@ -8,9 +8,9 @@ import cv2 as cv
 import numpy as np
 from typing import Optional, Tuple, Dict
 from pathlib import Path
-import processing.metrics as metrics
+import src.processing.metrics as metrics
 import math
-from filters.blur import Identical_kernel
+from src.filters.blur import Identical_kernel
 
 class Image:
     """

@@ -15,7 +15,7 @@ import os
 import json
 from pathlib import Path
 from typing import Optional, Any
-from processing.utils import (
+from src.processing.utils import (
     Image,
     imread,
     calculate_metrics

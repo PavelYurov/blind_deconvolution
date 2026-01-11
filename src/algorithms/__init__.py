@@ -36,8 +36,8 @@ Important Notes:
 Авторы: Юров П.И., Беззаборов А.А., Малыш Я.В.
 """
 
-from algorithms.base import DeconvolutionAlgorithm
-from algorithms.octavewrapper import OctaveEngine
+from src.algorithms.base import DeconvolutionAlgorithm
+from src.algorithms.octavewrapper import OctaveEngine
 
 __all__ = ['DeconvolutionAlgorithm', 'OctaveEngine']
 

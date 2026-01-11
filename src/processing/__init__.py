@@ -17,7 +17,7 @@
 Автор: Юров П.И.
 """
 
-from processing.core import (
+from .core import (
     Processing,
     merge,
     show_from_table,

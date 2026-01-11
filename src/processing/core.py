@@ -15,20 +15,20 @@ import pandas as pd
 from pathlib import Path
 from typing import Optional, Any
 
-from processing.utils import Image
-import filters.base as filters
-import algorithms.base as base
+from .utils import Image
+import src.filters.base as filters
+import src.algorithms.base as base
 
-from processing.extensions.hyperparameter_optimization import HyperparameterOptimizer
-from processing.extensions.pareto_analysis import ParetoFrontAnalyzer
-from processing.reader import ModuleReader
-from processing.display import ModuleDisplay
-from processing.preprocessing import ModulePreprocessing
-from processing.tables import ModuleData
-from processing.clear import ModuleClear
-from processing.applyfilter import ModuleFilter
-from processing.restore import ModuleProcess
-from processing.restorepipeline import ModuleProcessPipeline
+from .extensions.hyperparameter_optimization import HyperparameterOptimizer
+from .extensions.pareto_analysis import ParetoFrontAnalyzer
+from .reader import ModuleReader
+from .display import ModuleDisplay
+from .preprocessing import ModulePreprocessing
+from .tables import ModuleData
+from .clear import ModuleClear
+from .applyfilter import ModuleFilter
+from .restore import ModuleProcess
+from .restorepipeline import ModuleProcessPipeline
 
 
 class Processing:
