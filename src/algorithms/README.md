@@ -6,25 +6,25 @@
 
 ### `blind_deconvolution/implementations/`
 
-#### `classic/` — классические итеративные методы
+#### `classic/` — классические итеративные методы. [Описание](blind_deconvolution/implementations/classic/README.md)
 
 - [`richardson_lucy.py`](blind_deconvolution/implementations/classic/richardson_lucy.py) — Richardson–Lucy (blind/non-blind; пуассоновское Maximum Likelihood Estimation) [2][3]
 - [`alternating_minimization.py`](blind_deconvolution/implementations/classic/alternating_minimization.py) — Maximum A Posteriori blind deconvolution с Huber-регуляризацией, alternating minimization [8][21][30]
 - [`expectation_maximization.py`](blind_deconvolution/implementations/classic/expectation_maximization.py) — EM для идентификации blur/восстановления изображения [18][19]
 
-#### `bayesian/` — байесовские методы
+#### `bayesian/` — байесовские методы. [Описание](blind_deconvolution/implementations/bayesian/README.md)
 
 - [`vbbid_tv.py`](blind_deconvolution/implementations/bayesian/vbbid_tv.py) — Variational Bayesian blind deconvolution с TV prior [10]
 - [`bbd_deip.py`](blind_deconvolution/implementations/bayesian/bbd_deip.py) — Bayesian blind deconvolution по паре изображений с разной экспозицией [11]
 - [`sb_bid_pe.py`](blind_deconvolution/implementations/bayesian/sb_bid_pe.py) — Sparse Bayesian blind deconvolution с оценкой параметров [12]
 
-#### `variational/` — вариационные методы
+#### `variational/` — вариационные методы. [Описание](blind_deconvolution/implementations/variational/README.md)
 
 - [`vabid.py`](blind_deconvolution/implementations/variational/vabid.py) — Variational Bayes blind deconvolution (VAR3, alternating variational) [14]
 - [`vapibe.py`](blind_deconvolution/implementations/variational/vapibe.py) — Variational Bayes для совместной оценки параметров/изображения/blur [15]
 - [`vbsk_sid_st.py`](blind_deconvolution/implementations/variational/vbsk_sid_st.py) — VB sparse kernel-based blind deconvolution со Student’s-t priors [16]
 
-#### `sparse/` — разреженные/TV-подобные регуляризации
+#### `sparse/` — разреженные/TV-подобные регуляризации. [Описание](blind_deconvolution/implementations/sparse/README.md)
 
 - [`vbc_bid.py`](blind_deconvolution/implementations/sparse/vbc_bid.py) — VB compressive blind image deconvolution (VB-ADMM, wavelet sparsity) [13]
 - [`pbtvgr.py`](blind_deconvolution/implementations/sparse/pbtvgr.py) — blind deconvolution для Poisson noise: TV + L0 gradient regularization [24]
