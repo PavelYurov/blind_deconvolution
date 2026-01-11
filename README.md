@@ -127,46 +127,72 @@ python install.py --venv .venv install base
 
 ```
 blind_deconvolution/
-├── algorithms/                 # Алгоритмы и обёртки
-│   ├── base.py                 # DeconvolutionAlgorithm
-│   ├── blind_deconvolution/    # Blind deconvolution
-│   │   ├── implementations/    # Собственные реализации методов
-│   │   └── external/           # Внешние обёртки (original sources + wrapper)
-│   ├── kernel_estimation/      # Оценка PSF (пока пусто/заготовка)
-│   ├── nonblind_deconvolution/ # Non-blind deconvolution (известное ядро)
-│   └── unsorted/               # Экспериментальные/черновые алгоритмы
+├── src/                        # Исходники Python-пакета
+│   ├── algorithms/             # Алгоритмы и обёртки
+│   │   ├── base.py             # DeconvolutionAlgorithm
+│   │   ├── blind_deconvolution/
+│   │   │   ├── implementations/  # Собственные реализации
+│   │   │   │   ├── bayesian/
+│   │   │   │   ├── classic/
+│   │   │   │   ├── sparse/
+│   │   │   │   └── variational/
+│   │   │   └── external/         # Внешние реализации (много подпроектов)
+│   │   │   	└── ...
+│   │   ├── kernel_estimation/
+│   │   │   └── ...
+│   │   ├── nonblind_deconvolution/
+│   │   │   └── ...
+│   │   ├── unsorted/             # Экспериментальные/черновые алгоритмы (много подпроектов)
+│   │   ├── octavewrapper.py
+│   │   └── __init__.py
+│   ├── filters/                # Генерация искажений (blur/noise/denoise)
+│   │   ├── blur.py
+│   │   ├── noise.py
+│   │   ├── denoise.py
+│   │   ├── distributions.py
+│   │   ├── colored_noise.py
+│   │   ├── smooth.py
+│   │   └── __init__.py
+│   ├── processing/             # Основной функционал пайплайна
+│   │   ├── core.py
+│   │   ├── reader.py
+│   │   ├── restorepipeline.py
+│   │   ├── metrics.py
+│   │   ├── tables.py
+│   │   ├── utils.py
+│   │   └── extensions/         # Расширения пайплайна
+│   │       ├── hyperparameter_optimization.py
+│   │       ├── pareto_analysis.py
+│   │       └── base.py
+│   ├── scripts/                # Вспомогательные скрипты
+│   │   ├── dataset_generator.py
+│   │   └── kernel_generator.py
+│   └── __init__.py
 │
-├── filters/                    # Генерация искажений
-│   ├── base.py                 # FilterBase
-│   ├── blur.py                 # Размытие
-│   ├── noise.py                # Шумы
-│   ├── denoise.py              # Шумоподавление
-│   └── distributions.py        # PSF-функции
-│
-├── extensions/                 # Расширения
-│   ├── hyperparameter_optimization.py
-│   └── pareto_analysis.py
-│
-├── experiments/                # Тестирование алгоритмов и подбор гиперпараметров
-├── scripts/                    # Вспомогательные скрипты
-│   ├── kernel_generator.py     # Генератор ядер размытия (PSF)
-│   └── dataset_generator.py    # Генератор датасета
-├── docs/                       # Документация (Sphinx) и утилиты сборки
-│   ├── source/
+├── install.py                  # Интерактивный установщик зависимостей
+├── docs/                       # Документация (Sphinx) и сборка
+│   ├── source/                 # Sphinx sources
 │   │   ├── conf.py
 │   │   └── index.rst
 │   └── tools/
 │       └── build_docs.py
-│
-├── processing/                 # Основной функционал пайплайна
-├── pareto_analysis/            # Анализ Парето-фронтов
-├── dataset/                    # Данные/артефакты (если используются)
+├── experiments/                # Эксперименты/исследования
 ├── images/                     # Примеры изображений/артефакты
-├── testing/                    # Тестовые наборы/выходы прогонов
+├── tests/                      # Тестовые данные/выходы прогонов
+├── utils/                      # Вспомогательные утилиты
+│   ├── octave/
+│   └── preflight/              # Проверки окружения/зависимостей
+│       ├── __main__.py
+│       ├── config.py
+│       ├── report.py
+│       └── checks/
+│           ├── python.py
+│           └── packages.py
 │
-├── requirements.txt            # Зависимости
-├── pyproject.toml              # Метаданные проекта
-└── setup.cfg                   # Конфигурация flake8
+├── requirements.txt            # (если используется) зависимости через pip
+├── pyproject.toml              # Метаданные проекта + профили зависимостей
+├── setup.cfg                   # Конфигурация flake8
+└── README.md
 ```
 
 ## Качество кода
@@ -186,14 +212,52 @@ blind_deconvolution/
 
 ## Документация
 
-Документация проекта генерируется с помощью **Sphinx**.
+HTML-документация проекта генерируется с помощью **Sphinx** и публикуется на GitHub Pages:
 
-### Генерация HTML-документации
+### Онлайн-версия
+
+https://pavelyurov.github.io/blind_deconvolution/
+
+### Структура документации
+
+- `docs/source/` — исходники Sphinx (`.rst`, `conf.py`)
+- `docs/tools/build_docs.py` — скрипт сборки (генерация API + сборка HTML)
+- `docs/_build/html/` — результат локальной сборки (появляется после первого билда)
+
+Документация в основном строится из docstrings Python-модулей (автодокументация).
+
+### Требования
+
+В активном окружении Python должны быть доступны утилиты:
+- `sphinx-build`
+- `sphinx-apidoc`
+
+Опционально: тема `sphinx_rtd_theme` (если не установлена, используется fallback `alabaster`).
+
+### Локальная сборка (рекомендуемый способ)
 
 ```bash
 python docs/tools/build_docs.py
 ```
-Документация будет доступна в `docs/_build/html/index.html`.
+
+Скрипт делает два шага:
+1) генерирует `.rst` для API (через `sphinx-apidoc`) в `docs/source/`;
+2) собирает HTML в `docs/_build/html/`.
+
+Открывайте результат: `docs/_build/html/index.html`.
+
+### Ручная сборка (если нужен контроль шагов)
+
+Из корня репозитория:
+```bash
+sphinx-apidoc -o docs/source .
+sphinx-build -b html docs/source docs/_build/html
+```
+
+### Полезные замечания
+
+- `docs/tools/build_docs.py` удаляет все `docs/source/*.rst`, кроме `index.rst`, и генерирует заново — не храните важные ручные правки в авто-генерируемых `.rst`.
+- Если `sphinx-build`/`sphinx-apidoc` не найдены, установите Sphinx в активное окружение Python (например, в venv проекта).
 
 ## Руководитель проекта 
 
@@ -201,7 +265,7 @@ python docs/tools/build_docs.py
 
 ## Участники проекта
 
-- Беззаборов А.А., КМБО-01-22, antonbezzaborov929@gmail.com - Teamlead
+- Беззаборов А.А., КМБО-01-22, antonbezzaborov929@gmail.com - Тимлид
 - Юров П.И., КМБО-01-22, pavel.yurov0425@gmail.com - Программист
 - Куропатов К.Л., КМБО-01-22, konstantinkuropatov@gmail.com - Теоретик
 - Малыш Я.В., КМБО-03-22, mrgeroixyu@gmail.com - Программист
