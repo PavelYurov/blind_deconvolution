@@ -6,6 +6,7 @@ imageio
 tifffile
 opencv-python
 oct2py
+pydantic
 
 # Machine learning
 numpy
