@@ -16,7 +16,7 @@ import glob
 from pathlib import Path
 from typing import  Any
 
-from src.processing.utils import Image
+from .utils import Image
 
 
 class ModuleClear:

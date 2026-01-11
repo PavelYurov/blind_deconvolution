@@ -16,8 +16,8 @@ from pathlib import Path
 from typing import Optional, Any
 
 from .utils import Image
-import src.filters.base as filters
-import src.algorithms.base as base
+from ..filters import base as filters
+from ..algorithms.base import DeconvolutionAlgorithm
 
 from .extensions.hyperparameter_optimization import HyperparameterOptimizer
 from .extensions.pareto_analysis import ParetoFrontAnalyzer
@@ -287,7 +287,7 @@ class Processing:
         return self.amount_of_blurred
     
     def process(self, 
-                algorithm_processor: base.DeconvolutionAlgorithm, 
+                algorithm_processor: DeconvolutionAlgorithm, 
                 metadata: bool = False, 
                 unique_path: bool = True) -> None:
         """

@@ -12,15 +12,15 @@ import math
 from pathlib import Path
 from typing import Any
 
-from src.processing.utils import (
+from .utils import (
     Image,
     imread,
     generate_unique_file_path,
     calculate_metrics
 )
-import src.filters.base as filters
+from ..filters import base as filters
 
-from src.filters.blur import Identical_kernel
+from ..filters.blur import Identical_kernel
 
 class ModuleFilter:
     """

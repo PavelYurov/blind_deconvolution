@@ -13,9 +13,9 @@
 Авторы: Юров П.И., Беззаборов А.А.
 """
 
-from src.filters.base import FilterBase
-from src.filters.blur import DefocusBlur, MotionBlur, BSpline_blur, Kernel_convolution
-from src.filters.noise import (
+from .base import FilterBase
+from .blur import DefocusBlur, MotionBlur, BSpline_blur, Kernel_convolution
+from .noise import (
     GaussianNoise,
     PoissonNoise,
     SaltAndPepperNoise,
@@ -24,7 +24,7 @@ from src.filters.noise import (
     Pink_Noise,
     Brown_Noise,
 )
-from src.filters.smooth import MeanBlur, MedianBlur, GaussianBlur, BilateralFilter
+from .smooth import MeanBlur, MedianBlur, GaussianBlur, BilateralFilter
 
 __all__ = [
     'FilterBase',

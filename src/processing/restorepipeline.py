@@ -16,20 +16,20 @@ from pathlib import Path
 from typing import Any
 
 
-from src.processing.utils import (
+from .utils import (
     Image,
     imread,
     prepare_image_for_metric,
     generate_unique_file_path,
     calculate_metrics
 )
-import src.processing.metrics as metrics
-import src.algorithms.base as base
+from . import metrics
+from ..algorithms.base import DeconvolutionAlgorithm
 
 
 from IPython.display import display
 
-from src.processing.restore import ModuleProcess
+from .restore import ModuleProcess
 
 class ModuleProcessPipeline(ModuleProcess):
     """
@@ -227,7 +227,7 @@ class ModuleProcessPipeline(ModuleProcess):
                               img_obj: Image, 
                               blurred_path: Path, 
                               blurred_image: np.ndarray, 
-                              algorithm: base.DeconvolutionAlgorithm, 
+                              algorithm: DeconvolutionAlgorithm, 
                               data_dict: dict) -> None:
         """Восстановление одного изображения алгоритмом."""
         alg_name = algorithm.get_name()
@@ -292,7 +292,7 @@ class ModuleProcessPipeline(ModuleProcess):
     def _collect_algorithm_data(self, 
                                 data_dict: dict, 
                                 alg_name: str, 
-                                algorithm: base.DeconvolutionAlgorithm, 
+                                algorithm: DeconvolutionAlgorithm, 
                                 img_obj: Image, 
                                 blurred_path: Path, 
                                 restored_path: Path, 

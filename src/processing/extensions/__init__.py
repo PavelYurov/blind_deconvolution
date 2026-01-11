@@ -9,7 +9,7 @@
 Автор: Беззаборов А.А.
 """
 
-from src.processing.extensions.base import (
+from .base import (
     ProcessingExtension,
     ParameterRange,
     OptimizationResult,
@@ -18,8 +18,8 @@ from src.processing.extensions.base import (
     MetricType
 )
 
-from src.processing.extensions.hyperparameter_optimization import HyperparameterOptimizer
-from src.processing.extensions.pareto_analysis import ParetoFrontAnalyzer
+from .hyperparameter_optimization import HyperparameterOptimizer
+from .pareto_analysis import ParetoFrontAnalyzer
 
 __all__ = [
     'ProcessingExtension',
