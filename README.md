@@ -73,8 +73,32 @@
 
 ## Установка
 
+1. Установить последнюю версию пакета:
+
 ```bash
 pip install git+https://github.com/PavelYurov/blind_deconvolution.git
+```
+
+Будут установлен пакет `blinddeconv` и остальные зависимости (`numpy`, `scipy`, `opencv-python`, `scikit-image`, и др.)
+
+2. Установка с дополнительными зависимостями:
+
+Включает инструменты для тестирования, линтинга и интерактивной работы (`pytest`, `flake8`, `ipython`, `setuptools`)
+
+```bash
+pip install "git+https://github.com/PavelYurov/blind_deconvolution.git[dev]"
+```
+
+Необходимо для генерации документации через Sphinx (`sphinx`, `sphinx-rtd-theme`)
+
+```bash
+pip install "git+https://github.com/PavelYurov/blind_deconvolution.git[docs]"
+```
+
+Тестирования и документация вместе:
+
+```bash
+pip install "git+https://github.com/PavelYurov/blind_deconvolution.git[dev,docs]"
 ```
 
 ## Структура проекта

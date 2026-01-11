@@ -31,12 +31,7 @@ from algorithms.base import DeconvolutionAlgorithm
 
 SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "source")
 MATLAB_ROOT = os.path.join(SOURCE_PATH, "Graph_Based_BID")
-<<<<<<< HEAD
 MATLAB_CODE_PATH = os.path.join(MATLAB_ROOT, "Graph_Based_BID_p1.1")
-=======
-MATLAB_CODE_PATH = os.path.join(MATLAB_ROOT, "Graph_Based_BID_v1.1")
-OCTAVE_WRAPPER_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "octave_wrapper")
->>>>>>> e7f6d09caf207a77ebcb4406fecefaa1b1b317e5
 ALGORITHM_NAME = "BYchao100_Graph_Based_Blind_Image_Deblurring"
 
 
