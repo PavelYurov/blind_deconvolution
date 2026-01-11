@@ -16,20 +16,20 @@ from pathlib import Path
 from typing import Any
 
 
-from processing.utils import (
+from src.processing.utils import (
     Image,
     imread,
     prepare_image_for_metric,
     generate_unique_file_path,
     calculate_metrics
 )
-import processing.metrics as metrics
-import algorithms.base as base
+import src.processing.metrics as metrics
+import src.algorithms.base as base
 
 
 from IPython.display import display
 
-from processing.restore import ModuleProcess
+from src.processing.restore import ModuleProcess
 
 class ModuleProcessPipeline(ModuleProcess):
     """

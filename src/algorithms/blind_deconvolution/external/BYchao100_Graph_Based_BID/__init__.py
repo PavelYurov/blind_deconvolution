@@ -25,9 +25,9 @@ from typing import Any, Tuple
 
 import cv2
 import numpy as np
-from algorithms.octavewrapper import OctaveEngine
+from src.algorithms.octavewrapper import OctaveEngine
 
-from algorithms.base import DeconvolutionAlgorithm
+from src.algorithms.base import DeconvolutionAlgorithm
 
 SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "source")
 MATLAB_ROOT = os.path.join(SOURCE_PATH, "Graph_Based_BID")
@@ -62,8 +62,6 @@ class BYchao100GraphBasedBlindImageDeblurring(DeconvolutionAlgorithm):
 		self._oc = OctaveEngine.get_instance()
 		self._oc.addpath(self._oc.genpath(MATLAB_CODE_PATH))
 		self._oc.addpath(self._oc.genpath(OCTAVE_WRAPPER_PATH))
-		print("debug:")
-		print(OCTAVE_WRAPPER_PATH)
 
 	def change_param(self, param: Any):
 		if not isinstance(param, dict):

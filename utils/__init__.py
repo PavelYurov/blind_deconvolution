@@ -4,7 +4,7 @@
 Автор: Юров П.И.
 """
 
-from octave import octavesettings
+from .octave import octavesettings
 
 __all__ = ['octavesettings']
 

@@ -15,7 +15,7 @@ import cv2 as cv
 import matplotlib.pyplot as plt
 import math
 from typing import Tuple, Dict, Any
-from processing.utils import (
+from src.processing.utils import (
     Image,
     imread
 )

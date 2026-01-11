@@ -10,14 +10,14 @@ from pathlib import Path
 import json
 from typing import Tuple, Any
 
-from processing.utils import (
+from src.processing.utils import (
     Image,
     imread,
     prepare_image_for_metric,
     generate_unique_file_path,
     calculate_metrics
 )
-import algorithms.base as base
+import src.algorithms.base as base
 
 class ModuleProcess:
     """
