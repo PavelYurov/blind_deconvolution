@@ -7,6 +7,7 @@ tifffile
 opencv-python
 oct2py
 pydantic
+pydantic_settings
 
 # Machine learning
 numpy
