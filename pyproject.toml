@@ -9,6 +9,7 @@ authors = [
   { name = "Anton Bezzaborov" },
   { name = "Pavel Yurov" },
   { name = "Yaroslav Malysh" },
+  { name = "Konstantin Kuropatov" },
 ]
 description = "Blind Image Deconvolution"
 readme = "README.md"
