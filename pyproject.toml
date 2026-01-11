@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "blind_deconvolution"
 version = "0.1.0"
-authors = [{ name = "Anton Bezzaborov" }, { name = "Pavel Yurov" }]
+authors = [{ name = "Anton Bezzaborov" }, { name = "Pavel Yurov" }, { name = "Yarik Malysh" }]
 description = "Blind Image Deconvolution"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -38,7 +38,10 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["blind_deconvolution"]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.preflight]
 default-profile = "base"

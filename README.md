@@ -74,51 +74,7 @@
 ## Установка
 
 ```bash
-git clone https://github.com/PavelYurov/blind_deconvolution.git
-cd blind_deconvolution
-pip install -r requirements.txt
-```
-
-### Интерактивный установщик зависимостей (`install.py`)
-
-В репозитории есть интерактивный установщик, который:
-- проверяет версию Python и зависимости до установки;
-- показывает, что уже установлено и что не удовлетворяет требованиям;
-- спрашивает подтверждение и при согласии ставит недостающие пакеты через `pip`;
-- поддерживает удаление зависимостей выбранного профиля.
-
-Профили зависимостей берутся из `pyproject.toml` (секция `[tool.preflight.profiles]`).
-
-**Показать доступные профили:**
-```bash
-python install.py list-profiles
-```
-
-**Проверить зависимости (без установки):**
-```bash
-python install.py check base
-```
-
-**Установить недостающие зависимости (интерактивно):**
-```bash
-python install.py install base
-```
-
-**Автоматический режим (без вопросов):**
-```bash
-python install.py install base -y
-```
-
-**Удалить зависимости профиля:**
-```bash
-python install.py uninstall base
-```
-
-**Виртуальное окружение (рекомендуется):**
-при операциях `install/uninstall` скрипт предложит создать/использовать venv (по умолчанию каталог `venv`).
-Можно указать другой каталог:
-```bash
-python install.py --venv .venv install base
+pip install git+https://github.com/PavelYurov/blind_deconvolution.git
 ```
 
 ## Структура проекта
