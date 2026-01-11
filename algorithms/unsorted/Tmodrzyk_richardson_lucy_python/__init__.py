@@ -1,4 +1,23 @@
-# https://github.com/Tmodrzyk/richardson-lucy-python
+"""
+TmodrzykRichardsonLucyPython - Python Wrapper
+
+Original Implementation:
+    Tmodrzyk (GitHub)
+    GitHub Repository: https://github.com/Tmodrzyk/richardson-lucy-python
+    Language/Framework: Python
+
+Reference Paper (if applicable):
+    the Richardson-Lucy deconvolution algorithm leveraging the computational capabilities of PyTorch. The Richardson-Lucy algorithm is widely used for image deblurr
+
+Algorithm Description:
+    - Alternating Richardson–Lucy updates for latent image and PSF
+    - Outputs a restored image (and kernel estimate when available)
+    - Outputs a restored image (and kernel estimate when available)
+
+Author: AUTHOR_PROJECT
+Wrapper Version: 1.0.0
+Original Author: Tmodrzyk"""
+
 from __future__ import annotations
 from time import time
 from typing import Any, Dict, Iterable, Tuple, Union

@@ -81,15 +81,18 @@ pip install -r requirements.txt
 
 ## Структура проекта
 
+Подробнее об алгоритмах: [Путеводитель по алгоритмам](algorithms/README.md)
+
 ```
 BlindDeconvolution/
 ├── algorithms/                 # Алгоритмы и обёртки
 │   ├── base.py                 # DeconvolutionAlgorithm
-│   ├── implementations/        # Собственные реализации методов
-│   ├── kernel_estimation/      # Оценка PSF (заготовка/в процессе)
-│   ├── blind_deconvolution/    # Внешние обёртки (blind)
-│   ├── nonblind_deconvolution/ # Внешние обёртки (non-blind)
-│   └── unsorted/               # Алгоритмы в доработке/на разбор
+│   ├── blind_deconvolution/    # Blind deconvolution
+│   │   ├── implementations/    # Собственные реализации методов
+│   │   └── external/           # Внешние обёртки (original sources + wrapper)
+│   ├── kernel_estimation/      # Оценка PSF (пока пусто/заготовка)
+│   ├── nonblind_deconvolution/ # Non-blind deconvolution (известное ядро)
+│   └── unsorted/               # Экспериментальные/черновые алгоритмы
 │
 ├── filters/                    # Генерация искажений
 │   ├── base.py                 # FilterBase
@@ -107,10 +110,11 @@ BlindDeconvolution/
 │   ├── kernel_generator.py     # Генератор ядер размытия (PSF)
 │   └── dataset_generator.py    # Генератор датасета
 ├── docs/                       # Документация (Sphinx) и утилиты сборки
-│   ├── conf.py
-│   ├── index.rst
-│   ├── build_docs.py
-│   └── check_environment.py
+│   ├── source/
+│   │   ├── conf.py
+│   │   └── index.rst
+│   └── tools/
+│       └── build_docs.py
 │
 ├── processing/                 # Основной функционал пайплайна
 ├── pareto_analysis/            # Анализ Парето-фронтов
@@ -122,8 +126,6 @@ BlindDeconvolution/
 ├── pyproject.toml              # Метаданные проекта
 └── setup.cfg                   # Конфигурация flake8
 ```
-
-Подробнее об алгоритмах: [Путеводитель по алгоритмам](algorithms/README.md)
 
 ## Качество кода
 
@@ -147,7 +149,7 @@ BlindDeconvolution/
 ### Генерация HTML-документации
 
 ```bash
-python docs/build_docs.py
+python docs/tools/build_docs.py
 ```
 Документация будет доступна в `docs/_build/html/index.html`.
 

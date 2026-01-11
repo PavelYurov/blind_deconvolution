@@ -1,4 +1,23 @@
-# https://github.com/tianyishan/Blind_Deconvolution
+"""
+TianyishanBlindDeconvolutionDeconvolutionAlgorithm - Python Wrapper
+
+Original Implementation:
+    tianyishan (GitHub)
+    GitHub Repository: https://github.com/tianyishan/Blind_Deconvolution
+    Language/Framework: C/C++
+
+Reference Paper (if applicable):
+    Based on method described in the repository without published paper
+
+Algorithm Description:
+    - Iterative alternation between latent image and blur kernel (PSF) updates
+    - Uses regularization/prior terms to stabilize deconvolution
+    - Outputs a restored image (and kernel estimate when available)
+
+Author: AUTHOR_PROJECT
+Wrapper Version: 1.0.0
+Original Author: tianyishan"""
+
 from __future__ import annotations
 import math
 import time

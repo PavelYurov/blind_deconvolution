@@ -1,4 +1,23 @@
-# https://github.com/COR-OPT/RobustBlindDeconv
+"""
+COROPTRobustBlindDeconv - Python Wrapper
+
+Original Implementation:
+    COR-OPT (GitHub)
+    GitHub Repository: https://github.com/COR-OPT/RobustBlindDeconv
+    Language/Framework: Python
+
+Reference Paper (if applicable):
+    the subgradient and prox-linear methods
+
+Algorithm Description:
+    - Iterative alternation between latent image and blur kernel (PSF) updates
+    - Uses regularization/prior terms to stabilize deconvolution
+    - Outputs a restored image (and kernel estimate when available)
+
+Author: AUTHOR_PROJECT
+Wrapper Version: 1.0.0
+Original Author: COR-OPT"""
+
 from __future__ import annotations
 import sys
 from pathlib import Path

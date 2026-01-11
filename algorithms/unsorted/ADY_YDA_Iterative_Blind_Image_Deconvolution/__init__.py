@@ -1,4 +1,23 @@
-# https://github.com/ADY-YDA/Iterative-Blind-Image-Deconvolution/blob/main/Expectation-Maximization.ipynb
+"""
+ADYYDAIterativeBlindImageDeconvolution - Python Wrapper
+
+Original Implementation:
+    ADY-YDA (GitHub)
+    GitHub Repository: https://github.com/ADY-YDA/Iterative-Blind-Image-Deconvolution/blob/main/Expectation-Maximization.ipynb
+    Language/Framework: Python (Jupyter)
+
+Reference Paper (if applicable):
+    Based on method described in the repository without published paper
+
+Algorithm Description:
+    - Iterative alternation between latent image and blur kernel (PSF) updates
+    - Uses regularization/prior terms to stabilize deconvolution
+    - Outputs a restored image (and kernel estimate when available)
+
+Author: AUTHOR_PROJECT
+Wrapper Version: 1.0.0
+Original Author: ADY-YDA"""
+
 from __future__ import annotations
 
 from time import time

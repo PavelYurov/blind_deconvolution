@@ -1,4 +1,23 @@
-# https://github.com/idiap/semiblindpsfdeconv
+"""
+IdiapSemiblindpsfdeconv - Python Wrapper
+
+Original Implementation:
+    idiap (GitHub)
+    GitHub Repository: https://github.com/idiap/semiblindpsfdeconv
+    Language/Framework: Python
+
+Reference Paper (if applicable):
+    DOI: 10.1109/ICIP.2018.8451736
+
+Algorithm Description:
+    - Iterative alternation between latent image and blur kernel (PSF) updates
+    - Uses regularization/prior terms to stabilize deconvolution
+    - Outputs a restored image (and kernel estimate when available)
+
+Author: AUTHOR_PROJECT
+Wrapper Version: 1.0.0
+Original Author: idiap"""
+
 from __future__ import annotations
 import sys
 from pathlib import Path

@@ -1,4 +1,23 @@
-# https://github.com/axium/Blind-Image-Deconvolution-using-Deep-Generative-Priors
+"""
+AxiumBlindImageDeconvolutionUsingDeepGenerativePriors - Python Wrapper
+
+Original Implementation:
+    axium (GitHub)
+    GitHub Repository: https://github.com/axium/Blind-Image-Deconvolution-using-Deep-Generative-Priors
+    Language/Framework: Python + MATLAB
+
+Reference Paper (if applicable):
+    both algorithm 1 and 2 (proposed in paper) have been made available, along with pre-trained generative models for both image datasets and blurs. Code for algori
+
+Algorithm Description:
+    - Iterative alternation between latent image and blur kernel (PSF) updates
+    - Uses regularization/prior terms to stabilize deconvolution
+    - Outputs a restored image (and kernel estimate when available)
+
+Author: AUTHOR_PROJECT
+Wrapper Version: 1.0.0
+Original Author: axium"""
+
 from __future__ import annotations
 import os
 import sys

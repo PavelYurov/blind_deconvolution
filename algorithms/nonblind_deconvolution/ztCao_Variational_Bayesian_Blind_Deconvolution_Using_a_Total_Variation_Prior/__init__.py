@@ -1,4 +1,23 @@
-# https://github.com/2924878374/Variational-Bayesian-Blind-Deconvolution-Using-a-Total-Variation-Prior
+"""
+TV1DeconvolutionAlgorithm - Python Wrapper
+
+Original Implementation:
+    2924878374 (GitHub)
+    GitHub Repository: https://github.com/2924878374/Variational-Bayesian-Blind-Deconvolution-Using-a-Total-Variation-Prior
+    Language/Framework: Python (Jupyter)
+
+Reference Paper (if applicable):
+    advanced blind deconvolution techniques for educational and research purposes.
+
+Algorithm Description:
+    - Iterative alternation between latent image and blur kernel (PSF) updates
+    - Uses regularization/prior terms to stabilize deconvolution
+    - Outputs a restored image (and kernel estimate when available)
+
+Author: AUTHOR_PROJECT
+Wrapper Version: 1.0.0
+Original Author: 2924878374"""
+
 from __future__ import annotations
 
 from time import time

@@ -1,4 +1,23 @@
-# https://github.com/CACTuS-AI/Blind-Deconvolution-using-Modulated-Inputs
+"""
+CACTuSAIBlindDeconvolutionUsingModulatedInputs - Python Wrapper
+
+Original Implementation:
+    CACTuS-AI (GitHub)
+    GitHub Repository: https://github.com/CACTuS-AI/Blind-Deconvolution-using-Modulated-Inputs
+    Language/Framework: MATLAB
+
+Reference Paper (if applicable):
+    Based on method described in the repository without published paper
+
+Algorithm Description:
+    - Iterative alternation between latent image and blur kernel (PSF) updates
+    - Uses regularization/prior terms to stabilize deconvolution
+    - Outputs a restored image (and kernel estimate when available)
+
+Author: AUTHOR_PROJECT
+Wrapper Version: 1.0.0
+Original Author: CACTuS-AI"""
+
 from __future__ import annotations
 import sys
 from pathlib import Path

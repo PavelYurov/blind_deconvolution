@@ -1,4 +1,23 @@
-# https://github.com/jhell96/Deep-Blind-Deblur
+"""
+Jhell96DeepBlindDeblur - Python Wrapper
+
+Original Implementation:
+    jhell96 (GitHub)
+    GitHub Repository: https://github.com/jhell96/Deep-Blind-Deblur
+    Language/Framework: Python
+
+Reference Paper (if applicable):
+    Based on method described in the repository without published paper
+
+Algorithm Description:
+    - Iterative alternation between latent image and blur kernel (PSF) updates
+    - Uses regularization/prior terms to stabilize deconvolution
+    - Outputs a restored image (and kernel estimate when available)
+
+Author: AUTHOR_PROJECT
+Wrapper Version: 1.0.0
+Original Author: jhell96"""
+
 from __future__ import annotations
 import sys
 from pathlib import Path

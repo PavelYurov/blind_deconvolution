@@ -1,4 +1,23 @@
-# https://github.com/CEA-jiangming/DecGMCA
+"""
+CEAJiangmingDecGMCA - Python Wrapper
+
+Original Implementation:
+    CEA-jiangming (GitHub)
+    GitHub Repository: https://github.com/CEA-jiangming/DecGMCA
+    Language/Framework: Python
+
+Reference Paper (if applicable):
+    Based on method described in the repository without published paper
+
+Algorithm Description:
+    - Iterative alternation between latent image and blur kernel (PSF) updates
+    - Uses regularization/prior terms to stabilize deconvolution
+    - Outputs a restored image (and kernel estimate when available)
+
+Author: AUTHOR_PROJECT
+Wrapper Version: 1.0.0
+Original Author: CEA-jiangming"""
+
 from __future__ import annotations
 from time import time
 from typing import Any, Optional, Tuple

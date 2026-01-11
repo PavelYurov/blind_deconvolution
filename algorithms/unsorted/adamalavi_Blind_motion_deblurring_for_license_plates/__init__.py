@@ -1,4 +1,23 @@
-# https://github.com/ankitVP77/Blind-Motion-Deblurring-for-Legible-License-Plates-using-Deep-Learning
+"""
+AdamalaviBlindMotionDeblurringForLicensePlates - Python Wrapper
+
+Original Implementation:
+    ankitVP77 (GitHub)
+    GitHub Repository: https://github.com/ankitVP77/Blind-Motion-Deblurring-for-Legible-License-Plates-using-Deep-Learning
+    Language/Framework: Python
+
+Reference Paper (if applicable):
+    Based on method described in the repository without published paper
+
+Algorithm Description:
+    - Motion blur kernel estimation (often parametric) with restoration loop
+    - Deep-learning-based motion parameter prediction for license plates
+    - Outputs a restored image (and kernel estimate when available)
+
+Author: AUTHOR_PROJECT
+Wrapper Version: 1.0.0
+Original Author: ankitVP77"""
+
 from __future__ import annotations
 
 import sys
