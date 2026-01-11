@@ -155,11 +155,11 @@ python docs/tools/build_docs.py
 
 ## Руководитель проекта 
 
-- Парфенов Д.В. (promasterden@yandex.ru)
+- Парфенов Денис Васильевич, promasterden@yandex.ru
 
 ## Участники проекта
 
-- Юров П.И. (pavel.yurov0425@gmail.com)
-- Беззаборов А.А. (antonbezzaborov929@gmail.com)
-- Куропатов К.Л. (konstantinkuropatov@gmail.com)
-- Малыш Я.В. (mrgeroixyu@gmail.com)
+- Беззаборов А.А., КМБО-01-22, antonbezzaborov929@gmail.com - Teamlead
+- Юров П.И., КМБО-01-22, pavel.yurov0425@gmail.com - Программист
+- Куропатов К.Л., КМБО-01-22, konstantinkuropatov@gmail.com - Теоретик
+- Малыш Я.В., КМБО-03-22, mrgeroixyu@gmail.com - Программист
