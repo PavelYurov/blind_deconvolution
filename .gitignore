@@ -122,6 +122,7 @@ Desktop.ini
 /pareto_analysis/
 /preprocess/
 /docs/_build/
+/shit/
 
 # Прочие файлы
 /benchmark_generation.ipynb

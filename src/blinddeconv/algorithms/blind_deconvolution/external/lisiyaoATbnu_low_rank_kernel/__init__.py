@@ -26,7 +26,7 @@ import cv2
 import numpy as np
 import matlab.engine
 
-from algorithms.base import DeconvolutionAlgorithm
+from blinddeconv.algorithms.base import DeconvolutionAlgorithm
 
 ALGORITHM_NAME = "lisiyaoATbnu_low_rank_kernel"
 SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "source")
