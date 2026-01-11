@@ -7,7 +7,7 @@ import os
 import sys
 from pathlib import Path
 from oct2py import Oct2Py
-from configs.octaveconfig import octavesettings
+from utils.octave import octavesettings
 
 class OctaveEngine:
     """Одна среда Octave для всех алгоритмов."""
