@@ -1,9 +1,0 @@
-__pycache__/
-.python-version
-*.png
-*.ipynb
-!fails/*.png
-!examples/*.png
-!imgs/*.png
-!blind/*.png
-!non-blind/*.png

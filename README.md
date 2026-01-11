@@ -105,6 +105,12 @@ pip install "git+https://github.com/PavelYurov/blind_deconvolution.git[docs]"
 pip install "git+https://github.com/PavelYurov/blind_deconvolution.git[dev,docs]"
 ```
 
+## Удаление
+
+```bash
+pip uninstall blinddeconv
+```
+
 ## Структура проекта
 
 Подробнее об алгоритмах: [Путеводитель по алгоритмам](src/blinddeconv/algorithms/README.md)
