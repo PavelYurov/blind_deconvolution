@@ -153,11 +153,11 @@ python docs/tools/build_docs.py
 ```
 Документация будет доступна в `docs/_build/html/index.html`.
 
-## Авторы
+## Руководитель проекта 
 
-Руководитель проекта - Парфенов Д.В. (promasterden@yandex.ru)
+- Парфенов Д.В. (promasterden@yandex.ru)
 
-Участники проекта:
+## Участники проекта:
 
 - Юров П.И. (pavel.yurov0425@gmail.com)
 - Беззаборов А.А. (antonbezzaborov929@gmail.com)
