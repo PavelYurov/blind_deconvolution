@@ -81,6 +81,10 @@ pip install git+https://github.com/PavelYurov/blind_deconvolution.git
 
 Будут установлен пакет `blinddeconv` и остальные зависимости (`numpy`, `scipy`, `opencv-python`, `scikit-image`, и др.)
 
+```py
+import blinddeconv
+```
+
 2. Установка с дополнительными зависимостями:
 
 Включает инструменты для тестирования, линтинга и интерактивной работы (`pytest`, `flake8`, `ipython`, `setuptools`)
