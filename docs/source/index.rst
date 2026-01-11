@@ -14,8 +14,8 @@ BlindDeconvolution Documentation
 
 .. code-block:: python
 
-   from src.processing import Processing
-   from src.algorithms.implementations.richardson_lucy import RichardsonLucy
+   from src.blinddeconv.processing import Processing
+   from src.blinddeconv.algorithms.implementations.richardson_lucy import RichardsonLucy
 
    proc = Processing()
    proc.read_all()

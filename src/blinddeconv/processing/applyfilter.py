@@ -16,7 +16,7 @@ from .utils import (
     Image,
     imread,
     generate_unique_file_path,
-    calculate_metrics
+    calculate_metrics,
 )
 from ..filters import base as filters
 

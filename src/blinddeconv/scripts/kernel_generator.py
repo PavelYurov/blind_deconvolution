@@ -12,8 +12,8 @@ import shutil
 import math
 from typing import Dict, List, Tuple, Any, Optional
 
-from filters.blur import DefocusBlur, MotionBlur, BSpline_blur
-from filters.distributions import (
+from ..filters.blur import DefocusBlur, MotionBlur, BSpline_blur
+from ..filters.distributions import (
     gaussian_distribution,
     uniform_distribution,
     ring_distribution,

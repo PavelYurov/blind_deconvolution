@@ -16,15 +16,15 @@ import math
 from typing import Tuple, Dict, List, Any
 import matplotlib.pyplot as plt
 
-import processing as pr
-from filters.blur import DefocusBlur, MotionBlur, BSpline_blur
-from filters.distributions import (
+from .. import processing as pr
+from ..filters.blur import DefocusBlur, MotionBlur, BSpline_blur
+from ..filters.distributions import (
     gaussian_distribution,
     uniform_distribution,
     ring_distribution,
     exponential_decay_distribution
 )
-from filters.noise import (
+from ..filters.noise import (
     GaussianNoise,
     PoissonNoise,
     SaltAndPepperNoise,

@@ -37,7 +37,7 @@ Important Notes:
 """
 
 from .base import DeconvolutionAlgorithm
-from .octavewrapper import OctaveEngine
+from .octave import OctaveEngine
 
 __all__ = ['DeconvolutionAlgorithm', 'OctaveEngine']
 
