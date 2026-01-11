@@ -155,7 +155,7 @@ python docs/tools/build_docs.py
 
 ## Руководитель проекта 
 
-- Парфенов Д.В. (promasterden@yandex.ru)
+- Парфенов Денис Васильевич, promasterden@yandex.ru
 
 ## Участники проекта
 
