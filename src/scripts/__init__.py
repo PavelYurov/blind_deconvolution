@@ -6,7 +6,7 @@
     dataset_generator: Генерация датасета с искажениями
 """
 
-from scripts.kernel_generator import KernelGenerator
-from scripts.dataset_generator import DatasetGenerator
+from .kernel_generator import KernelGenerator
+from .dataset_generator import DatasetGenerator
 
 __all__ = ['KernelGenerator', 'DatasetGenerator']

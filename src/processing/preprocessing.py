@@ -21,7 +21,7 @@ from skimage.exposure import (
     cumulative_distribution
 )
 
-from src.processing.utils import (
+from .utils import (
     imread,
     float_img_to_int,
     prepare_image_for_metric,

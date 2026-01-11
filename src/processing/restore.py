@@ -10,14 +10,14 @@ from pathlib import Path
 import json
 from typing import Tuple, Any
 
-from src.processing.utils import (
+from .utils import (
     Image,
     imread,
     prepare_image_for_metric,
     generate_unique_file_path,
     calculate_metrics
 )
-import src.algorithms.base as base
+from ..algorithms.base import DeconvolutionAlgorithm
 
 class ModuleProcess:
     """
@@ -38,7 +38,7 @@ class ModuleProcess:
         self.processing = processing_instance
 
     def process(self, 
-                algorithm_processor: base.DeconvolutionAlgorithm, 
+                algorithm_processor: DeconvolutionAlgorithm, 
                 metadata: bool = False, 
                 unique_path: bool = True) -> None:
         """
@@ -64,7 +64,7 @@ class ModuleProcess:
         
     def _process_single_image(self, 
                               img_obj: Image, 
-                              algorithm_processor: base.DeconvolutionAlgorithm, 
+                              algorithm_processor: DeconvolutionAlgorithm, 
                               alg_name: str, 
                               metadata: bool = False, 
                               unique_path: bool = True) -> None:
@@ -146,7 +146,7 @@ class ModuleProcess:
                                     restored_path: Path, 
                                     kernel_path: Path, 
                                     alg_name: str, 
-                                    processor: base.DeconvolutionAlgorithm, 
+                                    processor: DeconvolutionAlgorithm, 
                                     metadata: bool = False) -> None:
         """Расчет метрик и обновление данных изображения."""
         original_image = prepare_image_for_metric(original_image)

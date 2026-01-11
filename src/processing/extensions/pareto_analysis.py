@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 import cv2 as cv
 
-from src.processing.extensions.base import ProcessingExtension, logger
+from .base import ProcessingExtension, logger
 
 
 class ParetoFrontAnalyzer(ProcessingExtension):
