@@ -1,5 +1,5 @@
 from importlib.metadata import version, PackageNotFoundError
-from preflight.report import CheckResult
+from ..report import CheckResult
 from packaging.requirements import Requirement
 
 

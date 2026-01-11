@@ -132,9 +132,9 @@ def _print_results(results) -> None:
 
 def build_plan(profile: str) -> InstallPlan:
     from packaging.requirements import Requirement
-    from preflight.checks.packages import check_requirement
-    from preflight.checks.python import check_python_version
-    from preflight.config import load_pyproject, resolve_profile_dependencies
+    from utils.preflight.checks.packages import check_requirement
+    from utils.preflight.checks.python import check_python_version
+    from utils.preflight.config import load_pyproject, resolve_profile_dependencies
 
     cfg = load_pyproject()
 
@@ -168,9 +168,9 @@ def build_plan(profile: str) -> InstallPlan:
 
 
 def cmd_check(args: argparse.Namespace) -> int:
-    from preflight.checks.packages import check_requirement
-    from preflight.checks.python import check_python_version
-    from preflight.config import load_pyproject, resolve_profile_dependencies
+    from utils.preflight.checks.packages import check_requirement
+    from utils.preflight.checks.python import check_python_version
+    from utils.preflight.config import load_pyproject, resolve_profile_dependencies
 
     cfg = load_pyproject()
     results = [check_python_version(cfg["project"]["requires-python"])]
@@ -235,7 +235,7 @@ def cmd_uninstall(args: argparse.Namespace) -> int:
 
 
 def cmd_list_profiles(_: argparse.Namespace) -> int:
-    from preflight.config import load_pyproject
+    from utils.preflight.config import load_pyproject
 
     cfg = load_pyproject()
     tool_cfg = cfg.get("tool", {}).get("preflight", {})

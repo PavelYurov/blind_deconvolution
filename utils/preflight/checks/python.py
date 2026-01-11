@@ -1,6 +1,6 @@
 import sys
 from packaging.specifiers import SpecifierSet
-from preflight.report import CheckResult
+from ..report import CheckResult
 
 
 def check_python_version(spec: str) -> CheckResult:
