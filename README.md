@@ -157,7 +157,7 @@ python docs/tools/build_docs.py
 
 - Парфенов Д.В. (promasterden@yandex.ru)
 
-## Участники проекта:
+## Участники проекта
 
 - Юров П.И. (pavel.yurov0425@gmail.com)
 - Беззаборов А.А. (antonbezzaborov929@gmail.com)
