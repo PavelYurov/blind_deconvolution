@@ -74,48 +74,125 @@
 ## Установка
 
 ```bash
-git clone https://github.com/PavelYurov/BlindDeconvolution.git
-cd BlindDeconvolution
+git clone https://github.com/PavelYurov/blind_deconvolution.git
+cd blind_deconvolution
 pip install -r requirements.txt
+```
+
+### Интерактивный установщик зависимостей (`install.py`)
+
+В репозитории есть интерактивный установщик, который:
+- проверяет версию Python и зависимости до установки;
+- показывает, что уже установлено и что не удовлетворяет требованиям;
+- спрашивает подтверждение и при согласии ставит недостающие пакеты через `pip`;
+- поддерживает удаление зависимостей выбранного профиля.
+
+Профили зависимостей берутся из `pyproject.toml` (секция `[tool.preflight.profiles]`).
+
+**Показать доступные профили:**
+```bash
+python install.py list-profiles
+```
+
+**Проверить зависимости (без установки):**
+```bash
+python install.py check base
+```
+
+**Установить недостающие зависимости (интерактивно):**
+```bash
+python install.py install base
+```
+
+**Автоматический режим (без вопросов):**
+```bash
+python install.py install base -y
+```
+
+**Удалить зависимости профиля:**
+```bash
+python install.py uninstall base
+```
+
+**Виртуальное окружение (рекомендуется):**
+при операциях `install/uninstall` скрипт предложит создать/использовать venv (по умолчанию каталог `venv`).
+Можно указать другой каталог:
+```bash
+python install.py --venv .venv install base
 ```
 
 ## Структура проекта
 
+Подробнее об алгоритмах: [Путеводитель по алгоритмам](src/algorithms/README.md)
+
 ```
-BlindDeconvolution/
-├── algorithms/                 # Blind Deconvolution алгоритмы
-│   ├── base.py                 # DeconvolutionAlgorithm
-│   ├── implementations/        # Реализации методов
-│   ├── unsorted/               # Алгоритмы в доработке
-│   └── blind_deconvolution/    # Внешние обёртки
+blind_deconvolution/
+├── src/                        # Исходники Python-пакета
+│   ├── algorithms/             # Алгоритмы и обёртки
+│   │   ├── base.py             # DeconvolutionAlgorithm
+│   │   ├── blind_deconvolution/
+│   │   │   ├── implementations/  # Собственные реализации
+│   │   │   │   ├── bayesian/
+│   │   │   │   ├── classic/
+│   │   │   │   ├── sparse/
+│   │   │   │   └── variational/
+│   │   │   └── external/         # Внешние реализации (много подпроектов)
+│   │   │   	└── ...
+│   │   ├── kernel_estimation/
+│   │   │   └── ...
+│   │   ├── nonblind_deconvolution/
+│   │   │   └── ...
+│   │   ├── unsorted/             # Экспериментальные/черновые алгоритмы (много подпроектов)
+│   │   ├── octavewrapper.py
+│   │   └── __init__.py
+│   ├── filters/                # Генерация искажений (blur/noise/denoise)
+│   │   ├── blur.py
+│   │   ├── noise.py
+│   │   ├── denoise.py
+│   │   ├── distributions.py
+│   │   ├── colored_noise.py
+│   │   ├── smooth.py
+│   │   └── __init__.py
+│   ├── processing/             # Основной функционал пайплайна
+│   │   ├── core.py
+│   │   ├── reader.py
+│   │   ├── restorepipeline.py
+│   │   ├── metrics.py
+│   │   ├── tables.py
+│   │   ├── utils.py
+│   │   └── extensions/         # Расширения пайплайна
+│   │       ├── hyperparameter_optimization.py
+│   │       ├── pareto_analysis.py
+│   │       └── base.py
+│   ├── scripts/                # Вспомогательные скрипты
+│   │   ├── dataset_generator.py
+│   │   └── kernel_generator.py
+│   └── __init__.py
 │
-├── filters/                    # Генерация искажений
-│   ├── base.py                 # FilterBase
-│   ├── blur.py                 # Размытие
-│   ├── noise.py                # Шумы
-│   ├── denoise.py              # Шумоподавление
-│   └── distributions.py        # PSF-функции
+├── install.py                  # Интерактивный установщик зависимостей
+├── docs/                       # Документация (Sphinx) и сборка
+│   ├── source/                 # Sphinx sources
+│   │   ├── conf.py
+│   │   └── index.rst
+│   └── tools/
+│       └── build_docs.py
+├── experiments/                # Эксперименты/исследования
+├── images/                     # Примеры изображений/артефакты
+├── tests/                      # Тестовые данные/выходы прогонов
+├── utils/                      # Вспомогательные утилиты
+│   ├── octave/
+│   └── preflight/              # Проверки окружения/зависимостей
+│       ├── __main__.py
+│       ├── config.py
+│       ├── report.py
+│       └── checks/
+│           ├── python.py
+│           └── packages.py
 │
-├── extensions/                 # Расширения
-│   ├── hyperparameter_optimization.py
-│   └── pareto_analysis.py
-│
-├── experiments/                # Тестирование алгоритмов и подбор гиперпараметров
-├── scripts/                    # Вспомогательные скрипты
-│   ├── kernel_generator.py     # Генератор ядер размытия (PSF)
-│   └── dataset_generator.py    # Генератор датасета
-├── docs/                       # Документация (Sphinx)
-├── docsrc/                     # Исходники документации
-├── tools/                      # Скрипты развертывания
-│   ├── build_docs.py
-│   └── check_environment.py
-│
-├── processing.py               # Основной функционал
-├── metrics.py                  # Метрики качества
-├── utils.py                    # Вспомогательные утилиты
-│
-├── requirements.txt            # Зависимости
-└── setup.cfg                   # Конфигурация flake8
+├── requirements.txt            # (если используется) зависимости через pip
+├── pyproject.toml              # Метаданные проекта + профили зависимостей
+├── setup.cfg                   # Конфигурация flake8
+└── README.md
 ```
 
 ## Качество кода
@@ -135,20 +212,56 @@ BlindDeconvolution/
 
 ## Документация
 
-Документация проекта генерируется с помощью **Sphinx**.
+HTML-документация проекта генерируется с помощью **Sphinx** и публикуется [по ссылке](https://pavelyurov.github.io/blind_deconvolution/):
 
-### Генерация HTML-документации
+### Структура документации
+
+- `docs/source/` — исходники Sphinx (`.rst`, `conf.py`)
+- `docs/tools/build_docs.py` — скрипт сборки (генерация API + сборка HTML)
+- `docs/_build/html/` — результат локальной сборки (появляется после первого билда)
+
+Документация в основном строится из docstrings Python-модулей (автодокументация).
+
+### Требования
+
+В активном окружении Python должны быть доступны утилиты:
+- `sphinx-build`
+- `sphinx-apidoc`
+
+Опционально: тема `sphinx_rtd_theme` (если не установлена, используется fallback `alabaster`).
+
+### Локальная сборка (рекомендуемый способ)
 
 ```bash
-cd docs
-sphinx-apidoc -f -o . ..
-make html
+python docs/tools/build_docs.py
 ```
-Документация будет доступна в `docs/_build/html/`.
 
-## Авторы
+Скрипт делает два шага:
+1) генерирует `.rst` для API (через `sphinx-apidoc`) в `docs/source/`;
+2) собирает HTML в `docs/_build/html/`.
 
-- Юров П.И.
-- Беззаборов А.А.
-- Куропатов К.Л.
-- Малыш Я.В.
+Открывайте результат: `docs/_build/html/index.html`.
+
+### Ручная сборка (если нужен контроль шагов)
+
+Из корня репозитория:
+```bash
+sphinx-apidoc -o docs/source .
+sphinx-build -b html docs/source docs/_build/html
+```
+
+### Полезные замечания
+
+- `docs/tools/build_docs.py` удаляет все `docs/source/*.rst`, кроме `index.rst`, и генерирует заново — не храните важные ручные правки в авто-генерируемых `.rst`.
+- Если `sphinx-build`/`sphinx-apidoc` не найдены, установите Sphinx в активное окружение Python (например, в venv проекта).
+
+## Руководитель проекта 
+
+- Парфенов Денис Васильевич, promasterden@yandex.ru
+
+## Участники проекта
+
+- Беззаборов А.А., КМБО-01-22, antonbezzaborov929@gmail.com - Тимлид
+- Юров П.И., КМБО-01-22, pavel.yurov0425@gmail.com - Программист
+- Куропатов К.Л., КМБО-01-22, konstantinkuropatov@gmail.com - Теоретик
+- Малыш Я.В., КМБО-03-22, mrgeroixyu@gmail.com - Программист
