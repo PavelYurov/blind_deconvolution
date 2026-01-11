@@ -10,6 +10,7 @@
 """
 
 from algorithms.base import DeconvolutionAlgorithm
+from algorithms.octavewrapper import OctaveEngine
 
-__all__ = ['DeconvolutionAlgorithm']
+__all__ = ['DeconvolutionAlgorithm', 'OctaveEngine']
 
