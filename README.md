@@ -212,11 +212,7 @@ blind_deconvolution/
 
 ## Документация
 
-HTML-документация проекта генерируется с помощью **Sphinx** и публикуется на GitHub Pages:
-
-### Онлайн-версия
-
-https://pavelyurov.github.io/blind_deconvolution/
+HTML-документация проекта генерируется с помощью **Sphinx** и публикуется [по ссылке](https://pavelyurov.github.io/blind_deconvolution/):
 
 ### Структура документации
 
