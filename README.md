@@ -73,57 +73,41 @@
 
 ## Установка
 
+1. Установить последнюю версию пакета:
+
 ```bash
-git clone https://github.com/PavelYurov/blind_deconvolution.git
-cd blind_deconvolution
-pip install -r requirements.txt
+pip install git+https://github.com/PavelYurov/blind_deconvolution.git
 ```
 
-### Интерактивный установщик зависимостей (`install.py`)
+Будут установлен пакет `blinddeconv` и остальные зависимости (`numpy`, `scipy`, `opencv-python`, `scikit-image`, и др.)
 
-В репозитории есть интерактивный установщик, который:
-- проверяет версию Python и зависимости до установки;
-- показывает, что уже установлено и что не удовлетворяет требованиям;
-- спрашивает подтверждение и при согласии ставит недостающие пакеты через `pip`;
-- поддерживает удаление зависимостей выбранного профиля.
-
-Профили зависимостей берутся из `pyproject.toml` (секция `[tool.preflight.profiles]`).
-
-**Показать доступные профили:**
-```bash
-python install.py list-profiles
+```py
+import blinddeconv
 ```
 
-**Проверить зависимости (без установки):**
+2. Установка с дополнительными зависимостями:
+
+Включает инструменты для тестирования, линтинга и интерактивной работы (`pytest`, `flake8`, `ipython`, `setuptools`)
+
 ```bash
-python install.py check base
+pip install "git+https://github.com/PavelYurov/blind_deconvolution.git[dev]"
 ```
 
-**Установить недостающие зависимости (интерактивно):**
+Необходимо для генерации документации через Sphinx (`sphinx`, `sphinx-rtd-theme`)
+
 ```bash
-python install.py install base
+pip install "git+https://github.com/PavelYurov/blind_deconvolution.git[docs]"
 ```
 
-**Автоматический режим (без вопросов):**
-```bash
-python install.py install base -y
-```
+Тестирования и документация вместе:
 
-**Удалить зависимости профиля:**
 ```bash
-python install.py uninstall base
-```
-
-**Виртуальное окружение (рекомендуется):**
-при операциях `install/uninstall` скрипт предложит создать/использовать venv (по умолчанию каталог `venv`).
-Можно указать другой каталог:
-```bash
-python install.py --venv .venv install base
+pip install "git+https://github.com/PavelYurov/blind_deconvolution.git[dev,docs]"
 ```
 
 ## Структура проекта
 
-Подробнее об алгоритмах: [Путеводитель по алгоритмам](src/algorithms/README.md)
+Подробнее об алгоритмах: [Путеводитель по алгоритмам](src/blinddeconv/algorithms/README.md)
 
 ```
 blind_deconvolution/
