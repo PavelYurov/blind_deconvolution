@@ -103,7 +103,7 @@ pip install "git+https://github.com/PavelYurov/blind_deconvolution.git[dev,docs]
 
 ## Структура проекта
 
-Подробнее об алгоритмах: [Путеводитель по алгоритмам](src/algorithms/README.md)
+Подробнее об алгоритмах: [Путеводитель по алгоритмам](src/blinddeconv/algorithms/README.md)
 
 ```
 blind_deconvolution/
