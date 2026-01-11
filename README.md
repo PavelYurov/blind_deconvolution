@@ -74,8 +74,8 @@
 ## Установка
 
 ```bash
-git clone https://github.com/PavelYurov/BlindDeconvolution.git
-cd BlindDeconvolution
+git clone https://github.com/PavelYurov/blind_deconvolution.git
+cd blind_deconvolution
 pip install -r requirements.txt
 ```
 
@@ -84,7 +84,7 @@ pip install -r requirements.txt
 Подробнее об алгоритмах: [Путеводитель по алгоритмам](algorithms/README.md)
 
 ```
-BlindDeconvolution/
+blind_deconvolution/
 ├── algorithms/                 # Алгоритмы и обёртки
 │   ├── base.py                 # DeconvolutionAlgorithm
 │   ├── blind_deconvolution/    # Blind deconvolution
