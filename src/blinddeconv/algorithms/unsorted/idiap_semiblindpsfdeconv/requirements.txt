@@ -1,8 +1,0 @@
-Pillow
-matplotlib
-numpy
-pandas
-scikit-image
-scipy
-torch
-torchvision

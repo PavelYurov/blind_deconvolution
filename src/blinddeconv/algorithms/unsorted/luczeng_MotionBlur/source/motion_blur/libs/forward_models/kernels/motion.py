@@ -1,8 +1,5 @@
 import numpy as np
 import math
-import matplotlib.pyplot as plt
-from motion_blur.libs.utils.display_utils import Formatter
-import torch
 
 
 def motion_kernel(theta: float, L: int) -> np.ndarray:
@@ -29,10 +26,10 @@ def motion_kernel(theta: float, L: int) -> np.ndarray:
     if theta > 180 or theta < 0:
         raise ValueError("theta should be between 0 and 180")
 
-    if torch.is_tensor(L):
-        L = L.numpy()
-    if torch.is_tensor(theta):
-        theta = theta.numpy()
+    if isinstance(L, np.ndarray):
+        L = int(L.reshape(-1)[0])
+    if isinstance(theta, np.ndarray):
+        theta = float(theta.reshape(-1)[0])
 
     # Kernel computation
     if L >= 2:
@@ -168,25 +165,5 @@ def line_integral(theta, x, y, pixel_half_width=0.5):
 
 
 if __name__ == "__main__":
-    """
-        Script to visualize the linear motion kernel. Change parameters to see its effects.
-    """
-
-    # Parameters
-    theta = 0
-    L = 2
-
-    # Generate kernel
-    kernel = motion_kernel(theta, L)
-
-    # Visualize
-    x = np.arange(0, L, 1) - (L - 1) / 2
-
-    fig, ax = plt.subplots()
-    im = ax.imshow(kernel, interpolation="none", extent=[x[0], x[-1], x[0], x[-1]])
-
-    ax.format_coord = Formatter(im)
-    if np.abs(np.tan(np.deg2rad(theta)) * L) <= L + 10:
-        ax.plot(x, np.tan(np.deg2rad(theta)) * x, "g")
-
-    plt.show()
+    # Minimal smoke-run
+    motion_kernel(0.0, 3)

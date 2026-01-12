@@ -1,5 +1,0 @@
-param: 'lr'
-min: -5
-max: -2
-n_bins : 4
-

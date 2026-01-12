@@ -127,60 +127,67 @@ pip uninstall blinddeconv
 
 ```
 blind_deconvolution/
-├── src/                        # Исходники Python-пакета
-│   ├── algorithms/             # Алгоритмы и обёртки
-│   │   ├── base.py             # DeconvolutionAlgorithm
-│   │   ├── blind_deconvolution/
-│   │   │   ├── implementations/  # Собственные реализации
-│   │   │   │   ├── bayesian/
-│   │   │   │   ├── classic/
-│   │   │   │   ├── sparse/
-│   │   │   │   └── variational/
-│   │   │   └── external/         # Внешние реализации (много подпроектов)
-│   │   │   	└── ...
-│   │   ├── kernel_estimation/
-│   │   │   └── ...
-│   │   ├── nonblind_deconvolution/
-│   │   │   └── ...
-│   │   ├── unsorted/             # Экспериментальные/черновые алгоритмы (много подпроектов)
-│   │   ├── octavewrapper.py
-│   │   └── __init__.py
-│   ├── filters/                # Генерация искажений (blur/noise/denoise)
-│   │   ├── blur.py
-│   │   ├── noise.py
-│   │   ├── denoise.py
-│   │   ├── distributions.py
-│   │   ├── colored_noise.py
-│   │   ├── smooth.py
-│   │   └── __init__.py
-│   ├── processing/             # Основной функционал пайплайна
-│   │   ├── core.py
-│   │   ├── reader.py
-│   │   ├── restorepipeline.py
-│   │   ├── metrics.py
-│   │   ├── tables.py
-│   │   ├── utils.py
-│   │   └── extensions/         # Расширения пайплайна
-│   │       ├── hyperparameter_optimization.py
-│   │       ├── pareto_analysis.py
-│   │       └── base.py
-│   ├── scripts/                # Вспомогательные скрипты
-│   │   ├── dataset_generator.py
-│   │   └── kernel_generator.py
-│   └── __init__.py
+├── src/                               # Исходники Python-пакета
+│   └── blinddeconv/                   # Python-пакет `blinddeconv`
+│       ├── algorithms/                # Алгоритмы и обёртки
+│       │   ├── base.py                # DeconvolutionAlgorithm
+│       │   ├── blind_deconvolution/
+│       │   │   ├── implementations/   # Собственные реализации
+│       │   │   │   ├── bayesian/
+│       │   │   │   ├── classic/
+│       │   │   │   ├── sparse/
+│       │   │   │   └── variational/
+│       │   │   └── external/          # Внешние реализации (много подпроектов)
+│       │   │       └── ...
+│       │   ├── kernel_estimation/
+│       │   │   └── ...
+│       │   ├── nonblind_deconvolution/
+│       │   │   └── ...
+│       │   ├── octave/                # Octave/Matlab-обвязка
+│       │   │   └── ...
+│       │   ├── unsorted/              # Экспериментальные/черновые алгоритмы (много подпроектов)
+│       │   │   └── ...
+│       │   ├── README.md              # Путеводитель по алгоритмам
+│       │   └── __init__.py
+│       ├── filters/                   # Генерация искажений (blur/noise/denoise)
+│       │   ├── blur.py
+│       │   ├── noise.py
+│       │   ├── denoise.py
+│       │   ├── distributions.py
+│       │   ├── colored_noise.py
+│       │   ├── smooth.py
+│       │   └── __init__.py
+│       ├── processing/                # Основной функционал пайплайна
+│       │   ├── core.py
+│       │   ├── reader.py
+│       │   ├── restorepipeline.py
+│       │   ├── metrics.py
+│       │   ├── tables.py
+│       │   ├── utils.py
+│       │   └── ...
+│       ├── scripts/                   # Вспомогательные скрипты
+│       │   ├── dataset_generator.py
+│       │   ├── kernel_generator.py
+│       │   └── __init__.py
+│       └── __init__.py
 │
-├── install.py                  # Интерактивный установщик зависимостей
-├── docs/                       # Документация (Sphinx) и сборка
-│   ├── source/                 # Sphinx sources
+├── docs/                              # Документация (Sphinx)
+│   ├── source/
 │   │   ├── conf.py
 │   │   └── index.rst
 │   └── tools/
 │       └── build_docs.py
-├── experiments/                # Эксперименты/исследования
-├── images/                     # Примеры изображений/артефакты
-├── tests/                      # Тестовые данные/выходы прогонов
-├── utils/                      # Вспомогательные утилиты
-│   └── preflight/              # Проверки окружения/зависимостей
+├── images/                            # Примеры изображений/артефакты
+│   ├── dataset_bind.json
+│   ├── distorted/
+│   │   └── ...
+│   └── ...
+├── references/                        # PDF-материалы/статьи
+│   └── *.pdf
+├── tests/                             # Тестовые данные/выходы прогонов
+│   └── ...
+├── utils/                             # Вспомогательные утилиты
+│   └── preflight/
 │       ├── __main__.py
 │       ├── config.py
 │       ├── report.py
@@ -188,9 +195,9 @@ blind_deconvolution/
 │           ├── python.py
 │           └── packages.py
 │
-├── requirements.txt            # (если используется) зависимости через pip
-├── pyproject.toml              # Метаданные проекта + профили зависимостей
-├── setup.cfg                   # Конфигурация flake8
+├── requirements.txt
+├── pyproject.toml
+├── setup.cfg
 └── README.md
 ```
 

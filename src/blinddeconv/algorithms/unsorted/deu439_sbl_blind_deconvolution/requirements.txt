@@ -1,5 +1,0 @@
-Pillow
-cvxpy
-matplotlib
-numpy
-scipy
