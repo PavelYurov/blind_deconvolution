@@ -1,4 +1,4 @@
-from algorithms.base import DeconvolutionAlgorithm
+from ....base import DeconvolutionAlgorithm
 import numpy as np
 from scipy.fft import fft2, ifft2, fftshift, ifftshift
 import cv2 as cv

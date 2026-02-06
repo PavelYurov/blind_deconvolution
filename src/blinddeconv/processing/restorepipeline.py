@@ -268,7 +268,7 @@ class ModuleProcessPipeline(ModuleProcess):
         )
         
         kernel_path = generate_unique_file_path(
-            self.processing.folder_path_restored,
+            self.processing.kernel_dir,
             f"{blurred_basename}_{alg_name}_kernel{ext}"
         )
         
