@@ -29,28 +29,34 @@ extensions = [
     "sphinx.ext.napoleon",      # Поддержка NumPy/Google style docstrings
     "sphinx.ext.viewcode",      # Ссылки на исходный код
     "sphinx.ext.intersphinx",   # Ссылки на внешнюю документацию
-    "myst_parser",              # Поддержка Markdown через MyST
 ]
 
-# MyST-Parser configuration 
+# MyST-Parser: поддержка Markdown (.md) файлов в Sphinx
+# Если myst-parser не установлен — Sphinx соберёт только .rst файлы
+try:
+    import myst_parser  # noqa: F401
+    extensions.append("myst_parser")
 
-# Поддерживаемые форматы файлов
-source_suffix = {
-    ".rst": "restructuredtext",
-    ".md": "markdown",
-}
+    # Поддерживаемые форматы файлов
+    source_suffix = {
+        ".rst": "restructuredtext",
+        ".md": "markdown",
+    }
 
-# Расширения MyST для расширенного Markdown
-myst_enable_extensions = [
-    "colon_fence",          # ::: вместо ``` для директив
-    "deflist",              # Списки определений
-    "fieldlist",            # Списки полей
-    "tasklist",             # Чекбоксы [ ] / [x]
-    "substitution",         # Подстановки {{ }}
-]
+    # Расширения MyST для расширенного Markdown
+    myst_enable_extensions = [
+        "colon_fence",          # ::: вместо ``` для директив
+        "deflist",              # Списки определений
+        "fieldlist",            # Списки полей
+        "tasklist",             # Чекбоксы [ ] / [x]
+        "substitution",         # Подстановки {{ }}
+    ]
 
-# Глубина автоматической генерации якорей для заголовков
-myst_heading_anchors = 3
+    # Глубина автоматической генерации якорей для заголовков
+    myst_heading_anchors = 3
+
+except ImportError:
+    pass  # .md файлы будут пропущены, соберутся только .rst
 
 # Napoleon settings для NumPy-style docstrings
 napoleon_google_docstring = False
