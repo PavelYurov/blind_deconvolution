@@ -4,7 +4,7 @@
 
 Методы сгруппированы по типу подхода
 
-### `blind_deconvolution/implementations/`
+### `blind_deconvolution/our company/`
 
 #### `classic/` — классические итеративные методы. [Описание](blind_deconvolution/implementations/classic/README.md)
 
@@ -33,7 +33,7 @@
 
 Алгоритмы, заимствованные из внешних репозиториев
 
-### `blind_deconvolution/external/`
+### `blind_deconvolution/third party company/`
 
 - [`BYchao100_Graph_Based_Blind_Image_Deblurring`](blind_deconvolution/external/BYchao100_Graph_Based_Blind_Image_Deblurring) — [repo](https://github.com/BYchao100/Graph-Based-Blind-Image-Deblurring/), graph-based blind deblurring (оценка PSF через графовую модель/регуляризацию) [8][35]
 - [`KanuGaba_Image_Deblurrer`](blind_deconvolution/external/KanuGaba_Image_Deblurrer) — [repo](https://github.com/KanuGaba/Image-Deblurrer/), Wiener deconvolution (не слепая, motion PSF `LEN/THETA`) [1]
