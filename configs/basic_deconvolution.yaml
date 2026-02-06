@@ -46,13 +46,13 @@ processing:
 # ─── Алгоритмы восстановления ────────────────────────────────────────────────
 # Можно указать краткое имя из реестра или полный путь модуля + имя класса
 algorithms:
-  - name: "vabid"
+  - name: "hqmbr"
     params:
-      max_iter: 100
-      kernel_size: 21
+      predict_psf: [[0,0,1],[0,1,0],[1,0,0]]
+      MAX_ITER: 3
 
 # ─── Генерация отчёта ────────────────────────────────────────────────────────
 report:
-  generate: false
+  generate: true
   format: "latex"
   output_path: "results/report.tex"

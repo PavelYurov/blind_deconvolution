@@ -11,7 +11,7 @@
 """
 import time
 import numpy as np
-from ...base import DeconvolutionAlgorithm
+from ....base import DeconvolutionAlgorithm
 
 from .convolve import create_line_psf, gradient
 from .deblur import computeLocalPrior, updatePsi, computeL, updatef, save_mask_as_image
@@ -27,7 +27,8 @@ class HQMBR(DeconvolutionAlgorithm):
         'lambda2': 25, # [10, 25]
         'k2': 1.5,
     }
-    def __init__(self, predict_psf, 
+    def __init__(self,
+                 predict_psf, 
                  MAX_ITER = 5, 
                  gamma=2, 
                  lambda1=0.5, 
@@ -54,6 +55,7 @@ class HQMBR(DeconvolutionAlgorithm):
         self.PHI_THRESHOLD = PHI_THRESHOLD
         self.MAX_ITER = MAX_ITER
         self.predict_psf = predict_psf
+
         self.inner_iter = inner_iter
         self.gamma = gamma
 

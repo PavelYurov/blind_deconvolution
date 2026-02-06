@@ -126,6 +126,13 @@ ALGORITHM_REGISTRY: Dict[str, Dict[str, str]] = {
         "description": "Компрессивная байесовская деконволюция",
         "category": "sparse",
     },
+    "hqmbr": {
+        "module": "blinddeconv.algorithms.nonblind_deconvolution"
+                  ".third_party_company.HQMotionBlurRestoration.HQMBR",
+        "class_name": "HQMBR",
+        "description": "111",
+        "category": "111",
+    },
 }
 
 FILTER_REGISTRY: Dict[str, Dict[str, Any]] = {
@@ -754,7 +761,7 @@ def generate_latex_report(
     \item \textbf{{Время запуска:}} {start_time.strftime('%d.%m.%Y %H:%M:%S')}
     \item \textbf{{Время завершения:}} {end_time.strftime('%d.%m.%Y %H:%M:%S')}
     \item \textbf{{Длительность:}} {duration:.1f} сек.
-    \item \textbf{{Режим:}} {config.get('processing', {{}}).get('mode', 'process')}
+    \item \textbf{{Режим:}} {config.get('processing', {}).get('mode', 'process')}
     \item \textbf{{Цветовой режим:}} {{'Цветной' if config.get('input', {{}}).get('color', False) else 'Ч/Б'}}
     \item \textbf{{Директория результатов:}} \verb|{results_dir}|
 \end{{itemize}}
@@ -773,7 +780,7 @@ def generate_latex_report(
 Результаты сохранены в директории \verb|{results_dir}|.
 
 Для детального анализа используйте CSV-таблицы в директории
-\verb|{config.get('output', {{}}).get('data_folder', 'data')}|.
+\verb|{config.get('output', {}).get('data_folder', 'data')}|.
 
 \end{{document}}
 """
