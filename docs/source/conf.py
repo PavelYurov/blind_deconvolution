@@ -4,6 +4,10 @@
 Использование:
     sphinx-apidoc -o . ..
     sphinx-build -b html . _build/html
+
+Поддерживает:
+    - reStructuredText (.rst) через встроенные парсеры Sphinx
+    - Markdown (.md) через MyST-Parser
 """
 
 import os
@@ -14,18 +18,39 @@ sys.path.insert(0, os.path.abspath("../../src"))
 # -- Project information -----------------------------------------------------
 
 project = "BlindDeconvolution"
-copyright = "2024, Юров П.И., Беззаборов А.А., Куропатов К.Л., Малыш Я.В."
+copyright = "2024-2026, Юров П.И., Беззаборов А.А., Куропатов К.Л., Малыш Я.В."
 author = "Юров П.И., Беззаборов А.А., Куропатов К.Л., Малыш Я.В."
 release = "1.0.0"
 
 # -- General configuration ---------------------------------------------------
 
 extensions = [
-    "sphinx.ext.autodoc",  # Автодокументация из docstrings
-    "sphinx.ext.napoleon",  # Поддержка NumPy/Google style docstrings
-    "sphinx.ext.viewcode",  # Ссылки на исходный код
-    "sphinx.ext.intersphinx",  # Ссылки на внешнюю документацию
+    "sphinx.ext.autodoc",       # Автодокументация из docstrings
+    "sphinx.ext.napoleon",      # Поддержка NumPy/Google style docstrings
+    "sphinx.ext.viewcode",      # Ссылки на исходный код
+    "sphinx.ext.intersphinx",   # Ссылки на внешнюю документацию
+    "myst_parser",              # Поддержка Markdown через MyST
 ]
+
+# -- MyST-Parser configuration -----------------------------------------------
+
+# Поддерживаемые форматы файлов
+source_suffix = {
+    ".rst": "restructuredtext",
+    ".md": "markdown",
+}
+
+# Расширения MyST для расширенного Markdown
+myst_enable_extensions = [
+    "colon_fence",          # ::: вместо ``` для директив
+    "deflist",              # Списки определений
+    "fieldlist",            # Списки полей
+    "tasklist",             # Чекбоксы [ ] / [x]
+    "substitution",         # Подстановки {{ }}
+]
+
+# Глубина автоматической генерации якорей для заголовков
+myst_heading_anchors = 3
 
 # Napoleon settings для NumPy-style docstrings
 napoleon_google_docstring = False
@@ -70,4 +95,12 @@ autodoc_mock_imports = [
     "matlab",
     "matlab.engine",
 ]
+
+# -- Options for intersphinx -------------------------------------------------
+
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy/", None),
+}
 
