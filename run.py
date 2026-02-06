@@ -130,8 +130,8 @@ ALGORITHM_REGISTRY: Dict[str, Dict[str, str]] = {
         "module": "blinddeconv.algorithms.nonblind_deconvolution"
                   ".third_party_company.HQMotionBlurRestoration.HQMBR",
         "class_name": "HQMBR",
-        "description": "111",
-        "category": "111",
+        "description": "High-Quality Motion Blur Restoration",
+        "category": "nonblind",
     },
 }
 
@@ -864,9 +864,7 @@ def run_pipeline(
 
     start_time = datetime.datetime.now()
     exp_name = config.get("experiment", {}).get("name", "Эксперимент")
-    logger.info("=" * 60)
     logger.info("Запуск: %s", exp_name)
-    logger.info("=" * 60)
 
     # Извлечение параметров
     input_cfg = config.get("input", {})
@@ -966,7 +964,6 @@ def run_pipeline(
         logger.warning("Не загружено ни одного изображения!")
         return {"status": "no_images", "config": config}
 
-    # ── Запуск обработки ─────────────────────────────────────────
     if mode == "full_process":
         logger.info("Запуск полного пайплайна (full_process)...")
         filter_chains = create_filter_chains(config.get("filters", []))
@@ -989,9 +986,7 @@ def run_pipeline(
 
     end_time = datetime.datetime.now()
     duration = (end_time - start_time).total_seconds()
-    logger.info("=" * 60)
     logger.info("Обработка завершена за %.1f сек.", duration)
-    logger.info("=" * 60)
 
     # Экспорт метаданных
     export_metadata(config, results_dir, start_time, end_time)

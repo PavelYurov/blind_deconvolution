@@ -584,15 +584,12 @@ def view_config(config_path: str, fmt: str) -> None:
     output_cfg = config.get("output", {})
     processing_cfg = config.get("processing", {})
 
-    # Общая информация
-    click.echo("\n" + "=" * 60)
+    click.echo()
     click.echo(f"  {exp.get('name', 'Без имени')}")
-    click.echo("=" * 60)
     if exp.get("description"):
         click.echo(f"  {exp['description']}")
     click.echo()
 
-    # Параметры ввода
     input_headers = ["Параметр", "Значение"]
     input_rows = [
         ["Папка изображений", input_cfg.get("images_folder", "---")],
@@ -622,8 +619,7 @@ def view_config(config_path: str, fmt: str) -> None:
     else:
         click.echo(_format_table(["Параметр", "Путь"], output_rows))
 
-    # Обработка
-    click.echo("\n  ОБРАБОТКА:")
+    click.echo("\n  Обработка:")
     proc_rows = [
         ["Режим", processing_cfg.get("mode", "process")],
         ["Метаданные",
@@ -690,10 +686,7 @@ def interactive(ctx: click.Context) -> None:
     Пошагово задаёт вопросы для настройки и запуска пайплайна.
     Подходит для новичков.
     """
-    click.echo("=" * 60)
-    click.echo("  Интерактивный режим настройки эксперимента")
-    click.echo("=" * 60)
-    click.echo()
+    click.echo("Интерактивный режим настройки эксперимента\n")
 
     # Эксперимент
     exp_name = click.prompt(
@@ -854,10 +847,7 @@ def interactive(ctx: click.Context) -> None:
     if gen_report:
         config["report"]["output_path"] = f"{output_dir}/report.tex"
 
-    # Предпросмотр 
-    click.echo("\n" + "=" * 60)
-    click.echo("  Конфигурация:")
-    click.echo("=" * 60)
+    click.echo("\nИтоговая конфигурация:")
     click.echo(json.dumps(config, ensure_ascii=False, indent=2))
 
     # Сохранение / Запуск
