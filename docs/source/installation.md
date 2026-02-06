@@ -9,51 +9,55 @@
 | ОЗУ | 4 ГБ | 8+ ГБ |
 | Диск | 500 МБ | 2+ ГБ (с данными) |
 
-## Установка пакета
+---
 
-### Способ 1: Установка из GitHub (рекомендуется)
+## Установка
+
+1. Установить последнюю версию пакета:
 
 ```bash
 pip install git+https://github.com/PavelYurov/blind_deconvolution.git
 ```
 
-Будут установлены основные зависимости: `numpy`, `scipy`, `opencv-python`, `scikit-image`, `pandas`, `matplotlib`, `pyyaml`, `jsonschema` и др.
+Будут установлен пакет `blinddeconv` и остальные зависимости (`numpy`, `scipy`, `opencv-python`, `scikit-image`, и др.)
 
-```python
+```py
 import blinddeconv
-from blinddeconv.processing import Processing
 ```
 
-### Способ 2: Установка для разработки (editable mode)
+2. Установка с дополнительными зависимостями:
+
+Включает инструменты для тестирования, линтинга и интерактивной работы (`pytest`, `flake8`, `ipython`, `setuptools`)
 
 ```bash
-git clone https://github.com/PavelYurov/blind_deconvolution.git
-cd blind_deconvolution
-pip install -e .
+pip install "git+https://github.com/PavelYurov/blind_deconvolution.git[dev]"
 ```
 
-### Способ 3: Через install.py (интерактивный установщик)
-
-Скрипт `scripts/install.py` предоставляет интерактивный установщик с профилями:
+Включает CLI-интерфейс и автоматизацию (`click`, `pyyaml`, `jsonschema`)
 
 ```bash
-# Просмотр доступных профилей
-python scripts/install.py list-profiles
-
-# Проверка установленных зависимостей
-python scripts/install.py check base
-
-# Установка базового профиля
-python scripts/install.py install base
-
-# Установка с автоподтверждением
-python scripts/install.py install base -y
+pip install "git+https://github.com/PavelYurov/blind_deconvolution.git[cli]"
 ```
 
-Установщик автоматически:
-- определяет виртуальное окружение (или предлагает создать);
-- проверяет уже установленные пакеты;
-- устанавливает только недостающие.
+Необходимо для генерации документации через Sphinx (`sphinx`, `sphinx-rtd-theme`)
+
+```bash
+pip install "git+https://github.com/PavelYurov/blind_deconvolution.git[docs]"
+```
+
+Всё вместе:
+
+```bash
+pip install "git+https://github.com/PavelYurov/blind_deconvolution.git[cli,dev,docs]"
+```
+
+## Удаление
+
+```bash
+pip uninstall blinddeconv
+```
+
+---
 
 ## Профили зависимостей
 
@@ -75,21 +79,66 @@ pip install ".[cli,dev]"
 pip install ".[cli,dev,docs,full]"
 ```
 
-## Зависимости для CLI и автоматизации
+---
 
-Для работы `run.py` и `cli.py` необходимы дополнительные пакеты:
+## Интерактивное развертывание окружения
 
+### Интерактивный установщик зависимостей (`install.py`)
+
+Скрипт обеспечивает автоматизированную настройку рабочего окружения. Основные функции:
+- создает и настраивает виртуальное окружение (по умолчанию `.venv`);
+- проверяет совместимость версии Python и наличие системных библиотек;
+- разрешает зависимости указанного профиля из `pyproject.toml` (секция `[tool.preflight.profiles]`);
+- устанавливает недостающие пакеты и регистрирует их в файле состояния `.dependency_state.json`.
+
+**Показать доступные профили:**
 ```bash
-pip install pyyaml jsonschema click
+python install.py list-profiles
 ```
 
-Или через профиль:
-
+**Проверить статус зависимостей (без установки):**
 ```bash
-pip install ".[cli]"
+python install.py check base
 ```
 
-## Настройка виртуального окружения
+**Установить зависимости профиля (интерактивно):**
+```bash
+python install.py install base
+```
+
+**Автоматический режим (без запросов подтверждения):**
+```bash
+python install.py install base -y
+```
+
+**Указание пути к виртуальному окружению:**
+Скрипт автоматически использует указанное окружение (создает его при отсутствии).
+```bash
+python install.py --venv my_env install base
+```
+
+### Интерактивное удаление зависимостей (`uninstall.py`)
+
+Скрипт выполняет безопасное удаление пакетов, опираясь на историю установок (`.dependency_state.json`). Алгоритм учитывает пересечения зависимостей между профилями:
+- удаляет пакеты, относящиеся *только* к выбранному профилю;
+- сохраняет пакеты, которые используются другими активными профилями;
+- поддерживает полную очистку окружения.
+
+**Удалить зависимости конкретного профиля:**
+```bash
+python uninstall.py base
+```
+*Пример: если пакет `numpy` используется и в профиле `base`, и в профиле `dev`, то при удалении `base` пакет `numpy` останется в системе.*
+
+**Полная очистка (сброс проекта):**
+Удаляет каталог виртуального окружения и файл истории установок.
+```bash
+python uninstall.py --clean-all
+```
+
+---
+
+## Настройка виртуального окружения (вручную)
 
 ```bash
 # Создание
@@ -104,6 +153,8 @@ source .venv/bin/activate
 # Установка проекта
 pip install -e ".[cli,dev]"
 ```
+
+---
 
 ## Опциональные зависимости
 
@@ -123,6 +174,8 @@ pip install -e ".[cli,dev]"
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 ```
 
+---
+
 ## Проверка установки
 
 ```python
@@ -136,11 +189,7 @@ p = Processing(images_folder="images/original", color=False)
 print("Установка прошла успешно!")
 ```
 
-## Удаление
-
-```bash
-pip uninstall blinddeconv
-```
+---
 
 ## Решение проблем
 
