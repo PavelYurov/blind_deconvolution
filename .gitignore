@@ -145,6 +145,7 @@ Desktop.ini
 /main6.ipynb
 /extensions.py
 /prompt.txt
+/.dependency_state.json
 
 # Лишние медиа
 /algorithms/**/*.png
