@@ -20,6 +20,11 @@ optuna
 # GUI & visualization
 matplotlib
 
+# CLI & automation
+click
+pyyaml
+jsonschema
+
 # Development tools
 setuptools
 ipython
