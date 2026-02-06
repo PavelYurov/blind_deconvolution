@@ -15,14 +15,14 @@ import sys
 
 sys.path.insert(0, os.path.abspath("../../src"))
 
-# -- Project information -----------------------------------------------------
+# Project information 
 
 project = "BlindDeconvolution"
 copyright = "2024-2026, Юров П.И., Беззаборов А.А., Куропатов К.Л., Малыш Я.В."
 author = "Юров П.И., Беззаборов А.А., Куропатов К.Л., Малыш Я.В."
 release = "1.0.0"
 
-# -- General configuration ---------------------------------------------------
+# General configuration
 
 extensions = [
     "sphinx.ext.autodoc",       # Автодокументация из docstrings
@@ -32,7 +32,7 @@ extensions = [
     "myst_parser",              # Поддержка Markdown через MyST
 ]
 
-# -- MyST-Parser configuration -----------------------------------------------
+# MyST-Parser configuration 
 
 # Поддерживаемые форматы файлов
 source_suffix = {
@@ -66,7 +66,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 # Язык документации
 language = "ru"
 
-# -- Options for HTML output -------------------------------------------------
+# Options for HTML output 
 
 html_theme = "sphinx_rtd_theme"  # Read the Docs тема (pip install sphinx-rtd-theme)
 html_static_path = ["_static"]
@@ -77,7 +77,7 @@ try:
 except ImportError:
     html_theme = "alabaster"
 
-# -- Options for autodoc -----------------------------------------------------
+# Options for autodoc 
 
 autodoc_default_options = {
     "members": True,
@@ -96,7 +96,7 @@ autodoc_mock_imports = [
     "matlab.engine",
 ]
 
-# -- Options for intersphinx -------------------------------------------------
+# Options for intersphinx
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
