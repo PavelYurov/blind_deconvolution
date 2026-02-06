@@ -30,7 +30,6 @@ BlindDeconvolution Documentation
    :caption: Разработка
 
    CONTRIBUTING
-   CHANGELOG
 
 .. toctree::
    :maxdepth: 4

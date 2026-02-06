@@ -217,6 +217,5 @@ blind_deconvolution/
 | [Поток данных](docs/source/data_flow.md) | Схемы `process` и `full_process`, формат `dataset.json` |
 | [API Reference](docs/source/api_reference.md) | Полная справка по классам, методам и функциям |
 | [Для разработчиков](docs/source/CONTRIBUTING.md) | Стандарты кода, добавление алгоритмов/фильтров, Git-конвенции, сборка документации, линтинг |
-| [История изменений](docs/source/CHANGELOG.md) | Версии и список изменений |
 
 Собранная HTML-документация: [pavelyurov.github.io/blind_deconvolution](https://pavelyurov.github.io/blind_deconvolution/)
