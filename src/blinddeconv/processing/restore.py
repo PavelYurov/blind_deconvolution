@@ -129,7 +129,7 @@ class ModuleProcess:
             )
             
             kernel_path = generate_unique_file_path(
-                self.processing.folder_path_restored,
+                self.processing.kernel_dir,
                 f"{base_name}_{alg_name}_kernel{base_path.suffix}"
             )
         else:
@@ -163,7 +163,9 @@ class ModuleProcess:
         img_obj.add_kernel(str(kernel_path), blurred_ref, alg_name)
 
         if metadata:
-            metadata_path = os.path.splitext(restored_path)[0] + '.json'
+            metadata_name = Path(restored_path).stem + '.json'
+            metadata_path = self.processing.data_path / metadata_name
+            print(f"ХУЙ: {metadata_path}")
 
             data = dict()
             data['original'] = img_obj.get_original()
@@ -179,7 +181,7 @@ class ModuleProcess:
             data['restored psnr'] = psnr_val
             data['restored ssim'] = ssim_val
             data['algorithm parametrs'] = processor.get_param()
-            print(data)
+            # print(data)
             with open(metadata_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
 

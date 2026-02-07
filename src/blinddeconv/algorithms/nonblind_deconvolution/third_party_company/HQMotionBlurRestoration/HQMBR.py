@@ -54,7 +54,7 @@ class HQMBR(DeconvolutionAlgorithm):
         self.L_THRESHOLD = L_THRESHOLD
         self.PHI_THRESHOLD = PHI_THRESHOLD
         self.MAX_ITER = MAX_ITER
-        self.predict_psf = predict_psf
+        self.predict_psf = np.array(predict_psf)
 
         self.inner_iter = inner_iter
         self.gamma = gamma
