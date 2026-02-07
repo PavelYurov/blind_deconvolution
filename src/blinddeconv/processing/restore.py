@@ -165,7 +165,6 @@ class ModuleProcess:
         if metadata:
             metadata_name = Path(restored_path).stem + '.json'
             metadata_path = self.processing.data_path / metadata_name
-            print(f"ХУЙ: {metadata_path}")
 
             data = dict()
             data['original'] = img_obj.get_original()
