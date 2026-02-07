@@ -994,9 +994,15 @@ def run_pipeline(
     # Генерация отчёта
     should_generate = generate_report or report_cfg.get("generate", False)
     if should_generate:
-        report_path = Path(
-            report_cfg.get("output_path", str(results_dir / "report.tex"))
-        )
+        # report_path = Path(
+        #     report_cfg.get("output_path", str(results_dir / "report.tex"))
+        # )
+        yaml_output_path = report_cfg.get("output_path")
+        if output_dir:
+            filename = Path(yaml_output_path).name if yaml_output_path else "report.tex"
+            report_path = results_dir / filename
+        else:
+            report_path = Path(yaml_output_path) if yaml_output_path else results_dir / "report.tex"
         logger.info("Генерация LaTeX-отчёта: %s", report_path)
         generate_latex_report(config, results_dir, report_path,
                               start_time, end_time)
