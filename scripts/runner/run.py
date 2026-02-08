@@ -29,7 +29,19 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 # Path configuration
-_PROJECT_ROOT = Path(__file__).resolve().parent
+
+def _find_project_root(start: Path) -> Path:
+    path = start.resolve()
+
+    while not (path / "pyproject.toml").exists():
+        if path.parent == path:
+            raise RuntimeError("Cannot locate project root")
+        path = path.parent
+
+    return path
+
+_CURRENT_FILE = Path(__file__).resolve()
+_PROJECT_ROOT = _find_project_root(_CURRENT_FILE)
 _SRC_DIR = _PROJECT_ROOT / "src"
 _ALGORITHMS_DIR = _SRC_DIR / "blinddeconv" / "algorithms"
 
