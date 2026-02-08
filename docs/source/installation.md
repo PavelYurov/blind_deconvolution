@@ -166,6 +166,23 @@ pip install -e ".[cli,dev]"
 2. Убедитесь, что `octave` доступен в `PATH`
 3. Установите Python-обёртку: `pip install oct2py`
 
+#### Настройка пути к Octave через `.env`
+
+Модуль `blinddeconv.system.octave` использует `pydantic-settings` и автоматически читает файл `.env` из корня проекта. Если исполняемый файл Octave не находится в `PATH`, создайте `.env`:
+
+```dotenv
+# .env (в корне проекта)
+OCTAVE_EXECUTABLE=C:\Program Files\GNU Octave\mingw64\bin\octave-cli.exe
+```
+
+На Linux/macOS:
+
+```dotenv
+OCTAVE_EXECUTABLE=/usr/local/bin/octave-cli
+```
+
+Если переменная не задана, система попытается найти `octave-cli` или `octave` через `shutil.which()`. При неудаче будет выведено предупреждение, но остальной функционал фреймворка продолжит работать.
+
 ### CUDA / GPU (для нейросетевых методов)
 
 Для алгоритмов на базе PyTorch:

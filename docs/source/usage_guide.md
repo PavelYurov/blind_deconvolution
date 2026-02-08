@@ -340,6 +340,44 @@ _CLI_COMPLETE=fish_source python cli.py | source
 
 ---
 
+## Сборка документации (`docs/tools/build_docs.py`)
+
+Утилита `build_docs.py` автоматизирует генерацию HTML-документации из исходного кода и Markdown-файлов.
+
+### Требования
+
+```bash
+pip install ".[docs]"
+```
+
+### Запуск
+
+```bash
+python docs/tools/build_docs.py
+```
+
+Скрипт выполняет два шага:
+1. **Генерация API** — вызывает `sphinx-apidoc --separate` для создания `.rst` файлов из docstrings модулей в `src/`. Все существующие `.rst` (кроме `index.rst`) удаляются и пересоздаются.
+2. **Сборка HTML** — вызывает `sphinx-build -b html` для компиляции документации в `docs/_build/html/`.
+
+Результат: `docs/_build/html/index.html`.
+
+### Ручная сборка
+
+Если нужен контроль над отдельными шагами:
+
+```bash
+sphinx-apidoc --separate -o docs/source src/
+sphinx-build -b html docs/source docs/_build/html
+```
+
+### Важно
+
+- Скрипт удаляет и пересоздаёт все `.rst` файлы в `docs/source/` (кроме `index.rst`) — не храните ручные правки в автогенерируемых `.rst`.
+- Markdown-файлы (`.md`) в `docs/source/` включаются через MyST-Parser автоматически и не затрагиваются.
+
+---
+
 ## Использование как Python-библиотеки
 
 ### Восстановление одного изображения

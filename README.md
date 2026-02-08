@@ -32,7 +32,7 @@
 Проект построен по модульному принципу с центральным классом-фасадом `Processing`:
 
 ```
-Processing (фасад)
+Processing (facade)
 ├── reader          — загрузка изображений, создание связей
 ├── display         — визуализация результатов
 ├── apply_filter    — применение фильтров (blur, noise, denoise)
@@ -56,49 +56,73 @@ Processing (фасад)
 
 ---
 
-## Быстрый старт
+## Начало работы
 
-### Установка
+### 1. Клонирование и настройка окружения
+
+```bash
+git clone https://github.com/PavelYurov/blind_deconvolution.git
+cd blind_deconvolution
+
+python -m venv .venv
+
+# Windows PowerShell
+.venv\Scripts\Activate.ps1
+
+# Linux / macOS
+source .venv/bin/activate
+```
+
+### 2. Установка
+
+```bash
+# Базовая установка
+pip install -e .
+
+# С CLI-интерфейсом (run.py, cli.py)
+pip install -e ".[cli]"
+
+# Для разработки
+pip install -e ".[cli,dev,docs]"
+```
+
+Альтернативный способ — без клонирования:
 
 ```bash
 pip install git+https://github.com/PavelYurov/blind_deconvolution.git
 ```
 
-### Использование как Python-библиотеки
+### 3. Использование
+
+**Как Python-библиотека:**
 
 ```python
 from blinddeconv.processing import Processing
-from blinddeconv.algorithms.blind_deconvolution.our_company.variational.vabid import VABID
+from blinddeconv.algorithms.task_type.company_type.algorithm_type.algorithm_name import algorithm_class
 
-# Создаём фреймворк
 proc = Processing(images_folder="images/original", color=False)
 
 # Связываем оригинал с искажённым
 proc.bind("images/original/airplane.png",
-          "images/distorted/airplane_blurred.png",
-          "images/kernel_data/kernel.npy",
-          "gaussian_blur")
+          "images/distorted/airplane_blurred.png")
 
 # Восстанавливаем
-proc.process(VABID(max_iter=100, kernel_size=21), metadata=True)
+proc.process(algorithm, metadata=True)
 
 # Визуализация
 proc.show()
 ```
 
-### Использование через CLI
+**Через CLI (запуск в виртуальном окружении):**
 
 ```bash
-# Установка CLI-зависимостей
-pip install pyyaml jsonschema click
-
 # Запуск по конфигурационному файлу
 python run.py --config configs/basic_deconvolution.yaml
 
 # Быстрая обработка одного изображения
 python cli.py process --input image.jpg --algorithm vabid
 
-# Интерактивный режим
+# Интерактивный мастер настройки
 python cli.py interactive
 ```
 
@@ -110,94 +134,86 @@ python cli.py interactive
 
 ```
 blind_deconvolution/
-├── src/                               # Исходники Python-пакета
-│   └── blinddeconv/                   # Python-пакет `blinddeconv`
-│       ├── algorithms/                # Алгоритмы и обёртки
-│       │   ├── base.py                # DeconvolutionAlgorithm
-│       │   ├── blind_deconvolution/
-│       │   │   ├── our_company/       # Собственные реализации
+├── src/                                 # Исходники Python-пакета
+│   └── blinddeconv/                     # Python-пакет blinddeconv
+│       ├── algorithms/                  # Алгоритмы и обёртки
+│       │   ├── base.py                  # DeconvolutionAlgorithm (ABC)
+│       │   ├── blind_deconvolution/     # Алгоритмы восстановления изображений вслепую
+│       │   │   ├── our_company/         # Собственные реализации
 │       │   │   │   ├── bayesian/
 │       │   │   │   ├── classic/
 │       │   │   │   ├── sparse/
 │       │   │   │   └── variational/
-│       │   │   └── third_party_company/  # Внешние реализации
-│       │   │       └── ...
-│       │   ├── kernel_estimation/
-│       │   │   └── ...
-│       │   ├── nonblind_deconvolution/
-│       │   │   └── ...
-│       │   ├── octave/                # Octave/Matlab-обвязка
-│       │   │   └── ...
-│       │   ├── unsorted/              # Экспериментальные алгоритмы
-│       │   │   └── ...
-│       │   ├── README.md              # Путеводитель по алгоритмам
-│       │   └── __init__.py
-│       ├── filters/                   # Генерация искажений (blur/noise/denoise)
-│       │   ├── blur.py
-│       │   ├── noise.py
-│       │   ├── denoise.py
-│       │   ├── distributions.py
-│       │   ├── colored_noise.py
-│       │   ├── smooth.py
-│       │   └── __init__.py
-│       ├── processing/                # Основной функционал пайплайна
-│       │   ├── core.py
-│       │   ├── reader.py
-│       │   ├── restorepipeline.py
-│       │   ├── metrics.py
-│       │   ├── tables.py
-│       │   ├── utils.py
-│       │   └── ...
-│       ├── scripts/                   # Вспомогательные скрипты
-│       │   ├── dataset_generator.py
-│       │   ├── kernel_generator.py
-│       │   └── __init__.py
-│       └── __init__.py
+│       │   │   └── third_party_company/
+│       │   ├── nonblind_deconvolution/  # Алгоритмы восстановления с известным PSF
+│       │   ├── kernel_estimation/       # Алгоритмы оценки PSF
+│       │   ├── unsorted/                # Экспериментальные
+│       │   └── README.md                # Путеводитель по алгоритмам
+│       ├── filters/                     # Генерация искажений
+│       │   ├── base.py                  # FilterBase (ABC)
+│       │   ├── blur.py                  # DefocusBlur, MotionBlur, и др.
+│       │   ├── noise.py                 # GaussianNoise, PoissonNoise, и др.
+│       │   ├── smooth.py                # MeanBlur, GaussianBlur, и др.
+│       │   └── distributions.py         # PSF-функции
+│       ├── processing/                  # Ядро фреймворка
+│       │   ├── core.py                  # Processing (фасад)
+│       │   ├── utils.py                 # Image, утилиты
+│       │   ├── metrics.py               # PSNR, SSIM
+│       │   ├── reader.py                # Загрузка изображений
+│       │   ├── display.py               # Визуализация
+│       │   ├── applyfilter.py           # Применение фильтров
+│       │   ├── restore.py               # Восстановление (один алгоритм)
+│       │   ├── restorepipeline.py       # Полный пайплайн восстановления
+│       │   ├── preprocessing.py         # Выравнивание гистограмм
+│       │   ├── tables.py                # Экспорт в CSV-таблицы
+│       │   ├── clear.py                 # Очистка
+│       │   └── extensions/              # Расширения
+│       │       ├── base.py
+│       │       ├── hyperparameter_optimization.py
+│       │       └── pareto_analysis.py
+│       ├── system/                      # Служебные модули
+│       │   ├── octave/                  # Octave/MATLAB-обвязка
+│       │   │   ├── octaveconfig.py
+│       │   │   └── octavewrapper.py
+│       │   └── cython/                
+│       └── scripts/                     # Генераторы данных
+│           ├── dataset_generator.py
+│           └── kernel_generator.py
 │
-├── configs/                           # Конфигурационные файлы
-│   ├── basic_deconvolution.yaml       # Базовый пример
-│   ├── medical_imaging.yaml           # Для медицинских изображений
-│   ├── satellite_images.yaml          # Для спутниковых снимков
-│   └── experiment_template.json       # Полный шаблон (JSON)
+├── scripts/                             # Утилиты проекта
+│   ├── install.py                       # Интерактивный установщик
+│   └── uninstall.py                     # Интерактивное удаление
 │
-├── run.py                             # Автоматизация по конфигам
-├── cli.py                             # CLI-интерфейс
+├── configs/                             # Конфигурационные файлы
+│   ├── basic_deconvolution.yaml         # Базовый пример (YAML)
+│   ├── ...
+│   └── experiment_template.json         # Полный шаблон (JSON)
+├── run.py                               # Автоматизация по конфигам
+├── cli.py                               # CLI-интерфейс
 │
-├── docs/                              # Документация (Sphinx + Markdown)
+├── docs/                                # Документация (Sphinx + Markdown)
 │   ├── source/
 │   │   ├── conf.py
 │   │   ├── index.rst
-│   │   ├── installation.md
-│   │   ├── usage_guide.md
-│   │   ├── configuration.md
-│   │   ├── architecture.md
-│   │   ├── data_flow.md
-│   │   ├── api_reference.md
-│   │   ├── CONTRIBUTING.md
-│   │   ├── CHANGELOG.md
-│   │   └── theory/
+│   │   └── *.md                         # Markdown-документация
 │   └── tools/
-│       └── build_docs.py
-├── images/                            # Примеры изображений/артефакты
+│       └── build_docs.py                # Сборка документации
+│
+├── images/                              # Примеры изображений/искажения
 │   ├── dataset_bind.json
 │   ├── distorted/
 │   │   └── ...
 │   └── ...
-├── references/                        # PDF-материалы/статьи
+├── references/                          # PDF-материалы/статьи
 │   └── *.pdf
-├── tests/                             # Тестовые данные/выходы прогонов
+├── tests/                               # Тестовые данные/выходы прогонов
 │   └── ...
-├── utils/                             # Вспомогательные утилиты
-│   └── preflight/
-│       ├── __main__.py
-│       ├── config.py
-│       ├── report.py
+├── utils/                               # Вспомогательные утилиты
+│   └── preflight/                       # Проверка зависимостей
+│       ├── config.py, report.py
 │       └── checks/
-│           ├── python.py
-│           └── packages.py
-│
-├── requirements.txt
 ├── pyproject.toml
+├── requirements.txt
 ├── setup.cfg
 └── README.md
 ```
@@ -210,12 +226,12 @@ blind_deconvolution/
 
 | Раздел | Описание |
 |--------|----------|
-| [Установка и настройка](docs/source/installation.md) | Все способы установки, профили зависимостей, интерактивный установщик, виртуальное окружение |
-| [Руководство пользователя](docs/source/usage_guide.md) | `run.py`, `cli.py`, все команды и аргументы, примеры Python-кода |
+| [Установка и настройка](docs/source/installation.md) | Все способы установки, профили зависимостей, интерактивный установщик, настройка Octave |
+| [Руководство пользователя](docs/source/usage_guide.md) | `run.py`, `cli.py`, все команды, примеры Python-кода, сборка документации |
 | [Конфигурационные файлы](docs/source/configuration.md) | Полная структура YAML/JSON-конфигов, валидация, реестры алгоритмов и фильтров |
 | [Архитектура системы](docs/source/architecture.md) | Компоненты, паттерны проектирования, организация модулей |
-| [Поток данных](docs/source/data_flow.md) | Схемы `process` и `full_process`, формат `dataset.json` |
+| [Поток данных](docs/source/data_flow.md) | Схемы `process` и `full_process`, `bind()`, `filter()`, формат `dataset.json` |
 | [API Reference](docs/source/api_reference.md) | Полная справка по классам, методам и функциям |
-| [Для разработчиков](docs/source/CONTRIBUTING.md) | Стандарты кода, добавление алгоритмов/фильтров, Git-конвенции, сборка документации, линтинг |
+| [Для разработчиков](docs/source/CONTRIBUTING.md) | Стандарты кода, добавление алгоритмов/фильтров, Git-конвенции, линтинг |
 
 Собранная HTML-документация: [pavelyurov.github.io/blind_deconvolution](https://pavelyurov.github.io/blind_deconvolution/)
