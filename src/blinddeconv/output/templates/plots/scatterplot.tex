@@ -1,0 +1,28 @@
+\begin{tikzpicture}
+    \begin{axis}[
+        title={\VAR{ title }},
+        xlabel={\VAR{ xlabel }},
+        ylabel={\VAR{ ylabel }},
+        grid=major,
+        legend pos=outer north east,
+        scatter/classes={
+            a={mark=o,draw=blue},
+            b={mark=square,draw=red}
+        }
+    ]
+    
+    \BLOCK{ for group in groups }
+    \addplot[
+        scatter,
+        only marks,
+        mark=*,
+        mark size=2.5pt
+    ]
+    coordinates {
+        \VAR{ group.coords }
+    };
+    \addlegendentry{\VAR{ group.name }}
+    \BLOCK{ endfor }
+    
+    \end{axis}
+\end{tikzpicture}

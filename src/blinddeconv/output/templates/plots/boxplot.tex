@@ -1,0 +1,27 @@
+\begin{tikzpicture}
+    \begin{axis}[
+        title={\VAR{ title }},
+        ylabel={\VAR{ ylabel }},
+        xtick={ \VAR{ xtick_indices } },
+        xticklabels={ \VAR{ xtick_labels } },
+        % xticklabel style={rotate=45, anchor=east},
+        xticklabel style={align=center},
+        boxplot/draw direction=y,
+        grid=major,
+        cycle list name=color list,
+    ]
+    
+    \BLOCK{ for plot in plots }
+    \addplot+[
+        boxplot prepared={
+            median=\VAR{ plot.median },
+            upper quartile=\VAR{ plot.q3 },
+            lower quartile=\VAR{ plot.q1 },
+            upper whisker=\VAR{ plot.max },
+            lower whisker=\VAR{ plot.min }
+        },
+    ] coordinates {};
+    \BLOCK{ endfor }
+    
+    \end{axis}
+\end{tikzpicture}

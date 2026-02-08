@@ -9,6 +9,7 @@ import cv2 as cv
 from pathlib import Path
 import json
 from typing import Tuple, Any
+import math
 
 from .utils import (
     Image,
@@ -167,13 +168,25 @@ class ModuleProcess:
             metadata_path = self.processing.data_path / metadata_name
 
             data = dict()
-            data['original'] = img_obj.get_original()
+            try:
+                data['original'] = img_obj.get_original()
+            except:
+                raise Exception("no original found during metadata collection")
             blurred_path = img_obj.get_blurred()
             data['blurred'] = blurred_path
             data['filter'] = img_obj.get_current_filter()
-            data['blurred kernel'] = img_obj.get_original_kernels()[blurred_path]
-            data['blurred psnr'] = img_obj.get_blurred_PSNR()[blurred_path]
-            data['blurred ssim'] = img_obj.get_blurred_SSIM()[blurred_path]
+            try:
+                data['blurred kernel'] = img_obj.get_original_kernels()[blurred_path]
+            except:
+                data['blurred kernel'] = ""
+            try:
+                data['blurred psnr'] = img_obj.get_blurred_PSNR()[blurred_path]
+            except:
+                data['blurred psnr'] = math.nan
+            try:
+                data['blurred ssim'] = img_obj.get_blurred_SSIM()[blurred_path]
+            except:
+                data['blurred ssim'] = math.nan
             data['algorithm'] = alg_name
             data['restored'] = str(restored_path)
             data['restored kernel'] = str(kernel_path)
