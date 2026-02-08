@@ -1,11 +1,12 @@
 """
-Интерфейс командной строки для быстрых операций слепой деконволюции.
+Интерфейс командной строки (CLI) на основе Click для фреймворка Blind Image Deconvolution.
 
-Предоставляет набор команд для обработки изображений, управления
-конфигурациями и интерактивной работы с фреймворком.
+Предоставляет команды для обработки отдельных изображений, выполнения пайплайнов 
+по конфигурационным файлам, управления конфигурациями и интерактивной настройки экспериментов.
 
-Использование:
-    python cli.py process --input image.jpg --algorithm vabid --iterations 100
+Использование::
+
+    python cli.py process --input image.jpg --algorithm vabid
     python cli.py run --config experiment.yaml
     python cli.py generate-config --template medical --output my_config.yaml
     python cli.py view-config experiment.yaml
@@ -13,14 +14,11 @@
     python cli.py list-algorithms
     python cli.py list-filters
 
-Автодополнение (bash):
-    eval "$(_CLI_COMPLETE=bash_source python cli.py)"
+Автодополнение в shell::
 
-Автодополнение (zsh):
-    eval "$(_CLI_COMPLETE=zsh_source python cli.py)"
-
-Автодополнение (fish):
-    _CLI_COMPLETE=fish_source python cli.py | source
+    eval "$(_CLI_COMPLETE=bash_source python cli.py)"   # bash
+    eval "$(_CLI_COMPLETE=zsh_source python cli.py)"    # zsh
+    _CLI_COMPLETE=fish_source python cli.py | source    # fish
 
 Автор: Беззаборов А.А.
 """
@@ -33,7 +31,7 @@ import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-# Настройка путей
+# Path configuration
 _PROJECT_ROOT = Path(__file__).resolve().parent
 _SRC_DIR = _PROJECT_ROOT / "src"
 _ALGORITHMS_DIR = _SRC_DIR / "blinddeconv" / "algorithms"
@@ -59,7 +57,7 @@ try:
 except ImportError:
     HAS_YAML = False
 
-# Импорт из run.py
+# Imports from run.py
 from run import (
     ALGORITHM_REGISTRY,
     FILTER_REGISTRY,
@@ -75,7 +73,7 @@ from run import (
 logger = logging.getLogger("blinddeconv.cli")
 
 
-# Шаблоны конфигураций
+# Configuration templates
 
 CONFIG_TEMPLATES: Dict[str, Dict[str, Any]] = {
     "basic": {
@@ -206,7 +204,7 @@ CONFIG_TEMPLATES: Dict[str, Dict[str, Any]] = {
 }
 
 
-# Утилиты форматирования
+# Formatting utilities
 
 def _format_table(headers: List[str], rows: List[List[str]],
                   col_widths: Optional[List[int]] = None) -> str:
@@ -288,7 +286,7 @@ def _format_table_latex(headers: List[str],
     )
 
 
-# Главная группа команд
+# Main command group
 
 @click.group(
     context_settings={"help_option_names": ["-h", "--help"]},
@@ -847,7 +845,7 @@ def interactive(ctx: click.Context) -> None:
     if gen_report:
         config["report"]["output_path"] = f"{output_dir}/report.tex"
 
-    click.echo("\nИтоговая конфигурация:")
+    click.echo("\nКонфигурация:")
     click.echo(json.dumps(config, ensure_ascii=False, indent=2))
 
     # Сохранение / Запуск
@@ -980,7 +978,7 @@ def list_filters(fmt: str) -> None:
         click.echo(f"  • {name}")
 
 
-# Точка входа
+# Entry point
 
 if __name__ == "__main__":
     cli()

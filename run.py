@@ -1,11 +1,12 @@
 """
-Главный скрипт автоматизации пайплайна слепой деконволюции.
+Конфигурационно-управляемый исполнитель пайплайнов обработки изображений для системы слепой деконволюции.
 
-Запускает полный цикл обработки изображений по конфигурационному файлу:
-загрузка конфига → валидация → создание пайплайна → обработка →
-сохранение результатов → генерация отчёта.
+Выполняет полный цикл обработки изображений из YAML/JSON конфигурационного файла:
+загрузка конфига, валидация, построение пайплайна, обработка изображений, 
+сохранение результатов и опциональная генерация LaTeX отчётов.
 
-Использование:
+Использование::
+
     python run.py --config configs/experiment.yaml
     python run.py --config configs/experiment.yaml --output-dir results/
     python run.py --config configs/experiment.yaml --generate-report
@@ -27,17 +28,17 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-# Настройка путей импорта 
+# Path configuration
 _PROJECT_ROOT = Path(__file__).resolve().parent
 _SRC_DIR = _PROJECT_ROOT / "src"
 _ALGORITHMS_DIR = _SRC_DIR / "blinddeconv" / "algorithms"
 
-# Добавляем src/ для импорта blinddeconv и algorithms/ для from base import
+# Extend sys.path for package discovery
 for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
-# Опциональные зависимости 
+# Optional dependencies
 try:
     import yaml
     HAS_YAML = True
@@ -54,7 +55,7 @@ except ImportError:
 logger = logging.getLogger("blinddeconv.run")
 
 
-# Реестры алгоритмов, фильтров и PSF-функций
+# Algorithm, filter, and PSF registries
 ALGORITHM_REGISTRY: Dict[str, Dict[str, str]] = {
     "richardson_lucy": {
         "module": "blinddeconv.algorithms.blind_deconvolution"
@@ -213,7 +214,7 @@ PSF_REGISTRY: Dict[str, str] = {
 }
 
 
-# JSON Schema для валидации конфигурации
+# JSON Schema for configuration validation
 
 CONFIG_SCHEMA: Dict[str, Any] = {
     "type": "object",
@@ -318,7 +319,7 @@ CONFIG_SCHEMA: Dict[str, Any] = {
 }
 
 
-# Загрузка и валидация конфигурации
+# Configuration loading and validation
 
 def load_config(config_path: Union[str, Path]) -> Dict[str, Any]:
     """
@@ -463,7 +464,7 @@ def validate_config(config: Dict[str, Any]) -> List[str]:
     return errors
 
 
-# Динамический импорт модулей
+# Dynamic module import
 
 def _import_class(module_path: str, class_name: str) -> type:
     """
@@ -534,7 +535,7 @@ def _import_class(module_path: str, class_name: str) -> type:
     return getattr(module, class_name)
 
 
-# Фабрики алгоритмов и фильтров
+# Algorithm and filter factories
 
 def create_algorithm(algo_config: Dict[str, Any]) -> Any:
     """
@@ -691,7 +692,7 @@ def create_filter_chains(
     return chains
 
 
-# Генерация LaTeX-отчёта
+# LaTeX report generation
 
 def generate_latex_report(
     config: Dict[str, Any],
@@ -792,7 +793,7 @@ def generate_latex_report(
     logger.info("LaTeX-отчёт сохранён: %s", output_path)
 
 
-# Экспорт метаданных эксперимента
+# Experiment metadata export
 
 def export_metadata(
     config: Dict[str, Any],
@@ -833,7 +834,7 @@ def export_metadata(
     logger.info("Метаданные сохранены: %s", metadata_path)
 
 
-# Основной пайплайн
+# Main pipeline
 
 def run_pipeline(
     config: Dict[str, Any],
@@ -1016,7 +1017,7 @@ def run_pipeline(
     }
 
 
-# Настройка логирования
+# Logging setup
 
 def setup_logging(verbose: bool = False) -> None:
     """
@@ -1046,7 +1047,7 @@ def setup_logging(verbose: bool = False) -> None:
     logging.getLogger("PIL").setLevel(logging.WARNING)
 
 
-# Точка входа (CLI)
+# CLI entry point
 
 def parse_args() -> argparse.Namespace:
     """
