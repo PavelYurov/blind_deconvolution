@@ -2,13 +2,24 @@
 \usepackage[utf8]{inputenc}
 \usepackage[T2A]{fontenc}
 \usepackage[russian]{babel}
+\usepackage{pgfplots}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
 \usepackage{graphicx}
 \usepackage{booktabs}
-\usepackage{pgfplots}
+\usepackage{geometry}
+\geometry{a4paper, margin=2cm}
 \pgfplotsset{compat=1.17}
+\usepackage{titlesec}
+
+\titleformat{\section}
+  {\centering\normalfont\bfseries}
+  {\thesection.}
+  {1em}
+  {}
 
 \title{\VAR{ title }}
-\author{\VAR{ author }}
 \date{\today}
 
 \begin{document}

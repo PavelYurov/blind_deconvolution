@@ -4,7 +4,6 @@ import pandas as pd
 from typing import Dict, Optional, List, Union
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from .tables import dataframe_to_latex
-from .plotting import prepare_boxplot_data, prepare_scatter_data
 
 logger = logging.getLogger(__name__)
 
@@ -65,84 +64,67 @@ class LatexExporter:
             raise
 
     def save_plot(self, df: pd.DataFrame, plot_type: str, filename: str, **kwargs):
+        pass
+
+    def generate_report(self, report_name: str, content_order: List[Dict]):
         """
-        Генерирует график pgfplots.
+        Главный метод сборки.
         
         Args:
-            df: DataFrame с данными.
-            plot_type: 'boxplot' или 'scatter'.
-            filename: Имя выходного файла (без расширения).
-            **kwargs: Параметры графика (x_col, y_col, title, ylabel и т.д.)
+            report_name: имя файла (report.pdf)
+            content_order: Список словарей, описывающих структуру.
+            Пример:
+            [
+                {'type': 'text', 'content': 'Введение...'},
+                {'type': 'include', 'file': 'table_summary'},
+                {'type': 'include', 'file': 'visuals_best'},
+            ]
         """
-        context = {}
-        template_name = ""
+        sections_tex = ""
+        
+        for item in content_order:
+            if item['type'] == 'section':
+                sections_tex += f"\\section{{{item['title']}}}\n"
+            elif item['type'] == 'subsection':
+                sections_tex += f"\\subsection{{{item['title']}}}\n"
+            elif item['type'] == 'text':
+                sections_tex += f"{item['content']}\n\n"
+            elif item['type'] == 'include':
+                filename = item['file'].replace('.tex', '')
+                sections_tex += f"\\input{{{filename}}}\n"
+            elif item['type'] == 'raw':
+                sections_tex += f"{item['content']}\n"
+                
+        context = {
+            'title': "Report",
+            'content': sections_tex
+        }
+        
+        template = self.env.get_template("base_report.tex")
+        rendered = template.render(**context)
+        self._write_file(f"{report_name}.tex", rendered)
 
-        if plot_type == 'boxplot':
-            # Ожидаем: value_col (что меряем), group_col (кто меряет)
-            value_col = kwargs.get('value_col', 'psnr')
-            group_col = kwargs.get('group_col', 'algorithm')
-            
-            data = prepare_boxplot_data(df, value_col, group_col)
-            context = {
-                'title': kwargs.get('title', f'Distribution of {value_col}'),
-                'ylabel': kwargs.get('ylabel', value_col.upper()),
-                'plots': data['plots'],
-                'xtick_indices': data['xtick_indices'],
-                'xtick_labels': data['xtick_labels']
-            }
-            template_name = "plots/boxplot.tex"
+    def _write_file(self, filename, content):
+        with open(os.path.join(self.output_dir, filename), "w", encoding="utf-8") as f:
+            f.write(content)
 
-        elif plot_type == 'scatter':
-            x_col = kwargs.get('x_col', 'time')
-            y_col = kwargs.get('y_col', 'psnr')
-            group_col = kwargs.get('group_col', 'algorithm')
-            
-            groups = prepare_scatter_data(df, x_col, y_col, group_col)
-            context = {
-                'title': kwargs.get('title', f'{y_col} vs {x_col}'),
-                'xlabel': kwargs.get('xlabel', x_col),
-                'ylabel': kwargs.get('ylabel', y_col),
-                'groups': groups
-            }
-            template_name = "plots/scatterplot.tex"
-            
-        else:
-            raise ValueError(f"Unknown plot type: {plot_type}")
-
+    def save_visuals(self, context: Dict, filename: str):
+        """
+        Рендерит блок визуального сравнения через шаблон visuals.tex.
+        
+        Args:
+            context: Словарь данных (результат prepare_visual_comparison_data)
+            filename: Имя выходного файла (без расширения)
+        """
         try:
-            template = self.env.get_template(template_name)
+            template = self.env.get_template("visuals.tex")
             rendered_tex = template.render(**context)
             
             output_path = os.path.join(self.output_dir, f"{filename}.tex")
             with open(output_path, "w", encoding="utf-8") as f:
                 f.write(rendered_tex)
-            logger.info(f"Plot saved: {output_path}")
+            logger.info(f"Visuals saved: {output_path}")
             
         except Exception as e:
-            logger.error(f"Failed to generate plot {filename}: {e}")
-            raise
-
-    def generate_report(self, report_name: str, template_name: str, context: Dict):
-        """
-        Генерирует полный отчет на основе шаблона.
-        
-        Args:
-            report_name: Имя выходного файла (без расширения).
-            template_name: Имя файла шаблона (например, 'article.tex').
-            context: Словарь данных для подстановки в шаблон.
-        """
-        try:
-            template = self.env.get_template(template_name)
-            rendered_tex = template.render(**context)
-            
-            output_path = os.path.join(self.output_dir, f"{report_name}.tex")
-            
-            with open(output_path, "w", encoding="utf-8") as f:
-                f.write(rendered_tex)
-                
-            logger.info(f"Report generated successfully: {output_path}")
-            return output_path
-            
-        except Exception as e:
-            logger.error(f"Failed to generate report: {e}")
+            logger.error(f"Failed to save visuals {filename}: {e}")
             raise

@@ -1,5 +1,5 @@
-from exporter import LatexExporter
-from src.blinddeconv.output.tables import (
+from .exporter import LatexExporter
+from .tables import (
     prepare_summary_table, 
     prepare_comparison_pivot,
     prepare_params_table
