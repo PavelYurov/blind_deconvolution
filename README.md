@@ -38,7 +38,7 @@
 
 ---
 
-## Начало работы
+## Техническое описание
 
 ### 1. Клонирование репозитория и настройка окружения
 
@@ -88,8 +88,8 @@ from blinddeconv.algorithms.task_type.company_type.algorithm_type.algorithm_name
 proc = Processing(images_folder="images/original", color=False)
 
 # Связывание оригинального и искажённого изображений
-proc.bind("images/original/airplane.png",
-          "images/distorted/airplane_blurred.png")
+proc.bind("images/original/image.png",
+          "images/distorted/image_blurred.png")
 
 # Восстановление изображения
 proc.process(ALGORITHM, metadata=True)
@@ -103,8 +103,8 @@ proc.show()
 Все команды выполняются в активированном виртуальном окружении:
 
 ```bash
-Запуск с использованием конфигурационного файла
-python run.py --config configs/config_name.yaml
+# Запуск полного пайплайна с использованием конфигурации
+python run.py --config configs/experiment.yaml
 
 # Быстрая обработка одного изображения
 python cli.py process \
@@ -214,16 +214,16 @@ blind_deconvolution/
 
 ## Подробная документация
 
-Полная документация доступна в `docs/source/` (читается на GitHub, собирается через Sphinx):
+Полная документация доступна в `docs/source/`:
 
 | Раздел | Описание |
 |--------|----------|
-| [Установка и настройка](docs/source/installation.md) | Все способы установки, профили зависимостей, интерактивный установщик, настройка Octave |
+| [Установка и настройка](docs/source/installation.md) | Все способы установки, профили зависимостей, интерактивный установщик, настройка Octave, Cython |
 | [Руководство пользователя](docs/source/usage_guide.md) | `run.py`, `cli.py`, все команды, примеры Python-кода, сборка документации |
 | [Конфигурационные файлы](docs/source/configuration.md) | Полная структура YAML/JSON-конфигов, валидация, реестры алгоритмов и фильтров |
 | [Архитектура системы](docs/source/architecture.md) | Компоненты, паттерны проектирования, организация модулей |
 | [Поток данных](docs/source/data_flow.md) | Схемы `process` и `full_process`, `bind()`, `filter()`, формат `dataset.json` |
 | [API Reference](docs/source/api_reference.md) | Полная справка по классам, методам и функциям |
-| [Для разработчиков](docs/source/CONTRIBUTING.md) | Стандарты кода, добавление алгоритмов/фильтров, Git-конвенции, линтинг |
+| [Для разработчиков](docs/source/CONTRIBUTING.md) | Стандарты кода, добавление алгоритмов/фильтров, линтинг |
 
 Собранная HTML-документация: [pavelyurov.github.io/blind_deconvolution](https://pavelyurov.github.io/blind_deconvolution/)
