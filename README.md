@@ -40,7 +40,7 @@
 
 ## Начало работы
 
-### 1. Клонирование и настройка окружения
+### 1. Клонирование репозитория и настройка окружения
 
 ```bash
 git clone https://github.com/PavelYurov/blind_deconvolution.git
@@ -55,20 +55,22 @@ python -m venv .venv
 source .venv/bin/activate
 ```
 
-### 2. Установка
+### 2. Установка пакета
 
 ```bash
-# Базовая установка
+# Базовая установка (минимальные зависимости)
 pip install -e .
 
-# С CLI-интерфейсом (run.py, cli.py)
+# С поддержкой CLI-интерфейса (run.py, cli.py)
 pip install -e ".[cli]"
 
-# Для разработки
+# Для разработки (все зависимости и инструменты разработки)
 pip install -e ".[cli,dev,docs]"
 ```
 
-Альтернативный способ — без клонирования:
+**Альтернативный способ — без клонирования**
+
+Если вам нужна только библиотека без исходного кода:
 
 ```bash
 pip install git+https://github.com/PavelYurov/blind_deconvolution.git
@@ -76,36 +78,44 @@ pip install git+https://github.com/PavelYurov/blind_deconvolution.git
 
 ### 3. Использование
 
-**Как Python-библиотека:**
+**В качестве Python-библиотеки**
 
 ```python
 from blinddeconv.processing import Processing
-from blinddeconv.algorithms.task_type.company_type.algorithm_type.algorithm_name import algorithm_class
+from blinddeconv.algorithms.task_type.company_type.algorithm_type.algorithm_name import ALGORITHM
 
+# Инициализация обработчика
 proc = Processing(images_folder="images/original", color=False)
 
-# Связываем оригинал с искажённым
+# Связывание оригинального и искажённого изображений
 proc.bind("images/original/airplane.png",
           "images/distorted/airplane_blurred.png")
 
-# Восстанавливаем
-proc.process(algorithm, metadata=True)
+# Восстановление изображения
+proc.process(ALGORITHM, metadata=True)
 
 # Визуализация
 proc.show()
 ```
 
-**Через CLI (запуск в виртуальном окружении):**
+**Через командную строку (CLI)**
+
+Все команды выполняются в активированном виртуальном окружении:
 
 ```bash
-# Запуск по конфигурационному файлу
-python run.py --config configs/basic_deconvolution.yaml
+Запуск с использованием конфигурационного файла
+python run.py --config configs/config_name.yaml
 
 # Быстрая обработка одного изображения
-python cli.py process --input image.jpg --algorithm vabid
+python cli.py process \
+  --input image.jpg \
+  --algorithm algorithm_name
 
 # Интерактивный мастер настройки
 python cli.py interactive
+
+# Просмотр доступных команд
+python cli.py --help
 ```
 
 ---
