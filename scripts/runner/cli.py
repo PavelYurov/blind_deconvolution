@@ -341,10 +341,15 @@ def cli(ctx: click.Context, verbose: bool) -> None:
 @click.option("--params", "-p", default=None,
               help='Параметры алгоритма в формате JSON, например: '
                    '\'{"max_iter": 100, "kernel_size": 21}\'')
+@click.option("--save-table", is_flag=True, default=False,
+              help="Сохранить CSV-таблицу с метриками после обработки.")
+@click.option("--table-name", default="metrics.csv",
+              help="Имя файла таблицы (сохраняется в output-dir/data/).")
 @click.pass_context
 def process(ctx: click.Context, input_path: str, algo_name: str,
             blurred_path: Optional[str], kernel_path: Optional[str],
-            output_dir: str, color: bool, params: Optional[str]) -> None:
+            output_dir: str, color: bool, params: Optional[str],
+            save_table: bool, table_name: str) -> None:
     """
     Быстрая обработка одного изображения.
 
@@ -380,16 +385,18 @@ def process(ctx: click.Context, input_path: str, algo_name: str,
         sys.exit(1)
 
     # Настройка Processing
-    images_folder = str(Path(input_path).parent)
-    actual_blurred = blurred_path or input_path
+    out_path = Path(output_dir)
+    restored_path = out_path / "restored"
+    data_path = out_path / "data"
+    kernel_out_path = out_path / "kernels"
 
     p = Processing(
-        images_folder=images_folder,
-        blurred_folder=str(Path(actual_blurred).parent),
-        restored_folder=str(Path(output_dir) / "restored"),
-        data_path=str(Path(output_dir) / "data"),
+        images_folder=str(Path(input_path).parent),
+        blurred_folder=str(Path(blurred_path or input_path).parent),
+        restored_folder=str(restored_path),
+        data_path=str(data_path),
         color=color,
-        kernel_dir=str(Path(output_dir) / "kernels"),
+        kernel_dir=str(kernel_out_path),
     )
 
     # Связывание изображений
@@ -418,6 +425,20 @@ def process(ctx: click.Context, input_path: str, algo_name: str,
     elapsed = (datetime.datetime.now() - start).total_seconds()
 
     click.echo(f"Обработка завершена за {elapsed:.1f} сек.")
+
+    if save_table:
+        # Убедимся, что папка data существует
+        data_path.mkdir(parents=True, exist_ok=True)
+        
+        target_csv = data_path / table_name
+        click.echo(f"Сохранение таблицы метрик: {target_csv}")
+        
+        try:
+            # Вызов метода processing.get_table()
+            p.get_table(target_csv, display_table=False)
+        except Exception as e:
+            click.echo(f"Ошибка при сохранении таблицы: {e}", err=True)
+
     click.echo(f"Результаты: {output_dir}/")
 
 
@@ -989,6 +1010,80 @@ def list_filters(fmt: str) -> None:
     for name in sorted(PSF_REGISTRY.keys()):
         click.echo(f"  • {name}")
 
+@cli.command()
+@click.option("--data-dir", "-d", required=True,
+              type=click.Path(exists=True),
+              help="Папка с данными (где лежит analysis_data.csv).")
+@click.option("--output", "-o", default="report.tex",
+              help="Имя выходного файла.")
+def report(data_dir: str, output: str) -> None:
+    """
+    Генерация отчета по уже существующим данным (без запуска обработки).
+    """
+    from blinddeconv.output.exporter import LatexExporter
+    from blinddeconv.output.data_loader import load_data
+    from blinddeconv.output.tables import (
+        prepare_summary_improvement_table,
+        prepare_detailed_comparison,
+        prepare_best_worst_table
+    )
+    
+    data_path = Path(data_dir)
+    # Ищем CSV
+    csv_path = data_path / "analysis_data.csv"
+    if not csv_path.exists():
+        csv_files = list(data_path.glob("*.csv"))
+        if not csv_files:
+            click.echo(f"Ошибка: CSV файлы не найдены в {data_path}", err=True)
+            sys.exit(1)
+        csv_path = csv_files[0]
+        click.echo(f"Используем файл: {csv_path.name}")
+
+    # Настройка путей
+    output_p = Path(output)
+    if output_p.is_absolute():
+        report_dir = output_p.parent
+        report_name = output_p.stem
+    else:
+        # Если путь относительный, сохраняем рядом с данными (на уровень выше data)
+        report_dir = data_path.parent
+        report_name = output_p.stem
+    
+    click.echo(f"Генерация отчета в: {report_dir}")
+    exporter = LatexExporter(output_dir=str(report_dir))
+
+    try:
+        df = load_data(str(csv_path))
+        
+        # 1. Таблицы
+        summary = prepare_summary_improvement_table(df)
+        exporter.save_table(summary, "tab_summary_gain", caption="Сводная статистика")
+        
+        bw_psnr = prepare_best_worst_table(df, metric='psnr')
+        exporter.save_table(bw_psnr, "tab_best_worst_psnr", caption="Экстремумы PSNR")
+        
+        if 'ssim_improvement' in df.columns:
+            bw_ssim = prepare_best_worst_table(df, metric='ssim')
+            exporter.save_table(bw_ssim, "tab_best_worst_ssim", caption="Экстремумы SSIM")
+            
+        det_psnr = prepare_detailed_comparison(df, metric='psnr')
+        exporter.save_table(det_psnr, "tab_detailed_psnr", caption="Детально (PSNR)")
+        
+        # 2. Структура
+        struct = [
+            {'type': 'section', 'title': 'Результаты (Standalone Report)'},
+            {'type': 'text', 'content': f'Отчет сгенерирован вручную из {csv_path.name}'},
+            {'type': 'include', 'file': 'tab_summary_gain'},
+            {'type': 'include', 'file': 'tab_best_worst_psnr'},
+            {'type': 'include', 'file': 'tab_detailed_psnr'},
+        ]
+        
+        exporter.generate_report(report_name, struct)
+        click.echo(f"Готово! {report_dir / (report_name + '.tex')}")
+        
+    except Exception as e:
+        click.echo(f"Ошибка: {e}", err=True)
+        sys.exit(1)
 
 # Entry point
 
