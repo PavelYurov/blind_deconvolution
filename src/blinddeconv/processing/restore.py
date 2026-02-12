@@ -9,6 +9,7 @@ import cv2 as cv
 from pathlib import Path
 import json
 from typing import Tuple, Any
+import math
 
 from .utils import (
     Image,
@@ -129,7 +130,7 @@ class ModuleProcess:
             )
             
             kernel_path = generate_unique_file_path(
-                self.processing.folder_path_restored,
+                self.processing.kernel_dir,
                 f"{base_name}_{alg_name}_kernel{base_path.suffix}"
             )
         else:
@@ -163,23 +164,36 @@ class ModuleProcess:
         img_obj.add_kernel(str(kernel_path), blurred_ref, alg_name)
 
         if metadata:
-            metadata_path = os.path.splitext(restored_path)[0] + '.json'
+            metadata_name = Path(restored_path).stem + '.json'
+            metadata_path = self.processing.data_path / metadata_name
 
             data = dict()
-            data['original'] = img_obj.get_original()
+            try:
+                data['original'] = img_obj.get_original()
+            except:
+                raise Exception("no original found during metadata collection")
             blurred_path = img_obj.get_blurred()
             data['blurred'] = blurred_path
             data['filter'] = img_obj.get_current_filter()
-            data['blurred kernel'] = img_obj.get_original_kernels()[blurred_path]
-            data['blurred psnr'] = img_obj.get_blurred_PSNR()[blurred_path]
-            data['blurred ssim'] = img_obj.get_blurred_SSIM()[blurred_path]
+            try:
+                data['blurred kernel'] = img_obj.get_original_kernels()[blurred_path]
+            except:
+                data['blurred kernel'] = ""
+            try:
+                data['blurred psnr'] = img_obj.get_blurred_PSNR()[blurred_path]
+            except:
+                data['blurred psnr'] = math.nan
+            try:
+                data['blurred ssim'] = img_obj.get_blurred_SSIM()[blurred_path]
+            except:
+                data['blurred ssim'] = math.nan
             data['algorithm'] = alg_name
             data['restored'] = str(restored_path)
             data['restored kernel'] = str(kernel_path)
             data['restored psnr'] = psnr_val
             data['restored ssim'] = ssim_val
             data['algorithm parametrs'] = processor.get_param()
-            print(data)
+            # print(data)
             with open(metadata_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
 

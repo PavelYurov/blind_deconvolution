@@ -27,99 +27,98 @@
 - **Построение многомерных Парето-фронтов** для анализа компромиссов между качеством и производительностью
 - **Систематическая оценка** устойчивости алгоритмов к шумам и смазам
 
-## Функциональность фреймворка
+### Функциональность фреймворка
 
-### Обработка изображений
+- **Обработка**: монохромные и цветные изображения (JPEG, BMP, PNG), пакетная обработка
+- **Генерация искажений**: расфокус, motion blur, B-spline траектории, гауссов/пуассонов/импульсный шум
+- **Методы восстановления**: классические, байесовские, вариационные, разреженные
+- **Метрики качества**: PSNR, SSIM, SML, Sharpness
+- **Оптимизация**: байесовская (TPE, GP), случайный поиск, NSGA-II
+- **Визуализация**: 3D Парето-фронты, сравнительный анализ, тепловые карты
 
-- Поддержка монохромных и цветных изображений (JPEG, BMP, PNG)
-- Пакетная обработка групп изображений
-- Автоматизация экспериментального конвейера
+---
 
-### Генерация искажений
+## Техническое описание
 
-- **Типы размытия**:
-  - Расфокус (2D гауссово ядро)
-  - Motion blur (1D линейное ядро)
-  - Комбинированные смазы (B-spline траектории)
-- **Типы шумов**:
-  - Гауссов шум
-  - Пуассонов шум
-  - Импульсный шум (salt & pepper)
+### 1. Клонирование репозитория и настройка окружения
 
-### Методы восстановления
+```bash
+git clone https://github.com/PavelYurov/blind_deconvolution.git
+cd blind_deconvolution
 
-- **Классические алгоритмы** (blind deconvolution) и регуляризационные подходы
-- **Оценка ядра размытия** (kernel estimation): слепые методы оценки PSF
-- **Non-blind deconvolution**: восстановление с известным ядром
+python -m venv .venv
 
-## Система оценки
+# Windows PowerShell
+.venv\Scripts\Activate.ps1
 
-- **Метрики качества**: PSNR, SSIM
-- **Производительность**: время выполнения
+# Linux / macOS
+source .venv/bin/activate
+```
 
-## Автоматическая оптимизация гиперпараметров
+### 2. Установка пакета
 
-### Методы оптимизации
+```bash
+# Базовая установка (минимальные зависимости)
+pip install -e .
 
-- **Байесовская оптимизация** c Gаussіаn Рrосеssеs
-- **Эвoлюциoнныe aлгopитмы**  (Gеnеtіс Аlgоrіthms)
-- **Случайный поиск** с адаптивным распределением
+# С поддержкой CLI-интерфейса (run.py, cli.py)
+pip install -e ".[cli]"
 
-### Оптимизируемые параметры
+# Для разработки (все зависимости и инструменты разработки)
+pip install -e ".[cli,dev,docs]"
+```
 
-Для каждого алгоритма определено пространство поиска гиперпараметров:
-- **Регуляризационные параметры**
-- **Количество итераций** и пороги сходимости
-- **Размеры ядер** размытия
-- **Параметры шумоподавления**
+**Альтернативный способ — без клонирования**
 
-## Визуализация
-
-### Многомерные Парето-фронты
-
-- **3D визуализация**: качество, сложность смаза, уровень шума
-- **Сравнительный анализ** производительности алгоритмов
-- **Анализ чувствительности** параметров к различным типам искажений
-
-## Установка
-
-1. Установить последнюю версию пакета:
+Если вам нужна только библиотека без исходного кода:
 
 ```bash
 pip install git+https://github.com/PavelYurov/blind_deconvolution.git
 ```
 
-Будут установлен пакет `blinddeconv` и остальные зависимости (`numpy`, `scipy`, `opencv-python`, `scikit-image`, и др.)
+### 3. Использование
 
-```py
-import blinddeconv
+**В качестве Python-библиотеки**
+
+```python
+from blinddeconv.processing import Processing
+from blinddeconv.algorithms.task_type.company_type.algorithm_type.algorithm_name import ALGORITHM
+
+# Инициализация обработчика
+proc = Processing(images_folder="images/original", color=False)
+
+# Связывание оригинального и искажённого изображений
+proc.bind("images/original/image.png",
+          "images/distorted/image_blurred.png")
+
+# Восстановление изображения
+proc.process(ALGORITHM, metadata=True)
+
+# Визуализация
+proc.show()
 ```
 
-2. Установка с дополнительными зависимостями:
+**Через командную строку (CLI)**
 
-Включает инструменты для тестирования, линтинга и интерактивной работы (`pytest`, `flake8`, `ipython`, `setuptools`)
+Все команды выполняются в активированном виртуальном окружении:
 
 ```bash
-pip install "git+https://github.com/PavelYurov/blind_deconvolution.git[dev]"
+# Запуск полного пайплайна с использованием конфигурации
+python run.py --config configs/experiment.yaml
+
+# Быстрая обработка одного изображения
+python cli.py process \
+  --input image.jpg \
+  --algorithm algorithm_name
+
+# Интерактивный мастер настройки
+python cli.py interactive
+
+# Просмотр доступных команд
+python cli.py --help
 ```
 
-Необходимо для генерации документации через Sphinx (`sphinx`, `sphinx-rtd-theme`)
-
-```bash
-pip install "git+https://github.com/PavelYurov/blind_deconvolution.git[docs]"
-```
-
-Тестирования и документация вместе:
-
-```bash
-pip install "git+https://github.com/PavelYurov/blind_deconvolution.git[dev,docs]"
-```
-
-## Удаление
-
-```bash
-pip uninstall blinddeconv
-```
+---
 
 ## Интерактивное развертывание окружения
 
@@ -182,136 +181,104 @@ python uninstall.py --clean-all
 
 ```
 blind_deconvolution/
-├── src/                               # Исходники Python-пакета
-│   └── blinddeconv/                   # Python-пакет `blinddeconv`
-│       ├── algorithms/                # Алгоритмы и обёртки
-│       │   ├── base.py                # DeconvolutionAlgorithm
-│       │   ├── blind_deconvolution/
-│       │   │   ├── implementations/   # Собственные реализации
+├── src/                                 # Исходники Python-пакета
+│   └── blinddeconv/                     # Python-пакет blinddeconv
+│       ├── algorithms/                  # Алгоритмы и обёртки
+│       │   ├── base.py                  # DeconvolutionAlgorithm (ABC)
+│       │   ├── blind_deconvolution/     # Алгоритмы восстановления изображений вслепую
+│       │   │   ├── our_company/         # Собственные реализации
 │       │   │   │   ├── bayesian/
 │       │   │   │   ├── classic/
 │       │   │   │   ├── sparse/
 │       │   │   │   └── variational/
-│       │   │   └── external/          # Внешние реализации (много подпроектов)
-│       │   │       └── ...
-│       │   ├── kernel_estimation/
-│       │   │   └── ...
-│       │   ├── nonblind_deconvolution/
-│       │   │   └── ...
-│       │   ├── octave/                # Octave/Matlab-обвязка
-│       │   │   └── ...
-│       │   ├── unsorted/              # Экспериментальные/черновые алгоритмы (много подпроектов)
-│       │   │   └── ...
-│       │   ├── README.md              # Путеводитель по алгоритмам
-│       │   └── __init__.py
-│       ├── filters/                   # Генерация искажений (blur/noise/denoise)
-│       │   ├── blur.py
-│       │   ├── noise.py
-│       │   ├── denoise.py
-│       │   ├── distributions.py
-│       │   ├── colored_noise.py
-│       │   ├── smooth.py
-│       │   └── __init__.py
-│       ├── processing/                # Основной функционал пайплайна
-│       │   ├── core.py
-│       │   ├── reader.py
-│       │   ├── restorepipeline.py
-│       │   ├── metrics.py
-│       │   ├── tables.py
-│       │   ├── utils.py
-│       │   └── ...
-│       ├── scripts/                   # Вспомогательные скрипты
-│       │   ├── dataset_generator.py
-│       │   ├── kernel_generator.py
-│       │   └── __init__.py
-│       └── __init__.py
+│       │   │   └── third_party_company/
+│       │   ├── nonblind_deconvolution/  # Алгоритмы восстановления с известным PSF
+│       │   ├── kernel_estimation/       # Алгоритмы оценки PSF
+│       │   ├── unsorted/                # Экспериментальные
+│       │   └── README.md                # Путеводитель по алгоритмам
+│       ├── filters/                     # Генерация искажений
+│       │   ├── base.py                  # FilterBase (ABC)
+│       │   ├── blur.py                  # DefocusBlur, MotionBlur, и др.
+│       │   ├── noise.py                 # GaussianNoise, PoissonNoise, и др.
+│       │   ├── smooth.py                # MeanBlur, GaussianBlur, и др.
+│       │   └── distributions.py         # PSF-функции
+│       ├── processing/                  # Ядро фреймворка
+│       │   ├── core.py                  # Processing (фасад)
+│       │   ├── utils.py                 # Image, утилиты
+│       │   ├── metrics.py               # PSNR, SSIM
+│       │   ├── reader.py                # Загрузка изображений
+│       │   ├── display.py               # Визуализация
+│       │   ├── applyfilter.py           # Применение фильтров
+│       │   ├── restore.py               # Восстановление (один алгоритм)
+│       │   ├── restorepipeline.py       # Полный пайплайн восстановления
+│       │   ├── preprocessing.py         # Выравнивание гистограмм
+│       │   ├── tables.py                # Экспорт в CSV-таблицы
+│       │   ├── clear.py                 # Очистка
+│       │   └── extensions/              # Расширения
+│       │       ├── base.py
+│       │       ├── hyperparameter_optimization.py
+│       │       └── pareto_analysis.py
+│       ├── system/                      # Служебные модули
+│       │   ├── octave/                  # Octave/MATLAB-обвязка
+│       │   │   ├── octaveconfig.py
+│       │   │   └── octavewrapper.py
+│       │   └── cython/                
+│       └── scripts/                     # Генераторы данных
+│           ├── dataset_generator.py
+│           └── kernel_generator.py
 │
-├── docs/                              # Документация (Sphinx)
+├── scripts/                             # Утилиты проекта
+│   ├── install.py                       # Интерактивный установщик
+│   └── uninstall.py                     # Интерактивное удаление
+│
+├── configs/                             # Конфигурационные файлы
+│   ├── basic_deconvolution.yaml         # Базовый пример (YAML)
+│   ├── ...
+│   └── experiment_template.json         # Полный шаблон (JSON)
+├── run.py                               # Автоматизация по конфигам
+├── cli.py                               # CLI-интерфейс
+│
+├── docs/                                # Документация (Sphinx + Markdown)
 │   ├── source/
 │   │   ├── conf.py
-│   │   └── index.rst
+│   │   ├── index.rst
+│   │   └── *.md                         # Markdown-документация
 │   └── tools/
-│       └── build_docs.py
-├── images/                            # Примеры изображений/артефакты
+│       └── build_docs.py                # Сборка документации
+│
+├── images/                              # Примеры изображений/искажения
 │   ├── dataset_bind.json
 │   ├── distorted/
 │   │   └── ...
 │   └── ...
-├── references/                        # PDF-материалы/статьи
+├── references/                          # PDF-материалы/статьи
 │   └── *.pdf
-├── tests/                             # Тестовые данные/выходы прогонов
+├── tests/                               # Тестовые данные/выходы прогонов
 │   └── ...
-├── utils/                             # Вспомогательные утилиты
-│   └── preflight/
-│       ├── __main__.py
-│       ├── config.py
-│       ├── report.py
+├── utils/                               # Вспомогательные утилиты
+│   └── preflight/                       # Проверка зависимостей
+│       ├── config.py, report.py
 │       └── checks/
-│           ├── python.py
-│           └── packages.py
-│
-├── requirements.txt
 ├── pyproject.toml
+├── requirements.txt
 ├── setup.cfg
 └── README.md
 ```
 
-## Качество кода
+---
 
-В проекте настроен линтер **flake8** для проверки стиля и качества Python-кода. Конфигурация находится в файле `setup.cfg`.
+## Подробная документация
 
-**Локальная работа:**
-1.  Установите зависимости: `pip install flake8 pre-commit`
-2.  Для ручного запуска проверки выполните в корне проекта: `flake8`
-3.  Для автоматической проверки перед каждым коммитом выполните: `pre-commit install`
+Полная документация доступна в `docs/source/`:
 
-**Интеграция с IDE:**
-Настройте свою среду разработки на использование виртуального окружения проекта и чтение `setup.cfg`, чтобы видеть предупреждения линтера прямо в редакторе.
+| Раздел | Описание |
+|--------|----------|
+| [Установка и настройка](docs/source/installation.md) | Все способы установки, профили зависимостей, интерактивный установщик, настройка Octave, Cython |
+| [Руководство пользователя](docs/source/usage_guide.md) | `run.py`, `cli.py`, все команды, примеры Python-кода, сборка документации |
+| [Конфигурационные файлы](docs/source/configuration.md) | Полная структура YAML/JSON-конфигов, валидация, реестры алгоритмов и фильтров |
+| [Архитектура системы](docs/source/architecture.md) | Компоненты, паттерны проектирования, организация модулей |
+| [Поток данных](docs/source/data_flow.md) | Схемы `process` и `full_process`, `bind()`, `filter()`, формат `dataset.json` |
+| [API Reference](docs/source/api_reference.md) | Полная справка по классам, методам и функциям |
+| [Для разработчиков](docs/source/CONTRIBUTING.md) | Стандарты кода, добавление алгоритмов/фильтров, линтинг |
 
-**На сервере (CI):**
-При каждом push в репозиторий CI-система запускает те же проверки `flake8`, чтобы поддерживать основную ветку (`main`/`master`) в чистоте.
-
-## Документация
-
-HTML-документация проекта генерируется с помощью **Sphinx** и публикуется [по ссылке](https://pavelyurov.github.io/blind_deconvolution/)
-
-### Структура документации
-
-- `docs/source/` — исходники Sphinx (`.rst`, `conf.py`)
-- `docs/tools/build_docs.py` — скрипт сборки (генерация API + сборка HTML)
-- `docs/_build/html/` — результат локальной сборки (появляется после первого билда)
-
-Документация в основном строится из docstrings Python-модулей (автодокументация).
-
-### Требования
-
-В активном окружении Python должны быть доступны утилиты:
-- `sphinx-build`
-- `sphinx-apidoc`
-
-Опционально: тема `sphinx_rtd_theme` (если не установлена, используется fallback `alabaster`).
-
-### Локальная сборка (рекомендуемый способ)
-
-```bash
-python docs/tools/build_docs.py
-```
-
-Скрипт делает два шага:
-1) генерирует `.rst` для API (через `sphinx-apidoc`) в `docs/source/`;
-2) собирает HTML в `docs/_build/html/`.
-
-Открывайте результат: `docs/_build/html/index.html`.
-
-### Ручная сборка (если нужен контроль шагов)
-
-Из корня репозитория:
-```bash
-sphinx-apidoc -o docs/source .
-sphinx-build -b html docs/source docs/_build/html
-```
-
-### Полезные замечания
-
-- `docs/tools/build_docs.py` удаляет все `docs/source/*.rst`, кроме `index.rst`, и генерирует заново — не храните важные ручные правки в авто-генерируемых `.rst`.
-- Если `sphinx-build`/`sphinx-apidoc` не найдены, установите Sphinx в активное окружение Python (например, в venv проекта).
+Собранная HTML-документация: [pavelyurov.github.io/blind_deconvolution](https://pavelyurov.github.io/blind_deconvolution/)

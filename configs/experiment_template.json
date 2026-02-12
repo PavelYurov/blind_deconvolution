@@ -1,0 +1,76 @@
+{
+    "_comment": "Шаблон конфигурации эксперимента (JSON). Все доступные параметры.",
+    "experiment": {
+        "name": "Experiment Name",
+        "description": "Описание эксперимента"
+    },
+    "input": {
+        "images_folder": "images/original",
+        "blurred_folder": "images/distorted",
+        "color": false,
+        "load_mode": "bind",
+        "bindings": [
+            {
+                "original": "images/original/airplane.png",
+                "blurred": "images/distorted/airplane_convolved_kernel.png",
+                "kernel": "images/kernel_data/convolved_kernel.npy",
+                "filter_description": "convolved_kernel"
+            }
+        ],
+        "bind_state_path": "dataset/dataset.json"
+    },
+    "output": {
+        "restored_folder": "results/restored",
+        "data_folder": "results/data",
+        "kernel_folder": "results/kernels"
+    },
+    "processing": {
+        "mode": "process",
+        "metadata": true,
+        "unique_paths": true
+    },
+    "algorithms": [
+        {
+            "name": "vabid",
+            "params": {
+                "max_iter": 100,
+                "kernel_size": 21
+            }
+        },
+        {
+            "_comment": "Пользовательский алгоритм с указанием полного пути модуля",
+            "name": "custom_algorithm",
+            "module": "blinddeconv.algorithms.blind_deconvolution.our_company.classic.richardson_lucy",
+            "class_name": "RichardsonLucy",
+            "params": {
+                "max_iter": 50,
+                "kernel_size": 15
+            }
+        }
+    ],
+    "filters": [
+        {
+            "chain": [
+                {
+                    "type": "defocus_blur",
+                    "params": {
+                        "psf": "gaussian",
+                        "param": 5.0,
+                        "kernel_size": 31
+                    }
+                },
+                {
+                    "type": "gaussian_noise",
+                    "params": {
+                        "param": 10.0
+                    }
+                }
+            ]
+        }
+    ],
+    "report": {
+        "generate": false,
+        "format": "latex",
+        "output_path": "results/report.tex"
+    }
+}

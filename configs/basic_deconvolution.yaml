@@ -1,0 +1,66 @@
+# ============================================================================
+# Базовый пример конфигурации для слепой деконволюции
+# ============================================================================
+# Запуск:
+#   python run.py --config configs/basic_deconvolution.yaml
+#   python run.py --config configs/basic_deconvolution.yaml --dry-run
+# ============================================================================
+
+experiment:
+  name: "Basic Deconvolution Experiment"
+  description: "Базовый пример: восстановление изображений с предварительно заданным размытием"
+
+# ─── Входные данные ──────────────────────────────────────────────────────────
+input:
+  images_folder: "images/original"
+  blurred_folder: "images/distorted"
+  color: false
+
+  # Режим загрузки:
+  #   "all"        — загрузить все изображения из images_folder (для full_process)
+  #   "bind"       — связать конкретные пары оригинал + смазанное
+  #   "bind_state" — загрузить ранее сохранённые связи из JSON
+  load_mode: "bind"
+
+  # Связи оригинал → смазанное (для load_mode: "bind")
+  bindings:
+    - original: "images/original/airplane.png"
+      blurred: "images/distorted/airplane_convolved_kernel.png"
+      kernel: "images/kernel_data/convolved_kernel.npy"
+      filter_description: "convolved_kernel"
+    - original: "images/original/boy.png"
+      blurred: "images/distorted/boy_convolved_kernel.png"
+      kernel: "images/kernel_data/convolved_kernel.npy"
+      filter_description: "convolved_kernel"
+
+# ─── Выходные директории ─────────────────────────────────────────────────────
+output:
+  restored_folder: "results/restored"
+  data_folder: "results/data"
+  kernel_folder: "results/kernels"
+
+# ─── Режим обработки ─────────────────────────────────────────────────────────
+processing:
+  # "process"      — восстановление по связям (оригинал + смазанное)
+  # "full_process" — полный пайплайн: фильтры → восстановление → анализ
+  mode: "process"
+  metadata: true
+  unique_paths: true
+
+# ─── Алгоритмы восстановления ────────────────────────────────────────────────
+# Можно указать краткое имя из реестра или полный путь модуля + имя класса
+algorithms:
+  - name: "hqmbr"
+    params:
+      predict_psf: [[0,0,1],[0,1,0],[1,0,0]]
+      MAX_ITER: 3
+  - name: "hqmbr"
+    params:
+      predict_psf: [[0,0,0],[1,1,1],[0,0,0]]
+      MAX_ITER: 5
+
+# ─── Генерация отчёта ────────────────────────────────────────────────────────
+report:
+  generate: true
+  format: "latex"
+  output_path: "results/report.tex"
