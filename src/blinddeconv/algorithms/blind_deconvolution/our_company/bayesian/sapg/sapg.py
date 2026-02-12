@@ -1,7 +1,7 @@
 import numpy as np
 import time
 from typing import Tuple, List, Any, Dict
-from .utils import precompute_gradient_operators, compute_spatial_gradient, gaussian_psf, project_param
+from .utils import precompute_gradient_operators, compute_spatial_gradient, gaussian_psf, gaussian_psf_deriv_alpha, project_param
 from .solvers import myula_sampler, sapg_update_theta, sapg_update_alpha, sapg_update_sigma2, tv_prox, data_fidelity_grad, solve_image_hqs
 
 # Robust import of base class

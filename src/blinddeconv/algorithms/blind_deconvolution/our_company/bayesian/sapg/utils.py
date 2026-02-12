@@ -25,6 +25,10 @@ def otf2psf(otf: np.ndarray, out_shape: Tuple[int, int]) -> np.ndarray:
     psf_padded = np.roll(psf_padded, out_shape[1] // 2, axis=1)
     return psf_padded[:out_shape[0], :out_shape[1]]
 
+def soft_threshold(x: np.ndarray, thresh: float) -> np.ndarray:
+    """Soft thresholding operator: sign(x) * max(|x| - thresh, 0)."""
+    return np.sign(x) * np.maximum(np.abs(x) - thresh, 0.0)
+
 def compute_spatial_gradient(x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """Computes gradients in spatial domain using forward differences."""
     # Roll -1 is equivalent to x[i+1] - x[i] with wrap around
@@ -71,6 +75,27 @@ def gaussian_psf(alpha: float, shape: Tuple[int, int]) -> np.ndarray:
     """
     kh, kw = shape
     grid_y, grid_x = np.mgrid[-kh//2:kh//2, -kw//2:kw//2]
-    psf = np.exp(-(grid_x**2 + grid_y**2) / (2 * alpha))
-    psf /= psf.sum()
+    r2 = grid_x**2 + grid_y**2
+    psf = np.exp(-r2 / (2 * alpha))
+    psf /= np.sum(psf) + EPSILON
     return psf
+
+def gaussian_psf_deriv_alpha(alpha: float, shape: Tuple[int, int]) -> np.ndarray:
+    """
+    Derivative of normalized Gaussian PSF w.r.t. alpha (variance).
+    """
+    kh, kw = shape
+    grid_y, grid_x = np.mgrid[-kh//2:kh//2, -kw//2:kw//2]
+    r2 = grid_x**2 + grid_y**2
+    psf = np.exp(-r2 / (2 * alpha))
+    sum_psf = np.sum(psf) + EPSILON
+    psf_norm = psf / sum_psf
+    term = psf * (r2 / (2 * alpha**2))
+    avg_term = np.sum(term) / sum_psf
+    d_psf = (term / sum_psf - psf_norm * avg_term)
+    return d_psf
+
+def project_param(value: float, bounds: Tuple[float, float]) -> float:
+    """Project value onto [min, max]."""
+    min_val, max_val = bounds
+    return max(min_val, min(value, max_val))

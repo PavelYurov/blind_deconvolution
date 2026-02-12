@@ -133,8 +133,9 @@ def solve_kernel_pgd(
     y: np.ndarray,
     x: np.ndarray,
     h_init: np.ndarray,
-    reg_weight: float,
-    inner_iter: int
+    D_x: np.ndarray,       
+    inner_iter: int,
+    momentum: float = 0.9   
 ) -> np.ndarray:
     """
     M-Step: Solves Kernel estimation using Projected Gradient Descent (PGD).
