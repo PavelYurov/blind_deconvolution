@@ -1,5 +1,6 @@
 import numpy as np
 from numpy.fft import fft2, ifft2
+from scipy.special import erf
 from typing import Tuple
 
 EPSILON = 1e-12
@@ -48,3 +49,19 @@ def precompute_gradient_operators(shape: Tuple[int, int]) -> Tuple[np.ndarray, n
     F_dy = fft2(dy)
     F_grad_sq = np.abs(F_dx)**2 + np.abs(F_dy)**2
     return F_dx, F_dy, F_grad_sq
+
+def truncated_gaussian_moments(m: float, v: float) -> Tuple[float, float]:
+    """Compute mean and variance of truncated Gaussian N(m, v) on [0, inf)."""
+    if v <= 0:
+        return max(m, 0.0), 0.0
+    sqrt_v = np.sqrt(v)
+    z = m / sqrt_v
+    if z < -10:  # Numerical stability
+        return 0.0, 0.0
+    phi = np.exp(-0.5 * z**2) / np.sqrt(2 * np.pi)
+    Phi = 0.5 * (1 + erf(z / np.sqrt(2)))
+    if Phi < EPSILON:
+        return 0.0, 0.0
+    mean_t = m + sqrt_v * (phi / Phi)
+    var_t = v * (1 + z * (phi / Phi) - (phi / Phi)**2)
+    return mean_t, var_t

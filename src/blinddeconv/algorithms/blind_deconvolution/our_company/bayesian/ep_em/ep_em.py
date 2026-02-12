@@ -7,17 +7,16 @@ Based on:
     using Expectation Propagation." EUSIPCO 2021.
 
 Modules:
-    - Utils: FFT helpers and math operators.
-    - Solvers: Pure functions for Image (HQS), Uncertainty (Spectral), and Kernel (PGD).
-    - Algorithm: Main class managing the EM loop.
+    - utils: FFT helpers and math operators.
+    - solvers: Pure functions for Image (HQS), Uncertainty (Spectral), and Kernel (PGD).
+    - ep_em: Main class managing the EM loop.
 """
 
 import numpy as np
-from numpy.fft import fft2, ifft2
 import time
-from typing import Tuple, List, Any, Dict, Optional
-import sys
-import os
+from typing import Tuple, List, Any, Dict
+from .utils import precompute_gradient_operators, compute_spatial_gradient
+from .solvers import solve_image_hqs, estimate_uncertainty, solve_kernel_pgd, non_neg_ep
 
 # Robust import of base class
 try:
@@ -29,26 +28,31 @@ except ImportError:
     class DeconvolutionAlgorithm:
         def __init__(self, name): self.name = name
 
-class EPEM_BID(DeconvolutionAlgorithm):
+class EP_EM(DeconvolutionAlgorithm):
     """
     Blind Image Deconvolution using Expectation Propagation (EP-EM).
     
     Implements the strategy described in Abdulaziz et al. (2021):
     1. Image Estimation: HQS (Half-Quadratic Splitting).
-    2. Uncertainty: Fast-Cx (Spectral Approximation).
-    3. Kernel Estimation: PGD (Projected Gradient Descent).
+    2. Uncertainty: Fast-Cx or RBMC (Spectral or Monte Carlo Approximation) with adaptive lambda_eff.
+    3. Kernel Estimation: Nesterov-accelerated PGD with covariance using full D_x.
+    4. Non-negativity: Optional EP update for soft constraint.
     """
     
     def __init__(
         self,
         kernel_shape: Tuple[int, int],
-        lambda_tv: float = 0.003,
-        noise_sigma: float = 0.01,
+        lambda_tv: float = 6.7,
+        noise_sigma: float = 0.05,
         max_iter: int = 30,
         # Solver params
         hqs_iter: int = 5,
         pgd_iter: int = 20,
+        pgd_momentum: float = 0.9,
         beta_max: float = 1024.0,
+        strategy: str = 'fast',
+        num_probes: int = 10,
+        non_neg: bool = True,
         verbose: bool = False
     ):
         super().__init__(name='EP-EM-BID')
@@ -61,7 +65,11 @@ class EPEM_BID(DeconvolutionAlgorithm):
         # Internal solver settings
         self.hqs_iter = hqs_iter
         self.pgd_iter = pgd_iter
+        self.pgd_momentum = pgd_momentum
         self.beta_max = beta_max
+        self.strategy = strategy
+        self.num_probes = num_probes
+        self.non_neg = non_neg
         
         self.history = {'kernel_diff': []}
         self.hyperparams = {}
@@ -105,21 +113,39 @@ class EPEM_BID(DeconvolutionAlgorithm):
                 self.beta_max, self.hqs_iter, F_ops
             )
             
-            # B. Estimate Uncertainty (Variance) via Spectral Method
-            uncertainty = estimate_uncertainty_spectral(
-                h, self.noise_sigma, self.lambda_tv, 
-                (H, W), F_grad_sq
+            # Compute adaptive lambda_eff based on current estimate
+            grad_x, grad_y = compute_spatial_gradient(x)
+            mean_abs_grad = (np.mean(np.abs(grad_x)) + np.mean(np.abs(grad_y))) / 2 + 1e-3
+            lambda_eff = self.lambda_tv / mean_abs_grad
+
+            # B. Estimate Uncertainty (Variance) and Autocovariance via Spectral Method
+            uncertainty, r = estimate_uncertainty(
+                h, self.noise_sigma, lambda_eff, (H, W), F_grad_sq,
+                strategy=self.strategy, num_probes=self.num_probes
             )
             
-            # M-STEP
-            # Estimate Kernel via PGD
-            # Regularization weight depends on image uncertainty
-            # Trace(h^T D h) approx sum(Var) * ||h||^2
-            reg_weight = uncertainty * (H * W)
+            # C. Incorporate non-negativity if enabled
+            if self.non_neg:
+                x = non_neg_ep(x, uncertainty)
+
+            # Compute full D_x matrix using autocovariance r
+            k = kh * kw
+            D_x = np.zeros((k, k))
+            for ii in range(k):
+                y1 = ii // kw
+                x1 = ii % kw
+                for jj in range(k):
+                    y2 = jj // kw
+                    x2 = jj % kw
+                    ly = y1 - y2
+                    lx = x1 - x2
+                    D_x[ii, jj] = N * r[ly % H, lx % W]
             
+            # M-STEP
+            # Estimate Kernel via PGD with full D_x
             h = solve_kernel_pgd(
                 y, x, h, 
-                reg_weight, self.pgd_iter
+                D_x, self.pgd_iter, momentum=self.pgd_momentum
             )
             
             # Monitoring
@@ -146,6 +172,7 @@ class EPEM_BID(DeconvolutionAlgorithm):
             'lambda_tv': self.lambda_tv,
             'noise_sigma': self.noise_sigma,
             'final_uncertainty': uncertainty,
+            'final_lambda_eff': lambda_eff,
             'iterations': it + 1
         }
         
@@ -156,7 +183,9 @@ class EPEM_BID(DeconvolutionAlgorithm):
             ('kernel_shape', self.kernel_shape),
             ('lambda_tv', self.lambda_tv),
             ('noise_sigma', self.noise_sigma),
-            ('max_iter', self.max_iter)
+            ('max_iter', self.max_iter),
+            ('strategy', self.strategy),
+            ('non_neg', self.non_neg)
         ]
 
     def change_param(self, params: Dict[str, Any]) -> None:
@@ -174,6 +203,6 @@ class EPEM_BID(DeconvolutionAlgorithm):
         return self.hyperparams
 
 def run_algorithm(g, kernel_shape, **kwargs):
-    algo = EPEM_BID(kernel_shape=kernel_shape, **kwargs)
+    algo = EP_EM(kernel_shape=kernel_shape, **kwargs)
     f_est, h_est = algo.process(g)
     return f_est, h_est, algo.hyperparams, algo.history

@@ -1,9 +1,8 @@
 import numpy as np
 from numpy.fft import fft2, ifft2
 from scipy.sparse.linalg import cg
-from scipy.special import erf
 from typing import Tuple
-from .utils import psf2otf, soft_threshold, EPSILON
+from .utils import psf2otf, soft_threshold, EPSILON, truncated_gaussian_moments
 
 def solve_image_hqs(
     y: np.ndarray,
@@ -46,7 +45,7 @@ def solve_image_hqs(
             lhs = alpha * F_h_sq + beta * F_grad_sq
             
             x = np.real(ifft2(rhs / (lhs + EPSILON)))
-            # Removed hard projection; handled in EP if enabled
+            x = np.maximum(x, 0.0) # Projection
             
             # 2. Shrinkage Step
             grad_x = np.real(ifft2(F_dx * fft2(x)))
@@ -59,37 +58,6 @@ def solve_image_hqs(
         beta *= 2.0 # Continuation scheme
         
     return x
-
-def estimate_uncertainty_spectral(
-    h: np.ndarray,
-    noise_sigma: float,
-    lambda_eff: float,
-    shape: Tuple[int, int],
-    F_grad_sq: np.ndarray
-) -> Tuple[float, np.ndarray]:
-    """
-    E-Step (Variance): Estimates marginal variance using Spectral Approximation.
-    Strategy 'Fast-Cx' from the paper.
-    Uses effective lambda for the prior approximation.
-    Returns scalar uncertainty (mean variance) and the full autocovariance function r.
-    """
-    H, W = shape
-    F_h = psf2otf(h, (H, W))
-    
-    alpha = 1.0 / (noise_sigma**2 + EPSILON)
-    
-    # Inverse Hessian Spectrum
-    inv_hessian = 1.0 / (alpha * np.abs(F_h)**2 + lambda_eff * F_grad_sq + EPSILON)
-    
-    # Scalar uncertainty (mean of diagonal)
-    uncertainty = float(np.mean(inv_hessian))
-    
-    # Full autocovariance function r(tau) = ifft2(inv_hessian)
-    # Note: scaling is such that r[0,0] == uncertainty
-    r = np.real(ifft2(inv_hessian))
-    
-    return uncertainty, r
-
 
 def estimate_uncertainty(
     h: np.ndarray,
