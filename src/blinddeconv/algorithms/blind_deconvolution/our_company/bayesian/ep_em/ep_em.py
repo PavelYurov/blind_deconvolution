@@ -139,7 +139,7 @@ class EP_EM(DeconvolutionAlgorithm):
                     x2 = jj % kw
                     ly = y1 - y2
                     lx = x1 - x2
-                    D_x[ii, jj] = N * r[ly % H, lx % W]
+                    D_x[ii, jj] = (H * W) * r[ly % H, lx % W]
             
             # M-STEP
             # Estimate Kernel via PGD with full D_x
