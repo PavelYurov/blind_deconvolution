@@ -176,6 +176,8 @@ class EP_EM(DeconvolutionAlgorithm):
             'iterations': it + 1
         }
         
+        x_final = x_final * 255.0
+        x_final = np.round(x_final).astype(np.int16)
         return x_final, h
 
     def get_param(self) -> List[Tuple[str, Any]]:

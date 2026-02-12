@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.fft import fft2, ifft2
 from typing import Tuple, Callable
-from .utils import psf2otf, compute_spatial_gradient, tv_prox, gaussian_psf, EPSILON, project_param
+from .utils import psf2otf, compute_spatial_gradient, tv_prox, gaussian_psf, EPSILON, project_param, soft_threshold
 
 def data_fidelity_grad(y: np.ndarray, alpha: float, sigma2: float, x: np.ndarray, psf_func: Callable) -> np.ndarray:
     """
@@ -106,3 +106,58 @@ def tv_norm(x: np.ndarray) -> float:
     """Total Variation norm g(x) = ||grad x||_1"""
     dx, dy = compute_spatial_gradient(x)
     return np.sum(np.sqrt(dx**2 + dy**2))
+
+def solve_image_hqs(
+    y: np.ndarray,
+    h: np.ndarray,
+    x_init: np.ndarray,
+    noise_sigma: float,
+    lambda_tv: float,
+    beta_max: float,
+    inner_iter: int,
+    F_ops: Tuple[np.ndarray, np.ndarray, np.ndarray]
+) -> np.ndarray:
+    """
+    E-Step (Mean): Solves MAP estimation for Image using Half-Quadratic Splitting.
+    Minimizes: ||y - h*x||^2 / (2*sigma^2) + lambda_tv * ||grad x||_1
+    """
+    H, W = y.shape
+    F_dx, F_dy, F_grad_sq = F_ops
+    
+    # Precompute constant FFT terms
+    F_y = fft2(y)
+    F_h = psf2otf(h, (H, W))
+    F_h_conj = np.conj(F_h)
+    F_h_sq = np.abs(F_h)**2
+    
+    alpha = 1.0 / (noise_sigma**2 + EPSILON)
+    
+    x = x_init.copy()
+    z_x = np.zeros_like(x)
+    z_y = np.zeros_like(x)
+    
+    beta = 1.0 # Starting beta
+    
+    while beta < beta_max:
+        for _ in range(inner_iter):
+            # 1. Linear System Solve (FFT)
+            # (alpha * H'H + beta * D'D) x = alpha * H'y + beta * D'z
+            rhs = alpha * F_h_conj * F_y + beta * (
+                np.conj(F_dx) * fft2(z_x) + np.conj(F_dy) * fft2(z_y)
+            )
+            lhs = alpha * F_h_sq + beta * F_grad_sq
+            
+            x = np.real(ifft2(rhs / (lhs + EPSILON)))
+            x = np.maximum(x, 0.0) # Projection
+            
+            # 2. Shrinkage Step
+            grad_x = np.real(ifft2(F_dx * fft2(x)))
+            grad_y = np.real(ifft2(F_dy * fft2(x)))
+            
+            thresh = lambda_tv / beta
+            z_x = soft_threshold(grad_x, thresh)
+            z_y = soft_threshold(grad_y, thresh)
+        
+        beta *= 2.0 # Continuation scheme
+        
+    return x

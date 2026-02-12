@@ -92,7 +92,7 @@ def estimate_uncertainty(
         accum = np.zeros(shape)
         for _ in range(num_probes):
             r_probe = np.random.randn(H, W)
-            v, info = cg(matvec, r_probe, tol=1e-6, maxiter=200)
+            v, info = cg(matvec, r_probe, atol=1e-6, maxiter=200)
             if info != 0:
                 print(f"CG did not converge: {info}")
             accum += v * r_probe

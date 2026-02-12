@@ -99,3 +99,7 @@ def project_param(value: float, bounds: Tuple[float, float]) -> float:
     """Project value onto [min, max]."""
     min_val, max_val = bounds
     return max(min_val, min(value, max_val))
+
+def soft_threshold(x: np.ndarray, thresh: float) -> np.ndarray:
+    """Soft thresholding operator: sign(x) * max(|x| - thresh, 0)."""
+    return np.sign(x) * np.maximum(np.abs(x) - thresh, 0.0)
