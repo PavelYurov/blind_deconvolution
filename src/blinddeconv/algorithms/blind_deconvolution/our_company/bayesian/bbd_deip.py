@@ -37,8 +37,28 @@ from typing import Tuple, List, Any, Dict
 
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from base import DeconvolutionAlgorithm
+from pathlib import Path
+
+def _find_project_root(start: Path) -> Path:
+    path = start.resolve()
+
+    while not (path / "pyproject.toml").exists():
+        if path.parent == path:
+            raise RuntimeError("Cannot locate project root")
+        path = path.parent
+
+    return path
+
+_CURRENT_FILE = Path(__file__).resolve()
+_PROJECT_ROOT = _find_project_root(_CURRENT_FILE)
+_SRC_DIR = _PROJECT_ROOT / "src"
+_ALGORITHMS_DIR = _SRC_DIR / "blinddeconv" / "algorithms"
+
+for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
+
+from blinddeconv.algorithms.base import DeconvolutionAlgorithm
 
 
 # Параметры гиперприори для гамма-распределений (плоские/неинформативные)
@@ -1092,7 +1112,7 @@ class BBD_DEIP(DeconvolutionAlgorithm):
             'noise_std_l': 1.0 / np.sqrt(E_beta_l),
             'noise_std_s': 1.0 / np.sqrt(E_beta_s)
         }
-        
+        x_est = x_est
         self.timer = time.time() - start_time
         
         return x_est, h_est
