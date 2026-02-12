@@ -24,9 +24,29 @@ from typing import Any
 
 import cv2
 import numpy as np
-import matlab.engine
+import sys
+from pathlib import Path
+def _find_project_root(start: Path) -> Path:
+    path = start.resolve()
+
+    while not (path / "pyproject.toml").exists():
+        if path.parent == path:
+            raise RuntimeError("Cannot locate project root")
+        path = path.parent
+
+    return path
+
+_CURRENT_FILE = Path(__file__).resolve()
+_PROJECT_ROOT = _find_project_root(_CURRENT_FILE)
+_SRC_DIR = _PROJECT_ROOT / "src"
+_ALGORITHMS_DIR = _SRC_DIR / "blinddeconv" / "algorithms"
+
+for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
 
 from blinddeconv.algorithms.base import DeconvolutionAlgorithm
+from blinddeconv.system.octave import OctaveEngine
 
 ALGORITHM_NAME = "lisiyaoATbnu_low_rank_kernel"
 SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "source")
@@ -52,9 +72,26 @@ class LisiyaoATbnuLowRankKernel(DeconvolutionAlgorithm):
 		verbose: bool = True,
 	):
 		super().__init__(ALGORITHM_NAME)
-		self._eng = matlab.engine.start_matlab()
-		self._eng.addpath(self._eng.genpath(SOURCE_PATH), nargout=0)
-		self._eng.cd(SOURCE_PATH, nargout=0)
+
+		self._eng = OctaveEngine.get_instance()
+		if self._eng is None:
+			raise RuntimeError("Could not initialize Octave Engine. Check octaveconfig.py and Octave installation.")
+
+        # Добавляем путь к исходникам алгоритма
+		self._eng.addpath(self._eng.genpath(SOURCE_PATH))
+		self._eng.cd(SOURCE_PATH)
+
+        # !ВАЖНО! Загружаем пакет image, необходимый для imresize, padarray и т.д.
+		try:
+			self._eng.eval("pkg load image")
+		except Exception as e:
+			print(f"Warning: Failed to load Octave 'image' package. Ensure it is installed (pkg install -forge image). Error: {e}")
+
+
+		# self._eng = matlab.engine.start_matlab()
+		# self._eng.addpath(self._eng.genpath(SOURCE_PATH), nargout=0)
+		# self._eng.cd(SOURCE_PATH, nargout=0)
+
 
 		self.tx = float(tx)
 		self.tau = float(tau)
@@ -134,24 +171,46 @@ class LisiyaoATbnuLowRankKernel(DeconvolutionAlgorithm):
 		image_gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
 		image_gray = image_gray.astype(np.float64) / 255.0
 
-		I_mat = matlab.double(image_gray.tolist())
-		self._eng.workspace["y_py"] = I_mat
-		self._eng.workspace["K_py"] = float(self.kernel_size)
+		self._eng.push('y_py', image_gray)
+		self._eng.push('K_py', float(self.kernel_size))
 
-		self._eng.workspace["tx"] = float(self.tx)
-		self._eng.workspace["tau"] = float(self.tau)
-		self._eng.workspace["delta"] = float(self.delta)
-		self._eng.workspace["imax"] = float(self.imax)
-		self._eng.workspace["ximax"] = float(self.ximax)
-		self._eng.workspace["xjmax"] = float(self.xjmax)
-		self._eng.workspace["kmax"] = float(self.kmax)
-		self._eng.workspace["rmax"] = float(self.rmax)
-		self._eng.workspace["sigma"] = float(self.sigma)
-		self._eng.workspace["lambda_param"] = float(self.lambda_)
-		self._eng.workspace["threshold"] = float(self.threshold)
-		self._eng.workspace["mu"] = float(self.mu)
-		self._eng.workspace["iterkrank"] = float(self.iterkrank)
-		self._eng.workspace["verbose"] = float(1 if self.verbose else 0)
+		# Передача параметров. 
+		# Создаем структуру params внутри Octave через eval, чтобы гарантировать правильные типы полей.
+		# Можно было бы передать dict, но eval надежнее для легаси кода.
+		
+		# Устанавливаем значения переменных для eval
+		self._eng.push('tx', self.tx)
+		self._eng.push('tau', self.tau)
+		self._eng.push('delta', self.delta)
+		self._eng.push('imax', self.imax)
+		self._eng.push('ximax', self.ximax)
+		self._eng.push('xjmax', self.xjmax)
+		self._eng.push('kmax', self.kmax)
+		self._eng.push('rmax', self.rmax)
+		self._eng.push('sigma', self.sigma)
+		self._eng.push('lambda_param', self.lambda_)
+		self._eng.push('threshold', self.threshold)
+		self._eng.push('mu', self.mu)
+		self._eng.push('iterkrank', self.iterkrank)
+		self._eng.push('verbose_flag', 1 if self.verbose else 0)
+		# I_mat = matlab.double(image_gray.tolist())
+		# self._eng.workspace["y_py"] = I_mat
+		# self._eng.workspace["K_py"] = float(self.kernel_size)
+
+		# self._eng.workspace["tx"] = float(self.tx)
+		# self._eng.workspace["tau"] = float(self.tau)
+		# self._eng.workspace["delta"] = float(self.delta)
+		# self._eng.workspace["imax"] = float(self.imax)
+		# self._eng.workspace["ximax"] = float(self.ximax)
+		# self._eng.workspace["xjmax"] = float(self.xjmax)
+		# self._eng.workspace["kmax"] = float(self.kmax)
+		# self._eng.workspace["rmax"] = float(self.rmax)
+		# self._eng.workspace["sigma"] = float(self.sigma)
+		# self._eng.workspace["lambda_param"] = float(self.lambda_)
+		# self._eng.workspace["threshold"] = float(self.threshold)
+		# self._eng.workspace["mu"] = float(self.mu)
+		# self._eng.workspace["iterkrank"] = float(self.iterkrank)
+		# self._eng.workspace["verbose"] = float(1 if self.verbose else 0)
 
 		self._eng.eval(
 			"params = struct("
@@ -168,18 +227,30 @@ class LisiyaoATbnuLowRankKernel(DeconvolutionAlgorithm):
 			"'threshold', threshold, "
 			"'mu', mu, "
 			"'iterkrank', iterkrank, "
-			"'verbose', logical(verbose) "
-			");",
-			nargout=0,
+			"'verbose', logical(verbose_flag) "
+			");"
 		)
 
-		self._eng.eval(
-			"[x_py, k_py] = multiscaled_cry(y_py, K_py, params);",
-			nargout=0,
-		)
+		# self._eng.eval(
+		# 	"[x_py, k_py] = multiscaled_cry(y_py, K_py, params);",
+		# 	nargout=0,
+		# )
 
-		x_mat = self._eng.workspace["x_py"]
-		k_mat = self._eng.workspace["k_py"]
+		# x_mat = self._eng.workspace["x_py"]
+		# k_mat = self._eng.workspace["k_py"]
+
+		try:
+			result = self._eng.multiscaled_cry(
+			    self._eng.pull('y_py'), 
+			    self._eng.pull('K_py'), 
+			    self._eng.pull('params'), 
+			    nout=2
+			)
+			x_mat, k_mat = result
+		except Exception as e:
+			print(f"Error executing Octave function: {e}")
+			# Возвращаем исходное изображение в случае ошибки
+			return image_bgr, np.zeros((self.kernel_size, self.kernel_size))
 
 		x_np = np.array(x_mat, dtype=np.float64)
 		x_np = np.clip(x_np, 0.0, 1.0)
@@ -196,7 +267,8 @@ class LisiyaoATbnuLowRankKernel(DeconvolutionAlgorithm):
 		return x_bgr, kernel
 
 	def __del__(self):
-		try:
-			self._eng.quit()
-		except Exception:
-			pass
+		# try:
+		# 	self._eng.quit()
+		# except Exception:
+		# 	pass
+		pass

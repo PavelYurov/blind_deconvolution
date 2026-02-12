@@ -40,8 +40,28 @@ from typing import Tuple, List, Any, Dict
 
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from base import DeconvolutionAlgorithm
+from pathlib import Path
+
+def _find_project_root(start: Path) -> Path:
+    path = start.resolve()
+
+    while not (path / "pyproject.toml").exists():
+        if path.parent == path:
+            raise RuntimeError("Cannot locate project root")
+        path = path.parent
+
+    return path
+
+_CURRENT_FILE = Path(__file__).resolve()
+_PROJECT_ROOT = _find_project_root(_CURRENT_FILE)
+_SRC_DIR = _PROJECT_ROOT / "src"
+_ALGORITHMS_DIR = _SRC_DIR / "blinddeconv" / "algorithms"
+
+for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
+
+from blinddeconv.algorithms.base import DeconvolutionAlgorithm
 
 
 EPSILON = 1e-10
@@ -422,7 +442,7 @@ class PBTVGR(DeconvolutionAlgorithm):
             A_op = LinearOperator((kh*kw, kh*kw), matvec=matvec)
             
             # Решение системы
-            h_flat, _ = cg(A_op, b_vec, x0=h_curr.flatten(), maxiter=cg_maxiter, tol=1e-5)
+            h_flat, _ = cg(A_op, b_vec, x0=h_curr.flatten(), maxiter=cg_maxiter, atol=1e-5)
             h_curr = h_flat.reshape((kh, kw))
             
             # Проекция и нормализация (п.5-6 Algorithm 2)

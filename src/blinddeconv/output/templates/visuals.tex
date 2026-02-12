@@ -1,0 +1,23 @@
+\BLOCK{ for item in items }
+\begin{figure}[H]
+    \centering
+    \begin{minipage}[t]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{\VAR{ item.path_original }}
+        \caption*{Original}
+    \end{minipage}
+    \hfill
+    \begin{minipage}[t]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{\VAR{ item.path_blurred }}
+        \caption*{Blurred}
+    \end{minipage}
+    \hfill
+    \begin{minipage}[t]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{\VAR{ item.path_restored }}
+        \caption*{\VAR{ item.algorithm } \\ (PSNR:\VAR{ item.psnr }) (SSIM:\VAR{ item.ssim })}
+    \end{minipage}
+    \caption{\VAR{ item.caption_text }}
+\end{figure}
+\BLOCK{ endfor }

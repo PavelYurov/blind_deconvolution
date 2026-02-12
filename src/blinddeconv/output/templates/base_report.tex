@@ -1,0 +1,40 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T2A]{fontenc}
+\usepackage[russian]{babel}
+\usepackage{pgfplots}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{geometry}
+\geometry{a4paper, margin=2cm}
+\pgfplotsset{compat=1.17}
+\usepackage{titlesec}
+
+\titleformat{\section}
+  {\centering\normalfont\bfseries}
+  {\thesection.}
+  {1em}
+  {}
+\titleformat{\subsection}
+  {\normalfont\normalsize\bfseries}
+  {\thesubsection}
+  {1em}
+  {}
+
+\title{\VAR{ title }}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Введение}
+\VAR{ introduction_text }
+
+\section{Результаты экспериментов}
+\VAR{ content }
+
+\end{document}

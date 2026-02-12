@@ -12,8 +12,18 @@ import os
 import shutil
 from pathlib import Path
 
+def _find_project_root(start: Path) -> Path:
+    path = start.resolve()
+
+    while not (path / "pyproject.toml").exists():
+        if path.parent == path:
+            raise RuntimeError("Cannot locate project root")
+        path = path.parent
+
+    return path
+
 CURRENT_FILE = Path(__file__).resolve()
-PROJECT_ROOT = CURRENT_FILE.parent.parent if CURRENT_FILE.parent.name == "scripts" else CURRENT_FILE.parent
+PROJECT_ROOT = _find_project_root(CURRENT_FILE)
 STATE_FILE = PROJECT_ROOT / ".dependency_state.json"
 
 def load_state() -> dict:

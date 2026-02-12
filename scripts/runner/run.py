@@ -28,8 +28,21 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+
 # Path configuration
-_PROJECT_ROOT = Path(__file__).resolve().parent
+
+def _find_project_root(start: Path) -> Path:
+    path = start.resolve()
+
+    while not (path / "pyproject.toml").exists():
+        if path.parent == path:
+            raise RuntimeError("Cannot locate project root")
+        path = path.parent
+
+    return path
+
+_CURRENT_FILE = Path(__file__).resolve()
+_PROJECT_ROOT = _find_project_root(_CURRENT_FILE)
 _SRC_DIR = _PROJECT_ROOT / "src"
 _ALGORITHMS_DIR = _SRC_DIR / "blinddeconv" / "algorithms"
 
@@ -51,6 +64,13 @@ try:
 except ImportError:
     HAS_JSONSCHEMA = False
 
+from blinddeconv.output.exporter import LatexExporter
+from blinddeconv.output.data_loader import load_data
+from blinddeconv.output.tables import (
+    prepare_summary_improvement_table,
+    prepare_detailed_comparison,
+    prepare_best_worst_table
+)
 
 logger = logging.getLogger("blinddeconv.run")
 
@@ -694,7 +714,7 @@ def create_filter_chains(
 
 # LaTeX report generation
 
-def generate_latex_report(
+def generate_latex_metadata_report(
     config: Dict[str, Any],
     results_dir: Path,
     output_path: Path,
@@ -792,6 +812,119 @@ def generate_latex_report(
 
     logger.info("LaTeX-отчёт сохранён: %s", output_path)
 
+
+def generate_latex_results_report(
+    config: Dict[str, Any],
+    results_dir: Path,
+    output_path: Path,
+    start_time: datetime.datetime,
+    end_time: datetime.datetime,
+    data_folder: Path,
+) -> None:
+    """
+    Генерация профессионального LaTeX-отчёта через модуль blinddeconv.output.
+    """
+    csv_path = data_folder / "analysis_data.csv"
+    if not csv_path.exists():
+        csv_files = list(data_folder.glob("*.csv"))
+        if csv_files:
+            csv_path = csv_files[0]
+            logger.warning(f"analysis_data.csv не найден, используем {csv_path.name}")
+        else:
+            logger.error(f"Не найдены CSV файлы в {data_folder}. Генерация отчёта невозможна.")
+            return
+
+    # 2. Инициализация экспортера
+    # output_path может быть файлом (report.tex) или папкой.
+    # Exporter ожидает директорию.
+    if output_path.suffix == '.tex':
+        report_dir = output_path.parent
+        report_filename = output_path.stem # без .tex
+    else:
+        report_dir = output_path
+        report_filename = "report"
+
+    exporter = LatexExporter(output_dir=str(report_dir))
+    
+    # 3. Загрузка данных
+    try:
+        df = load_data(str(csv_path))
+        logger.info(f"Данные загружены из {csv_path} ({len(df)} строк)")
+    except Exception as e:
+        logger.error(f"Ошибка загрузки данных для отчета: {e}")
+        return
+
+    # 4. Генерация таблиц
+    try:
+        # Сводная
+        summary_df = prepare_summary_improvement_table(df)
+        exporter.save_table(summary_df, "tab_summary_gain", caption="Средний прирост метрик")
+
+        # Экстремумы PSNR
+        bw_psnr = prepare_best_worst_table(df, metric='psnr')
+        exporter.save_table(bw_psnr, "tab_best_worst_psnr", caption="Лучшие и худшие результаты (PSNR Gain)")
+
+        # Экстремумы SSIM (если есть)
+        has_ssim = 'ssim_improvement' in df.columns
+        if has_ssim:
+            bw_ssim = prepare_best_worst_table(df, metric='ssim')
+            exporter.save_table(bw_ssim, "tab_best_worst_ssim", caption="Лучшие и худшие результаты (SSIM Gain)")
+
+        # Детальные
+        det_psnr = prepare_detailed_comparison(df, metric='psnr')
+        exporter.save_table(det_psnr, "tab_detailed_psnr", caption="Детальное сравнение (PSNR)")
+
+        if 'ssim' in df.columns:
+            det_ssim = prepare_detailed_comparison(df, metric='ssim')
+            exporter.save_table(det_ssim, "tab_detailed_ssim", caption="Детальное сравнение (SSIM)")
+            
+    except Exception as e:
+        logger.error(f"Ошибка при генерации таблиц: {e}")
+        return
+
+    # 5. Сборка структуры отчета
+    exp_name = config.get("experiment", {}).get("name", "Experiment")
+    exp_desc = config.get("experiment", {}).get("description", "")
+    duration = (end_time - start_time).total_seconds()
+    
+    intro_text = (
+        f"Эксперимент: {exp_name}\n\n"
+        f"Описание: {exp_desc}\n\n"
+        f"Длительность: {duration:.1f} сек. "
+        f"Обработано файлов: {len(df) if not df.empty else 0}."
+    )
+
+    report_struct = [
+        {'type': 'section', 'title': 'Введение'},
+        {'type': 'text', 'content': intro_text},
+        
+        {'type': 'section', 'title': 'Сводная статистика'},
+        {'type': 'text', 'content': 'Средний прирост метрик качества относительно смазанного изображения.'},
+        {'type': 'include', 'file': 'tab_summary_gain'},
+        {'type': 'section', 'title': 'Худшие и лучшие случаи'},
+        {'type': 'subsection', 'title': 'PSNR'},
+        {'type': 'include', 'file': 'tab_best_worst_psnr'},
+    ]
+
+    if has_ssim:
+        report_struct.extend([
+            {'type': 'subsection', 'title': 'SSIM'},
+            {'type': 'include', 'file': 'tab_best_worst_ssim'},
+        ])
+
+    report_struct.extend([
+        {'type': 'section', 'title': 'Детальное сравнение'},
+        {'type': 'include', 'file': 'tab_detailed_psnr'},
+    ])
+    
+    if 'ssim' in df.columns:
+        report_struct.append({'type': 'include', 'file': 'tab_detailed_ssim'})
+
+    try:
+        exporter.generate_report(report_filename + '_results', report_struct)
+        logger.info(f"Отчет успешно сгенерирован: {report_dir / (report_filename + '_results.tex')}")
+    except Exception as e:
+        logger.error(f"Ошибка сборки отчета: {e}")
 
 # Experiment metadata export
 
@@ -989,6 +1122,11 @@ def run_pipeline(
     duration = (end_time - start_time).total_seconds()
     logger.info("Обработка завершена за %.1f сек.", duration)
 
+    results_data_path = Path(data_folder) / "analysis_data.csv"
+    processing.get_table(results_data_path)
+    logger.info("Результаты сохранены в '%s'", results_data_path)
+
+    
     # Экспорт метаданных
     export_metadata(config, results_dir, start_time, end_time)
 
@@ -1004,9 +1142,20 @@ def run_pipeline(
             report_path = results_dir / filename
         else:
             report_path = Path(yaml_output_path) if yaml_output_path else results_dir / "report.tex"
-        logger.info("Генерация LaTeX-отчёта: %s", report_path)
-        generate_latex_report(config, results_dir, report_path,
+        logger.info("Генерация LaTeX-отчёта (метаданные): %s", report_path)
+        generate_latex_metadata_report(config, results_dir, report_path,
                               start_time, end_time)
+        
+        logger.info("Генерация LaTeX-отчёта (результаты): %s", report_path)
+        
+        generate_latex_results_report(
+            config, 
+            results_dir, 
+            report_path,
+            start_time, 
+            end_time,
+            data_folder=Path(data_folder) 
+        )
 
     return {
         "status": "completed",

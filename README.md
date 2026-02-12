@@ -27,25 +27,7 @@
 - **Построение многомерных Парето-фронтов** для анализа компромиссов между качеством и производительностью
 - **Систематическая оценка** устойчивости алгоритмов к шумам и смазам
 
-## Модульная архитектура
-
-Проект построен по модульному принципу с центральным классом-фасадом `Processing`:
-
-```
-Processing (facade)
-├── reader          — загрузка изображений, создание связей
-├── display         — визуализация результатов
-├── apply_filter    — применение фильтров (blur, noise, denoise)
-├── module_process  — восстановление (один алгоритм)
-├── process_pipeline— полный пайплайн (фильтры → восстановление → анализ)
-├── histogram       — предобработка (выравнивание гистограмм)
-├── tables          — экспорт метрик (CSV)
-├── clear           — очистка связей и файлов
-├── optimizer       — оптимизация гиперпараметров (Optuna)
-└── analyzer        — Парето-анализ
-```
-
-### Функциональность
+### Функциональность фреймворка
 
 - **Обработка**: монохромные и цветные изображения (JPEG, BMP, PNG), пакетная обработка
 - **Генерация искажений**: расфокус, motion blur, B-spline траектории, гауссов/пуассонов/импульсный шум
@@ -56,9 +38,9 @@ Processing (facade)
 
 ---
 
-## Начало работы
+## Техническое описание
 
-### 1. Клонирование и настройка окружения
+### 1. Клонирование репозитория и настройка окружения
 
 ```bash
 git clone https://github.com/PavelYurov/blind_deconvolution.git
@@ -73,20 +55,22 @@ python -m venv .venv
 source .venv/bin/activate
 ```
 
-### 2. Установка
+### 2. Установка пакета
 
 ```bash
-# Базовая установка
+# Базовая установка (минимальные зависимости)
 pip install -e .
 
-# С CLI-интерфейсом (run.py, cli.py)
+# С поддержкой CLI-интерфейса (run.py, cli.py)
 pip install -e ".[cli]"
 
-# Для разработки
+# Для разработки (все зависимости и инструменты разработки)
 pip install -e ".[cli,dev,docs]"
 ```
 
-Альтернативный способ — без клонирования:
+**Альтернативный способ — без клонирования**
+
+Если вам нужна только библиотека без исходного кода:
 
 ```bash
 pip install git+https://github.com/PavelYurov/blind_deconvolution.git
@@ -94,36 +78,44 @@ pip install git+https://github.com/PavelYurov/blind_deconvolution.git
 
 ### 3. Использование
 
-**Как Python-библиотека:**
+**В качестве Python-библиотеки**
 
 ```python
 from blinddeconv.processing import Processing
-from blinddeconv.algorithms.task_type.company_type.algorithm_type.algorithm_name import algorithm_class
+from blinddeconv.algorithms.task_type.company_type.algorithm_type.algorithm_name import ALGORITHM
 
+# Инициализация обработчика
 proc = Processing(images_folder="images/original", color=False)
 
-# Связываем оригинал с искажённым
-proc.bind("images/original/airplane.png",
-          "images/distorted/airplane_blurred.png")
+# Связывание оригинального и искажённого изображений
+proc.bind("images/original/image.png",
+          "images/distorted/image_blurred.png")
 
-# Восстанавливаем
-proc.process(algorithm, metadata=True)
+# Восстановление изображения
+proc.process(ALGORITHM, metadata=True)
 
 # Визуализация
 proc.show()
 ```
 
-**Через CLI (запуск в виртуальном окружении):**
+**Через командную строку (CLI)**
+
+Все команды выполняются в активированном виртуальном окружении:
 
 ```bash
-# Запуск по конфигурационному файлу
-python run.py --config configs/basic_deconvolution.yaml
+# Запуск полного пайплайна с использованием конфигурации
+python run.py --config configs/experiment.yaml
 
 # Быстрая обработка одного изображения
-python cli.py process --input image.jpg --algorithm vabid
+python cli.py process \
+  --input image.jpg \
+  --algorithm algorithm_name
 
 # Интерактивный мастер настройки
 python cli.py interactive
+
+# Просмотр доступных команд
+python cli.py --help
 ```
 
 ---
@@ -222,16 +214,16 @@ blind_deconvolution/
 
 ## Подробная документация
 
-Полная документация доступна в `docs/source/` (читается на GitHub, собирается через Sphinx):
+Полная документация доступна в `docs/source/`:
 
 | Раздел | Описание |
 |--------|----------|
-| [Установка и настройка](docs/source/installation.md) | Все способы установки, профили зависимостей, интерактивный установщик, настройка Octave |
+| [Установка и настройка](docs/source/installation.md) | Все способы установки, профили зависимостей, интерактивный установщик, настройка Octave, Cython |
 | [Руководство пользователя](docs/source/usage_guide.md) | `run.py`, `cli.py`, все команды, примеры Python-кода, сборка документации |
 | [Конфигурационные файлы](docs/source/configuration.md) | Полная структура YAML/JSON-конфигов, валидация, реестры алгоритмов и фильтров |
 | [Архитектура системы](docs/source/architecture.md) | Компоненты, паттерны проектирования, организация модулей |
 | [Поток данных](docs/source/data_flow.md) | Схемы `process` и `full_process`, `bind()`, `filter()`, формат `dataset.json` |
 | [API Reference](docs/source/api_reference.md) | Полная справка по классам, методам и функциям |
-| [Для разработчиков](docs/source/CONTRIBUTING.md) | Стандарты кода, добавление алгоритмов/фильтров, Git-конвенции, линтинг |
+| [Для разработчиков](docs/source/CONTRIBUTING.md) | Стандарты кода, добавление алгоритмов/фильтров, линтинг |
 
 Собранная HTML-документация: [pavelyurov.github.io/blind_deconvolution](https://pavelyurov.github.io/blind_deconvolution/)
