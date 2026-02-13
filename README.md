@@ -1,15 +1,17 @@
 # Исследование методов Blind Image Deconvolution
 
+[![CI](https://github.com/PavelYurov/blind_deconvolution/actions/workflows/ci.yml/badge.svg)](https://github.com/PavelYurov/blind_deconvolution/actions)
+
 ## Руководитель проекта 
 
 - Парфенов Денис Васильевич, promasterden@yandex.ru
 
 ## Участники проекта
 
-- Беззаборов А.А., КМБО-01-22, antonbezzaborov929@gmail.com - Тимлид
-- Юров П.И., КМБО-01-22, pavel.yurov0425@gmail.com - Программист
-- Куропатов К.Л., КМБО-01-22, konstantinkuropatov@gmail.com - Теоретик
-- Малыш Я.В., КМБО-03-22, mrgeroixyu@gmail.com - Программист
+- Беззаборов А.А., КМБО-01-22, antonbezzaborov929@gmail.com - Тимлид-разработчик, Variational Bayesian (Heavy-tailed & Sparse Priors) алгормитмы и фреймворк
+- Юров П.И., КМБО-01-22, pavel.yurov0425@gmail.com - Разработчик, Non-Local Low-Rank Tensor Approximation алгормитмы и фреймворк
+- Куропатов К.Л., КМБО-01-22, konstantinkuropatov@gmail.com -  Разработчик-теоретик, Variational Bayesian (Total Variation & Structured Priors) алгоритмы
+- Малыш Я.В., КМБО-03-22, mrgeroixyu@gmail.com - Разработчик, L0/L1-Regularized Optimization алгормитмы и фреймворк
 
 ## Описание проекта
 
@@ -57,14 +59,17 @@ source .venv/bin/activate
 
 ### 2. Установка пакета
 
+Базовая установка (минимальные зависимости)
 ```bash
-# Базовая установка (минимальные зависимости)
 pip install -e .
+```
 
-# С поддержкой CLI-интерфейса (run.py, cli.py)
+С поддержкой CLI-интерфейса (run.py, cli.py)
+```bash
 pip install -e ".[cli]"
-
-# Для разработки (все зависимости и инструменты разработки)
+```
+Для разработки (все зависимости и инструменты разработки)
+```bash
 pip install -e ".[cli,dev,docs]"
 ```
 
@@ -83,18 +88,19 @@ pip install git+https://github.com/PavelYurov/blind_deconvolution.git
 ```python
 from blinddeconv.processing import Processing
 from blinddeconv.algorithms.task_type.company_type.algorithm_type.algorithm_name import ALGORITHM
-
-# Инициализация обработчика
+```
+Инициализация обработчика
+```python
 proc = Processing(images_folder="images/original", color=False)
-
-# Связывание оригинального и искажённого изображений
+```
+Бинд оригинального и искажённого изображений
+```python
 proc.bind("images/original/image.png",
           "images/distorted/image_blurred.png")
-
-# Восстановление изображения
+```
+Восстановление изображения и визуализация
+```python
 proc.process(ALGORITHM, metadata=True)
-
-# Визуализация
 proc.show()
 ```
 
@@ -102,19 +108,22 @@ proc.show()
 
 Все команды выполняются в активированном виртуальном окружении:
 
+Запуск полного пайплайна с использованием конфигурации
 ```bash
-# Запуск полного пайплайна с использованием конфигурации
 python run.py --config configs/experiment.yaml
-
-# Быстрая обработка одного изображения
+```
+Быстрая обработка одного изображени
+```bash
 python cli.py process \
   --input image.jpg \
   --algorithm algorithm_name
-
-# Интерактивный мастер настройки
+```
+Интерактивный мастер настройки
+```bash
 python cli.py interactive
-
-# Просмотр доступных команд
+```
+Просмотр доступных команд
+```bash
 python cli.py --help
 ```
 
