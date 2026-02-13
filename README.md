@@ -47,13 +47,14 @@
 ```bash
 git clone https://github.com/PavelYurov/blind_deconvolution.git
 cd blind_deconvolution
-
 python -m venv .venv
-
-# Windows PowerShell
+```
+Windows PowerShell
+```bash
 .venv\Scripts\Activate.ps1
-
-# Linux / macOS
+```
+Linux / macOS
+```bash
 source .venv/bin/activate
 ```
 
