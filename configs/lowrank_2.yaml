@@ -1,0 +1,99 @@
+# ============================================================================
+# LowRank-BD: Конфигурация для сильной расфокусировки (DefocusBlur)
+# ============================================================================
+# Целевой сценарий:
+#   DefocusBlur(param=4..8, kernel_size=61)
+#   Пример: fl_defocus2 = DefocusBlur(gaussian_distribution, param=5, kernel_size=61)
+#
+# Почему дефолтные параметры не работают:
+#   1. Ядро расфокусировки — диск (disk/circle), это матрица ПОЛНОГО
+#      ранга.  Low-rank регуляризация (sigma=1.0) пытается
+#      сжать ранг ядра и ИСКАЖАЕТ дисковую структуру, заменяя её
+#      аппроксимацией ранга 1–2.
+#   2. kernel_beta = 3e-3 слишком мало — Tikhonov-регуляризация
+#      не удерживает гладкую дисковую форму ядра.
+#   3. threshold = 0.05 слишком агрессивно обнуляет «хвосты»
+#      дискового ядра (элементы вблизи границы диска малы по
+#      амплитуде, но физически значимы).
+#
+# Что изменено и почему:
+#   - sigma ↓ 0.0: ПОЛНОСТЬЮ ОТКЛЮЧЕНА low-rank регуляризация.
+#     Disk-ядро имеет полный ранг ≈ min(kh, kw), ядерная норма
+#     была бы вредна.  Это ключевое изменение.
+#   - lambda_ ↑ 3e-3: умеренное усиление.  Для defocus blur
+#     изображение теряет ВЧ компоненты изотропно → нужна чуть
+#     более сильная регуляризация, чтобы подавить шум в ВЧ.
+#   - kernel_beta ↑ 5e-3: усиленное Tikhonov-якорение.
+#     Удерживает ядро «гладким» и ближе к дисковой форме,
+#     предотвращая появление артефактных пиков.
+#   - alpha_multiplier ↓ 1.5: более плавное масштабирование α
+#     по пирамиде масштабов.
+#   - threshold ↓ 0.02: меньше обрезка → сохраняются элементы
+#     на краю дискового ядра.
+#   - max_iter ↑ 10: больше итераций для сходимости.
+#   - iter_k_rank ↑ 5: больше CG-уточнений ядра (хоть IRNN
+#     отключён, CG+projection всё ещё важен).
+#   - exp_a = 0.8: оставлен по умолчанию.  Для изотропного
+#     размытия дефокуса moderate prior лучше, чем sparse (0.5).
+# ============================================================================
+
+experiment:
+  name: "LowRank-BD: Large Defocus Blur"
+  description: >
+    Восстановление изображений с сильной расфокусировкой (param >= 4).
+    Ключевое отличие: low-rank регуляризация ОТКЛЮЧЕНА, так как
+    ядро расфокуса — диск полного ранга.
+
+input:
+  images_folder: "images/original"
+  color: false
+  load_mode: "all"
+
+output:
+  restored_folder: "results/lowrank_defocus/restored"
+  data_folder: "results/lowrank_defocus/data"
+  kernel_folder: "results/lowrank_defocus/kernels"
+
+processing:
+  mode: "full_process"
+  metadata: true
+  unique_paths: true
+
+filters:
+  - chain:
+      - type: "defocus_blur"
+        params:
+          psf: "gaussian"
+          param: 5
+          kernel_size: 61
+
+algorithms:
+  - name: "lowrank_bd"
+    params:
+      kernel_size: 31
+      # ─── Регуляризация изображения ─────────────────────────────
+      lambda_: 0.003          # ↑ 1.5×  (default: 2e-3)
+      alpha_multiplier: 1.5   # ↓       (default: 2.0)
+      exp_a: 0.8              #   default
+      thr_e: 0.000667         #   default (1/1500)
+      # ─── Регуляризация ядра ────────────────────────────────────
+      kernel_beta: 0.005      # ↑ 1.7×  (default: 3e-3)
+      sigma: 0.0              # ↓ OFF!  (default: 1.0) — disk полного ранга
+      tau: 0.00001            #   default (не используется при sigma=0)
+      delta: 0.00001          #   default
+      threshold: 0.02         # ↓       (default: 0.05)
+      # ─── Итерации ─────────────────────────────────────────────
+      max_iter: 10            # ↑ 1.4×  (default: 7)
+      max_irls: 3             #   default
+      max_cg: 200             #   default
+      max_iter_k: 50          #   default
+      max_iter_rank: 3        #   default (не используется при sigma=0)
+      iter_k_rank: 5          # ↑ 1.7×  (default: 3)
+      # ─── Non-blind деконволюция ────────────────────────────────
+      nb_lambda: 3000.0       #   default
+      nb_alpha: 0.5           #   default
+
+report:
+  generate: true
+  format: "latex"
+  output_path: "results/lowrank_defocus/report.tex"

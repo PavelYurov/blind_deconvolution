@@ -19,14 +19,30 @@ from .utils import precompute_gradient_operators, compute_spatial_gradient
 from .solvers import solve_image_hqs, estimate_uncertainty, solve_kernel_pgd, non_neg_ep
 
 # Robust import of base class
-try:
-    import sys
-    import os
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from base import DeconvolutionAlgorithm
-except ImportError:
-    class DeconvolutionAlgorithm:
-        def __init__(self, name): self.name = name
+import sys
+import os
+from pathlib import Path
+
+def _find_project_root(start: Path) -> Path:
+    path = start.resolve()
+
+    while not (path / "pyproject.toml").exists():
+        if path.parent == path:
+            raise RuntimeError("Cannot locate project root")
+        path = path.parent
+
+    return path
+
+_CURRENT_FILE = Path(__file__).resolve()
+_PROJECT_ROOT = _find_project_root(_CURRENT_FILE)
+_SRC_DIR = _PROJECT_ROOT / "src"
+_ALGORITHMS_DIR = _SRC_DIR / "blinddeconv" / "algorithms"
+
+for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
+
+from blinddeconv.algorithms.base import DeconvolutionAlgorithm
 
 class EP_EM(DeconvolutionAlgorithm):
     """

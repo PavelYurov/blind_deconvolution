@@ -25,9 +25,34 @@ from typing import Any, Optional, Tuple
 
 import cv2
 import numpy as np
-import matlab.engine
+import tempfile
+import shutil
 
-from algorithms.base import DeconvolutionAlgorithm
+import sys
+import os
+from pathlib import Path
+
+def _find_project_root(start: Path) -> Path:
+    path = start.resolve()
+
+    while not (path / "pyproject.toml").exists():
+        if path.parent == path:
+            raise RuntimeError("Cannot locate project root")
+        path = path.parent
+
+    return path
+
+_CURRENT_FILE = Path(__file__).resolve()
+_PROJECT_ROOT = _find_project_root(_CURRENT_FILE)
+_SRC_DIR = _PROJECT_ROOT / "src"
+_ALGORITHMS_DIR = _SRC_DIR / "blinddeconv" / "algorithms"
+
+for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
+
+from blinddeconv.algorithms.base import DeconvolutionAlgorithm
+from blinddeconv.system.octave import OctaveEngine
 
 ALGORITHM_NAME = "TobiasWolf_math_Blind_Deconvolution_MHDM"
 SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "source")
@@ -50,9 +75,37 @@ class TobiasWolfMathBlindDeconvolutionMHDM(DeconvolutionAlgorithm):
 	):
 		super().__init__(ALGORITHM_NAME)
 
-		self._eng = matlab.engine.start_matlab()
-		self._eng.addpath(self._eng.genpath(SOURCE_PATH), nargout=0)
-		self._eng.cd(SOURCE_PATH, nargout=0)
+		self._eng = OctaveEngine.get_instance()
+		if self._eng is None:
+			raise RuntimeError("Could not initialize Octave Engine. Check octaveconfig.py and Octave installation.")
+
+		self._eng.addpath(self._eng.genpath(SOURCE_PATH))
+		self._eng.cd(SOURCE_PATH)
+
+		try:
+			self._eng.eval("pkg load image")
+		except Exception as e:
+			print(f"Warning: Failed to load Octave 'image' package. Ensure it is installed (pkg install -forge image). Error: {e}")
+
+		# Compatibility shim: sum(..., 'all') is MATLAB R2018b+ syntax,
+		# not supported in older Octave versions.
+		self._compat_dir = tempfile.mkdtemp(prefix="octave_compat_")
+		sum_shim_path = os.path.join(self._compat_dir, "sum.m")
+		with open(sum_shim_path, "w") as f:
+			f.write(
+				"function s = sum(x, varargin)\n"
+				"  if nargin >= 2 && ischar(varargin{1}) && strcmp(varargin{1}, 'all')\n"
+				"    if nargin == 3\n"
+				"      s = builtin('sum', x(:), varargin{2});\n"
+				"    else\n"
+				"      s = builtin('sum', x(:));\n"
+				"    end\n"
+				"  else\n"
+				"    s = builtin('sum', x, varargin{:});\n"
+				"  end\n"
+				"end\n"
+			)
+		self._eng.addpath(self._compat_dir)
 
 		self.lambda0 = float(lambda0)
 		self.mu0 = float(mu0)
@@ -121,43 +174,44 @@ class TobiasWolfMathBlindDeconvolutionMHDM(DeconvolutionAlgorithm):
 		if image_gray.max() > 1.5:
 			image_gray /= 255.0
 
-		m, n = image_gray.shape
-		I_mat = matlab.double(image_gray.tolist())
-		self._eng.workspace["f_py"] = I_mat
-		self._eng.workspace["lambda0_py"] = float(self.lambda0)
-		self._eng.workspace["mu0_py"] = float(self.mu0)
-		self._eng.workspace["r_py"] = float(self.r)
-		self._eng.workspace["s_py"] = float(self.s)
-		self._eng.workspace["tol_py"] = float(self.tol)
-		self._eng.workspace["maxits_py"] = float(self.maxits)
+		self._eng.push('f_py', image_gray)
+		self._eng.push('lambda0_py', float(self.lambda0))
+		self._eng.push('mu0_py', float(self.mu0))
+		self._eng.push('r_py', float(self.r))
+		self._eng.push('s_py', float(self.s))
+		self._eng.push('tol_py', float(self.tol))
+		self._eng.push('maxits_py', float(self.maxits))
 
 		stopping_val = self._compute_stopping(image_gray)
-		self._eng.workspace["stopping_py"] = float(stopping_val)
+		self._eng.push('stopping_py', float(stopping_val))
 
-		self._eng.eval(
-			"""
-			f = f_py;
-			[m_py,n_py] = size(f);
-			f_four = fft2(f);
+		try:
+			self._eng.eval(
+				"f = f_py;"
+				"[m_py,n_py] = size(f);"
+				"f_four = fft2(f);"
+				"[rr, c] = ismember(f_four, conj(f_four));"
+				"c = reshape(c, m_py*n_py, 1);"
+				"zero_mask = (c == 0);"
+				"c(zero_mask) = find(zero_mask);"
+				"M = [c, c(c)];"
+				"sortedM = sort(M, 2);"
+				"[~, uniqueIdx] = unique(sortedM, 'rows', 'stable');"
+				"indices = M(uniqueIdx, :);"
+				"[u_end_py, k_end_py, ~, ~, ~] = blind_deconvolution_MHDM( "
+				"f, f_four, "
+				"lambda0_py, mu0_py, "
+				"r_py, s_py, "
+				"tol_py, stopping_py, maxits_py, indices);"
+			)
 
-			[rr, c] = ismember(f_four, conj(f_four));
-			c = reshape(c, m_py*n_py, 1);
-			M = [c, c(c)];
-			sortedM = sort(M, 2);
-			[~, uniqueIdx] = unique(sortedM, 'rows', 'stable');
-			indices = M(uniqueIdx, :);
-
-			[u_end_py, k_end_py, ~, ~, ~] = blind_deconvolution_MHDM( ...
-				f, f_four, ...
-				lambda0_py, mu0_py, ...
-				r_py, s_py, ...
-				tol_py, stopping_py, maxits_py, indices);
-			""",
-			nargout=0,
-		)
-
-		u_end_mat = self._eng.workspace["u_end_py"]
-		k_end_mat = self._eng.workspace["k_end_py"]
+			u_end_mat = self._eng.pull('u_end_py')
+			k_end_mat = self._eng.pull('k_end_py')
+		except Exception as e:
+			print(f"Error executing Octave function: {e}")
+			if image.ndim == 2:
+				return cv2.cvtColor(image, cv2.COLOR_GRAY2BGR), np.zeros((3, 3))
+			return image, np.zeros((3, 3))
 
 		u_np = np.array(u_end_mat, dtype=np.float64)
 		u_np = np.clip(u_np, 0.0, 1.0)
@@ -169,10 +223,8 @@ class TobiasWolfMathBlindDeconvolutionMHDM(DeconvolutionAlgorithm):
 		return u_bgr, kernel
 
 	def __del__(self):
-		try:
-			self._eng.quit()
-		except Exception:
-			pass
+		if hasattr(self, '_compat_dir') and os.path.isdir(self._compat_dir):
+			shutil.rmtree(self._compat_dir, ignore_errors=True)
 
 
 __all__ = ["TobiasWolfMathBlindDeconvolutionMHDM"]
