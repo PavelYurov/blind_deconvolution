@@ -93,18 +93,20 @@ blind_deconvolution/
 ```bash
 git clone https://github.com/PavelYurov/blind_deconvolution.git
 cd blind_deconvolution
-
 python -m venv .venv
-
-# Windows PowerShell
+```
+Windows PowerShell
+```bash
 .venv\Scripts\Activate.ps1
-
-# Linux / macOS
+```
+Linux / macOS
+```bash
 source .venv/bin/activate
-
+```
+Установка
+```bash
 pip install -e ".[dev,cli,docs]"
-
-python -c "from blinddeconv.processing import Processing; print('OK')"
+python -c "from blinddeconv.processing import Processing"
 ```
 
 ## Стандарты кода
@@ -280,32 +282,19 @@ class MyFilter(FilterBase):
 ```
 
 ## Сборка документации
-
+Установка зависимостей
 ```bash
-# Установка зависимостей
 pip install ".[docs]"
-
-# Генерация API + сборка HTML
+```
+Генерация API и сборка HTML
+```bash
 python docs/tools/build_docs.py
-
-# Или вручную:
+```
+Или вручную:
+```bash
 cd docs/source
 sphinx-apidoc --separate -o docs/source src/
 sphinx-build -b html docs/source docs/_build/html
-
-Документация появится в `docs/_build/html/index.html`.
-
-## Тестирование
-
-```bash
-# Запуск тестов
-pytest tests/
-
-# С покрытием
-pytest --cov=blinddeconv tests/
-
-# Только определённый модуль
-pytest tests/test_processing.py -v
 ```
 
 ## Качество кода
