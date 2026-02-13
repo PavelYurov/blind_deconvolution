@@ -1,6 +1,6 @@
 # Исследование методов Blind Image Deconvolution
 
-[![CI](https://github.com/PavelYurov/blind_deconvolution/actions/workflows/ci.yml/badge.svg)](https://github.com/PavelYurov/blind_deconvolution/actions)
+[![CI](https://github.com/PavelYurov/blind_deconvolution/actions/workflows/ci.yml/badge.svg?branch=feature/automation-system)](https://github.com/PavelYurov/blind_deconvolution/actions/workflows/ci.yml)
 
 ## Руководитель проекта 
 
@@ -8,7 +8,7 @@
 
 ## Участники проекта
 
-- Беззаборов А.А., КМБО-01-22, antonbezzaborov929@gmail.com - Тимлид-разработчик, Variational Bayesian (Heavy-tailed & Sparse Priors) алгормитмы и фреймворк
+- Беззаборов А.А., КМБО-01-22, antonbezzaborov929@gmail.com - Тимлид-разработчик, Variational Bayesian (Robust & Sparse Priors) алгормитмы и фреймворк
 - Юров П.И., КМБО-01-22, pavel.yurov0425@gmail.com - Разработчик, Non-Local Low-Rank Tensor Approximation алгормитмы и фреймворк
 - Куропатов К.Л., КМБО-01-22, konstantinkuropatov@gmail.com -  Разработчик-теоретик, Variational Bayesian (Total Variation & Structured Priors) алгоритмы
 - Малыш Я.В., КМБО-03-22, mrgeroixyu@gmail.com - Разработчик, L0/L1-Regularized Optimization алгормитмы и фреймворк
