@@ -35,7 +35,7 @@ References
 import numpy as np
 from scipy.signal import fftconvolve
 
-from .utils import psf2otf
+from .utils import psf2otf, block_matching
 
 
 # ======================================================================
@@ -51,6 +51,8 @@ def optimize_image(
     max_cg: int = 200,
     exp_a: float = 0.8,
     thr_e: float = 1.0 / 1500,
+    z_nlr: np.ndarray = None,
+    mu_nlr: float = 0.0,
 ) -> np.ndarray:
     """
     Estimate the latent sharp image via IRLS with hyper-Laplacian prior.
@@ -107,6 +109,12 @@ def optimize_image(
         Hyper-Laplacian exponent *p* (0 < p ≤ 2; typical 0.5–0.8).
     thr_e : float
         Smoothing parameter ε to avoid division by zero in weights.
+    z_nlr : np.ndarray or None, optional
+        Non-local low-rank prior image (WNNM-denoised).
+        When provided together with ``mu_nlr > 0``, adds the
+        coupling term μ‖x − z‖² to the objective.
+    mu_nlr : float
+        Weight for the non-local low-rank coupling term.
 
     Returns
     -------
@@ -123,6 +131,8 @@ def optimize_image(
 
     kernel_rot = np.rot90(kernel, 2)     # K^T (adjoint of K)
 
+    use_nlr = z_nlr is not None and mu_nlr > 0.0
+
     for irls_it in range(max_irls):
         # ---- Compute IRLS weights ------------------------------------
         # [6], solve_image_irls.m:
@@ -137,8 +147,10 @@ def optimize_image(
         # Right-hand side:  b = K^T y
         # [6], solve_image_L2_w.m:  b = conv2(I, rfilt1)
         b = fftconvolve(blurred, kernel_rot, mode='same')
+        if use_nlr:
+            b = b + mu_nlr * z_nlr
 
-        # Linear operator  A·v = K^T K v + α D^T W D v
+        # Linear operator  A·v = K^T K v + α D^T W D v  [+ μ v]
         def _apply_A(v):
             # K^T K v   (data-fidelity Hessian)
             Kv = fftconvolve(v, kernel, mode='same')
@@ -153,6 +165,9 @@ def optimize_image(
                 vx * weight_x, dxf_t, mode='full')
             result += reg_weight * fftconvolve(
                 vy * weight_y, dyf_t, mode='full')
+
+            if use_nlr:
+                result = result + mu_nlr * v
 
             return result
 
@@ -310,6 +325,96 @@ def optimize_kernel(
 
 
 # ======================================================================
+#  2b.  KERNEL ESTIMATION  (FFT Closed-Form, Gradient Domain)
+# ======================================================================
+
+def optimize_kernel_fft(
+    x: np.ndarray,
+    blurred: np.ndarray,
+    kernel_size: int,
+    gamma: float = 2.0,
+) -> np.ndarray:
+    """
+    FFT-based kernel estimation in the gradient domain.
+
+    Solves the least-squares kernel problem using horizontal and
+    vertical image gradients (Ren et al. 2016, Eq. 23):
+
+    .. math::
+
+        k = \\mathcal{F}^{-1}\\!\\left(
+            \\frac{\\sum_{i \\in \\{h,v\\}}
+                   \\overline{\\mathcal{F}(\\partial_i x)}
+                   \\,\\cdot\\,
+                   \\mathcal{F}(\\partial_i y)}
+                 {\\sum_{i \\in \\{h,v\\}}
+                   |\\mathcal{F}(\\partial_i x)|^2 + \\gamma}
+        \\right)
+
+    Then projects onto the PSF feasible set {k ≥ 0, Σk = 1}.
+
+    Parameters
+    ----------
+    x : np.ndarray, shape (H, W)
+        Current sharp-image estimate.
+    blurred : np.ndarray, shape (H, W)
+        Observed blurred image.
+    kernel_size : int
+        Target kernel size (must be odd).
+    gamma : float
+        Tikhonov regularisation weight.
+
+    Returns
+    -------
+    kernel : np.ndarray, shape (kernel_size, kernel_size)
+
+    References
+    ----------
+    [2] Ren et al. (IEEE TIP 2016), Eq. (23)–(24).
+    """
+    H, W = blurred.shape
+    ks = kernel_size
+    half = ks // 2
+
+    # Gradient operators
+    dx = np.array([[1.0, -1.0]])
+    dy = np.array([[1.0], [-1.0]])
+
+    # Image & observation gradients
+    gx_x = fftconvolve(x, dx, mode='same')
+    gy_x = fftconvolve(x, dy, mode='same')
+    gx_y = fftconvolve(blurred, dx, mode='same')
+    gy_y = fftconvolve(blurred, dy, mode='same')
+
+    # 2-D FFTs
+    Fgx_x = np.fft.fft2(gx_x)
+    Fgy_x = np.fft.fft2(gy_x)
+    Fgx_y = np.fft.fft2(gx_y)
+    Fgy_y = np.fft.fft2(gy_y)
+
+    # Closed-form solution  (Ren 2016, Eq. 23)
+    numer = np.conj(Fgx_x) * Fgx_y + np.conj(Fgy_x) * Fgy_y
+    denom = np.abs(Fgx_x) ** 2 + np.abs(Fgy_x) ** 2 + gamma
+
+    k_full = np.real(np.fft.ifft2(numer / denom))
+
+    # The PSF center sits at (0, 0) in FFT convention;
+    # shift to array center, then crop to target size.
+    k_full = np.fft.fftshift(k_full)
+    cy, cx = H // 2, W // 2
+    kernel = k_full[cy - half: cy + half + 1,
+                    cx - half: cx + half + 1].copy()
+
+    # Project onto feasible set:  k ≥ 0,  Σk = 1
+    kernel = np.clip(kernel, 0.0, None)
+    total = kernel.sum()
+    if total > 0:
+        kernel /= total
+
+    return kernel
+
+
+# ======================================================================
 #  3.  LOW-RANK KERNEL REGULARISATION  (IRNN)
 # ======================================================================
 
@@ -377,23 +482,139 @@ def low_rank_regularization(
     """
     X = kernel.copy()
 
-    # Uniform initial weights (before first SVD)
-    w = np.ones(min(X.shape))
-
     for _ in range(max_iter):
         U, S, Vt = np.linalg.svd(X, full_matrices=False)
+
+        # MM weights from CURRENT singular values:  w_i = 1/(σ_i + δ)
+        # ([1], optimizerank_new.m;  derivative of  log(σ + δ))
+        w = 1.0 / (S + delta)
 
         # Weighted soft-thresholding of singular values
         # Eq. (8) in [2]: S_thresh = max(Σ − τ·diag(w), 0)
         S_thresh = np.maximum(S - tau * w, 0.0)
         X = (U * S_thresh) @ Vt
 
-        # Update weights:  w_i = 1/(σ_i + δ)
-        # Captures the derivative of  log(σ + δ)
-        sigma = np.linalg.svd(X, compute_uv=False)
-        w = 1.0 / (sigma + delta)
-
     return X
+
+
+# ======================================================================
+#  3b.  NON-LOCAL LOW-RANK IMAGE REGULARISATION  (WNNM)
+# ======================================================================
+
+def wnnm_regularization(
+    image: np.ndarray,
+    patch_size: int = 6,
+    search_window: int = 20,
+    num_similar: int = 60,
+    stride: int = 3,
+    wnnm_C: float = 0.05,
+    delta: float = 1e-6,
+) -> np.ndarray:
+    """
+    Non-local low-rank image regularisation via Weighted Nuclear Norm
+    Minimisation (WNNM).
+
+    Adapts the multi-image low-rank idea to a *single* image by
+    exploiting **Non-Local Self-Similarity** (NLSS): similar patches
+    within the image are stacked into a matrix that is approximately
+    low-rank, then denoised via WNNM.
+
+    Pipeline
+    --------
+    1. **Block matching** (BM3D-style): for each reference patch,
+       find the ``num_similar`` most similar patches in a local window.
+    2. **WNNM**: for each patch group, form a data matrix
+       X ∈ R^{d × n}, compute SVD, and apply weighted
+       soft-thresholding of singular values.
+    3. **Aggregation**: average overlapping denoised patches.
+
+    Parameters
+    ----------
+    image : np.ndarray, shape (H, W)
+        Current image estimate.
+    patch_size : int
+        Side length of square patches.
+    search_window : int
+        Half-side of the search area around each reference patch.
+    num_similar : int
+        Maximum similar patches per group (including reference).
+    stride : int
+        Spacing between reference patch positions.
+    wnnm_C : float
+        Weight scaling constant for WNNM:
+        w_i = C · √n / (σ_i + δ).
+    delta : float
+        Smoothing constant to avoid division by zero.
+
+    Returns
+    -------
+    denoised : np.ndarray, shape (H, W)
+
+    References
+    ----------
+    [2] Ren et al. (IEEE TIP 2016), Sec. III — Enhanced Low-Rank Prior.
+    [5] Yang et al. (IEEE Access 2020), Sec. III-A — Non-local
+        low-rank prior.
+    Gu, S., et al. "Weighted nuclear norm minimization with
+    application to image denoising." CVPR, 2014.
+    Dabov, K., et al. "Image denoising by sparse 3-D transform-domain
+    collaborative filtering." IEEE TIP, 2007 (BM3D grouping).
+    """
+    H, W = image.shape
+    ps = patch_size
+
+    # Guard: if the image is too small for meaningful block matching,
+    # return it unchanged.
+    if H < 3 * ps or W < 3 * ps:
+        return image.copy()
+
+    # ---- Step 1: Block Matching  (Dabov et al., BM3D) ----------------
+    groups = block_matching(image, ps, search_window, num_similar, stride)
+
+    # ---- Step 2: WNNM on each group  (Gu et al. 2014) ---------------
+    result = np.zeros_like(image)
+    count = np.zeros_like(image)
+    d = ps * ps
+
+    for positions in groups:
+        n = len(positions)
+        if n < 2:
+            continue
+
+        # Form patch matrix  X ∈ R^{d × n}
+        X = np.empty((d, n))
+        for j in range(n):
+            r, c = positions[j]
+            X[:, j] = image[r:r + ps, c:c + ps].ravel()
+
+        # Subtract column mean (improves low-rank approximation)
+        mean_col = X.mean(axis=1, keepdims=True)
+        X_c = X - mean_col
+
+        # SVD
+        U, S, Vt = np.linalg.svd(X_c, full_matrices=False)
+
+        # WNNM weights:  w_i = C √n / (σ_i + δ)
+        w = wnnm_C * np.sqrt(n) / (S + delta)
+
+        # Weighted soft-thresholding of singular values
+        S_new = np.maximum(S - w, 0.0)
+
+        # Reconstruct denoised patches
+        X_den = (U * S_new) @ Vt + mean_col
+
+        # Accumulate into output
+        for j in range(n):
+            r, c = positions[j]
+            result[r:r + ps, c:c + ps] += X_den[:, j].reshape(ps, ps)
+            count[r:r + ps, c:c + ps] += 1.0
+
+    # ---- Step 3: Normalise by overlap count -------------------------
+    mask = count > 0
+    result[mask] /= count[mask]
+    result[~mask] = image[~mask]
+
+    return result
 
 
 # ======================================================================
@@ -494,19 +715,31 @@ def fast_deconv_hyper_laplacian(
     wx = gx.copy()
     wy = gy.copy()
 
-    for _ in range(max_outer):
+    # ------------------------------------------------------------------
+    # β-continuation: start with a smaller penalty and ramp up to the
+    # target β geometrically.  Early iterations act as regularised
+    # pre-conditioning (strong prior → smooth, no ringing); later
+    # iterations refine detail.
+    # Ref: Boyd et al. (2011), Sec. 3.4.1; Krishnan & Fergus (2009).
+    # ------------------------------------------------------------------
+    beta_min = max(1.0, beta / 64.0)
+    beta_rate = (beta / beta_min) ** (1.0 / max(max_outer - 1, 1))
+
+    for outer_it in range(max_outer):
+        cur_beta = min(beta_min * beta_rate ** outer_it, beta)
+
         for _ in range(max_inner):
 
             # === w-sub-problem ========================================
             # prox_{|·|^α / β}(∇g + b)
             if alpha == 1.0:
                 # Soft-thresholding  ([4], Eq. (6))
-                wx = _soft_threshold(gx + bx, 1.0 / beta)
-                wy = _soft_threshold(gy + by, 1.0 / beta)
+                wx = _soft_threshold(gx + bx, 1.0 / cur_beta)
+                wy = _soft_threshold(gy + by, 1.0 / cur_beta)
             else:
                 # Hyper-Laplacian proximal  ([4], Sec. 3.1)
-                wx = _hyper_laplacian_proximal(gx + bx, beta, alpha)
-                wy = _hyper_laplacian_proximal(gy + by, beta, alpha)
+                wx = _hyper_laplacian_proximal(gx + bx, cur_beta, alpha)
+                wy = _hyper_laplacian_proximal(gy + by, cur_beta, alpha)
 
             # === b-update (Bregman iteration) =========================
             bx = bx + gx - wx
@@ -518,8 +751,9 @@ def fast_deconv_hyper_laplacian(
             wx_full = fftconvolve(wx - bx, dxt, mode='full')
             wy_full = fftconvolve(wy - by, dyt, mode='full')
 
-            numer = lambda_ * Ktf + beta * np.fft.fft2(wx_full + wy_full)
-            denom = lambda_ * KtK + beta * DtD
+            numer = lambda_ * Ktf + cur_beta * np.fft.fft2(
+                wx_full + wy_full)
+            denom = lambda_ * KtK + cur_beta * DtD
 
             g = np.real(np.fft.ifft2(numer / (denom + 1e-10)))
 

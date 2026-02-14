@@ -316,8 +316,13 @@ def edgetaper(image: np.ndarray, kernel: np.ndarray) -> np.ndarray:
     border_y = max(kh // 2, 1)
     border_x = max(kw // 2, 1)
 
-    ramp_y = np.linspace(0, 1, border_y, endpoint=False)
-    ramp_x = np.linspace(0, 1, border_x, endpoint=False)
+    # Raised-cosine (Hann) window → C¹-smooth transition.
+    # Linear ramp has a derivative discontinuity at the junction with
+    # the interior, causing spectral leakage / boundary ringing.
+    t_y = np.linspace(0, 1, border_y, endpoint=False)
+    t_x = np.linspace(0, 1, border_x, endpoint=False)
+    ramp_y = 0.5 * (1.0 - np.cos(np.pi * t_y))
+    ramp_x = 0.5 * (1.0 - np.cos(np.pi * t_x))
 
     wy[:border_y] = ramp_y
     wy[-border_y:] = ramp_y[::-1]
@@ -327,6 +332,95 @@ def edgetaper(image: np.ndarray, kernel: np.ndarray) -> np.ndarray:
     weight = wy[:, None] * wx[None, :]
 
     return weight * image + (1.0 - weight) * blurred
+
+
+# =============================================================================
+#   Block Matching  (Non-Local Self-Similarity)
+# =============================================================================
+
+def block_matching(
+    image: np.ndarray,
+    patch_size: int = 6,
+    search_window: int = 20,
+    num_similar: int = 60,
+    stride: int = 3,
+) -> List:
+    """
+    BM3D-style block matching for non-local self-similarity.
+
+    For every reference patch (sampled on a regular grid with step
+    ``stride``), finds the ``num_similar`` most similar patches
+    inside a local search area using Euclidean distance.
+
+    Parameters
+    ----------
+    image : np.ndarray, shape (H, W)
+        Input image (float64, e.g. [0, 1]).
+    patch_size : int
+        Side length of square patches.
+    search_window : int
+        Half-side of the square search area around each reference.
+    num_similar : int
+        Maximum number of similar patches per group (incl. reference).
+    stride : int
+        Spacing between reference patch positions.
+
+    Returns
+    -------
+    groups : list of np.ndarray
+        Each element is an ``(n_i, 2)`` int array of ``(row, col)``
+        top-left positions of similar patches.
+
+    References
+    ----------
+    Dabov, K., et al. "Image denoising by sparse 3-D transform-domain
+    collaborative filtering." IEEE TIP, 2007 (BM3D).
+    """
+    H, W = image.shape
+    ps = patch_size
+
+    # All overlapping patches via sliding window (zero-copy view).
+    # Shape: (pH, pW, ps, ps)  where  pH = H-ps+1, pW = W-ps+1.
+    patches = np.lib.stride_tricks.sliding_window_view(image, (ps, ps))
+    pH, pW = patches.shape[:2]
+
+    # Flatten each patch to a vector: (pH, pW, d)  where d = ps*ps.
+    # reshape may copy internally when the view is non-contiguous.
+    d = ps * ps
+    patches_flat = patches.reshape(pH, pW, d)
+
+    groups: List[np.ndarray] = []
+
+    for ri in range(0, pH, stride):
+        for ci in range(0, pW, stride):
+            ref = patches_flat[ri, ci]            # (d,)
+
+            # Search-window bounds (clipped to valid patch area)
+            r0 = max(0, ri - search_window)
+            r1 = min(pH, ri + search_window + 1)
+            c0 = max(0, ci - search_window)
+            c1 = min(pW, ci + search_window + 1)
+
+            # Vectorised L2 distances inside the search region
+            region = patches_flat[r0:r1, c0:c1]    # (h, w, d)
+            sh, sw = region.shape[:2]
+            diffs = region - ref[None, None, :]
+            dists = np.einsum('ijk,ijk->ij', diffs, diffs)  # (h, w)
+            dists_flat = dists.ravel()
+
+            # Select top-k nearest neighbours
+            k = min(num_similar, len(dists_flat))
+            idx = np.argpartition(dists_flat, k)[:k]
+            idx_sorted = idx[np.argsort(dists_flat[idx])]
+
+            # Map flat index back to absolute (row, col)
+            local_rows = idx_sorted // sw + r0
+            local_cols = idx_sorted % sw + c0
+            positions = np.column_stack([local_rows, local_cols])
+
+            groups.append(positions)
+
+    return groups
 
 
 # =============================================================================

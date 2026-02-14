@@ -23,12 +23,15 @@ each scale:
    domain with optional Tikhonov regularisation and an exponential
    regularisation schedule.
 
-3. **Low-rank regularisation** (IRNN)
-   Enforces low-rank structure on the kernel matrix using iteratively
-   reweighted nuclear-norm minimisation with the ``log det`` surrogate
-   for the rank function.  This suppresses artefacts caused by
-   kernel-size over-estimation.
-   See Li et al. (WACV 2019) [1], Ren et al. (TIP 2016) [2].
+3. **Low-rank regularisation** (WNNM + Non-Local Self-Similarity)
+   Exploits non-local self-similarity within a single image:
+   similar patches are grouped via BM3D-style block matching and
+   stacked into matrices.  Weighted Nuclear Norm Minimisation
+   (WNNM) enforces low-rank structure on each patch group,
+   providing a powerful image prior that replaces the multi-image
+   kernel-matrix IRNN.
+   See Ren et al. (TIP 2016) [2], Gu et al. (CVPR 2014),
+   Yang et al. (IEEE Access 2020) [5].
 
 4. **Non-blind deconvolution** (Split Bregman / ADMM)
    Given the estimated kernel, recovers the sharp image using a
@@ -70,7 +73,9 @@ from .utils import (
 from .solvers import (
     optimize_image,
     optimize_kernel,
+    optimize_kernel_fft,
     low_rank_regularization,
+    wnnm_regularization,
     fast_deconv_hyper_laplacian,
 )
 from pathlib import Path
@@ -148,6 +153,20 @@ class LowRankBD(DeconvolutionAlgorithm):
         Regularisation weight for non-blind deconvolution.
     nb_alpha : float
         Hyper-Laplacian exponent for non-blind deconvolution.
+    patch_size : int
+        Patch side length for WNNM block matching.
+    search_window : int
+        Half-side of search area for block matching.
+    num_similar : int
+        Maximum number of similar patches per group.
+    stride_bm : int
+        Stride for reference patch sampling in block matching.
+    wnnm_C : float
+        WNNM weight scaling constant.
+    mu_nlr : float
+        Coupling weight between WNNM prior and image estimate.
+    kernel_gamma : float
+        Tikhonov weight for FFT-based kernel estimation.
     verbose : bool
         Print progress messages.
     """
@@ -172,6 +191,13 @@ class LowRankBD(DeconvolutionAlgorithm):
         threshold: float = 0.05,
         nb_lambda: float = 3000.0,
         nb_alpha: float = 0.5,
+        patch_size: int = 6,
+        search_window: int = 20,
+        num_similar: int = 60,
+        stride_bm: int = 3,
+        wnnm_C: float = 0.05,
+        mu_nlr: float = 0.05,
+        kernel_gamma: float = 2.0,
         verbose: bool = False,
     ):
         super().__init__(name='LowRank-BD')
@@ -197,6 +223,13 @@ class LowRankBD(DeconvolutionAlgorithm):
         self.threshold        = threshold
         self.nb_lambda        = nb_lambda
         self.nb_alpha         = nb_alpha
+        self.patch_size       = patch_size
+        self.search_window    = search_window
+        self.num_similar      = num_similar
+        self.stride_bm        = stride_bm
+        self.wnnm_C           = wnnm_C
+        self.mu_nlr           = mu_nlr
+        self.kernel_gamma     = kernel_gamma
         self.verbose          = verbose
 
         self.history: Dict[str, list]    = {'kernel_diff': [], 'scale': []}
@@ -317,34 +350,43 @@ class LowRankBD(DeconvolutionAlgorithm):
             tau_scale = self.tau * (si + 1) / num_scales
 
             # --- Alternating minimisation at this scale ----------------
+            z_nlr = None    # WNNM prior (computed inside loop)
+
             for it in range(self.max_iter):
                 k_prev = k.copy()
 
-                # ---- Image step (IRLS + CG, [6]) ---------------------
-                # Solves: min_x ||x⊛k - y||² + α D^T W D x
+                # ---- Non-local low-rank regularisation (WNNM) --------
+                # Exploit non-local self-similarity: group similar
+                # patches → low-rank matrix → WNNM denoising.
+                # [2] Ren et al. 2016;  [5] Yang et al. 2020.
+                if (self.sigma > 0
+                        and min(y_small.shape) >= 3 * self.patch_size):
+                    z_nlr = wnnm_regularization(
+                        x,
+                        self.patch_size,
+                        self.search_window,
+                        self.num_similar,
+                        self.stride_bm,
+                        self.wnnm_C,
+                        self.delta,
+                    )
+
+                # ---- Image step (IRLS + CG + WNNM, [6]) -------------
+                # min_x ||x⊛k − y||² + α D^T W D x + μ||x − z||²
                 x = optimize_image(
                     x, k, y_small, alpha,
                     self.max_irls, self.max_cg,
                     self.exp_a, self.thr_e,
+                    z_nlr=z_nlr,
+                    mu_nlr=self.mu_nlr if z_nlr is not None else 0.0,
                 )
 
-                # ---- Kernel + Low-rank step --------------------------
-                for ir in range(self.iter_k_rank):
-                    # Kernel estimation (CG + projection)
-                    k = optimize_kernel(
-                        x, k, y_small,
-                        self.kernel_beta, self.max_iter_k,
-                    )
-
-                    # Low-rank regularisation (IRNN,  [1], [2])
-                    if self.sigma > 0:
-                        k = low_rank_regularization(
-                            k, self.max_iter_rank,
-                            tau_scale, self.delta,
-                        )
-
-                    # Project onto feasible set: k ≥ 0, Σk = 1
-                    k = normalize_kernel(k)
+                # ---- Kernel step (FFT, gradient domain, [2]) ---------
+                # Closed-form Fourier solution using image & observation
+                # gradients  (Ren 2016, Eq. 23).
+                k = optimize_kernel_fft(
+                    x, y_small, Ki, self.kernel_gamma,
+                )
 
                 # Progressive thresholding
                 # [1], blinddeconv_new2_cry.m:
@@ -418,6 +460,10 @@ class LowRankBD(DeconvolutionAlgorithm):
             'tau':         self.tau,
             'nb_lambda':   self.nb_lambda,
             'nb_alpha':    self.nb_alpha,
+            'patch_size':  self.patch_size,
+            'wnnm_C':      self.wnnm_C,
+            'mu_nlr':      self.mu_nlr,
+            'kernel_gamma': self.kernel_gamma,
             'scales':      scales,
             'iterations':  sum(
                 1 for s in self.history['scale'] if s == K
@@ -457,6 +503,13 @@ class LowRankBD(DeconvolutionAlgorithm):
             ('threshold',        self.threshold),
             ('nb_lambda',        self.nb_lambda),
             ('nb_alpha',         self.nb_alpha),
+            ('patch_size',       self.patch_size),
+            ('search_window',    self.search_window),
+            ('num_similar',      self.num_similar),
+            ('stride_bm',        self.stride_bm),
+            ('wnnm_C',           self.wnnm_C),
+            ('mu_nlr',           self.mu_nlr),
+            ('kernel_gamma',     self.kernel_gamma),
             ('verbose',          self.verbose),
         ]
 
