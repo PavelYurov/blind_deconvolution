@@ -2,7 +2,7 @@ import numpy as np
 from numpy.fft import fft2, ifft2
 import time
 from typing import Tuple, List, Any, Dict
-from .utils import get_grad_operators, psf2otf
+from .utils import get_grad_operators, psf2otf, adjust_psf
 from .solvers import solve_h_subproblem, solve_u_subproblem, solve_o_subproblem, solve_nonblind_tv
 
 # Robust import of base class
