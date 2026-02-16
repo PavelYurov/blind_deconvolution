@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.fft import fft2, ifft2
 import time
 from typing import Tuple, List, Any, Dict
 from .utils import get_grad_operators, psf2otf
@@ -55,7 +56,7 @@ class PBTVGR(DeconvolutionAlgorithm):
         super().__init__(name='PBTVGR')
         self.kernel_shape = tuple(kernel_shape)
         
-        # Parameters from Section V.F
+        # Parameters from Section V.F of Dong et al.
         self.lambda_ = lambda_      # Data fidelity weight (Poisson)
         self.mu = mu                # PSF TV weight
         self.beta_init = beta_init  # Initial penalty parameter
@@ -112,13 +113,13 @@ class PBTVGR(DeconvolutionAlgorithm):
         for k in range(self.max_iter):
             h_prev = h.copy()
             
-            # 1. Update h (IRLS)
+            # 1. Update h (IRLS) - Algorithm 2
             h = solve_h_subproblem(u, o, h, beta, self.mu, F_dx, F_dy)
             
-            # 2. Update u (Poisson root finding)
+            # 2. Update u (Poisson root finding) - Algorithm 3
             u = solve_u_subproblem(g, h, o, beta, self.lambda_)
             
-            # 3. Update o (L0 smoothing)
+            # 3. Update o (L0 smoothing) - Algorithm 4
             o = solve_o_subproblem(u, h, o, beta, F_dx, F_dy)
             
             # 4. Update beta (Eq. 12)

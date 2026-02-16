@@ -60,4 +60,3 @@ def compute_divergence(vx: np.ndarray, vy: np.ndarray) -> np.ndarray:
     # D_x^T * v = v[i, j-1] - v[i, j] (Backward diff)
     dx = np.roll(vx, 1, axis=1) - vx
     dy = np.roll(vy, 1, axis=0) - vy
-    return dx + dy
