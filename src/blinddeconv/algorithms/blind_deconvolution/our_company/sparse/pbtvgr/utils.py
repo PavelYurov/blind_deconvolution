@@ -60,3 +60,38 @@ def compute_divergence(vx: np.ndarray, vy: np.ndarray) -> np.ndarray:
     # D_x^T * v = v[i, j-1] - v[i, j] (Backward diff)
     dx = np.roll(vx, 1, axis=1) - vx
     dy = np.roll(vy, 1, axis=0) - vy
+
+    return dx + dy
+
+def adjust_psf(h: np.ndarray) -> np.ndarray:
+    """
+    Post-processing for Kernel:
+    1. Thresholding: Sets small values to 0 to remove noise.
+    2. Centering: Shifts center of mass to the geometric center.
+    Required to resolve shift ambiguity in Blind Deconvolution.
+    """
+    h = h.copy()
+    
+    # 1. Dynamic Thresholding
+    # Keep only values > 5% of the peak (heuristic used in most implementations)
+    threshold = h.max() * 0.05
+    h[h < threshold] = 0
+    
+    # 2. Centering
+    cy, cx = center_of_mass(h)
+    kh, kw = h.shape
+    
+    # Shift needed to move mass center to geometric center
+    shift_y = (kh // 2) - cy
+    shift_x = (kw // 2) - cx
+    
+    if not np.isnan(shift_y) and not np.isnan(shift_x):
+        h = shift(h, (shift_y, shift_x), order=1, mode='constant', cval=0.0)
+    
+    # 3. Normalize
+    h = np.maximum(h, 0)
+    h_sum = np.sum(h)
+    if h_sum > 1e-12:
+        h /= h_sum
+        
+    return h

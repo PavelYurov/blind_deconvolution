@@ -42,14 +42,14 @@ class PBTVGR(DeconvolutionAlgorithm):
     def __init__(
         self,
         kernel_shape: Tuple[int, int],
-        lambda_: float = 2e4,
-        mu: float = 0.04,
+        lambda_: float = 5e4,
+        mu: float = 0.1,
         beta_init: float = 1.0,
         T: float = 50.0,
         tau: float = 10.0,
-        xi: float = 2e4,
+        xi: float = 5e4,
         eta_init: float = 1.0,
-        max_iter: int = 30,
+        max_iter: int = 40,
         tol: float = 1e-4,
         verbose: bool = False
     ):
@@ -115,6 +115,9 @@ class PBTVGR(DeconvolutionAlgorithm):
             
             # 1. Update h (IRLS) - Algorithm 2
             h = solve_h_subproblem(u, o, h, beta, self.mu, F_dx, F_dy)
+
+            # Adjust PSF 
+            h = adjust_psf(h)
             
             # 2. Update u (Poisson root finding) - Algorithm 3
             u = solve_u_subproblem(g, h, o, beta, self.lambda_)
@@ -129,7 +132,7 @@ class PBTVGR(DeconvolutionAlgorithm):
             
             beta = beta + min(self.T, self.tau * diff_norm)
             
-            # Check convergence
+            # Convergence info
             h_diff = np.linalg.norm(h - h_prev) / (np.linalg.norm(h_prev) + 1e-12)
             self.history['error'].append(diff_norm)
             
