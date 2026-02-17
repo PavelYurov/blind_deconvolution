@@ -1,55 +1,66 @@
 """
-Blind Image Deconvolution via Fractional-Order TV
-with Patch-wise Minimal Pixels (PMP) Prior.
+Слепая деконволюция изображений на основе дробного порядка
+с PMP (Patch-wise Minimal Pixels) prior.
 
-Framework wrapper that exposes the ``process`` interface expected
-by :class:`DeconvolutionAlgorithm`.
+Обёртка над алгоритмом coarse-to-fine для интеграции с фреймворком.
 
-Algorithm overview (Wu et al. [1]):
-  1. Build a coarse-to-fine image pyramid.
-  2. At each level alternate between:
-     a) **Image estimation** — ADMM with Grünwald–Letnikov
-        fractional-order total variation (α ∈ (1, 2)) to suppress
-        ringing artefacts ([1] Sec. 3.1, [2] Sec. 2).
-     b) **Edge prediction** — gradient thresholding weighted by the
-        Patch-wise Minimal Pixels map ([1] Sec. 3.2).
-     c) **Kernel estimation** — closed-form spectral solver with
-        simplex projection ([1] Sec. 3.3).
-  3. Final non-blind deconvolution with fractional TV.
-
-References
-----------
-[1] Wu, T., Wan, S., Feng, C., Zhang, H., Zeng, T.
+Литература:
+    Wu, T., Wan, S., Feng, C., Zhang, H., & Zeng, T. (2024).
     "Blind Image Deconvolution: When Patch-wise Minimal Pixels Prior
-    Meets Fractional-Order Method."
-    J. Math. Imaging Vis., 2024.
+     Meets Fractional-Order Method."
+    Journal of Mathematical Imaging and Vision, 67(1), 2.
     DOI: 10.1007/s10851-024-01221-x
 
-[2] Pan, X., Ye, Y., Wang, J., Gao, X., Zhou, X.
-    "Noncausal fractional directional differentiator and blind
-    deconvolution: motion blur estimation."
-    Multimedia Tools Appl., 73(3), 1485–1506, 2014.
+Краткое описание метода:
+    Предложена вариационная модель для слепой деконволюции,
+    объединяющая два регуляризатора:
 
-Modules
--------
-- ``utils``   : FFT helpers, GL coefficients, PMP, pyramid, kernel ops.
-- ``solvers`` : ADMM image solver, kernel estimator, coarse-to-fine loop.
-- ``fractional_order`` (this file) : framework wrapper class.
+    1. Изотропный дробный Total Variation (FTV) порядка alpha in (1, 2):
+       ||nabla^alpha f||_{2,1} = sum_i sqrt((D_x^alpha f_i)^2 + (D_y^alpha f_i)^2)
+
+       Дробная производная определяется по Грюнвальду–Летникову (GL).
+       Выбор alpha in (1, 2) обеспечивает более плавную регуляризацию,
+       чем стандартный TV (alpha=1), подавляя кольцевые артефакты (ringing).
+
+    2. Patch-wise Minimal Pixels (PMP) prior:
+       R_PMP(f) = sum_i min_{j in P_i} |f_j|
+
+       Аналог тёмного канала (dark channel prior): для каждого патча
+       наименьшее абсолютное значение должно быть близко к нулю.
+       Способствует восстановлению резких границ.
+
+    Энергетический функционал:
+       E(f, h) = (1/2)||h * f - g||_2^2
+               + lambda * ||nabla^alpha f||_{2,1}
+               + mu * R_PMP(f)
+               + (gamma/2) * ||h||_2^2
+
+    Ограничения на ядро: h >= 0, ||h||_1 = 1.
+
+    Оптимизация выполняется чередующейся минимизацией (alternating minimization)
+    в рамках coarse-to-fine (многомасштабной) схемы:
+      - f-подзадача: ADMM с расщеплением на дробный TV и PMP
+      - h-подзадача: решение в градиентной области через FFT
+
+Модуль:
+    fractional_order.py — обёртка-класс FractionalOrderBID.
+    solvers.py          — логика солверов (ADMM, оценка ядра, coarse-to-fine).
+    utils.py            — вспомогательный функционал (GL-коэффициенты, PMP, пирамида и пр.).
 """
 
 import numpy as np
 import time
 from typing import Tuple, List, Any, Dict
 
-from .solvers import coarse_to_fine_estimation, final_nonblind_deconvolution
+from .solvers import coarse_to_fine
 
-# ---- Robust import of the abstract base class ----
+# ── Импорт базового класса фреймворка ──
 import sys
 from pathlib import Path
 
 
 def _find_project_root(start: Path) -> Path:
-    """Walk up until ``pyproject.toml`` is found."""
+    """Поиск корня проекта (по наличию pyproject.toml)."""
     path = start.resolve()
     while not (path / "pyproject.toml").exists():
         if path.parent == path:
@@ -72,270 +83,227 @@ from blinddeconv.algorithms.base import DeconvolutionAlgorithm
 
 class FractionalOrderBID(DeconvolutionAlgorithm):
     """
-    Blind Image Deconvolution using Fractional-Order TV + PMP Prior.
+    Слепая деконволюция на основе дробного TV с PMP prior.
 
-    The method combines a fractional-order variational regulariser
-    (Grünwald–Letnikov derivative of order *alpha*) with a patch-wise
-    minimal pixels prior to simultaneously estimate the blur kernel and
-    the latent sharp image from a single blurred observation.
+    Реализация алгоритма Wu et al. (2024):
+        - Дробный TV порядка alpha in (1, 2) подавляет ringing-артефакты
+        - PMP prior обеспечивает сохранение резких границ
+        - Coarse-to-fine схема для устойчивой оценки ядра
 
     Parameters
     ----------
-    kernel_shape : (int, int)
-        Spatial support of the blur kernel (height, width).
-        Both values should be odd.
+    kernel_size : tuple of (int, int)
+        Размер искомого ядра PSF (должен быть нечётным).
+        По умолчанию (25, 25).
     alpha : float
-        Fractional derivative order.  Values in (1, 2).
-        α → 1 recovers standard TV; α → 2 approaches Laplacian.
-        Typical good range: 1.2 – 1.6  ([1] Sec. 4).
-    gl_truncation : int
-        Number of terms in the GL finite-difference stencil.
-    lambda_tv : float
-        Fractional-TV regularisation weight during the blind phase.
-    lambda_tv_final : float
-        Fractional-TV weight for the final non-blind pass.
-    mu_kernel : float
-        Tikhonov weight on the kernel.
+        Порядок дробной производной (1 < alpha < 2).
+        По умолчанию 1.5.
+    lambda_ftv : float
+        Вес дробного TV регуляризатора.
+    mu_pmp : float
+        Вес PMP prior.
+    gamma_kernel : float
+        Вес Тихоновской регуляризации ядра.
+    patch_size : int
+        Размер патча для PMP prior.
+    num_scales : int
+        Число уровней пирамиды.
+    outer_iter : int
+        Число чередующихся итераций (f, h) на каждом масштабе.
     admm_iter : int
-        Inner ADMM iterations per image sub-problem.
-    inner_iter : int
-        Alternating-minimisation passes per pyramid level.
-    rho_init : float
-        Initial ADMM penalty parameter.
-    grad_threshold_pct : float
-        Percentile for gradient thresholding in edge prediction.
-    pmp_patch_size : int
-        Patch size for the PMP prior (odd).
-    pmp_gamma : float
-        Decay rate for the PMP weight map.
-    scale_ratio : float
-        Geometric ratio between successive pyramid scales.
-    final_iter : int
-        ADMM iterations for the final non-blind pass.
+        Число ADMM итераций для оценки изображения.
+    beta1 : float
+        Штрафной параметр ADMM для дробного TV.
+    beta2 : float
+        Штрафной параметр ADMM для PMP.
     verbose : bool
+        Вывод диагностической информации.
     """
 
     def __init__(
         self,
-        kernel_shape: Tuple[int, int] = (21, 21),
-        alpha: float = 1.4,
-        gl_truncation: int = 10,
-        lambda_tv: float = 4e-3,
-        lambda_tv_final: float = 2e-3,
-        mu_kernel: float = 0.01,
-        admm_iter: int = 15,
-        inner_iter: int = 3,
-        rho_init: float = 1.0,
-        grad_threshold_pct: float = 94.0,
-        pmp_patch_size: int = 5,
-        pmp_gamma: float = 2.0,
-        scale_ratio: float = 1.5,
-        final_iter: int = 30,
-        verbose: bool = False,
+        kernel_size: Tuple[int, int] = (25, 25),
+        alpha: float = 1.5,
+        lambda_ftv: float = 4e-3,
+        mu_pmp: float = 1e-3,
+        gamma_kernel: float = 2.0,
+        patch_size: int = 5,
+        num_scales: int = 5,
+        outer_iter: int = 5,
+        admm_iter: int = 10,
+        beta1: float = 1.0,
+        beta2: float = 1.0,
+        kernel_threshold_ratio: float = 0.05,
+        final_deconv_iter: int = 40,
+        verbose: bool = False
     ):
-        super().__init__(name="FractionalOrder-PMP-BID")
+        super().__init__(name='FractionalOrder-BID')
 
-        # Kernel geometry
-        self.kernel_shape = tuple(kernel_shape)
+        # ── Параметры модели (Раздел 3 статьи) ──
+        self.kernel_size = tuple(kernel_size)
+        self.alpha = alpha              # Порядок дробной производной
+        self.lambda_ftv = lambda_ftv    # Вес дробного TV
+        self.mu_pmp = mu_pmp            # Вес PMP prior
+        self.gamma_kernel = gamma_kernel  # Регуляризация ядра
+        self.patch_size = patch_size    # Размер патча PMP
 
-        # Fractional derivative parameters  – [1] Eq. 7, [2] Sec. 2
-        self.alpha = alpha
-        self.gl_truncation = gl_truncation
-
-        # Regularisation weights
-        self.lambda_tv = lambda_tv
-        self.lambda_tv_final = lambda_tv_final
-        self.mu_kernel = mu_kernel
-
-        # Solver controls
+        # ── Параметры солвера (Раздел 4 статьи) ──
+        self.num_scales = num_scales
+        self.outer_iter = outer_iter
         self.admm_iter = admm_iter
-        self.inner_iter = inner_iter
-        self.rho_init = rho_init
-        self.final_iter = final_iter
-
-        # PMP prior parameters  – [1] Sec. 3.2
-        self.grad_threshold_pct = grad_threshold_pct
-        self.pmp_patch_size = pmp_patch_size
-        self.pmp_gamma = pmp_gamma
-
-        # Multi-scale
-        self.scale_ratio = scale_ratio
+        self.beta1 = beta1              # Штрафной ADMM для FTV
+        self.beta2 = beta2              # Штрафной ADMM для PMP
+        self.kernel_threshold_ratio = kernel_threshold_ratio
+        self.final_deconv_iter = final_deconv_iter
 
         self.verbose = verbose
 
-        # Runtime bookkeeping
-        self.history: Dict[str, list] = {"kernel_diff": []}
-        self.hyperparams: Dict[str, Any] = {}
+        # ── Сохранённые результаты ──
+        self.history = {}
+        self.hyperparams = {}
 
-    # ---------------------------------------------------------------
-    #  Main entry point
-    # ---------------------------------------------------------------
-    def process(
-        self, image: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Run full blind deconvolution pipeline.
+        Основной интерфейс фреймворка: слепая деконволюция изображения.
 
         Parameters
         ----------
-        image : ndarray (H, W) or (H, W, C)
-            Blurred observation.  Grayscale (single-channel) or colour.
-            Values may be uint8 [0, 255] or float [0, 1].
+        image : np.ndarray
+            Размытое изображение (H x W) или (H x W x C).
+            Может быть uint8 [0, 255] или float [0, 1].
 
         Returns
         -------
-        restored : ndarray (H, W), int16, [0, 255]
-            Estimated sharp image.
-        kernel : ndarray (kh, kw), float64
-            Estimated blur kernel (non-negative, unit sum).
+        restored : np.ndarray
+            Восстановленное изображение в формате int16, [0, 255].
+        kernel : np.ndarray
+            Оценённое ядро PSF (kh x kw), float64, сумма = 1.
         """
-        t0 = time.time()
+        start_time = time.time()
 
-        # ------ Pre-processing ------
-        y = image.astype(np.float64)
-        if y.max() > 1.0:
-            y /= 255.0
+        # ── 1. Подготовка входных данных ──
+        img = image.astype(np.float64)
 
-        # Handle colour by converting to grayscale for kernel estimation
-        if y.ndim == 3:
-            y_gray = 0.2989 * y[:, :, 0] + 0.5870 * y[:, :, 1] + 0.1140 * y[:, :, 2]
+        # Обработка цветных изображений: работаем с яркостным каналом
+        is_color = (img.ndim == 3 and img.shape[2] == 3)
+
+        if is_color:
+            # Конвертация BGR -> YCrCb, оценка ядра по яркости (Y)
+            if img.max() > 1.0:
+                img /= 255.0
+            img_y = 0.299 * img[:, :, 2] + 0.587 * img[:, :, 1] + 0.114 * img[:, :, 0]
         else:
-            y_gray = y
+            if img.max() > 1.0:
+                img /= 255.0
+            img_y = img.copy()
 
-        H, W = y_gray.shape
-
-        if self.verbose:
-            print(
-                f"[{self.name}] Image {H}×{W}, "
-                f"kernel {self.kernel_shape}, α = {self.alpha}"
-            )
-
-        # ------ Phase 1: Coarse-to-fine kernel estimation ------
-        k_est, _ = coarse_to_fine_estimation(
-            y_gray,
-            kernel_shape=self.kernel_shape,
+        # ── 2. Запуск coarse-to-fine слепой деконволюции ──
+        f_restored, h_estimated, history = coarse_to_fine(
+            g=img_y,
+            kernel_size=self.kernel_size,
             alpha=self.alpha,
-            L=self.gl_truncation,
-            lambda_tv=self.lambda_tv,
-            mu_kernel=self.mu_kernel,
+            lambda_ftv=self.lambda_ftv,
+            mu_pmp=self.mu_pmp,
+            gamma_kernel=self.gamma_kernel,
+            patch_size=self.patch_size,
+            num_scales=self.num_scales,
+            outer_iter=self.outer_iter,
             admm_iter=self.admm_iter,
-            rho_init=self.rho_init,
-            inner_iter=self.inner_iter,
-            grad_threshold_pct=self.grad_threshold_pct,
-            pmp_patch_size=self.pmp_patch_size,
-            pmp_gamma=self.pmp_gamma,
-            scale_ratio=self.scale_ratio,
-            verbose=self.verbose,
+            beta1=self.beta1,
+            beta2=self.beta2,
+            kernel_threshold_ratio=self.kernel_threshold_ratio,
+            final_deconv_iter=self.final_deconv_iter,
+            verbose=self.verbose
         )
 
-        # ------ Phase 2: Final non-blind deconvolution ------
-        if self.verbose:
-            print(f"[{self.name}] Final non-blind restoration …")
+        # ── 3. Обработка цветных изображений (применение ядра к каждому каналу) ──
+        if is_color:
+            from .solvers import final_nonblind_deconv
+            from .utils import edgetaper
 
-        if y.ndim == 3:
-            # Process each channel independently with the same kernel
-            channels = []
-            for c in range(y.shape[2]):
-                ch = final_nonblind_deconvolution(
-                    y[:, :, c], k_est,
+            restored_color = np.zeros_like(img, dtype=np.float64)
+            for c in range(3):
+                ch = img[:, :, c]
+                ch_tapered = edgetaper(ch, h_estimated)
+                restored_color[:, :, c] = final_nonblind_deconv(
+                    ch_tapered, h_estimated,
                     alpha=self.alpha,
-                    L=self.gl_truncation,
-                    lambda_tv=self.lambda_tv_final,
-                    num_iter=self.final_iter,
-                    rho_init=self.rho_init,
+                    lambda_ftv=self.lambda_ftv * 0.5,
+                    beta=self.beta1 * 2.0,
+                    num_iter=self.final_deconv_iter
                 )
-                channels.append(ch)
-            x_final = np.stack(channels, axis=-1)
+            f_out = np.clip(restored_color * 255.0, 0.0, 255.0)
+            f_out = np.round(f_out).astype(np.int16)
         else:
-            x_final = final_nonblind_deconvolution(
-                y_gray, k_est,
-                alpha=self.alpha,
-                L=self.gl_truncation,
-                lambda_tv=self.lambda_tv_final,
-                num_iter=self.final_iter,
-                rho_init=self.rho_init,
-            )
+            f_out = np.clip(f_restored * 255.0, 0.0, 255.0)
+            f_out = np.round(f_out).astype(np.int16)
 
-        elapsed = time.time() - t0
+        # ── 4. Сохранение метаданных ──
+        elapsed = time.time() - start_time
         self.timer = elapsed
-
+        self.history = history
         self.hyperparams = {
-            "alpha": self.alpha,
-            "gl_truncation": self.gl_truncation,
-            "lambda_tv": self.lambda_tv,
-            "lambda_tv_final": self.lambda_tv_final,
-            "mu_kernel": self.mu_kernel,
-            "elapsed_sec": elapsed,
+            'alpha': self.alpha,
+            'lambda_ftv': self.lambda_ftv,
+            'mu_pmp': self.mu_pmp,
+            'gamma_kernel': self.gamma_kernel,
+            'kernel_size': self.kernel_size,
+            'num_scales': self.num_scales,
+            'elapsed_time': elapsed,
         }
 
         if self.verbose:
-            print(f"[{self.name}] Done in {elapsed:.1f} s.")
+            print(f"[{self.name}] Done in {elapsed:.2f}s")
 
-        # ------ Post-processing ------
-        x_final = x_final * 255.0
-        x_final = np.clip(np.round(x_final), 0, 255).astype(np.int16)
-        return x_final, k_est
+        return f_out, h_estimated
 
-    # ---------------------------------------------------------------
-    #  Framework interface
-    # ---------------------------------------------------------------
     def get_param(self) -> List[Tuple[str, Any]]:
+        """
+        Получение текущих гиперпараметров алгоритма.
+
+        Returns
+        -------
+        params : list of tuple
+            Список (название, значение) для всех гиперпараметров.
+        """
         return [
-            ("kernel_shape", self.kernel_shape),
-            ("alpha", self.alpha),
-            ("gl_truncation", self.gl_truncation),
-            ("lambda_tv", self.lambda_tv),
-            ("lambda_tv_final", self.lambda_tv_final),
-            ("mu_kernel", self.mu_kernel),
-            ("admm_iter", self.admm_iter),
-            ("inner_iter", self.inner_iter),
-            ("rho_init", self.rho_init),
-            ("grad_threshold_pct", self.grad_threshold_pct),
-            ("pmp_patch_size", self.pmp_patch_size),
-            ("pmp_gamma", self.pmp_gamma),
-            ("scale_ratio", self.scale_ratio),
-            ("final_iter", self.final_iter),
+            ('kernel_size', self.kernel_size),
+            ('alpha', self.alpha),
+            ('lambda_ftv', self.lambda_ftv),
+            ('mu_pmp', self.mu_pmp),
+            ('gamma_kernel', self.gamma_kernel),
+            ('patch_size', self.patch_size),
+            ('num_scales', self.num_scales),
+            ('outer_iter', self.outer_iter),
+            ('admm_iter', self.admm_iter),
+            ('beta1', self.beta1),
+            ('beta2', self.beta2),
+            ('final_deconv_iter', self.final_deconv_iter),
         ]
 
     def change_param(self, params: Dict[str, Any]) -> None:
+        """
+        Изменение гиперпараметров алгоритма.
+
+        Parameters
+        ----------
+        params : dict
+            Словарь {имя_параметра: новое_значение}.
+            Допустимые ключи: kernel_size, alpha, lambda_ftv, mu_pmp,
+            gamma_kernel, patch_size, num_scales, outer_iter, admm_iter,
+            beta1, beta2, final_deconv_iter, verbose.
+        """
         for key, value in params.items():
             if hasattr(self, key):
-                if key == "kernel_shape":
-                    self.kernel_shape = tuple(value)
+                if key == 'kernel_size':
+                    self.kernel_size = tuple(value)
                 else:
                     setattr(self, key, value)
 
     def get_history(self) -> dict:
+        """Получение истории оптимизации (kernel_diff, energy)."""
         return self.history
 
     def get_hyperparams(self) -> dict:
+        """Получение словаря гиперпараметров после последнего запуска."""
         return self.hyperparams
-
-
-# ===================================================================
-#  Convenience function (mirrors ep_em.run_algorithm)
-# ===================================================================
-def run_algorithm(
-    g: np.ndarray,
-    kernel_shape: Tuple[int, int],
-    **kwargs,
-) -> Tuple[np.ndarray, np.ndarray, dict, dict]:
-    """
-    Convenience entry point for quick experiments.
-
-    Parameters
-    ----------
-    g : ndarray
-        Blurred image.
-    kernel_shape : (kh, kw)
-        Kernel support size.
-    **kwargs
-        Forwarded to :class:`FractionalOrderBID`.
-
-    Returns
-    -------
-    (restored, kernel, hyperparams, history)
-    """
-    algo = FractionalOrderBID(kernel_shape=kernel_shape, **kwargs)
-    f_est, h_est = algo.process(g)
-    return f_est, h_est, algo.hyperparams, algo.history

@@ -1,595 +1,587 @@
 """
-Utility functions for Fractional-Order Blind Image Deconvolution.
+Вспомогательные функции для метода слепой деконволюции
+на основе дробного порядка с PMP-априори.
 
-Mathematical infrastructure for:
-  - Grünwald–Letnikov (GL) fractional-order differentiation
-  - Patch-wise Minimal Pixels (PMP) prior computation
-  - Multi-scale Gaussian pyramid construction
-  - PSF / OTF conversions, gradient operators, shrinkage operators
-
-References
-----------
-[1] Wu, T., Wan, S., Feng, C., Zhang, H., Zeng, T.
+Литература:
+    Wu, T., Wan, S., Feng, C., Zhang, H., & Zeng, T. (2024).
     "Blind Image Deconvolution: When Patch-wise Minimal Pixels Prior
-    Meets Fractional-Order Method."
-    Journal of Mathematical Imaging and Vision, 2024.
+     Meets Fractional-Order Method."
+    Journal of Mathematical Imaging and Vision, 67(1), 2.
     DOI: 10.1007/s10851-024-01221-x
 
-[2] Pan, X., Ye, Y., Wang, J., Gao, X., Zhou, X.
-    "Noncausal fractional directional differentiator and blind
-    deconvolution: motion blur estimation."
-    Multimedia Tools and Applications, 73(3), 1485–1506, 2014.
+Содержимое модуля:
+    - Вычисление коэффициентов Грюнвальда–Летникова (GL) для дробных производных
+    - Построение частотных операторов дробного дифференцирования
+    - Мягкое пороговое преобразование (soft-thresholding)
+    - Изотропное векторное сжатие (vector shrinkage)
+    - Вычисление PMP (Patch-wise Minimal Pixels) prior
+    - Пирамида Гаусса для coarse-to-fine схемы
+    - Утилиты для работы с ядрами размытия
 """
 
 import numpy as np
 from numpy.fft import fft2, ifft2
-from scipy.ndimage import minimum_filter, gaussian_filter
-from scipy.special import gamma as gamma_func
-from typing import Tuple, List, NamedTuple
+from scipy.ndimage import minimum_filter, gaussian_filter, zoom
+from scipy.signal import fftconvolve
 
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-EPSILON = 1e-12
+# ─────────────────────────────────────────────────────────────────────────────
+#  1. Дробные производные (Грюнвальд–Летников)
+# ─────────────────────────────────────────────────────────────────────────────
 
-
-# ---------------------------------------------------------------------------
-# Named tuples for structured data
-# ---------------------------------------------------------------------------
-class FractionalOperators(NamedTuple):
-    """Pre-computed Fourier-domain fractional gradient operators."""
-    F_Cx: np.ndarray        # FFT of horizontal GL filter
-    F_Cy: np.ndarray        # FFT of vertical GL filter
-    F_frac_sq: np.ndarray   # |F_Cx|^2 + |F_Cy|^2
-
-
-class IntegerGradientOperators(NamedTuple):
-    """Pre-computed Fourier-domain first-order gradient operators."""
-    F_dx: np.ndarray        # FFT of horizontal difference filter
-    F_dy: np.ndarray        # FFT of vertical difference filter
-    F_grad_sq: np.ndarray   # |F_dx|^2 + |F_dy|^2
-
-
-# ===================================================================
-#  PSF / OTF conversions
-# ===================================================================
-def psf2otf(psf: np.ndarray, shape: Tuple[int, int]) -> np.ndarray:
+def gl_coefficients(alpha: float, n: int) -> np.ndarray:
     """
-    Convert a Point-Spread Function (PSF) to an Optical Transfer Function (OTF).
+    Коэффициенты дробной производной Грюнвальда–Летникова (GL) порядка alpha.
 
-    The PSF is zero-padded to *shape* and circularly shifted so that the
-    centre of the PSF lands at the origin (0, 0) before the FFT.
+    Определение:
+        w_0 = 1
+        w_k = (1 - (alpha + 1) / k) * w_{k-1},  k = 1, 2, ..., n-1
 
-    Parameters
-    ----------
-    psf : ndarray, shape (kh, kw)
-        Spatial-domain blur kernel.
-    shape : (H, W)
-        Target output size (image dimensions).
-
-    Returns
-    -------
-    otf : ndarray, complex, shape (H, W)
-        Frequency-domain transfer function.
-    """
-    kh, kw = psf.shape
-    padded = np.zeros(shape, dtype=np.float64)
-    padded[:kh, :kw] = psf
-    # Circular shift so that the kernel centre goes to (0, 0)
-    padded = np.roll(padded, -(kh // 2), axis=0)
-    padded = np.roll(padded, -(kw // 2), axis=1)
-    return fft2(padded)
-
-
-def otf2psf(otf: np.ndarray, out_shape: Tuple[int, int]) -> np.ndarray:
-    """
-    Convert an OTF back to a PSF of size *out_shape*.
-
-    Parameters
-    ----------
-    otf : ndarray, complex
-        Frequency-domain transfer function.
-    out_shape : (kh, kw)
-        Desired spatial extent of the output PSF.
-
-    Returns
-    -------
-    psf : ndarray, shape (kh, kw)
-    """
-    kh, kw = out_shape
-    full = np.real(ifft2(otf))
-    full = np.roll(full, kh // 2, axis=0)
-    full = np.roll(full, kw // 2, axis=1)
-    return full[:kh, :kw]
-
-
-# ===================================================================
-#  Shrinkage / thresholding operators
-# ===================================================================
-def soft_threshold(x: np.ndarray, thresh: float) -> np.ndarray:
-    r"""
-    Proximal operator of the :math:`\ell_1` norm (soft thresholding).
-
-    .. math::
-        \mathrm{shrink}(x, \tau) = \mathrm{sign}(x)\,\max(|x| - \tau,\, 0)
-
-    Parameters
-    ----------
-    x : ndarray
-    thresh : float  (>= 0)
-
-    Returns
-    -------
-    ndarray, same shape as *x*.
-    """
-    return np.sign(x) * np.maximum(np.abs(x) - thresh, 0.0)
-
-
-# ===================================================================
-#  Grünwald–Letnikov fractional derivative
-# ===================================================================
-def grunwald_letnikov_weights(alpha: float, L: int) -> np.ndarray:
-    r"""
-    Compute the truncated Grünwald–Letnikov (GL) coefficients of order
-    :math:`\alpha`.
-
-    The recurrence ([2], Sec. 2; [1], Eq. 7) is
-
-    .. math::
-        c_0^{(\alpha)} = 1, \qquad
-        c_j^{(\alpha)} = \Bigl(1 - \frac{\alpha + 1}{j}\Bigr)\,
-                         c_{j-1}^{(\alpha)}, \quad j = 1, 2, \dots
-
-    These are the coefficients of the finite-difference approximation
-
-    .. math::
-        D^{\alpha} f[n] \approx \sum_{l=0}^{L-1} c_l^{(\alpha)}\, f[n - l].
+    Эквивалентно:
+        w_k = (-1)^k * C(alpha, k) = (-1)^k * Gamma(alpha + 1) / (k! * Gamma(alpha - k + 1))
 
     Parameters
     ----------
     alpha : float
-        Fractional order (typically 1 < alpha < 2).
-    L : int
-        Truncation length (number of taps).
+        Порядок дробной производной (типично 1 < alpha < 2 для регуляризации).
+    n : int
+        Число коэффициентов.
 
     Returns
     -------
-    c : ndarray, shape (L,)
-        GL coefficients ``[c_0, c_1, ..., c_{L-1}]``.
+    w : np.ndarray, shape (n,)
+        Массив GL-коэффициентов.
 
-    Notes
-    -----
-    * For :math:`\alpha = 1`: ``c = [1, -1, 0, ...]`` (first difference).
-    * For :math:`\alpha = 2`: ``c = [1, -2, 1, 0, ...]`` (second difference).
+    References
+    ----------
+    Podlubny, I. (1999). Fractional Differential Equations. Academic Press.
+    Oldham, K. B. & Spanier, J. (1974). The Fractional Calculus. Academic Press.
     """
-    c = np.zeros(L, dtype=np.float64)
-    c[0] = 1.0
-    for j in range(1, L):
-        c[j] = (1.0 - (alpha + 1.0) / j) * c[j - 1]
-    return c
+    w = np.zeros(n, dtype=np.float64)
+    w[0] = 1.0
+    for k in range(1, n):
+        w[k] = (1.0 - (alpha + 1.0) / k) * w[k - 1]
+    return w
 
 
-def build_fractional_filter_2d(
-    alpha: float, L: int, shape: Tuple[int, int], axis: int
-) -> np.ndarray:
-    r"""
-    Embed GL coefficients into a 2-D array suitable for ``fft2``.
+def fft_fractional_operators(shape: tuple, alpha: float, truncation: int = None):
+    """
+    Построение частотных представлений операторов дробного дифференцирования
+    D_x^alpha и D_y^alpha для FFT-основанных солверов.
 
-    The filter is placed along *axis* starting at the origin so that
-
-    .. math::
-        F\{D_{x}^{\alpha} u\} = \hat{C}_x \cdot \hat{u}
-
-    with ``\hat{C}_x = \mathrm{fft2}(\text{filter})``.
+    Операторы строятся путём вычисления GL-коэффициентов, размещения их
+    в массив размера shape и перехода в частотную область через fft2.
 
     Parameters
     ----------
+    shape : tuple of (int, int)
+        Размер изображения (H, W).
     alpha : float
-    L : int
-        Truncation length (capped to image dimension along *axis*).
-    shape : (H, W)
-    axis : int
-        0 → vertical (y) derivative, 1 → horizontal (x) derivative.
+        Порядок дробной производной.
+    truncation : int or None
+        Длина усечения ряда GL-коэффициентов. По умолчанию min(H, W).
 
     Returns
     -------
-    filt : ndarray, shape (H, W)
+    F_Dx : np.ndarray, complex
+        FFT горизонтального оператора дробной производной.
+    F_Dy : np.ndarray, complex
+        FFT вертикального оператора дробной производной.
+    F_Dx_sq : np.ndarray, float
+        |F_Dx|^2 — квадрат модуля.
+    F_Dy_sq : np.ndarray, float
+        |F_Dy|^2 — квадрат модуля.
     """
     H, W = shape
-    dim = H if axis == 0 else W
-    L_eff = min(L, dim)
-    c = grunwald_letnikov_weights(alpha, L_eff)
+    if truncation is None:
+        truncation = min(H, W)
 
-    filt = np.zeros(shape, dtype=np.float64)
-    if axis == 1:
-        filt[0, :L_eff] = c
+    w = gl_coefficients(alpha, truncation)
+
+    # Горизонтальный оператор: строка GL-коэффициентов
+    kernel_x = np.zeros((H, W), dtype=np.float64)
+    kernel_x[0, :min(W, truncation)] = w[:min(W, truncation)]
+
+    # Вертикальный оператор: столбец GL-коэффициентов
+    kernel_y = np.zeros((H, W), dtype=np.float64)
+    kernel_y[:min(H, truncation), 0] = w[:min(H, truncation)]
+
+    F_Dx = fft2(kernel_x)
+    F_Dy = fft2(kernel_y)
+
+    F_Dx_sq = np.abs(F_Dx) ** 2
+    F_Dy_sq = np.abs(F_Dy) ** 2
+
+    return F_Dx, F_Dy, F_Dx_sq, F_Dy_sq
+
+
+def fft_gradient_operators(shape: tuple):
+    """
+    Построение FFT стандартных (целочисленных) операторов градиента
+    для оценки ядра в градиентной области.
+
+    Используются конечные разности с периодическими граничными условиями:
+        dx: [1, -1]   (горизонтальная)
+        dy: [1; -1]   (вертикальная)
+
+    Parameters
+    ----------
+    shape : tuple of (int, int)
+        Размер изображения (H, W).
+
+    Returns
+    -------
+    F_dx : np.ndarray, complex
+        FFT горизонтального градиентного оператора.
+    F_dy : np.ndarray, complex
+        FFT вертикального градиентного оператора.
+    """
+    H, W = shape
+
+    dx = np.zeros((H, W), dtype=np.float64)
+    dx[0, 0] = 1.0
+    dx[0, -1] = -1.0
+
+    dy = np.zeros((H, W), dtype=np.float64)
+    dy[0, 0] = 1.0
+    dy[-1, 0] = -1.0
+
+    return fft2(dx), fft2(dy)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  2. Операторы проксимального отображения
+# ─────────────────────────────────────────────────────────────────────────────
+
+def soft_threshold(x: np.ndarray, threshold: float) -> np.ndarray:
+    """
+    Оператор мягкого порогового преобразования (shrinkage).
+
+    S_t(x) = sign(x) * max(|x| - t, 0)
+
+    Является проксимальным оператором l1-нормы:
+        prox_{t ||.||_1}(x) = argmin_z { t||z||_1 + (1/2)||z - x||_2^2 }
+
+    Parameters
+    ----------
+    x : np.ndarray
+        Входной массив.
+    threshold : float
+        Пороговое значение t > 0.
+
+    Returns
+    -------
+    result : np.ndarray
+        Результат мягкого порогового преобразования.
+    """
+    return np.sign(x) * np.maximum(np.abs(x) - threshold, 0.0)
+
+
+def vector_shrinkage(vx: np.ndarray, vy: np.ndarray, threshold: float):
+    """
+    Изотропное (векторное) сжатие для двумерного полного вариационного
+    регуляризатора.
+
+    Для каждого пикселя i с вектором v_i = (vx_i, vy_i):
+        factor_i = max(||v_i|| - t, 0) / max(||v_i||, eps)
+        (sx_i, sy_i) = factor_i * (vx_i, vy_i)
+
+    Это проксимальный оператор изотропного TV:
+        sum_i sqrt(vx_i^2 + vy_i^2)
+
+    Parameters
+    ----------
+    vx, vy : np.ndarray
+        Компоненты двумерного векторного поля.
+    threshold : float
+        Пороговое значение t > 0.
+
+    Returns
+    -------
+    sx, sy : np.ndarray
+        Компоненты сжатого векторного поля.
+    """
+    magnitude = np.sqrt(vx ** 2 + vy ** 2)
+    factor = np.maximum(magnitude - threshold, 0.0) / np.maximum(magnitude, 1e-10)
+    return vx * factor, vy * factor
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  3. PMP (Patch-wise Minimal Pixels) prior
+# ─────────────────────────────────────────────────────────────────────────────
+
+def patch_minimum(image: np.ndarray, patch_size: int) -> np.ndarray:
+    """
+    Вычисление PMP-оператора (Patch-wise Minimal Pixels).
+
+    Для каждой позиции i вычисляется минимальное абсолютное значение
+    в окрестности размером patch_size x patch_size:
+        M(f)_i = min_{j in P_i} |f_j|
+
+    Аналогичен «тёмному каналу» (dark channel) для абсолютных значений.
+
+    Parameters
+    ----------
+    image : np.ndarray
+        Входное изображение.
+    patch_size : int
+        Размер квадратного патча.
+
+    Returns
+    -------
+    dark_channel : np.ndarray
+        Карта поэлементных минимумов.
+
+    References
+    ----------
+    Pan, J., Sun, D., Pfister, H., & Yang, M.-H. (2016).
+    Blind Image Deblurring Using Dark Channel Prior. CVPR.
+
+    He, K., Sun, J., & Tang, X. (2011).
+    Single Image Haze Removal Using Dark Channel Prior. IEEE TPAMI.
+    """
+    return minimum_filter(np.abs(image), size=patch_size)
+
+
+def pmp_weight_map(image: np.ndarray, patch_size: int) -> np.ndarray:
+    """
+    Вычисление карты весов PMP prior для итеративно-перевзвешенного подхода.
+
+    Пиксель i получает вес w_i = 1, если он является (приблизительно)
+    минимальным в своём патче P_i, иначе w_i = 0.
+
+    Это позволяет аппроксимировать PMP-регуляризатор как взвешенную l1-норму:
+        R_PMP(f) ≈ sum_i w_i |f_i|
+
+    Parameters
+    ----------
+    image : np.ndarray
+        Входное изображение.
+    patch_size : int
+        Размер патча.
+
+    Returns
+    -------
+    weights : np.ndarray
+        Бинарная карта весов (0 или 1).
+    """
+    abs_image = np.abs(image)
+    dark_channel = minimum_filter(abs_image, size=patch_size)
+    weights = (abs_image <= dark_channel + 1e-6).astype(np.float64)
+    return weights
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  4. Пирамида Гаусса (coarse-to-fine)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def build_gaussian_pyramid(image: np.ndarray, num_scales: int,
+                           scale_factor: float = None) -> list:
+    """
+    Построение Гауссовой пирамиды изображений для coarse-to-fine оценки.
+
+    На каждом уровне изображение уменьшается в scale_factor раз
+    с предварительным Гауссовым сглаживанием (σ = factor/2)
+    и билинейной интерполяцией.
+
+    Parameters
+    ----------
+    image : np.ndarray
+        Исходное размытое изображение (наивысшее разрешение).
+    num_scales : int
+        Число уровней пирамиды.
+    scale_factor : float or None
+        Коэффициент масштабирования между уровнями.
+        По умолчанию sqrt(2) ≈ 1.414.
+
+    Returns
+    -------
+    pyramid : list of np.ndarray
+        Список изображений от грубого (мелкого) к мелкому (оригинальному).
+
+    References
+    ----------
+    Cho, S. & Lee, S. (2009). Fast Motion Deblurring. SIGGRAPH Asia.
+    """
+    if scale_factor is None:
+        scale_factor = np.sqrt(2)
+
+    pyramid = []
+
+    for s in range(num_scales - 1, -1, -1):
+        factor = scale_factor ** s
+        if s == 0:
+            pyramid.append(image.copy())
+        else:
+            new_h = max(int(np.round(image.shape[0] / factor)), 16)
+            new_w = max(int(np.round(image.shape[1] / factor)), 16)
+            sigma = factor / 2.0
+            smoothed = gaussian_filter(image, sigma=sigma)
+            scaled = zoom(smoothed,
+                          (new_h / image.shape[0], new_w / image.shape[1]),
+                          order=1)
+            pyramid.append(scaled)
+
+    return pyramid
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  5. Утилиты для ядра размытия
+# ─────────────────────────────────────────────────────────────────────────────
+
+def center_kernel_fft(kernel: np.ndarray, target_size: tuple) -> np.ndarray:
+    """
+    Размещение ядра PSF в массив размера target_size для FFT.
+
+    Центр ядра переносится в позицию (0, 0) с периодической
+    обёрткой (wrap-around), что соответствует циклической свёртке.
+
+    Parameters
+    ----------
+    kernel : np.ndarray
+        Компактное ядро размытия (kh x kw).
+    target_size : tuple of (int, int)
+        Целевой размер массива (H, W).
+
+    Returns
+    -------
+    padded : np.ndarray
+        Ядро, центрированное для FFT-свёртки.
+    """
+    H, W = target_size
+    kh, kw = kernel.shape
+
+    padded = np.zeros((H, W), dtype=np.float64)
+    half_kh = kh // 2
+    half_kw = kw // 2
+
+    for i in range(kh):
+        for j in range(kw):
+            ii = (i - half_kh) % H
+            jj = (j - half_kw) % W
+            padded[ii, jj] = kernel[i, j]
+
+    return padded
+
+
+def crop_kernel_from_fft(kernel_full: np.ndarray, kernel_size: tuple) -> np.ndarray:
+    """
+    Извлечение компактного ядра из полноразмерного массива (после IFFT).
+
+    Находит пиковый элемент и вырезает окрестность kernel_size,
+    затем проецирует на допустимое множество (>=0, сумма=1).
+
+    Parameters
+    ----------
+    kernel_full : np.ndarray
+        Полноразмерное ядро (H x W).
+    kernel_size : tuple of (int, int)
+        Требуемый размер ядра (kh, kw).
+
+    Returns
+    -------
+    kernel : np.ndarray
+        Компактное ядро, спроецированное на симплекс.
+    """
+    H, W = kernel_full.shape
+    kh, kw = kernel_size
+
+    peak_y, peak_x = np.unravel_index(np.argmax(kernel_full), kernel_full.shape)
+
+    kernel = np.zeros((kh, kw), dtype=np.float64)
+    half_kh = kh // 2
+    half_kw = kw // 2
+
+    for i in range(kh):
+        for j in range(kw):
+            ii = (peak_y + i - half_kh) % H
+            jj = (peak_x + j - half_kw) % W
+            kernel[i, j] = kernel_full[ii, jj]
+
+    kernel = np.maximum(kernel, 0.0)
+    if kernel.sum() > 0:
+        kernel /= kernel.sum()
     else:
-        filt[:L_eff, 0] = c
-    return filt
+        kernel = np.ones((kh, kw), dtype=np.float64) / (kh * kw)
+
+    return kernel
 
 
-def precompute_fractional_operators(
-    shape: Tuple[int, int], alpha: float, L: int = 10
-) -> FractionalOperators:
-    r"""
-    Pre-compute the FFTs of the fractional gradient operators and their
-    combined squared magnitude.
+def resize_kernel(kernel: np.ndarray, new_size: tuple) -> np.ndarray:
+    """
+    Масштабирование ядра к новому размеру (для coarse-to-fine).
 
-    .. math::
-        |\hat{C}_x|^2 + |\hat{C}_y|^2
+    Используется билинейная интерполяция с последующей
+    проекцией на допустимое множество.
 
     Parameters
     ----------
-    shape : (H, W)
-    alpha : float
-        Fractional order.
-    L : int
-        GL truncation length (default 10).
+    kernel : np.ndarray
+        Исходное ядро.
+    new_size : tuple of (int, int)
+        Новый размер (new_h, new_w).
 
     Returns
     -------
-    FractionalOperators
-        Named tuple ``(F_Cx, F_Cy, F_frac_sq)``.
+    resized : np.ndarray
+        Масштабированное ядро (>=0, сумма=1).
     """
-    filt_x = build_fractional_filter_2d(alpha, L, shape, axis=1)
-    filt_y = build_fractional_filter_2d(alpha, L, shape, axis=0)
-    F_Cx = fft2(filt_x)
-    F_Cy = fft2(filt_y)
-    F_frac_sq = np.abs(F_Cx) ** 2 + np.abs(F_Cy) ** 2
-    return FractionalOperators(F_Cx, F_Cy, F_frac_sq)
+    old_h, old_w = kernel.shape
+    new_h, new_w = new_size
+
+    resized = zoom(kernel, (new_h / old_h, new_w / old_w), order=1)
+    resized = np.maximum(resized, 0.0)
+    if resized.sum() > 0:
+        resized /= resized.sum()
+    else:
+        resized = np.ones(new_size, dtype=np.float64) / (new_h * new_w)
+
+    return resized
 
 
-# ===================================================================
-#  Integer-order (first-difference) gradient operators
-# ===================================================================
-def precompute_gradient_operators(
-    shape: Tuple[int, int],
-) -> IntegerGradientOperators:
-    r"""
-    Pre-compute FFTs of the first-order forward-difference operators
-    :math:`\partial_x`, :math:`\partial_y`.
-
-    .. math::
-        \partial_x u[i,j] = u[i, j+1] - u[i, j]
-
-    Returns
-    -------
-    IntegerGradientOperators
-        Named tuple ``(F_dx, F_dy, F_grad_sq)``.
+def kernel_threshold(kernel: np.ndarray, threshold_ratio: float = 0.05) -> np.ndarray:
     """
-    H, W = shape
-    dx = np.zeros(shape, dtype=np.float64)
-    dx[0, 0] = -1.0
-    dx[0, 1] = 1.0
-    dy = np.zeros(shape, dtype=np.float64)
-    dy[0, 0] = -1.0
-    dy[1, 0] = 1.0
-    F_dx = fft2(dx)
-    F_dy = fft2(dy)
-    F_grad_sq = np.abs(F_dx) ** 2 + np.abs(F_dy) ** 2
-    return IntegerGradientOperators(F_dx, F_dy, F_grad_sq)
+    Пороговая обработка ядра: обнуление малых элементов.
 
-
-def compute_spatial_gradient(
-    u: np.ndarray,
-) -> Tuple[np.ndarray, np.ndarray]:
-    r"""
-    Spatial first-order forward differences (circular boundary).
-
-    .. math::
-        \partial_x u[i,j] = u[i, j{+}1] - u[i, j]
-
-    Returns
-    -------
-    (dx, dy) : tuple of ndarray
-    """
-    dx = np.roll(u, -1, axis=1) - u
-    dy = np.roll(u, -1, axis=0) - u
-    return dx, dy
-
-
-# ===================================================================
-#  Patch-wise Minimal Pixels (PMP) prior
-# ===================================================================
-def compute_pmp_map(
-    u: np.ndarray, patch_size: int = 5
-) -> np.ndarray:
-    r"""
-    Compute the Patch-wise Minimal Pixels (PMP) map.
-
-    For each pixel :math:`(i, j)` the PMP value is the minimum intensity
-    in the surrounding :math:`p \times p` patch ([1], Sec. 3.2):
-
-    .. math::
-        \mathrm{PMP}(u)(i, j) = \min_{(s, t)\,\in\,\Omega_p(i,j)} u(s, t)
-
-    This is equivalent to a morphological erosion with a flat
-    :math:`p \times p` structuring element.
+    Элементы ядра, значение которых меньше threshold_ratio * max(kernel),
+    обнуляются. Затем ядро нормируется на единичную сумму.
 
     Parameters
     ----------
-    u : ndarray, shape (H, W)
-        Grayscale image in [0, 1].
-    patch_size : int
-        Side length of the square patch (must be odd for symmetry).
+    kernel : np.ndarray
+        Входное ядро.
+    threshold_ratio : float
+        Доля от максимума — порог обнуления.
 
     Returns
     -------
-    pmp : ndarray, shape (H, W)
+    kernel : np.ndarray
+        Пороговое ядро (>=0, сумма=1).
     """
-    return minimum_filter(u, size=patch_size, mode='reflect')
+    max_val = kernel.max()
+    if max_val > 0:
+        kernel[kernel < threshold_ratio * max_val] = 0.0
+    kernel = np.maximum(kernel, 0.0)
+    if kernel.sum() > 0:
+        kernel /= kernel.sum()
+    return kernel
 
 
-def predict_edges_with_pmp(
-    u: np.ndarray,
-    grad_threshold_percentile: float = 94.0,
-    patch_size: int = 5,
-    pmp_gamma: float = 2.0,
-) -> Tuple[np.ndarray, np.ndarray]:
-    r"""
-    Predict salient edges for kernel estimation, guided by the PMP prior.
+# ─────────────────────────────────────────────────────────────────────────────
+#  6. Edge tapering (уменьшение артефактов граничных условий)
+# ─────────────────────────────────────────────────────────────────────────────
 
-    Procedure ([1], Sec. 3.2):
-    1. Compute spatial gradients :math:`\partial_x u`, :math:`\partial_y u`.
-    2. Compute the PMP map and derive a weight
-       :math:`w = \exp(-\gamma \cdot \mathrm{PMP}(u))`.
-       Low PMP values (near dark pixels) yield *high* weight, meaning
-       those edges are likely genuine structure rather than blur artefacts.
-    3. Weight the gradient magnitudes and retain only those above a
-       percentile threshold.
+def edgetaper(image: np.ndarray, kernel: np.ndarray) -> np.ndarray:
+    """
+    Ослабление граничных артефактов (edge tapering).
+
+    Вычисляет автокорреляцию PSF и строит весовую карту alpha,
+    затем выполняет линейную интерполяцию:
+        result = alpha * image + (1 - alpha) * (image * kernel)
+
+    Это снижает эффект «звона» (ringing) вблизи границ изображения,
+    вызванный предположением циклической свёртки при FFT-деконволюции.
 
     Parameters
     ----------
-    u : ndarray  (H, W)
-    grad_threshold_percentile : float
-        Percentile (0–100) of weighted gradient magnitude above which
-        edges are kept.
-    patch_size : int
-        PMP patch side length.
-    pmp_gamma : float
-        Decay rate for the PMP weight map.
+    image : np.ndarray
+        Входное изображение.
+    kernel : np.ndarray
+        Ядро размытия (PSF).
 
     Returns
     -------
-    (pred_dx, pred_dy) : tuple of ndarray
-        Predicted (thresholded) gradient maps.
-    """
-    dx, dy = compute_spatial_gradient(u)
-    mag = np.sqrt(dx ** 2 + dy ** 2 + EPSILON)
+    tapered : np.ndarray
+        Изображение с ослабленными граничными артефактами.
 
-    # PMP-based weighting
-    pmp = compute_pmp_map(u, patch_size)
-    weight = np.exp(-pmp_gamma * pmp)
-
-    weighted_mag = mag * weight
-    tau = np.percentile(weighted_mag, grad_threshold_percentile)
-
-    mask = weighted_mag >= tau
-    pred_dx = dx * mask
-    pred_dy = dy * mask
-    return pred_dx, pred_dy
-
-
-# ===================================================================
-#  Multi-scale pyramid utilities
-# ===================================================================
-def build_scale_list(
-    max_kernel_dim: int, min_kernel_dim: int = 3, scale_ratio: float = 1.5
-) -> List[float]:
-    r"""
-    Compute the sequence of image-scale factors for coarse-to-fine
-    kernel estimation.
-
-    At the coarsest level the effective kernel width is approximately
-    *min_kernel_dim* pixels; at the finest it equals *max_kernel_dim*.
-
-    Parameters
+    References
     ----------
-    max_kernel_dim : int
-        Largest kernel dimension at the finest (original) scale.
-    min_kernel_dim : int
-        Approximate kernel size at the coarsest level.
-    scale_ratio : float
-        Geometric ratio between successive scales (> 1).
-
-    Returns
-    -------
-    scales : list of float
-        Image down-scale factors, coarse → fine.  The last entry is 1.0.
+    MATLAB, edgetaper function.
     """
-    if max_kernel_dim <= min_kernel_dim:
-        return [1.0]
-
-    num_scales = int(
-        np.ceil(np.log(max_kernel_dim / min_kernel_dim) / np.log(scale_ratio))
-    ) + 1
-    num_scales = max(num_scales, 2)
-
-    # Geometric sequence of effective kernel widths, coarse → fine
-    factors = np.logspace(
-        np.log10(min_kernel_dim / max_kernel_dim), 0.0, num_scales
-    )
-    return factors.tolist()
-
-
-def downscale_image(
-    image: np.ndarray, scale: float
-) -> np.ndarray:
-    """
-    Down-scale *image* by *scale* using Gaussian anti-aliasing.
-
-    Parameters
-    ----------
-    image : ndarray (H, W)
-    scale : float in (0, 1]
-
-    Returns
-    -------
-    ndarray
-    """
-    if scale >= 1.0 - 1e-8:
-        return image.copy()
-
-    # Anti-alias with Gaussian whose sigma matches the scale
-    sigma = 0.5 / scale
-    smoothed = gaussian_filter(image, sigma=sigma, mode='reflect')
+    # Автокорреляция ядра
+    acf = fftconvolve(kernel, kernel[::-1, ::-1], mode='full')
+    acf /= acf.max()
 
     H, W = image.shape
-    new_H = max(1, int(np.round(H * scale)))
-    new_W = max(1, int(np.round(W * scale)))
-
-    # Bilinear interpolation via meshgrid
-    row_idx = np.linspace(0, H - 1, new_H)
-    col_idx = np.linspace(0, W - 1, new_W)
-    row_grid, col_grid = np.meshgrid(row_idx, col_idx, indexing='ij')
-
-    # Use floor/ceil for bilinear interpolation
-    r0 = np.floor(row_grid).astype(int)
-    r1 = np.minimum(r0 + 1, H - 1)
-    c0 = np.floor(col_grid).astype(int)
-    c1 = np.minimum(c0 + 1, W - 1)
-
-    dr = row_grid - r0
-    dc = col_grid - c0
-
-    out = (
-        smoothed[r0, c0] * (1 - dr) * (1 - dc)
-        + smoothed[r1, c0] * dr * (1 - dc)
-        + smoothed[r0, c1] * (1 - dr) * dc
-        + smoothed[r1, c1] * dr * dc
-    )
-    return out
-
-
-def resize_kernel(
-    kernel: np.ndarray, new_shape: Tuple[int, int]
-) -> np.ndarray:
-    r"""
-    Resize a blur kernel to *new_shape* using bilinear interpolation,
-    then re-normalise to unit sum.
-
-    Parameters
-    ----------
-    kernel : ndarray (kh_old, kw_old)
-    new_shape : (kh_new, kw_new)
-
-    Returns
-    -------
-    ndarray (kh_new, kw_new)
-    """
-    kh_old, kw_old = kernel.shape
-    kh_new, kw_new = new_shape
-
-    if (kh_old, kw_old) == (kh_new, kw_new):
-        return kernel.copy()
-
-    row_idx = np.linspace(0, kh_old - 1, kh_new)
-    col_idx = np.linspace(0, kw_old - 1, kw_new)
-    rg, cg = np.meshgrid(row_idx, col_idx, indexing='ij')
-
-    r0 = np.floor(rg).astype(int)
-    r1 = np.minimum(r0 + 1, kh_old - 1)
-    c0 = np.floor(cg).astype(int)
-    c1 = np.minimum(c0 + 1, kw_old - 1)
-    dr = rg - r0
-    dc = cg - c0
-
-    out = (
-        kernel[r0, c0] * (1 - dr) * (1 - dc)
-        + kernel[r1, c0] * dr * (1 - dc)
-        + kernel[r0, c1] * (1 - dr) * dc
-        + kernel[r1, c1] * dr * dc
-    )
-    out = np.maximum(out, 0.0)
-    s = out.sum()
-    if s > EPSILON:
-        out /= s
-    return out
-
-
-# ===================================================================
-#  Kernel post-processing
-# ===================================================================
-def threshold_kernel(
-    kernel: np.ndarray, rel_threshold: float = 0.05
-) -> np.ndarray:
-    r"""
-    Remove small / noisy entries from a kernel estimate and
-    re-normalise.
-
-    Parameters
-    ----------
-    kernel : ndarray
-    rel_threshold : float
-        Fraction of the maximum value below which entries are zeroed.
-
-    Returns
-    -------
-    ndarray
-    """
-    k = kernel.copy()
-    k[k < rel_threshold * k.max()] = 0.0
-    k = np.maximum(k, 0.0)
-    s = k.sum()
-    if s > EPSILON:
-        k /= s
-    else:
-        # Fall back to a delta kernel
-        k = np.zeros_like(kernel)
-        k[k.shape[0] // 2, k.shape[1] // 2] = 1.0
-    return k
-
-
-def center_kernel(kernel: np.ndarray) -> np.ndarray:
-    """
-    Shift a kernel so that its centre of mass coincides with the
-    geometric centre of the array.
-
-    Parameters
-    ----------
-    kernel : ndarray (kh, kw)
-
-    Returns
-    -------
-    ndarray (kh, kw)
-    """
     kh, kw = kernel.shape
-    total = kernel.sum()
-    if total < EPSILON:
-        return kernel.copy()
 
-    yy, xx = np.mgrid[:kh, :kw]
-    cy = np.sum(yy * kernel) / total
-    cx = np.sum(xx * kernel) / total
+    # 1D маргинальные автокорреляции (для строк и столбцов)
+    acf_y = acf[:, acf.shape[1] // 2]
+    acf_x = acf[acf.shape[0] // 2, :]
 
-    shift_y = int(np.round(kh / 2.0 - cy))
-    shift_x = int(np.round(kw / 2.0 - cx))
+    # Построение карт альфа для строк и столбцов
+    alpha_y = np.ones(H, dtype=np.float64)
+    half_ky = len(acf_y) // 2
+    for i in range(min(half_ky, H)):
+        val = acf_y[half_ky - i]
+        alpha_y[i] = min(alpha_y[i], val)
+        alpha_y[H - 1 - i] = min(alpha_y[H - 1 - i], val)
 
-    return np.roll(np.roll(kernel, shift_y, axis=0), shift_x, axis=1)
+    alpha_x = np.ones(W, dtype=np.float64)
+    half_kx = len(acf_x) // 2
+    for i in range(min(half_kx, W)):
+        val = acf_x[half_kx - i]
+        alpha_x[i] = min(alpha_x[i], val)
+        alpha_x[W - 1 - i] = min(alpha_x[W - 1 - i], val)
+
+    alpha = alpha_y[:, None] * alpha_x[None, :]
+
+    # Интерполяция: оригинал * alpha + размытое * (1 - alpha)
+    blurred = fftconvolve(image, kernel, mode='same')
+    tapered = image * alpha + blurred * (1.0 - alpha)
+
+    return tapered
 
 
-def make_initial_kernel(
-    kernel_shape: Tuple[int, int],
-) -> np.ndarray:
-    r"""
-    Create an initial Gaussian kernel for the coarsest pyramid level.
+# ─────────────────────────────────────────────────────────────────────────────
+#  7. Оценка уровня шума
+# ─────────────────────────────────────────────────────────────────────────────
 
-    The standard deviation is set to ``max(kh, kw) / 6`` so that
-    the kernel energy is well inside the support.
+def estimate_noise_sigma(image: np.ndarray) -> float:
+    """
+    Оценка стандартного отклонения шума методом MAD (Median Absolute Deviation).
+
+    Применяется лапласиан-фильтр, далее оценка по формуле Donoho:
+        sigma = median(|L * image|) / 0.6745
 
     Parameters
     ----------
-    kernel_shape : (kh, kw)
+    image : np.ndarray
+        Входное изображение (нормализованное к [0, 1]).
 
     Returns
     -------
-    ndarray (kh, kw)
+    sigma : float
+        Оценка стандартного отклонения шума.
+
+    References
+    ----------
+    Donoho, D. L. (1995). De-noising by Soft-Thresholding.
+    IEEE Trans. on Information Theory.
     """
-    kh, kw = kernel_shape
-    sig = max(kh, kw) / 6.0
-    yy, xx = np.ogrid[-(kh // 2): kh - kh // 2,
-                       -(kw // 2): kw - kw // 2]
-    h = np.exp(-(xx ** 2 + yy ** 2) / (2.0 * sig ** 2))
-    h /= h.sum()
-    return h
+    from scipy.ndimage import convolve
+    laplacian = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]], dtype=np.float64)
+    filtered = convolve(image, laplacian)
+    sigma = np.median(np.abs(filtered)) / (0.6745 * np.sqrt(20.0))
+    return max(sigma, 1e-4)
+
+
+def compute_gradient(image: np.ndarray):
+    """
+    Вычисление градиента изображения (конечные разности с периодическими г.у.).
+
+    Parameters
+    ----------
+    image : np.ndarray
+        Входное изображение.
+
+    Returns
+    -------
+    gx : np.ndarray
+        Горизонтальный градиент.
+    gy : np.ndarray
+        Вертикальный градиент.
+    """
+    gx = np.roll(image, -1, axis=1) - image
+    gy = np.roll(image, -1, axis=0) - image
+    return gx, gy

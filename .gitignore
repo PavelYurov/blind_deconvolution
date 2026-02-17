@@ -146,6 +146,8 @@ Desktop.ini
 /main7.ipynb
 /main8.ipynb
 /main9.ipynb
+/main10.ipynb
+/main**.ipynb
 /extensions.py
 /prompt.txt
 /.dependency_state.json

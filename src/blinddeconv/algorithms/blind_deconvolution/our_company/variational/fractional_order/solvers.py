@@ -1,511 +1,589 @@
 """
-Solvers for Fractional-Order Blind Image Deconvolution
-with Patch-wise Minimal Pixels (PMP) Prior.
+Солверы для метода слепой деконволюции на основе дробного порядка
+с PMP (Patch-wise Minimal Pixels) prior.
 
-This module contains the core numerical routines:
-
-1. **Image sub-problem** – ADMM with fractional-order total-variation
-   regularisation (Sec. 3.1 of [1]).
-2. **Kernel sub-problem** – closed-form in the Fourier domain with
-   simplex projection (Sec. 3.3 of [1]).
-3. **Edge prediction** – gradient thresholding guided by the PMP map
-   (Sec. 3.2 of [1]).
-4. **Coarse-to-fine loop** – multi-scale blind estimation
-   (Algorithm 2 in [1]; standard scheme of [3, 4]).
-
-References
-----------
-[1] Wu, T., Wan, S., Feng, C., Zhang, H., Zeng, T.
+Литература:
+    Wu, T., Wan, S., Feng, C., Zhang, H., & Zeng, T. (2024).
     "Blind Image Deconvolution: When Patch-wise Minimal Pixels Prior
-    Meets Fractional-Order Method."
-    J. Math. Imaging Vis., 2024.  DOI: 10.1007/s10851-024-01221-x
+     Meets Fractional-Order Method."
+    Journal of Mathematical Imaging and Vision, 67(1), 2.
+    DOI: 10.1007/s10851-024-01221-x
 
-[2] Pan, X., Ye, Y., Wang, J., Gao, X., Zhou, X.
-    "Noncausal fractional directional differentiator and blind
-    deconvolution: motion blur estimation."
-    Multimedia Tools Appl., 73(3), 1485–1506, 2014.
+Реализованные солверы:
 
-[3] Cho, S., Lee, S.
-    "Fast motion deblurring."
-    ACM Trans. Graphics (SIGGRAPH Asia), 28(5), 2009.
+1. solve_image_admm:
+   Оценка латентного изображения f при фиксированном ядре h.
+   Используется ADMM (Alternating Direction Method of Multipliers)
+   для минимизации энергии с дробным TV и PMP-регуляризатором.
 
-[4] Xu, L., Jia, J.
-    "Two-phase kernel estimation for robust motion deblurring."
-    ECCV 2010, pp. 157–170.
+   Энергия f-подзадачи (Раздел 4 статьи):
+       min_f  (1/2)||h * f - g||^2
+            + lambda * ||nabla^alpha f||_{2,1}
+            + mu * sum_i min_{j in P_i} |f_j|
+
+2. solve_kernel:
+   Оценка ядра h при фиксированном изображении f.
+   Решение в градиентной области через FFT:
+       min_h  ||nabla(h * f) - nabla g||^2 + gamma * ||h||^2
+   с проекцией на допустимое множество {h >= 0, ||h||_1 = 1}.
+
+3. coarse_to_fine:
+   Многомасштабная (coarse-to-fine) схема слепой деконволюции.
+   Пирамида Гаусса + последовательная оценка ядра от грубого к точному.
+
+4. final_nonblind_deconv:
+   Финальная не-слепая деконволюция методом ADMM с дробным TV.
 """
-
-from __future__ import annotations
 
 import numpy as np
 from numpy.fft import fft2, ifft2
-from typing import Tuple, Optional
 
 from .utils import (
-    EPSILON,
-    FractionalOperators,
-    IntegerGradientOperators,
-    psf2otf,
+    fft_fractional_operators,
+    fft_gradient_operators,
     soft_threshold,
-    precompute_fractional_operators,
-    precompute_gradient_operators,
-    predict_edges_with_pmp,
-    build_scale_list,
-    downscale_image,
+    vector_shrinkage,
+    pmp_weight_map,
+    center_kernel_fft,
+    crop_kernel_from_fft,
     resize_kernel,
-    threshold_kernel,
-    center_kernel,
-    make_initial_kernel,
+    kernel_threshold,
+    build_gaussian_pyramid,
+    edgetaper,
+    compute_gradient,
 )
 
 
-# ===================================================================
-# 1.  Image sub-problem  –  ADMM with fractional-order TV
-# ===================================================================
-def solve_image_fractional_tv(
-    g: np.ndarray,
-    k: np.ndarray,
-    u_init: np.ndarray,
-    frac_ops: FractionalOperators,
-    lambda_tv: float,
-    rho: float = 1.0,
-    num_iter: int = 15,
-    rho_scale: float = 1.05,
-) -> np.ndarray:
-    r"""
-    Solve the image sub-problem via ADMM with fractional-order TV.
+# ─────────────────────────────────────────────────────────────────────────────
+#  1. Оценка латентного изображения (f-подзадача) через ADMM
+# ─────────────────────────────────────────────────────────────────────────────
 
-    The optimisation problem ([1], Sec. 3.1, Eq. 8) is
+def solve_image_admm(g: np.ndarray,
+                     h: np.ndarray,
+                     f_init: np.ndarray,
+                     alpha: float,
+                     lambda_ftv: float,
+                     mu_pmp: float,
+                     patch_size: int,
+                     beta1: float,
+                     beta2: float,
+                     num_iter: int,
+                     fft_ops: dict = None) -> np.ndarray:
+    """
+    Оценка латентного изображения f при фиксированном ядре h
+    посредством ADMM с двумя регуляризаторами:
+        (i)  Изотропный дробный TV порядка alpha
+        (ii) PMP (Patch-wise Minimal Pixels) prior
 
-    .. math::
-        \min_{u}\;
-        \tfrac{1}{2}\|k \ast u - g\|_2^2
-        + \lambda\bigl(\|v_x\|_1 + \|v_y\|_1\bigr)
+    Минимизируемый функционал:
+        E(f) = (1/2)||h * f - g||_2^2
+             + lambda * ||nabla^alpha f||_{2,1}
+             + mu * sum_i w_i |f_i|
 
-    subject to  :math:`v_x = D_x^{\alpha} u`,
-    :math:`v_y = D_y^{\alpha} u`.
+    где w_i — веса PMP, обновляемые итеративно
+    (iteratively reweighted l1 аппроксимация PMP prior).
 
-    **ADMM splitting** introduces scaled dual variables
-    :math:`b_x, b_y` and penalty :math:`\rho`:
+    ADMM формулировка (Раздел 4 статьи):
+        Вводятся вспомогательные переменные:
+            u1 = D_x^alpha f   (горизонтальная дробная производная)
+            u2 = D_y^alpha f   (вертикальная дробная производная)
+            v  = f             (для PMP)
 
-    *u-update* (linear system in Fourier domain – [1], Eq. 9):
+        Расширенный Лагранжиан:
+            L = (1/2)||h*f - g||^2
+              + lambda * ||(u1, u2)||_{2,1}
+              + mu * sum_i w_i |v_i|
+              + (beta1/2)||D_x^alpha f - u1 + d1||^2
+              + (beta1/2)||D_y^alpha f - u2 + d2||^2
+              + (beta2/2)||f - v + d3||^2
 
-    .. math::
-        \hat{u} = \frac{
-            \overline{\hat{k}}\,\hat{g}
-            + \rho\bigl(
-                \overline{\hat{C}_x}(\hat{v}_x - \hat{b}_x)
-              + \overline{\hat{C}_y}(\hat{v}_y - \hat{b}_y)
-            \bigr)
-        }{
-            |\hat{k}|^2
-            + \rho\bigl(|\hat{C}_x|^2 + |\hat{C}_y|^2\bigr)
-        }
+    ADMM итерации:
 
-    *v-update* (soft thresholding – [1], Eq. 10):
+    (a) f-обновление (в частотной области):
+        F(f) = [conj(F(h)) F(g) + beta1 (conj(F(Dx)) F(z1) + conj(F(Dy)) F(z2)) + beta2 F(z3)]
+             / [|F(h)|^2 + beta1 (|F(Dx)|^2 + |F(Dy)|^2) + beta2]
+        где z1 = u1 - d1, z2 = u2 - d2, z3 = v - d3
 
-    .. math::
-        v_d = \mathrm{shrink}\!\bigl(D_d^{\alpha} u + b_d,\;
-              \lambda / \rho\bigr), \quad d \in \{x, y\}
+    (b) (u1, u2)-обновление (изотропное векторное сжатие):
+        (u1, u2) = VecShrink(D_x^alpha f + d1, D_y^alpha f + d2, lambda/beta1)
 
-    *Dual update* :
+    (c) v-обновление (взвешенная мягкая пороговая обработка):
+        v = shrink(f + d3, mu * w / beta2)
 
-    .. math::
-        b_d \leftarrow b_d + D_d^{\alpha} u - v_d
+    (d) Обновление двойственных переменных:
+        d1 <- d1 + D_x^alpha f - u1
+        d2 <- d2 + D_y^alpha f - u2
+        d3 <- d3 + f - v
+
+    (e) Обновление весов PMP:
+        w = pmp_weight_map(f)
 
     Parameters
     ----------
-    g : ndarray (H, W)        – blurred observation.
-    k : ndarray (kh, kw)      – current kernel estimate.
-    u_init : ndarray (H, W)   – warm-start for the image.
-    frac_ops : FractionalOperators
-        Pre-computed fractional gradient FFTs.
-    lambda_tv : float          – regularisation weight.
-    rho : float                – initial ADMM penalty.
-    num_iter : int             – number of ADMM iterations.
-    rho_scale : float          – multiplicative increase of rho per iter.
+    g : np.ndarray
+        Размытое изображение (H x W), float64, [0, 1].
+    h : np.ndarray
+        Текущая оценка ядра PSF (kh x kw).
+    f_init : np.ndarray
+        Начальное приближение изображения (H x W).
+    alpha : float
+        Порядок дробной производной (1 < alpha < 2).
+    lambda_ftv : float
+        Вес изотропного дробного TV.
+    mu_pmp : float
+        Вес PMP prior.
+    patch_size : int
+        Размер патча для PMP.
+    beta1 : float
+        Штрафной параметр ADMM для дробного TV.
+    beta2 : float
+        Штрафной параметр ADMM для PMP.
+    num_iter : int
+        Число итераций ADMM.
+    fft_ops : dict or None
+        Предвычисленные FFT операторы (для повторного использования).
+        Ожидаемые ключи: 'F_Dx', 'F_Dy', 'F_Dx_sq', 'F_Dy_sq'.
 
     Returns
     -------
-    u : ndarray (H, W)
-        Estimated latent image (values clipped to [0, 1]).
+    f : np.ndarray
+        Восстановленное изображение (H x W).
     """
     H, W = g.shape
-    F_Cx, F_Cy, F_frac_sq = frac_ops
 
-    F_k = psf2otf(k, (H, W))
-    F_k_conj = np.conj(F_k)
-    F_k_sq = np.abs(F_k) ** 2
+    # Предвычисление FFT операторов
+    if fft_ops is None:
+        F_Dx, F_Dy, F_Dx_sq, F_Dy_sq = fft_fractional_operators((H, W), alpha)
+    else:
+        F_Dx = fft_ops['F_Dx']
+        F_Dy = fft_ops['F_Dy']
+        F_Dx_sq = fft_ops['F_Dx_sq']
+        F_Dy_sq = fft_ops['F_Dy_sq']
+
+    # FFT ядра
+    H_padded = center_kernel_fft(h, (H, W))
+    F_h = fft2(H_padded)
+    F_h_conj = np.conj(F_h)
+    F_h_sq = np.abs(F_h) ** 2
+
+    # FFT наблюдения
     F_g = fft2(g)
 
-    # Initialise primal and dual variables
-    u = u_init.copy()
-    vx = np.zeros((H, W), dtype=np.float64)
-    vy = np.zeros((H, W), dtype=np.float64)
-    bx = np.zeros((H, W), dtype=np.float64)
-    by = np.zeros((H, W), dtype=np.float64)
+    # Инициализация
+    f = f_init.copy()
+    u1 = np.zeros((H, W), dtype=np.float64)
+    u2 = np.zeros((H, W), dtype=np.float64)
+    v = f.copy()
+    d1 = np.zeros((H, W), dtype=np.float64)
+    d2 = np.zeros((H, W), dtype=np.float64)
+    d3 = np.zeros((H, W), dtype=np.float64)
+
+    # Знаменатель f-обновления (постоянный в ADMM)
+    denom = F_h_sq + beta1 * (F_Dx_sq + F_Dy_sq) + beta2
+
+    # Карта весов PMP (инициализация)
+    w_pmp = pmp_weight_map(f, patch_size)
+
+    for it in range(num_iter):
+        # (a) f-обновление (Частотная область)
+        z1 = u1 - d1
+        z2 = u2 - d2
+        z3 = v - d3
+
+        numer = (F_h_conj * F_g
+                 + beta1 * (np.conj(F_Dx) * fft2(z1) + np.conj(F_Dy) * fft2(z2))
+                 + beta2 * fft2(z3))
+
+        f = np.real(ifft2(numer / denom))
+
+        # (b) (u1, u2)-обновление: изотропное векторное сжатие
+        #     D_x^alpha f + d1, D_y^alpha f + d2
+        Dxf = np.real(ifft2(F_Dx * fft2(f)))
+        Dyf = np.real(ifft2(F_Dy * fft2(f)))
+
+        u1, u2 = vector_shrinkage(Dxf + d1, Dyf + d2, lambda_ftv / beta1)
+
+        # (c) v-обновление: взвешенная мягкая пороговая обработка (PMP)
+        v = soft_threshold(f + d3, mu_pmp * w_pmp / beta2)
+
+        # (d) Обновление двойственных переменных
+        d1 = d1 + Dxf - u1
+        d2 = d2 + Dyf - u2
+        d3 = d3 + f - v
+
+        # (e) Периодическое обновление весов PMP (каждые 3 итерации)
+        if (it + 1) % 3 == 0:
+            w_pmp = pmp_weight_map(f, patch_size)
+
+    # Ограничение диапазона [0, 1]
+    f = np.clip(f, 0.0, 1.0)
+
+    return f
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  2. Оценка ядра размытия (h-подзадача) через FFT в градиентной области
+# ─────────────────────────────────────────────────────────────────────────────
+
+def solve_kernel(g: np.ndarray,
+                 f: np.ndarray,
+                 kernel_size: tuple,
+                 gamma: float,
+                 threshold_ratio: float = 0.05) -> np.ndarray:
+    """
+    Оценка ядра размытия h при фиксированном латентном изображении f.
+
+    Решается в градиентной области (более устойчиво к артефактам):
+        min_h  ||h * nabla_x f - nabla_x g||^2
+             + ||h * nabla_y f - nabla_y g||^2
+             + gamma * ||h||^2
+
+    Решение в частотной области (замкнутая форма):
+        F(h) = [conj(F(f_x)) F(g_x) + conj(F(f_y)) F(g_y)]
+             / [|F(f_x)|^2 + |F(f_y)|^2 + gamma]
+
+    где f_x = nabla_x f, g_x = nabla_x g (конечные разности).
+
+    После FFT-вычисления выполняется проекция на допустимое множество:
+        h >= 0,  ||h||_1 = 1
+
+    Parameters
+    ----------
+    g : np.ndarray
+        Размытое изображение (H x W).
+    f : np.ndarray
+        Текущая оценка латентного изображения (H x W).
+    kernel_size : tuple of (int, int)
+        Размер ядра (kh, kw).
+    gamma : float
+        Вес регуляризации ядра (Тихоновская регуляризация).
+    threshold_ratio : float
+        Порог для обнуления малых элементов ядра.
+
+    Returns
+    -------
+    kernel : np.ndarray
+        Оценённое ядро (kh x kw), неотрицательное, нормированное.
+    """
+    H, W = g.shape
+
+    # Градиенты изображений (конечные разности)
+    fx, fy = compute_gradient(f)
+    gx, gy = compute_gradient(g)
+
+    # FFT градиентов
+    F_fx = fft2(fx)
+    F_fy = fft2(fy)
+    F_gx = fft2(gx)
+    F_gy = fft2(gy)
+
+    # Решение в частотной области
+    numer = np.conj(F_fx) * F_gx + np.conj(F_fy) * F_gy
+    denom = np.abs(F_fx) ** 2 + np.abs(F_fy) ** 2 + gamma
+
+    F_h = numer / denom
+    h_full = np.real(ifft2(F_h))
+
+    # Извлечение компактного ядра
+    kernel = crop_kernel_from_fft(h_full, kernel_size)
+
+    # Пороговая обработка
+    kernel = kernel_threshold(kernel, threshold_ratio)
+
+    return kernel
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  3. Финальная не-слепая деконволюция (дробный TV через ADMM)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def final_nonblind_deconv(g: np.ndarray,
+                          h: np.ndarray,
+                          alpha: float,
+                          lambda_ftv: float,
+                          beta: float = 1.0,
+                          num_iter: int = 30) -> np.ndarray:
+    """
+    Финальная не-слепая деконволюция с дробным TV.
+
+    Решается задача:
+        min_f  (1/2)||h * f - g||^2 + lambda * ||nabla^alpha f||_{2,1}
+
+    посредством ADMM (упрощённая версия без PMP, только дробный TV).
+
+    ADMM итерации:
+    (a) f-обновление:
+        F(f) = [conj(F(h)) F(g) + beta (conj(F(Dx)) F(u1 - d1) + conj(F(Dy)) F(u2 - d2))]
+             / [|F(h)|^2 + beta (|F(Dx)|^2 + |F(Dy)|^2)]
+
+    (b) (u1, u2)-обновление: VecShrink(Dxf + d1, Dyf + d2, lambda/beta)
+
+    (c) Обновление двойственных переменных
+
+    Parameters
+    ----------
+    g : np.ndarray
+        Размытое изображение (H x W), float64, [0, 1].
+    h : np.ndarray
+        Финальная оценка ядра PSF (kh x kw).
+    alpha : float
+        Порядок дробной производной.
+    lambda_ftv : float
+        Вес дробного TV.
+    beta : float
+        Штрафной параметр ADMM.
+    num_iter : int
+        Число ADMM итераций.
+
+    Returns
+    -------
+    f : np.ndarray
+        Восстановленное изображение (H x W), [0, 1].
+    """
+    H, W = g.shape
+
+    # Предвычисление операторов
+    F_Dx, F_Dy, F_Dx_sq, F_Dy_sq = fft_fractional_operators((H, W), alpha)
+
+    H_padded = center_kernel_fft(h, (H, W))
+    F_h = fft2(H_padded)
+    F_h_conj = np.conj(F_h)
+    F_h_sq = np.abs(F_h) ** 2
+
+    F_g = fft2(g)
+
+    # Инициализация
+    f = g.copy()
+    u1 = np.zeros((H, W), dtype=np.float64)
+    u2 = np.zeros((H, W), dtype=np.float64)
+    d1 = np.zeros((H, W), dtype=np.float64)
+    d2 = np.zeros((H, W), dtype=np.float64)
+
+    denom = F_h_sq + beta * (F_Dx_sq + F_Dy_sq)
 
     for _ in range(num_iter):
-        # -------- u-update (Fourier solve) --------
-        rhs = F_k_conj * F_g + rho * (
-            np.conj(F_Cx) * fft2(vx - bx)
-            + np.conj(F_Cy) * fft2(vy - by)
-        )
-        denom = F_k_sq + rho * F_frac_sq + EPSILON
-        u = np.real(ifft2(rhs / denom))
+        # (a) f-обновление
+        z1 = u1 - d1
+        z2 = u2 - d2
 
-        # -------- v-update (shrinkage) --------
-        Dx_u = np.real(ifft2(F_Cx * fft2(u)))
-        Dy_u = np.real(ifft2(F_Cy * fft2(u)))
+        numer = (F_h_conj * F_g
+                 + beta * (np.conj(F_Dx) * fft2(z1) + np.conj(F_Dy) * fft2(z2)))
+        f = np.real(ifft2(numer / denom))
 
-        vx = soft_threshold(Dx_u + bx, lambda_tv / rho)
-        vy = soft_threshold(Dy_u + by, lambda_tv / rho)
+        # (b) u-обновление
+        Dxf = np.real(ifft2(F_Dx * fft2(f)))
+        Dyf = np.real(ifft2(F_Dy * fft2(f)))
+        u1, u2 = vector_shrinkage(Dxf + d1, Dyf + d2, lambda_ftv / beta)
 
-        # -------- dual update --------
-        bx += Dx_u - vx
-        by += Dy_u - vy
+        # (c) Двойственные переменные
+        d1 = d1 + Dxf - u1
+        d2 = d2 + Dyf - u2
 
-        # Increase penalty (continuation)
-        rho *= rho_scale
-
-    u = np.clip(u, 0.0, 1.0)
-    return u
+    f = np.clip(f, 0.0, 1.0)
+    return f
 
 
-# ===================================================================
-# 2.  Kernel sub-problem  –  spectral solve + simplex projection
-# ===================================================================
-def estimate_kernel_from_edges(
-    pred_dx: np.ndarray,
-    pred_dy: np.ndarray,
-    g: np.ndarray,
-    kernel_shape: Tuple[int, int],
-    mu: float = 0.01,
-    int_ops: Optional[IntegerGradientOperators] = None,
-) -> np.ndarray:
-    r"""
-    Estimate the blur kernel from predicted edge maps.
+# ─────────────────────────────────────────────────────────────────────────────
+#  4. Основной алгоритм: coarse-to-fine слепая деконволюция
+# ─────────────────────────────────────────────────────────────────────────────
 
-    Given predicted gradients :math:`\hat\partial_x u`,
-    :math:`\hat\partial_y u` and the blurred image :math:`g`,
-    the kernel sub-problem ([1], Sec. 3.3) reads
-
-    .. math::
-        \min_{k}\;
-        \sum_{d \in \{x,y\}}
-          \lVert \hat\partial_d u \ast k - \partial_d g \rVert_2^2
-        + \mu\,\|k\|_2^2
-        \quad \text{s.t.}\;\; k \ge 0,\;\sum k = 1.
-
-    Closed-form solution in the frequency domain:
-
-    .. math::
-        \hat{k} = \frac{
-            \sum_d \overline{\widehat{\hat\partial_d u}}\;
-                   \widehat{\partial_d g}
-        }{
-            \sum_d \bigl|\widehat{\hat\partial_d u}\bigr|^2 + \mu
-        }
-
-    The spatial kernel is then projected onto the probability simplex
-    (non-negativity + unit sum), thresholded, and centred.
-
-    Parameters
-    ----------
-    pred_dx, pred_dy : ndarray (H, W)
-        Predicted salient gradient maps.
-    g : ndarray (H, W)
-        Blurred observation.
-    kernel_shape : (kh, kw)
-    mu : float
-        Tikhonov regularisation for kernel smoothness.
-    int_ops : IntegerGradientOperators or None
-        If *None*, operators are recomputed internally.
-
-    Returns
-    -------
-    k : ndarray (kh, kw)
-        Estimated kernel (non-negative, unit sum).
+def coarse_to_fine(g: np.ndarray,
+                   kernel_size: tuple,
+                   alpha: float = 1.5,
+                   lambda_ftv: float = 4e-3,
+                   mu_pmp: float = 1e-3,
+                   gamma_kernel: float = 2.0,
+                   patch_size: int = 5,
+                   num_scales: int = 5,
+                   outer_iter: int = 5,
+                   admm_iter: int = 10,
+                   beta1: float = 1.0,
+                   beta2: float = 1.0,
+                   kernel_threshold_ratio: float = 0.05,
+                   final_deconv_iter: int = 40,
+                   verbose: bool = False) -> tuple:
     """
-    H, W = g.shape
+    Многомасштабная (coarse-to-fine) слепая деконволюция с дробным TV и PMP.
 
-    if int_ops is None:
-        int_ops = precompute_gradient_operators((H, W))
+    Алгоритм (Раздел 4 статьи, Algorithm 1):
 
-    F_dx, F_dy, _ = int_ops
+    1. Построить Гауссову пирамиду g_1, ..., g_S размытого изображения.
+    2. Инициализировать ядро h_1 дельта-функцией на грубейшем уровне.
+    3. Для каждого масштаба s = 1, ..., S:
+       a. Оценить латентное изображение f_s методом ADMM
+          (дробный TV + PMP, см. solve_image_admm).
+       b. Оценить ядро h_s в градиентной области (см. solve_kernel).
+       c. Если s < S, масштабировать h_s к размеру следующего уровня.
+    4. Финальная не-слепая деконволюция (дробный TV без PMP).
 
-    # Gradients of blurred image g
-    F_g = fft2(g)
-    F_gx = F_dx * F_g      # ∂_x g  in Fourier
-    F_gy = F_dy * F_g
-
-    # Predicted edge maps in Fourier
-    F_px = fft2(pred_dx)
-    F_py = fft2(pred_dy)
-
-    # Closed-form ([1] Eq. 12-like)
-    numerator = np.conj(F_px) * F_gx + np.conj(F_py) * F_gy
-    denominator = np.abs(F_px) ** 2 + np.abs(F_py) ** 2 + mu
-
-    F_k = numerator / denominator
-    k_full = np.real(ifft2(F_k))
-
-    # Crop to kernel support (centred)
-    kh, kw = kernel_shape
-    k_full = np.roll(k_full, kh // 2, axis=0)
-    k_full = np.roll(k_full, kw // 2, axis=1)
-    k = k_full[:kh, :kw]
-
-    # Simplex projection:  k ≥ 0, Σk = 1
-    k = np.maximum(k, 0.0)
-    k = threshold_kernel(k, rel_threshold=0.05)
-    k = center_kernel(k)
-    return k
-
-
-# ===================================================================
-# 3.  Single-scale blind estimation step
-# ===================================================================
-def single_scale_step(
-    g: np.ndarray,
-    k: np.ndarray,
-    kernel_shape: Tuple[int, int],
-    alpha: float,
-    L: int,
-    lambda_tv: float,
-    mu_kernel: float,
-    admm_iter: int,
-    rho_init: float,
-    grad_threshold_pct: float,
-    pmp_patch_size: int,
-    pmp_gamma: float,
-) -> Tuple[np.ndarray, np.ndarray]:
-    r"""
-    One iteration of the alternating minimisation at a single
-    pyramid level.
-
-    1. **Image estimation** with fractional-order TV (ADMM).
-    2. **Edge prediction** via PMP-guided gradient thresholding.
-    3. **Kernel estimation** from predicted edges (Fourier solve).
+    Выбор порядка дробной производной alpha:
+        alpha in (1, 2)  контролирует баланс между сохранением
+        деталей (alpha -> 1, стандартный TV) и подавлением звона
+        (alpha -> 2, лапласиан).
+        Оптимальное значение alpha ≈ 1.3-1.7 (Раздел 3 статьи).
 
     Parameters
     ----------
-    g : ndarray (H, W) – blurred image at this scale.
-    k : ndarray        – current kernel estimate.
-    kernel_shape       – desired kernel size at this scale.
-    alpha, L           – fractional derivative parameters.
-    lambda_tv, mu_kernel – regularisation weights.
-    admm_iter          – inner ADMM iterations for image step.
-    rho_init           – initial ADMM penalty.
-    grad_threshold_pct – gradient thresholding percentile.
-    pmp_patch_size     – PMP patch size.
-    pmp_gamma          – PMP decay parameter.
-
-    Returns
-    -------
-    (k_new, u) : tuple
-        Updated kernel and intermediate image.
-    """
-    H, W = g.shape
-
-    # Pre-compute operators for this image size
-    frac_ops = precompute_fractional_operators((H, W), alpha, L)
-    int_ops = precompute_gradient_operators((H, W))
-
-    # 1. Image estimation (ADMM with fractional TV)  –  [1] Sec. 3.1
-    u = solve_image_fractional_tv(
-        g, k, g.copy(), frac_ops,
-        lambda_tv=lambda_tv,
-        rho=rho_init,
-        num_iter=admm_iter,
-    )
-
-    # 2. Edge prediction with PMP  –  [1] Sec. 3.2
-    pred_dx, pred_dy = predict_edges_with_pmp(
-        u,
-        grad_threshold_percentile=grad_threshold_pct,
-        patch_size=pmp_patch_size,
-        pmp_gamma=pmp_gamma,
-    )
-
-    # 3. Kernel estimation  –  [1] Sec. 3.3
-    k_new = estimate_kernel_from_edges(
-        pred_dx, pred_dy, g, kernel_shape,
-        mu=mu_kernel, int_ops=int_ops,
-    )
-
-    return k_new, u
-
-
-# ===================================================================
-# 4.  Coarse-to-fine multi-scale loop
-# ===================================================================
-def coarse_to_fine_estimation(
-    g: np.ndarray,
-    kernel_shape: Tuple[int, int],
-    alpha: float = 1.4,
-    L: int = 10,
-    lambda_tv: float = 4e-3,
-    mu_kernel: float = 0.01,
-    admm_iter: int = 15,
-    rho_init: float = 1.0,
-    inner_iter: int = 3,
-    grad_threshold_pct: float = 94.0,
-    pmp_patch_size: int = 5,
-    pmp_gamma: float = 2.0,
-    scale_ratio: float = 1.5,
-    verbose: bool = False,
-) -> Tuple[np.ndarray, np.ndarray]:
-    r"""
-    Multi-scale coarse-to-fine blind deconvolution
-    ([1], Algorithm 2; see also [3, 4] for the standard pyramid scheme).
-
-    The image pyramid is built so that the effective kernel at the
-    coarsest level is ≈ 3 pixels wide.  At each level the algorithm
-    alternates between:
-
-    * fractional-TV image estimation  (ADMM, Sec. 3.1),
-    * PMP-guided edge prediction      (Sec. 3.2),
-    * spectral kernel estimation      (Sec. 3.3).
-
-    The kernel estimate is up-sampled between levels.
-
-    Parameters
-    ----------
-    g : ndarray (H, W)
-        Full-resolution blurred image, float64 in [0, 1].
-    kernel_shape : (kh, kw)
-        Maximum kernel support at the finest level.
+    g : np.ndarray
+        Размытое изображение (H x W), float64, [0, 1].
+    kernel_size : tuple of (int, int)
+        Ожидаемый размер ядра (kh, kw) — должен быть нечётным.
     alpha : float
-        Fractional derivative order (1 < α < 2).
-    L : int
-        GL truncation length.
-    lambda_tv : float
-        Weight of the fractional-TV regulariser.
-    mu_kernel : float
-        Tikhonov weight on the kernel.
+        Порядок дробной производной (1 < alpha < 2, по умолчанию 1.5).
+    lambda_ftv : float
+        Вес дробного TV регуляризатора.
+    mu_pmp : float
+        Вес PMP prior.
+    gamma_kernel : float
+        Вес регуляризации ядра (Тихонов).
+    patch_size : int
+        Размер патча для PMP.
+    num_scales : int
+        Число уровней пирамиды.
+    outer_iter : int
+        Число чередующихся итераций (f, h) на каждом масштабе.
     admm_iter : int
-        ADMM iterations per image-estimation step.
-    rho_init : float
-        Initial ADMM penalty parameter.
-    inner_iter : int
-        Number of alternating-minimisation passes per scale.
-    grad_threshold_pct : float
-        Percentile threshold for edge prediction.
-    pmp_patch_size : int
-        PMP prior patch size.
-    pmp_gamma : float
-        PMP weight decay.
-    scale_ratio : float
-        Ratio between successive pyramid scales.
+        Число ADMM итераций для оценки изображения.
+    beta1 : float
+        Штрафной параметр ADMM для дробного TV.
+    beta2 : float
+        Штрафной параметр ADMM для PMP.
+    kernel_threshold_ratio : float
+        Порог для обнуления малых элементов ядра.
+    final_deconv_iter : int
+        Число итераций финальной не-слепой деконволюции.
     verbose : bool
+        Вывод диагностической информации.
 
     Returns
     -------
-    (k_est, u_est) : tuple
-        Estimated kernel and latent image at the finest scale.
+    f_final : np.ndarray
+        Восстановленное изображение (H x W), [0, 1].
+    h_final : np.ndarray
+        Оценённое ядро (kh x kw), сумма = 1.
+    history : dict
+        Словарь с историей оптимизации.
     """
-    kh, kw = kernel_shape
-    max_k = max(kh, kw)
+    H, W = g.shape
+    kh, kw = kernel_size
 
-    # Build scale list (coarse → fine)
-    scales = build_scale_list(max_k, min_kernel_dim=3,
-                              scale_ratio=scale_ratio)
+    # ── 1. Ограничение числа масштабов ──
+    min_dim = min(H, W)
+    max_possible_scales = max(int(np.log(min_dim / max(kh, kw)) / np.log(np.sqrt(2))), 1) + 1
+    num_scales = min(num_scales, max_possible_scales)
 
-    # Initialise a small Gaussian kernel at the coarsest scale
-    init_k_size = max(3, int(np.round(max_k * scales[0])))
-    init_k_size = init_k_size if init_k_size % 2 == 1 else init_k_size + 1
-    k_est = make_initial_kernel((init_k_size, init_k_size))
+    if verbose:
+        print(f"[FO-BID] Image: {H}x{W}, Kernel: {kh}x{kw}, "
+              f"Scales: {num_scales}, alpha: {alpha:.2f}")
 
-    u_est = g.copy()
+    # ── 2. Построение пирамиды ──
+    pyramid = build_gaussian_pyramid(g, num_scales)
 
-    for s_idx, scale in enumerate(scales):
-        # ---- Down-scale image to current pyramid level ----
-        g_s = downscale_image(g, scale)
+    # ── 3. Инициализация ядра (delta-функция) ──
+    h = np.zeros((kh, kw), dtype=np.float64)
+    h[kh // 2, kw // 2] = 1.0
+
+    history = {'kernel_diff': [], 'energy': []}
+
+    # ── 4. Цикл по масштабам (от грубого к точному) ──
+    for scale_idx, g_s in enumerate(pyramid):
         H_s, W_s = g_s.shape
 
-        # Effective kernel size at this scale
-        cur_kh = max(3, int(np.round(kh * scale)))
-        cur_kw = max(3, int(np.round(kw * scale)))
-        cur_kh = cur_kh if cur_kh % 2 == 1 else cur_kh + 1
-        cur_kw = cur_kw if cur_kw % 2 == 1 else cur_kw + 1
-        cur_kshape = (cur_kh, cur_kw)
+        # Масштабирование ядра к текущему уровню
+        scale_factor_h = H_s / H
+        scale_factor_w = W_s / W
+        kh_s = max(int(np.round(kh * scale_factor_h)), 3)
+        kw_s = max(int(np.round(kw * scale_factor_w)), 3)
+        # Принудительно нечётные размеры
+        kh_s = kh_s if kh_s % 2 == 1 else kh_s + 1
+        kw_s = kw_s if kw_s % 2 == 1 else kw_s + 1
 
-        # Up-sample kernel from previous (coarser) level
-        k_s = resize_kernel(k_est, cur_kshape)
+        h_s = resize_kernel(h, (kh_s, kw_s))
+
+        # Edge tapering
+        g_tapered = edgetaper(g_s, h_s)
+
+        # Предвычисление FFT операторов дробных производных
+        fft_ops = {}
+        F_Dx, F_Dy, F_Dx_sq, F_Dy_sq = fft_fractional_operators(
+            (H_s, W_s), alpha)
+        fft_ops['F_Dx'] = F_Dx
+        fft_ops['F_Dy'] = F_Dy
+        fft_ops['F_Dx_sq'] = F_Dx_sq
+        fft_ops['F_Dy_sq'] = F_Dy_sq
+
+        # Начальное приближение изображения
+        f_s = g_tapered.copy()
+
+        # Адаптивные параметры регуляризации по масштабу
+        # На грубых масштабах — более сильная регуляризация
+        scale_weight = (num_scales - scale_idx) / num_scales
+        lambda_s = lambda_ftv * (1.0 + scale_weight)
+        mu_s = mu_pmp * (1.0 + 0.5 * scale_weight)
+        gamma_s = gamma_kernel * (1.0 + 2.0 * scale_weight)
 
         if verbose:
-            print(
-                f"  Scale {s_idx + 1}/{len(scales)}: "
-                f"img {H_s}×{W_s}, kernel {cur_kh}×{cur_kw}, "
-                f"factor {scale:.3f}"
+            print(f"  Scale {scale_idx + 1}/{num_scales}: "
+                  f"{H_s}x{W_s}, kernel {kh_s}x{kw_s}, "
+                  f"lambda={lambda_s:.4f}, mu={mu_s:.4f}, gamma={gamma_s:.2f}")
+
+        # ── Чередующиеся итерации на текущем масштабе ──
+        for it in range(outer_iter):
+            h_prev = h_s.copy()
+
+            # (A) Оценка изображения f при фиксированном h
+            f_s = solve_image_admm(
+                g_tapered, h_s, f_s,
+                alpha=alpha,
+                lambda_ftv=lambda_s,
+                mu_pmp=mu_s,
+                patch_size=patch_size,
+                beta1=beta1,
+                beta2=beta2,
+                num_iter=admm_iter,
+                fft_ops=fft_ops
             )
 
-        # ---- Alternating minimisation at this scale ----
-        for it in range(inner_iter):
-            k_s, u_s = single_scale_step(
-                g_s, k_s, cur_kshape,
-                alpha=alpha, L=L,
-                lambda_tv=lambda_tv,
-                mu_kernel=mu_kernel,
-                admm_iter=admm_iter,
-                rho_init=rho_init,
-                grad_threshold_pct=grad_threshold_pct,
-                pmp_patch_size=pmp_patch_size,
-                pmp_gamma=pmp_gamma,
+            # (B) Оценка ядра h при фиксированном f
+            h_s = solve_kernel(
+                g_tapered, f_s,
+                kernel_size=(kh_s, kw_s),
+                gamma=gamma_s,
+                threshold_ratio=kernel_threshold_ratio
             )
 
-        k_est = k_s
-        u_est = u_s
+            # Мониторинг сходимости
+            hdiff = np.linalg.norm(h_s - h_prev) / max(np.linalg.norm(h_prev), 1e-10)
+            history['kernel_diff'].append(hdiff)
 
-    # Resize final kernel to requested shape if not exact
-    if k_est.shape != kernel_shape:
-        k_est = resize_kernel(k_est, kernel_shape)
+            if verbose:
+                energy = 0.5 * np.sum((np.real(ifft2(
+                    fft2(center_kernel_fft(h_s, (H_s, W_s))) * fft2(f_s)))
+                    - g_tapered) ** 2)
+                history['energy'].append(energy)
+                print(f"    Iter {it + 1}/{outer_iter}: "
+                      f"dh={hdiff:.6f}, E={energy:.4f}")
 
-    return k_est, u_est
+            # Критерий ранней остановки
+            if hdiff < 1e-4 and it > 1:
+                if verbose:
+                    print(f"    Converged at iter {it + 1}")
+                break
 
+        # Сохранение текущей оценки ядра (масштабированной к полному размеру)
+        h = resize_kernel(h_s, (kh, kw))
 
-# ===================================================================
-# 5.  Final non-blind deconvolution with fractional TV
-# ===================================================================
-def final_nonblind_deconvolution(
-    g: np.ndarray,
-    k: np.ndarray,
-    alpha: float = 1.4,
-    L: int = 10,
-    lambda_tv: float = 2e-3,
-    num_iter: int = 30,
-    rho_init: float = 1.0,
-) -> np.ndarray:
-    r"""
-    Final non-blind restoration using the estimated kernel and
-    fractional-order TV regularisation (ADMM).
+    # ── 5. Финальная не-слепая деконволюция ──
+    if verbose:
+        print(f"  Final non-blind deconvolution (iter={final_deconv_iter})")
 
-    This solves ([1], Eq. 8) one last time with more iterations and
-    a smaller :math:`\lambda` for fine detail recovery.
-
-    Parameters
-    ----------
-    g : ndarray (H, W)  – blurred observation.
-    k : ndarray          – estimated kernel.
-    alpha : float        – fractional order.
-    L : int              – GL truncation length.
-    lambda_tv : float    – regularisation weight (typically smaller
-                           than in the blind phase).
-    num_iter : int       – ADMM iterations.
-    rho_init : float     – initial ADMM penalty.
-
-    Returns
-    -------
-    u : ndarray (H, W)  – restored image, clipped to [0, 1].
-    """
-    H, W = g.shape
-    frac_ops = precompute_fractional_operators((H, W), alpha, L)
-
-    u = solve_image_fractional_tv(
-        g, k, g.copy(), frac_ops,
-        lambda_tv=lambda_tv,
-        rho=rho_init,
-        num_iter=num_iter,
-        rho_scale=1.02,
+    g_tapered_final = edgetaper(g, h)
+    f_final = final_nonblind_deconv(
+        g_tapered_final, h,
+        alpha=alpha,
+        lambda_ftv=lambda_ftv * 0.5,  # Уменьшенная регуляризация для финала
+        beta=beta1 * 2.0,
+        num_iter=final_deconv_iter
     )
-    return u
+
+    return f_final, h, history

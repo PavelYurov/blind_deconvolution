@@ -1,58 +1,3 @@
-"""
-Low-Rank Blind Image Deconvolution.
-
-Main module providing the :class:`LowRankBD` class, which wraps the
-multi-scale blind deconvolution algorithm with low-rank kernel
-regularisation into the framework's :class:`DeconvolutionAlgorithm`
-interface.
-
-Algorithm overview
-------------------
-The method operates in a coarse-to-fine multi-scale framework
-(§ 1–3 below), alternating between three coupled sub-problems at
-each scale:
-
-1. **Image estimation** (ISTA)
-   Estimates latent gradient images *x₁*, *x₂* using the L₁/L₂
-   normalised-sparsity prior, which promotes sparse gradients while
-   being scale-invariant.
-   See Krishnan et al. (CVPR 2011) [3].
-
-2. **Kernel estimation** (Conjugate Gradient)
-   Estimates the blur kernel *k* via least-squares on the gradient
-   domain with optional Tikhonov regularisation and an exponential
-   regularisation schedule.
-
-3. **Low-rank regularisation** (IRNN)
-   Enforces low-rank structure on the kernel matrix using iteratively
-   reweighted nuclear-norm minimisation with the ``log det`` surrogate
-   for the rank function.  This suppresses artefacts caused by
-   kernel-size over-estimation.
-   See Li et al. (WACV 2019) [1], Ren et al. (TIP 2016) [2].
-
-4. **Non-blind deconvolution** (Split Bregman / ADMM)
-   Given the estimated kernel, recovers the sharp image using a
-   hyper-Laplacian gradient prior.
-   See Krishnan & Fergus (NIPS 2009) [4].
-
-References
-----------
-[1] Li, S., Chu, W., & Kuo, C.-C.J. "Understanding kernel size in
-    blind deconvolution." WACV, 2019.
-    GitHub: https://github.com/lisiyaoATbnu/low_rank_kernel
-[2] Ren, D., et al. "Image Deblurring via Enhanced Low Rank Prior."
-    IEEE TIP, vol. 25, no. 7, pp. 3426–3437, 2016.
-[3] Krishnan, D., Tay, T., & Fergus, R. "Blind deconvolution using
-    a normalized sparsity measure." CVPR, 2011.
-[4] Krishnan, D. & Fergus, R. "Fast Image Deconvolution using
-    Hyper-Laplacian Priors." NIPS, 2009.
-[5] Yang, J., et al. "Hyper-Laplacian Regularized Non-local Low-rank
-    Prior for Blind Image Deblurring." IEEE Access, 2020.
-[6] Dong, J., et al. "Multi-image blind deconvolution using low-rank
-    representation." Neurocomputing, vol. 259, pp. 227–236, 2017.
-    GitHub: https://github.com/crewleader/BlindDeconvolutionLowRank
-"""
-
 import numpy as np
 import time
 from typing import Tuple, List, Any, Dict
@@ -96,19 +41,7 @@ class LowRankBD(DeconvolutionAlgorithm):
     """
     Low-Rank Blind Image Deconvolution.
 
-    Estimates both the blur kernel and the latent sharp image from a
-    single blurred observation, using a multi-scale coarse-to-fine
-    framework with low-rank kernel regularisation.
-
-    The image sub-problem is solved in the *image domain* via IRLS
-    (Iteratively Reweighted Least Squares) with a hyper-Laplacian
-    edge prior, following [6] (``solve_image_irls.m`` /
-    ``solve_image_L2_w.m``).  The kernel sub-problem is solved via
-    Conjugate Gradient with Tikhonov regularisation and projection
-    onto {k ≥ 0, Σk = 1}.
-
-    Parameters
-    ----------
+    Parameters:
     kernel_size : int
         Expected maximum PSF size (must be odd, ≥ 3).
     lambda_ : float
@@ -202,42 +135,12 @@ class LowRankBD(DeconvolutionAlgorithm):
         self.history: Dict[str, list]    = {'kernel_diff': [], 'scale': []}
         self.hyperparams: Dict[str, Any] = {}
 
-    # ==================================================================
-    #  Main entry point
-    # ==================================================================
-
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
         Perform blind deconvolution on the input blurred image.
-
-        **Phase 1 — Blind kernel estimation (multi-scale):**
-        At each scale, alternates among image estimation (IRLS+CG),
-        kernel estimation (CG+projection), and low-rank IRNN
-        regularisation.  All steps work in the image domain following
-        [6] (Dong et al. 2017).
-
-        **Phase 2 — Non-blind image restoration:**
-        Given the estimated kernel, recovers the sharp image via the
-        hyper-Laplacian Split-Bregman solver [4].
-
-        Parameters
-        ----------
-        image : np.ndarray
-            Blurred input image, shape ``(H, W)`` or ``(H, W, 3)``.
-            Accepts ``uint8 [0, 255]`` or ``float [0, 1]``.
-
-        Returns
-        -------
-        restored : np.ndarray
-            Restored image, same spatial shape as input,
-            dtype ``int16``, range [0, 255].
-        kernel : np.ndarray
-            Estimated blur kernel (PSF), float64, non-negative,
-            sums to one.
         """
         start_time = time.time()
 
-        # --- Data preparation -----------------------------------------
         y = image.astype(np.float64)
         if y.max() > 1.0:
             y /= 255.0
@@ -257,104 +160,75 @@ class LowRankBD(DeconvolutionAlgorithm):
             print(f"[{self.name}] Image: {H}×{W}, "
                   f"Kernel: {K}×{K}")
 
-        # ==============================================================
-        #  PHASE 1:  Multi-Scale Blind Deconvolution  (image domain)
-        # ==============================================================
-        # Build coarse-to-fine scale pyramid
         scales = build_scale_pyramid(K)
         num_scales = len(scales)
 
         if self.verbose:
             print(f"[{self.name}] Scales: {scales}")
 
-        # --- Initialisation -------------------------------------------
         min_scale = scales[0]
 
-        # Initial kernel: delta function (no directional bias)
         k = np.zeros((min_scale, min_scale))
         k[min_scale // 2, min_scale // 2] = 1.0
 
-        # Latent sharp image estimate (initialised from observation
-        # at the first scale)
         x = None
 
-        # --- Process each scale ---------------------------------------
         for si, Ki in enumerate(scales):
             if self.verbose:
                 print(f"[{self.name}] Scale {si + 1}/{num_scales}: "
                       f"kernel {Ki}×{Ki}")
 
-            # Down-sample blurred observation to current scale ratio
             ratio = Ki / K
             hw = (max(int(np.floor(H * ratio)), Ki + 2),
                   max(int(np.floor(W * ratio)), Ki + 2))
             y_small = resize_image(y_gray, hw)
 
-            # Image estimate: init from observation or carry over
             if x is None:
                 x = y_small.copy()
             else:
                 x = resize_image(x, hw)
 
-            # Up-scale kernel (skip for the first scale)
             if si > 0:
                 k = resize_image(k, (Ki, Ki))
                 k = normalize_kernel(k)
 
-            # Scale-dependent regularisation weight:
-            # α = λ₀ · m^(level − 0.5)
-            # Larger α at coarser scales → smoother images → easier
-            # kernel estimation;  decreases at finer scales to
-            # preserve detail.
-            # [6], function_multi_image_deblurring.m:
-            #   alpha = min_alpha * alpha_multiplier^(k - 0.5)
             scale_idx = num_scales - 1 - si
             alpha = self.lambda_ * self.alpha_multiplier ** (
                 scale_idx - 0.5
             )
 
-            # τ increases linearly with scale  ([1])
             tau_scale = self.tau * (si + 1) / num_scales
 
-            # --- Alternating minimisation at this scale ----------------
+
             for it in range(self.max_iter):
                 k_prev = k.copy()
 
-                # ---- Image step (IRLS + CG, [6]) ---------------------
-                # Solves: min_x ||x⊛k - y||² + α D^T W D x
                 x = optimize_image(
                     x, k, y_small, alpha,
                     self.max_irls, self.max_cg,
                     self.exp_a, self.thr_e,
                 )
 
-                # ---- Kernel + Low-rank step --------------------------
                 for ir in range(self.iter_k_rank):
-                    # Kernel estimation (CG + projection)
+
                     k = optimize_kernel(
                         x, k, y_small,
                         self.kernel_beta, self.max_iter_k,
                     )
 
-                    # Low-rank regularisation (IRNN,  [1], [2])
                     if self.sigma > 0:
                         k = low_rank_regularization(
                             k, self.max_iter_rank,
                             tau_scale, self.delta,
                         )
 
-                    # Project onto feasible set: k ≥ 0, Σk = 1
                     k = normalize_kernel(k)
 
-                # Progressive thresholding
-                # [1], blinddeconv_new2_cry.m:
-                #   k(k < max(k)*threshold*i/imax) = 0
                 k = normalize_kernel(
                     k,
                     self.threshold * (it + 1) / self.max_iter,
                 )
 
-                # — Convergence monitoring —
                 diff = np.linalg.norm(k - k_prev)
                 self.history['kernel_diff'].append(diff)
                 self.history['scale'].append(Ki)
@@ -363,20 +237,15 @@ class LowRankBD(DeconvolutionAlgorithm):
                     print(f"  Iter {it + 1}/{self.max_iter}: "
                           f"‖Δk‖ = {diff:.6f}")
 
-            # Centre kernel (no companion images to shift)
             k = center_kernel(k)
             k = normalize_kernel(k)
 
-        # Final threshold
         k = normalize_kernel(k, self.threshold)
 
         if self.verbose:
             print(f"[{self.name}] Kernel estimated in "
                   f"{time.time() - start_time:.1f} s")
 
-        # ==============================================================
-        #  PHASE 2:  Non-Blind Deconvolution
-        # ==============================================================
         if self.verbose:
             print(f"[{self.name}] Non-blind deconvolution "
                   f"(λ={self.nb_lambda}, α={self.nb_alpha}) ...")
@@ -384,7 +253,6 @@ class LowRankBD(DeconvolutionAlgorithm):
         bhs = K // 2
 
         if is_color:
-            # Deconvolve luminance channel; keep chrominance intact
             y_pad = np.pad(ycbcr[:, :, 0], bhs, mode='edge')
             for _ in range(4):
                 y_pad = edgetaper(y_pad, k)
@@ -428,13 +296,8 @@ class LowRankBD(DeconvolutionAlgorithm):
         if self.verbose:
             print(f"[{self.name}] Done in {self.timer:.1f} s")
 
-        # Framework convention: return int16 image in [0, 255]
         result = np.round(result * 255.0).astype(np.int16)
         return result, k
-
-    # ==================================================================
-    #  Framework interface
-    # ==================================================================
 
     def get_param(self) -> List[Tuple[str, Any]]:
         """Return current hyper-parameter list."""
@@ -475,36 +338,3 @@ class LowRankBD(DeconvolutionAlgorithm):
     def get_hyperparams(self) -> dict:
         """Hyper-parameters and run-time statistics after process()."""
         return self.hyperparams
-
-
-# ======================================================================
-#  Convenience function
-# ======================================================================
-
-def run_algorithm(
-    g: np.ndarray,
-    kernel_size: int,
-    **kwargs,
-) -> Tuple[np.ndarray, np.ndarray, dict, dict]:
-    """
-    Convenience wrapper for running LowRank-BD.
-
-    Parameters
-    ----------
-    g : np.ndarray
-        Blurred image.
-    kernel_size : int
-        Expected PSF size (odd, ≥ 3).
-    **kwargs
-        Forwarded to :class:`LowRankBD`.
-
-    Returns
-    -------
-    f_est      : np.ndarray — restored image
-    k_est      : np.ndarray — estimated kernel
-    hyperparams : dict
-    history     : dict
-    """
-    algo = LowRankBD(kernel_size=kernel_size, **kwargs)
-    f_est, k_est = algo.process(g)
-    return f_est, k_est, algo.get_hyperparams(), algo.get_history()

@@ -1,19 +1,23 @@
 """
 Blind Image Deconvolution using Expectation Propagation (EP-EM).
-Based on Abdulaziz et al., 2021.
-Strict Mathematical Implementation.
+Implementation Strategy: Fast-Cx (Spectral Uncertainty) + HQS + PGD.
+
+Based on:
+    Abdulaziz, A., et al. "Blind deconvolution of images corrupted by Gaussian noise 
+    using Expectation Propagation." EUSIPCO 2021.
 
 Modules:
     - utils: FFT helpers and math operators.
-    - solvers: EP Update mathematics (Laplace moments) and M-step solvers.
+    - solvers: Pure functions for Image (HQS), Uncertainty (Spectral), and Kernel (PGD).
     - ep_em: Main class managing the EM loop.
 """
 
 import numpy as np
 import time
 from typing import Tuple, List, Any, Dict
+from scipy.signal import convolve2d
 from .utils import precompute_gradient_operators, compute_spatial_gradient, edgetaper
-from .solvers import solve_image_ep, estimate_uncertainty, solve_kernel_pgd, non_neg_ep
+from .solvers import solve_image_hqs, estimate_uncertainty, solve_kernel_pgd, non_neg_ep
 
 
 try:
@@ -29,14 +33,15 @@ class EP_EM(DeconvolutionAlgorithm):
     def __init__(
         self,
         kernel_shape: Tuple[int, int],
-        lambda_tv: float = 6.7,      
-        noise_sigma: float = 0.05,   
+        lambda_tv: float = 6.7,     
+        noise_sigma: float = 0.05, 
         max_iter: int = 30,          
-        hqs_iter: int = 5,           
+        hqs_iter: int = 5,          
         pgd_iter: int = 20,          
         pgd_momentum: float = 0.9,
-        strategy: str = 'fast',      
-        num_probes: int = 10,        
+        beta_max: float = 512.0,     
+        strategy: str = 'fast',
+        num_probes: int = 10,
         non_neg: bool = True,
         verbose: bool = False
     ):
@@ -47,9 +52,10 @@ class EP_EM(DeconvolutionAlgorithm):
         self.max_iter = max_iter
         self.verbose = verbose
         
-        self.ep_iter = hqs_iter      
+        self.hqs_iter = hqs_iter
         self.pgd_iter = pgd_iter
         self.pgd_momentum = pgd_momentum
+        self.beta_max = beta_max
         self.strategy = strategy
         self.num_probes = num_probes
         self.non_neg = non_neg
@@ -59,17 +65,19 @@ class EP_EM(DeconvolutionAlgorithm):
 
     def _build_Dx_fast(self, r: np.ndarray, kh: int, kw: int, H: int, W: int) -> np.ndarray:
         """
-        Builds the covariance matrix D_x block from autocorrelation r.
-        Calculates (H*W) * r[disp].
+        Быстрое построение матрицы Dx (ковариация) без вложенных циклов.
+        Математически эквивалентно оригиналу, но работает за доли секунды.
         """
         k = kh * kw
         I = np.arange(k)
         y_idx = I // kw
         x_idx = I % kw
         
+
         dy = (y_idx[:, None] - y_idx[None, :]) % H
         dx = (x_idx[:, None] - x_idx[None, :]) % W
         
+
         D_x = (H * W) * r[dy, dx]
         return D_x
 
@@ -86,10 +94,8 @@ class EP_EM(DeconvolutionAlgorithm):
         h = np.exp(-(grid_x**2 + grid_y**2) / (2 * sig**2))
         h /= h.sum()
         
-
         y = edgetaper(y_full, h)
         x = y.copy()
-
 
         F_ops = precompute_gradient_operators((H, W))
         _, _, F_grad_sq = F_ops
@@ -97,68 +103,49 @@ class EP_EM(DeconvolutionAlgorithm):
         if self.verbose:
             print(f"[{self.name}] Start. Img: {H}x{W}, Ker: {kh}x{kw}")
 
-
-        ep_state = None 
-
-
         for it in range(self.max_iter):
             h_prev = h.copy()
             
-
-            x, ep_state, var_x = solve_image_ep(
+            x = solve_image_hqs(
                 y, h, x, 
                 self.noise_sigma, self.lambda_tv, 
-                self.ep_iter, F_ops,
-                ep_state=ep_state,
-                strategy=self.strategy,
-                num_probes=self.num_probes
+                self.beta_max, self.hqs_iter, F_ops
             )
             
 
-            if ep_state is not None:
-                avg_gamma = 0.5 * (np.mean(ep_state['gamma_h']) + np.mean(ep_state['gamma_v']))
-            else:
-                avg_gamma = self.lambda_tv 
-            
-            uncertainty_scalar, r_corr = estimate_uncertainty(
-                h, self.noise_sigma, avg_gamma, (H, W), F_grad_sq,
+            grad_x, grad_y = compute_spatial_gradient(x)
+            mean_grad = np.mean(np.abs(grad_x)) + np.mean(np.abs(grad_y)) + 1e-6
+            lambda_eff = self.lambda_tv / (mean_grad * 0.5)
+
+            uncertainty, r = estimate_uncertainty(
+                h, self.noise_sigma, lambda_eff, (H, W), F_grad_sq,
                 strategy=self.strategy
             )
             
-
             if self.non_neg:
-                x = non_neg_ep(x, uncertainty_scalar)
+                x = non_neg_ep(x, uncertainty)
 
 
-            D_x = self._build_Dx_fast(r_corr, kh, kw, H, W)
-            
+            D_x = self._build_Dx_fast(r, kh, kw, H, W)
 
             h = solve_kernel_pgd(
                 y, x, h, 
-                D_x, self.pgd_iter, 
-                momentum=self.pgd_momentum,
-                var_x=var_x 
+                D_x, self.pgd_iter, momentum=self.pgd_momentum
             )
             
 
             diff = np.linalg.norm(h - h_prev)
             if self.verbose:
-                print(f"Iter {it+1}: dH={diff:.6f}, Var_X={var_x:.2e}, Gamma_Msg={avg_gamma:.2f}")
+                print(f"Iter {it+1}: dH={diff:.6f}, Uncert={uncertainty:.2e}")
             
             if diff < 1e-6:
                 break
         
-
-        
         y_final_taper = edgetaper(y_full, h)
-        
-
-        x_final, _, _ = solve_image_ep(
+        x_final = solve_image_hqs(
             y_final_taper, h, x, 
-            self.noise_sigma, self.lambda_tv, 
-            self.ep_iter * 2, F_ops,
-            ep_state=ep_state,
-            strategy='fast' 
+            self.noise_sigma, self.lambda_tv * 0.8, 
+            self.beta_max * 4.0, self.hqs_iter * 2, F_ops
         )
         
         x_final = np.clip(x_final * 255.0, 0, 255).astype(np.uint8)

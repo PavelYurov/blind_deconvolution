@@ -55,7 +55,7 @@ def edgetaper(img: np.ndarray, kernel: np.ndarray) -> np.ndarray:
     Slightly blurs the edges of the image to avoid ringing artifacts in FFT-based deconvolution.
     Simulates Matlab's edgetaper.
     """
-    alpha = 0.5
+    alpha = 0.5 
     H, W = img.shape
     kh, kw = kernel.shape
     
@@ -70,7 +70,8 @@ def edgetaper(img: np.ndarray, kernel: np.ndarray) -> np.ndarray:
     w_y = np.ones(H)
     w_x = np.ones(W)
     
-    taper_h = np.hanning(pad_h * 4)
+
+    taper_h = np.hanning(pad_h * 4) 
     taper_w = np.hanning(pad_w * 4)
     
     w_y[:pad_h*2] = taper_h[:pad_h*2]

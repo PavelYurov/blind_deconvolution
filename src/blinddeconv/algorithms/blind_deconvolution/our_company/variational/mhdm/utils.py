@@ -1,145 +1,92 @@
 """
 Utility functions for the MHDM (Multiscale Hierarchical Decomposition Method)
 blind deconvolution algorithm.
-
-Provides Fourier-domain helpers: Sobolev weights, conjugate symmetry index
-computation, PSF/OTF conversions, and noise level estimation.
-
-References
-----------
-[1] Wolf, T., Kindermann, S., Resmerita, E., Vese, L.
-    "Applications of multiscale hierarchical decomposition to blind
-    deconvolution." arXiv:2409.08734v5, 2025.
-[2] Justen, L. "Blind Deconvolution: Theory, Regularization and
-    Applications." PhD thesis, p. 110 — Sobolev Fourier weights.
 """
 
 import numpy as np
 from typing import Tuple
 
-
-# ---------------------------------------------------------------------------
-# Fourier-domain Sobolev weights
-# ---------------------------------------------------------------------------
-
 def compute_fourier_weights(m: int, n: int) -> np.ndarray:
-    r"""
-    Compute discrete Sobolev-type Fourier weights delta(j, l).
-
-    The weights are the eigenvalues of (I - Delta) on the periodic grid,
-    discretised for 2D DFT of size (m, n):
-
-    .. math::
-        \delta_{j,l} = 1
-            + 2 m^2 \bigl(1 - \cos(2\pi j / m)\bigr)
-            + 2 n^2 \bigl(1 - \cos(2\pi l / n)\bigr),
-        \qquad j=0,\dots,m{-}1,\; l=0,\dots,n{-}1.
-
-    Ref: [2], page 110, adapted to ``numpy.fft.fft2`` index ordering.
-
-    Parameters
-    ----------
+    """
+    Compute discrete Sobolev-type Fourier weights.
+    Parameters:
     m, n : int
         Spatial dimensions (rows, columns).
-
-    Returns
-    -------
-    delta : ndarray, shape (m, n)
-        Weight array.  delta[0, 0] = 1 (DC component).
+    Returns:
+    delta : ndarray, shape (m, n), float64
+        Weight array.  ``delta[0, 0] == 1``.
     """
-    j = np.arange(m)
-    l = np.arange(n)
-    # Column vector for row-frequencies, row vector for col-frequencies
-    row_term = 2.0 * m**2 * (1.0 - np.cos(2.0 * np.pi * j / m))  # (m,)
-    col_term = 2.0 * n**2 * (1.0 - np.cos(2.0 * np.pi * l / n))  # (n,)
+    j = np.arange(m, dtype=np.float64)
+    l = np.arange(n, dtype=np.float64)
+    row_term = 2.0 * m ** 2 * (1.0 - np.cos(2.0 * np.pi * j / m))   # (m,)
+    col_term = 2.0 * n ** 2 * (1.0 - np.cos(2.0 * np.pi * l / n))   # (n,)
     delta = 1.0 + row_term[:, None] + col_term[None, :]
     return delta
 
 
-# ---------------------------------------------------------------------------
-# Conjugate-symmetry index pairs
-# ---------------------------------------------------------------------------
-
-def compute_conjugate_indices(m: int, n: int) -> Tuple[np.ndarray, np.ndarray]:
+def compute_conjugate_indices(
+    m: int, n: int,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
-    Compute unique conjugate-symmetry index pairs for a real-valued 2D DFT.
-
-    For a real signal, the DFT satisfies Hermitian symmetry:
-        F[j, l] = conj(F[(m-j) mod m, (n-l) mod n]).
-
-    This function returns two integer arrays ``primary`` and ``conjugate``
-    such that, for every non-self-conjugate frequency (j, l), the value at
-    ``primary[k]`` is computed and the value at ``conjugate[k]`` is set to
-    its complex conjugate.  The DC component (0, 0) is excluded (handled
-    separately in the algorithm).
-
-    Parameters
-    ----------
+    Compute index sets for enforcing Hermitian symmetry on a 2D DFT grid.
+    Parameters:
     m, n : int
-        Spatial dimensions.
+        Spatial dimensions (rows, columns).
 
-    Returns
-    -------
-    primary : ndarray, shape (N, 2)
-        Array of (row, col) indices for the "primary" half.
-    conjugate : ndarray, shape (N, 2)
-        Corresponding conjugate indices.
+    Returns:
+    primary : ndarray, shape (N_pair, 2), intp
+        Primary 2D indices for each conjugate pair.
+    conjugate : ndarray, shape (N_pair, 2), intp
+        Corresponding conjugate 2D indices.
+    self_conjugate : ndarray, shape (N_self, 2), intp
+        Self-conjugate indices (excluding DC).
     """
-    primary = []
-    conjugate = []
+    primary_list = []
+    conjugate_list = []
+    self_conj_list = []
     visited = set()
 
     for j in range(m):
         for l in range(n):
-            cj = (m - j) % m
-            cl = (n - l) % n
-
-            # Skip DC component — handled separately
             if j == 0 and l == 0:
                 continue
 
-            # Skip self-conjugate points (e.g. Nyquist frequencies)
+            cj = (m - j) % m
+            cl = (n - l) % n
             if (j, l) == (cj, cl):
+                self_conj_list.append((j, l))
                 continue
 
             pair = frozenset(((j, l), (cj, cl)))
             if pair not in visited:
                 visited.add(pair)
-                primary.append((j, l))
-                conjugate.append((cj, cl))
+                primary_list.append((j, l))
+                conjugate_list.append((cj, cl))
 
-    return np.array(primary, dtype=np.intp), np.array(conjugate, dtype=np.intp)
+    def _to_array(lst):
+        if lst:
+            return np.array(lst, dtype=np.intp)
+        return np.empty((0, 2), dtype=np.intp)
 
+    return _to_array(primary_list), _to_array(conjugate_list), _to_array(self_conj_list)
 
-# ---------------------------------------------------------------------------
-# PSF <-> OTF conversions  (equivalents of MATLAB psf2otf / otf2psf)
-# ---------------------------------------------------------------------------
 
 def psf2otf(psf: np.ndarray, output_size: Tuple[int, int]) -> np.ndarray:
     """
-    Convert a point-spread function (PSF) to an optical transfer function
-    (OTF), replicating MATLAB's ``psf2otf``.
-
-    The PSF is zero-padded to *output_size* and circularly shifted so that
-    the centre of the PSF sits at index (0, 0) before taking the 2D FFT.
-
-    Parameters
-    ----------
-    psf : ndarray
-        Spatial-domain PSF (arbitrary size).
-    output_size : tuple of int
+    Convert a spatial-domain PSF to a frequency-domain OTF.
+    Parameters:
+    psf : ndarray, shape (ph, pw)
+        Spatial-domain point-spread function.
+    output_size : tuple of (int, int)
         Desired (rows, cols) of the output OTF.
-
-    Returns
-    -------
-    otf : ndarray (complex)
-        Frequency-domain OTF of shape *output_size*.
+    Returns:
+    otf : ndarray, shape *output_size*, complex128
+        Frequency-domain optical transfer function.
     """
     ph, pw = psf.shape
-    padded = np.zeros(output_size, dtype=psf.dtype)
+    padded = np.zeros(output_size, dtype=np.float64)
     padded[:ph, :pw] = psf
 
-    # Circular shift so that the centre of the PSF is at (0, 0)
     shift_y = -(ph // 2)
     shift_x = -(pw // 2)
     padded = np.roll(padded, shift=(shift_y, shift_x), axis=(0, 1))
@@ -147,29 +94,25 @@ def psf2otf(psf: np.ndarray, output_size: Tuple[int, int]) -> np.ndarray:
     return np.fft.fft2(padded)
 
 
-def otf2psf(otf: np.ndarray,
-            psf_size: Tuple[int, int] | None = None) -> np.ndarray:
+def otf2psf(
+    otf: np.ndarray,
+    psf_size: Tuple[int, int] | None = None,
+) -> np.ndarray:
     """
-    Convert an OTF back to the spatial-domain PSF, replicating MATLAB's
-    ``otf2psf``.
-
-    Parameters
-    ----------
-    otf : ndarray (complex)
+    Convert a frequency-domain OTF to a spatial-domain PSF.
+    Parameters:
+    otf : ndarray, shape (m, n), complex
         Frequency-domain OTF.
-    psf_size : tuple of int or None
-        If given, crop the result to this size (centred).
+    psf_size : tuple of (int, int) or None
+        If given, crop the output to this centred (rows, cols) region.
         If None, return the full-size PSF.
 
-    Returns
-    -------
-    psf : ndarray (real)
+    Returns:
+    psf : ndarray, shape psf_size or (m, n), float64
         Spatial-domain PSF.
     """
     m, n = otf.shape
     psf_full = np.real(np.fft.ifft2(otf))
-
-    # Circularly shift the PSF so that the peak is at the centre
     psf_full = np.fft.fftshift(psf_full)
 
     if psf_size is None:
@@ -182,82 +125,53 @@ def otf2psf(otf: np.ndarray,
     return psf_full[top:top + kh, left:left + kw]
 
 
-# ---------------------------------------------------------------------------
-# Noise level estimation (Robust Median Estimator)
-# ---------------------------------------------------------------------------
-
-def estimate_noise_sigma(image: np.ndarray,
-                        sigma_floor: float = 0.005) -> float:
-    r"""
+def estimate_noise_sigma(
+    image: np.ndarray,
+    sigma_floor: float = 2.0,
+) -> float:
+    """
     Estimate the standard deviation of additive white Gaussian noise
-    from a single (possibly blurred) image using the Robust Median
-    Estimator on high-frequency Laplacian residuals.
+    from a single image.
 
-    .. math::
-        \hat\sigma = \frac{\mathrm{median}\bigl(|\nabla^2 y|\bigr)}{0.6745
-        \,\sqrt{2}}
-
-    This is a standard non-parametric estimator (Donoho & Johnstone, 1994)
-    applied to the Laplacian rather than wavelet coefficients.
-
-    A lower bound ``sigma_floor`` is enforced to prevent the MHDM
-    discrepancy-principle stopping threshold from vanishing on
-    low-noise or noise-free images, which would drive the
-    regularisation to near-zero and produce divergent reconstructions.
-    The default floor 0.005 corresponds to ~46 dB peak-signal SNR,
-    which is below the noise level of virtually any real sensor.
-
-    Parameters
-    ----------
+    Parameters:
     image : ndarray, shape (H, W)
-        Observed (noisy, possibly blurred) image in [0, 1].
+        Observed image. The estimator is scale-invariant (linear).
+        If image is in [0, 1], returns sigma in [0, 1].
+        If image is in [0, 255], returns sigma in [0, 255].
     sigma_floor : float
-        Minimum returned sigma (default 0.005 ≈ 1.3/255).
+        Minimum returned sigma.
+        For [0, 1] images, default 0.005 is appropriate.
+        For [0, 255] images, use ~1.0.
 
-    Returns
-    -------
+    Returns:
     sigma : float
         Estimated noise standard deviation.
     """
-    # 3×3 Laplacian kernel
-    laplacian = np.array([[0,  1, 0],
-                          [1, -4, 1],
-                          [0,  1, 0]], dtype=np.float64)
+    laplacian_kernel = np.array([
+        [0,  1, 0],
+        [1, -4, 1],
+        [0,  1, 0],
+    ], dtype=np.float64)
 
     from scipy.signal import fftconvolve
-    residual = fftconvolve(image, laplacian, mode='valid')
+    residual = fftconvolve(image, laplacian_kernel, mode='valid')
 
-    # MAD estimator with correction factor for Gaussian
-    sigma = np.median(np.abs(residual)) / (0.6745 * np.sqrt(2.0))
+    sigma = np.median(np.abs(residual)) / (0.6745 * np.sqrt(20.0))
     return float(max(sigma, sigma_floor))
 
 
-# ---------------------------------------------------------------------------
-# Complex-valued sign (MATLAB-compatible)
-# ---------------------------------------------------------------------------
-
 def complex_sign(z: np.ndarray) -> np.ndarray:
-    r"""
-    Element-wise complex sign, matching MATLAB's ``sign`` for complex input:
-
-    .. math::
-        \operatorname{sign}(z) = \begin{cases}
-            z / |z|, & z \neq 0, \\
-            0,       & z = 0.
-        \end{cases}
-
-    Parameters
-    ----------
+    """
+    Parameters:
     z : ndarray (complex or real)
         Input array.
 
-    Returns
-    -------
+    Returns:
     s : ndarray
-        Complex sign of *z*.
+        Complex sign, same shape and dtype as input.
     """
     magnitude = np.abs(z)
     out = np.zeros_like(z)
-    nonzero = magnitude > 0.0
-    out[nonzero] = z[nonzero] / magnitude[nonzero]
+    mask = magnitude > 0.0
+    out[mask] = z[mask] / magnitude[mask]
     return out
