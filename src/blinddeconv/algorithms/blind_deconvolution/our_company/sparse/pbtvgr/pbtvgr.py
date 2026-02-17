@@ -5,6 +5,7 @@ from typing import Tuple, List, Any, Dict
 from .utils import get_grad_operators, psf2otf, adjust_psf
 from .solvers import solve_h_subproblem, solve_u_subproblem, solve_o_subproblem, solve_nonblind_tv
 
+# Robust import of base class
 import sys
 import os
 from pathlib import Path
@@ -54,12 +55,15 @@ class PBTVGR(DeconvolutionAlgorithm):
     ):
         super().__init__(name='PBTVGR')
         self.kernel_shape = tuple(kernel_shape)
-        self.lambda_ = lambda_      
-        self.mu = mu                
-        self.beta_init = beta_init  
-        self.T = T                  
-        self.tau = tau              
         
+        # Parameters from Section V.F of Dong et al.
+        self.lambda_ = lambda_      # Data fidelity weight (Poisson)
+        self.mu = mu                # PSF TV weight
+        self.beta_init = beta_init  # Initial penalty parameter
+        self.T = T                  # Max beta step
+        self.tau = tau              # Beta update rate
+        
+        # Non-blind parameters
         self.xi = xi
         self.eta_init = eta_init
         
@@ -72,16 +76,22 @@ class PBTVGR(DeconvolutionAlgorithm):
 
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         start_time = time.time()
+        
+        # Normalize image to avoid numerical issues with large Poisson values
+        # Dong et al. typically work with normalized intensities or counts
         g = image.astype(np.float64)
         img_min, img_max = g.min(), g.max()
         
+        # Normalize to [0, 1] for stability, then scale back later
         scale_factor = img_max - img_min + 1e-8
         g = (g - img_min) / scale_factor
-        g = np.maximum(g, 1e-8) 
+        g = np.maximum(g, 1e-8) # Avoid log(0)
         
         H, W = g.shape
         kh, kw = self.kernel_shape
         
+        # --- Initialization ---
+        # Initialize h as Gaussian (Section V.F)
         sigma = max(kh, kw) / 15.0
         x_grid = np.linspace(-kh//2, kh//2, kh)
         y_grid = np.linspace(-kw//2, kw//2, kw)
@@ -89,6 +99,7 @@ class PBTVGR(DeconvolutionAlgorithm):
         h = np.exp(-(X**2 + Y**2) / (2 * sigma**2))
         h /= h.sum()
         
+        # Initialize u and o with input image
         u = g.copy()
         o = g.copy()
         
@@ -98,22 +109,30 @@ class PBTVGR(DeconvolutionAlgorithm):
         if self.verbose:
             print(f"[{self.name}] Start. Img: {H}x{W}, Ker: {kh}x{kw}")
         
+        # --- Algorithm 1: Blind Deconvolution ---
         for k in range(self.max_iter):
             h_prev = h.copy()
             
+            # 1. Update h (IRLS) - Algorithm 2
             h = solve_h_subproblem(u, o, h, beta, self.mu, F_dx, F_dy)
 
+            # Adjust PSF 
             h = adjust_psf(h)
             
+            # 2. Update u (Poisson root finding) - Algorithm 3
             u = solve_u_subproblem(g, h, o, beta, self.lambda_)
             
+            # 3. Update o (L0 smoothing) - Algorithm 4
             o = solve_o_subproblem(u, h, o, beta, F_dx, F_dy)
             
+            # 4. Update beta (Eq. 12)
+            # beta = beta + min(T, tau * ||ho - u||^2)
             ho = np.real(ifft2(psf2otf(h, (H, W)) * fft2(o)))
             diff_norm = np.linalg.norm(ho - u)**2
             
             beta = beta + min(self.T, self.tau * diff_norm)
             
+            # Convergence info
             h_diff = np.linalg.norm(h - h_prev) / (np.linalg.norm(h_prev) + 1e-12)
             self.history['error'].append(diff_norm)
             
@@ -127,8 +146,10 @@ class PBTVGR(DeconvolutionAlgorithm):
         if self.verbose:
             print("Blind stage finished. Starting non-blind refinement...")
         
+        # --- Algorithm 5: Non-blind Refinement ---
         o_final = solve_nonblind_tv(g, h, o, self.xi, self.eta_init, F_dx, F_dy)
         
+        # Restore scale
         o_final = o_final * scale_factor + img_min
         
         self.hyperparams = {
