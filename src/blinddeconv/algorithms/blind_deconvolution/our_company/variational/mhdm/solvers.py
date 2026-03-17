@@ -1,299 +1,115 @@
 """
-Solvers for the MHDM (Multiscale Hierarchical Decomposition Method)
-blind deconvolution algorithm.
+Логика решателей для MHDM Blind Deconvolution.
+Реализация формул из [Wolf et al., 2025] с защитой от численной нестабильности.
 """
 
 import numpy as np
-from typing import Tuple, List
 
-from .utils import compute_fourier_weights, complex_sign
-
-
-def mhdm_initial(
-    f_four: np.ndarray,
-    lambda_val: float,
-    mu_val: float,
-    r: float,
-    s: float,
-) -> Tuple[np.ndarray, np.ndarray]:
+def solve_step_0(F_f: np.ndarray, 
+                 lambda_0: float, 
+                 mu_0: float, 
+                 W_r: np.ndarray, 
+                 W_s: np.ndarray) -> tuple:
     """
-    Parameters:
-    f_four : ndarray, shape (m, n), complex128
-        2D DFT of the observed blurred-and-noisy image.
-    lambda_val : float
-        Image regularisation parameter :math:`\lambda`.
-    mu_val : float
-        Kernel regularisation parameter :math:`\mu`.
-    r, s : float
-        Sobolev exponents for image (*r*) and kernel (*s*) penalties.
+    Начальное приближение (u0, k0). Формулы (3.3)-(3.4).
     """
-    m, n = f_four.shape
-    delta = compute_fourier_weights(m, n)
+    abs_F_f = np.abs(F_f)
+    
+    # sgn(f)
+    sgn_F_f = np.zeros_like(F_f)
+    mask_nz = abs_F_f > 1e-12
+    sgn_F_f[mask_nz] = F_f[mask_nz] / abs_F_f[mask_nz]
+    
+    # Расчет u0
+    # Чтобы избежать деления на ноль и переполнения:
+    ratio_u = (mu_0 * W_s) / (lambda_0 * W_r + 1e-12)
+    
+    # Порог: |f| - mu0 * Ws
+    thresh_u = abs_F_f - (mu_0 * W_s)
+    
+    # u0 = sgn(f) * sqrt( ratio * [thresh]+ )
+    term_u = np.sqrt(ratio_u * np.maximum(thresh_u, 0.0))
+    F_u0 = sgn_F_f * term_u
+    
+    # Расчет k0
+    ratio_k = (lambda_0 * W_r) / (mu_0 * W_s + 1e-12)
+    thresh_k = abs_F_f - (lambda_0 * W_r)
+    
+    term_k = np.sqrt(ratio_k * np.maximum(thresh_k, 0.0))
+    F_k0 = term_k.astype(np.complex128)
+    
+    # Принудительно задаем средние значения (DC component)
+    F_k0[0, 0] = 1.0 + 0j
+    F_u0[0, 0] = F_f[0, 0]
+    
+    return F_u0, F_k0
 
-    abs_f = np.abs(f_four)
-    ratio_mu_lam = mu_val / lambda_val                          
-
-    inner_u = (np.sqrt(ratio_mu_lam) * delta ** ((s - r) / 2.0) * abs_f
-               - mu_val * delta ** s)
-    u_four = np.sqrt(np.maximum(inner_u, 0.0)) * complex_sign(f_four)
-
-    inner_k = (np.sqrt(1.0 / ratio_mu_lam) * delta ** ((r - s) / 2.0) * abs_f
-               - lambda_val * delta ** r)
-    k_four = np.sqrt(np.maximum(inner_k, 0.0))
-
-    k_four[0, 0] = 1.0
-    u_four[0, 0] = f_four[0, 0]
-
-    return u_four, k_four
-
-
-def _solve_single_frequency(
-    u_n: complex,
-    k_n: complex,
-    f_val: complex,
-    a_n: float,
-    b_n: float,
-    tol: float,
-) -> Tuple[complex, complex]:
+def solve_step_n(F_f: np.ndarray,
+                 F_U_prev: np.ndarray,
+                 F_K_prev: np.ndarray,
+                 lambda_n: float,
+                 mu_n: float,
+                 W_r: np.ndarray,
+                 W_s: np.ndarray) -> tuple:
     """
-    Solve the pointwise bilinear Tikhonov sub-problem at one frequency.
-    Parameters:
-    u_n, k_n : complex
-        Current cumulative image / kernel iterates at this frequency.
-    f_val : complex
-        DFT coefficient of the observation at this frequency.
-    a_n : float
-        Image regularisation weight`.
-    b_n : float
-        Kernel regularisation weight.
-    tol : float
-        Tolerance for admitting roots with slightly negative real part
-        (handles numerical noise in the polynomial root-finding).
-    Returns:
-    u_inc : complex
-        Fourier-domain image increment at this frequency.
-    k_inc : complex
-        Fourier-domain kernel increment at this frequency.
+    Вычисляет приращения (u_inc, k_inc) решая полином 5-й степени.
     """
-    fu_conj = np.real(f_val * np.conj(u_n))     # Re( f_hat * conj(u_hat_n) )
-    re_kn   = np.real(k_n)
-    abs_un2 = np.abs(u_n) ** 2
-    abs_f2  = np.abs(f_val) ** 2
+    # Гарантируем вещественность известных величин
+    q_n = np.real(F_K_prev)  # Предыдущее ядро
+    
+    p_n = F_U_prev
+    z = F_f
+    
+    # Коэффициенты регуляризации для текущего шага
+    a_n = lambda_n * W_r
+    b_n = mu_n * W_s
+    
+    # Предварительные расчеты
+    a2 = a_n**2
+    abs_pn_sq = np.real(p_n * np.conj(p_n))
+    abs_z_sq = np.real(z * np.conj(z))
+    Re_zp = np.real(z * np.conj(p_n))
+    
+    # Коэффициенты полинома P(Q) (Уравнение 3.16)
+    C5 = b_n
+    C4 = -b_n * q_n
+    C3 = 2 * a_n * b_n
+    C2 = a_n * Re_zp - 2 * a_n * b_n * q_n
+    C1 = a2 * abs_pn_sq - a_n * abs_z_sq + a2 * b_n
+    C0 = -a2 * (Re_zp + b_n * q_n)
+    
+    # Начальное приближение: предыдущее ядро
+    Q = q_n.copy().astype(np.float64)
+    
+    # Метод Ньютона (векторизованный)
+    for _ in range(10):
+        Q2 = Q * Q
+        Q3 = Q2 * Q
+        Q4 = Q3 * Q
+        
+        P_val = C5*Q4*Q + C4*Q4 + C3*Q3 + C2*Q2 + C1*Q + C0
+        P_der = 5*C5*Q4 + 4*C4*Q3 + 3*C3*Q2 + 2*C2*Q + C1
+        
+        mask = np.abs(P_der) > 1e-12
+        delta = np.zeros_like(Q)
+        delta[mask] = P_val[mask] / P_der[mask]
+        delta = np.clip(delta, -100.0, 100.0)
+        
+        Q = Q - delta
+        Q = np.maximum(Q, 0.0)
 
-    c5 = b_n
-    c4 = -re_kn * b_n
-    c3 = 2.0 * a_n * b_n
-    c2 = a_n * fu_conj - 2.0 * a_n * b_n * re_kn
-    c1 = a_n ** 2 * abs_un2 - a_n * abs_f2 + a_n ** 2 * b_n
-    c0 = -a_n ** 2 * (fu_conj + b_n * re_kn)
-
-    coeffs = np.array([c5, c4, c3, c2, c1, c0], dtype=np.float64)
-    roots = np.roots(coeffs)
-    q_candidates = roots - k_n
-
-    def objective(q: complex) -> float:
-        """Evaluate J at increment q (Eq. 31 in [1])."""
-        p = q + k_n
-        abs_p2 = np.abs(p) ** 2
-        term1 = (a_n / (abs_p2 + a_n)) * np.abs(u_n * p - f_val) ** 2
-        term2 = b_n * np.abs(q) ** 2
-        return float(np.real(term1 + term2))
-
-    best_q   = q_candidates[0]
-    best_obj = objective(best_q)
-
-    for q in q_candidates[1:]:
-        obj = objective(q)
-        if obj <= best_obj and np.real(q) >= -tol:
-            best_q   = q
-            best_obj = obj
-
-    p_star     = best_q + k_n
-    abs_pstar2 = np.abs(p_star) ** 2
-    u_inc = (a_n * u_n + f_val * np.conj(p_star)) / (abs_pstar2 + a_n) - u_n
-
-    return u_inc, best_q
-
-def mhdm_step(
-    u_n: np.ndarray,
-    k_n: np.ndarray,
-    f_four: np.ndarray,
-    lambda_val: float,
-    mu_val: float,
-    r: float,
-    s: float,
-    tol: float,
-    primary_idx: np.ndarray,
-    conjugate_idx: np.ndarray,
-    self_conj_idx: np.ndarray,
-) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Parameters:
-    u_n, k_n : ndarray, shape (m, n), complex128
-        Current cumulative Fourier iterates.
-    f_four : ndarray, shape (m, n), complex128
-        DFT of the observed image.
-    lambda_val, mu_val : float
-        Regularisation parameters at the current scale.
-    r, s : float
-        Sobolev exponents for image / kernel penalties.
-    tol : float
-        Tolerance for polynomial root selection.
-    primary_idx : ndarray, shape (N_pair, 2), intp
-        Primary 2D indices for conjugate pairs.
-    conjugate_idx : ndarray, shape (N_pair, 2), intp
-        Corresponding conjugate 2D indices.
-    self_conj_idx : ndarray, shape (N_self, 2), intp
-        Self-conjugate (Nyquist) indices, excluding DC.
-
-    Returns:
-    u_inc : ndarray, shape (m, n), complex128
-        Fourier-domain image increment.
-    k_inc : ndarray, shape (m, n), complex128
-        Fourier-domain kernel increment.
-    """
-    m, n = f_four.shape
-    delta = compute_fourier_weights(m, n)
-
-    u_inc = np.zeros((m, n), dtype=np.complex128)
-    k_inc = np.zeros((m, n), dtype=np.complex128)
-
-    num_pairs = primary_idx.shape[0]
-    for idx in range(num_pairs):
-        pj, pl = primary_idx[idx]
-        a_n = lambda_val * delta[pj, pl] ** r      
-        b_n = mu_val    * delta[pj, pl] ** s         
-
-        u_val, k_val = _solve_single_frequency(
-            u_n[pj, pl], k_n[pj, pl], f_four[pj, pl],
-            a_n, b_n, tol,
-        )
-
-        u_inc[pj, pl] = u_val
-        k_inc[pj, pl] = k_val
-
-        cj, cl = conjugate_idx[idx]
-        u_inc[cj, cl] = np.conj(u_val)
-        k_inc[cj, cl] = np.conj(k_val)
-
-    num_self = self_conj_idx.shape[0]
-    for idx in range(num_self):
-        sj, sl = self_conj_idx[idx]
-        a_n = lambda_val * delta[sj, sl] ** r
-        b_n = mu_val    * delta[sj, sl] ** s
-
-        u_val, k_val = _solve_single_frequency(
-            u_n[sj, sl], k_n[sj, sl], f_four[sj, sl],
-            a_n, b_n, tol,
-        )
-
-        u_inc[sj, sl] = np.real(u_val)
-        k_inc[sj, sl] = np.real(k_val)
-
-    k_inc[0, 0] = 1.0 - k_n[0, 0]
-    u_inc[0, 0] = f_four[0, 0] - u_n[0, 0]
-
-    return u_inc, k_inc
-
-
-def blind_deconvolution_mhdm(
-    f: np.ndarray,
-    f_four: np.ndarray,
-    lambda_0: float,
-    mu_0: float,
-    r: float,
-    s: float,
-    tol: float,
-    stopping: float,
-    maxits: int,
-    primary_idx: np.ndarray,
-    conjugate_idx: np.ndarray,
-    self_conj_idx: np.ndarray,
-    verbose: bool = False,
-) -> Tuple[np.ndarray, np.ndarray, List[np.ndarray], List[np.ndarray],
-           int, List[float]]:
-    """
-    Run the full blind MHDM loop (Algorithm 2 in [1]).
-
-    Parameters:
-    f : ndarray, shape (m, n)
-        Observed blurred-and-noisy image (spatial domain, in [0, 1]).
-    f_four : ndarray, shape (m, n), complex128
-        Pre-computed 2D DFT of *f*.
-    lambda_0, mu_0 : float
-        Initial regularisation parameters.
-    r, s : float
-        Sobolev exponents.
-    tol : float
-        Numerical tolerance for polynomial root selection.
-    stopping : float
-        Discrepancy-principle threshold.
-    maxits : int
-        Maximum number of MHDM iterations.
-    primary_idx, conjugate_idx : ndarray
-        Conjugate-pair index arrays.
-    self_conj_idx : ndarray
-        Self-conjugate (Nyquist) index array.
-    verbose : bool
-        Print per-iteration diagnostics.
-
-    Returns:
-    u_end : ndarray, shape (m, n)
-        Restored image (spatial domain).
-    k_end : ndarray, shape (m, n)
-        Estimated full-size PSF (spatial domain, fftshift-ed).
-    u_four_list : list of ndarray
-        Cumulative Fourier image iterates.
-    k_four_list : list of ndarray
-        Cumulative Fourier kernel iterates.
-    its : int
-        Total number of iterations performed.
-    residuals : list of float
-    """
-    l2_norm = lambda arr: float(np.sqrt(np.sum(np.abs(arr) ** 2)))
-
-    lam = lambda_0
-    mu  = mu_0
-
-    u_four, k_four = mhdm_initial(f_four, lam, mu, r, s)
-
-    u_four_list: List[np.ndarray] = [u_four.copy()]
-    k_four_list: List[np.ndarray] = [k_four.copy()]
-
-    residual = l2_norm(f - np.real(np.fft.ifft2(u_four * k_four)))
-    residuals: List[float] = [residual]
-    its = 1
-
-    if verbose:
-        print(f"[MHDM] Iter 0   residual={residual:.6f}   "
-              f"stopping={stopping:.6f}")
-
-    while residual > stopping and its <= maxits:
-        lam /= 4.0
-        mu  /= 4.0
-
-        u_inc, k_inc = mhdm_step(
-            u_four_list[-1], k_four_list[-1], f_four,
-            lam, mu, r, s, tol,
-            primary_idx, conjugate_idx, self_conj_idx,
-        )
-
-        its += 1
-        u_four_new = u_four_list[-1] + u_inc
-        k_four_new = k_four_list[-1] + k_inc
-
-        u_four_list.append(u_four_new)
-        k_four_list.append(k_four_new)
-
-        residual = l2_norm(f - np.real(np.fft.ifft2(u_four_new * k_four_new)))
-        residuals.append(residual)
-
-        if verbose:
-            print(f"[MHDM] Iter {its - 1}   residual={residual:.6f}")
-
-    u_end = np.real(np.fft.ifft2(u_four_list[-1]))
-
-    k_end = np.real(np.fft.ifft2(k_four_list[-1]))
-    k_end = np.fft.fftshift(k_end)
-
-    return u_end, k_end, u_four_list, k_four_list, its, residuals
+    # Приращение ядра
+    F_k_inc = (Q - q_n).astype(np.complex128)
+    
+    # Восстановление изображения через формулу (3.12)
+    denom = Q**2 + a_n
+    denom[denom < 1e-12] = 1e-12
+    
+    U_next = (a_n * p_n + z * Q) / denom
+    F_u_inc = U_next - F_U_prev
+    
+    # Фиксация среднего
+    F_k_inc[0, 0] = 0.0j
+    F_u_inc[0, 0] = 0.0j
+    
+    return F_u_inc, F_k_inc

@@ -1,177 +1,133 @@
 """
-Utility functions for the MHDM (Multiscale Hierarchical Decomposition Method)
-blind deconvolution algorithm.
+Вспомогательные функции для MHDM Blind Deconvolution.
+Реализация весов норм Соболева, паддинга и пост-обработки ядра.
 """
 
 import numpy as np
-from typing import Tuple
+from scipy.ndimage import zoom, label, center_of_mass, shift
 
-def compute_fourier_weights(m: int, n: int) -> np.ndarray:
+def compute_sobolev_weights(shape: tuple, order: float) -> np.ndarray:
     """
-    Compute discrete Sobolev-type Fourier weights.
-    Parameters:
-    m, n : int
-        Spatial dimensions (rows, columns).
-    Returns:
-    delta : ndarray, shape (m, n), float64
-        Weight array.  ``delta[0, 0] == 1``.
+    Вычисляет веса дискретной нормы Соболева в частотной области.
     """
-    j = np.arange(m, dtype=np.float64)
-    l = np.arange(n, dtype=np.float64)
-    row_term = 2.0 * m ** 2 * (1.0 - np.cos(2.0 * np.pi * j / m))   # (m,)
-    col_term = 2.0 * n ** 2 * (1.0 - np.cos(2.0 * np.pi * l / n))   # (n,)
-    delta = 1.0 + row_term[:, None] + col_term[None, :]
-    return delta
+    m, n = shape
+    i = np.arange(m).reshape(-1, 1)
+    j = np.arange(n).reshape(1, -1)
+    
+    term_i = 2 * (m**2) * (1 - np.cos(2 * np.pi * i / m))
+    term_j = 2 * (n**2) * (1 - np.cos(2 * np.pi * j / n))
+    
+    delta = 1.0 + term_i + term_j
+    
+    return np.power(delta, order)
 
+def normalize_min_max(x: np.ndarray) -> np.ndarray:
+    """Нормализует массив в диапазон [0, 1]."""
+    xmin, xmax = x.min(), x.max()
+    if xmax > xmin + 1e-8:
+        return (x - xmin) / (xmax - xmin)
+    return x
 
-def compute_conjugate_indices(
-    m: int, n: int,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def pad_image(image: np.ndarray, pad_size: int, mode: str = 'reflect') -> np.ndarray:
     """
-    Compute index sets for enforcing Hermitian symmetry on a 2D DFT grid.
-    Parameters:
-    m, n : int
-        Spatial dimensions (rows, columns).
-
-    Returns:
-    primary : ndarray, shape (N_pair, 2), intp
-        Primary 2D indices for each conjugate pair.
-    conjugate : ndarray, shape (N_pair, 2), intp
-        Corresponding conjugate 2D indices.
-    self_conjugate : ndarray, shape (N_self, 2), intp
-        Self-conjugate indices (excluding DC).
+    Расширяет изображение.
     """
-    primary_list = []
-    conjugate_list = []
-    self_conj_list = []
-    visited = set()
+    return np.pad(image, ((pad_size, pad_size), (pad_size, pad_size)), mode=mode)
 
-    for j in range(m):
-        for l in range(n):
-            if j == 0 and l == 0:
-                continue
+def crop_center(image: np.ndarray, target_shape: tuple) -> np.ndarray:
+    """Вырезает центральную часть изображения."""
+    h, w = image.shape
+    th, tw = target_shape
+    start_y = (h - th) // 2
+    start_x = (w - tw) // 2
+    return image[start_y:start_y+th, start_x:start_x+tw]
 
-            cj = (m - j) % m
-            cl = (n - l) % n
-            if (j, l) == (cj, cl):
-                self_conj_list.append((j, l))
-                continue
+def resize_image(image: np.ndarray, scale: float) -> np.ndarray:
+    """Ресайз изображения (бикубическая интерполяция)."""
+    return zoom(image, scale, order=3, prefilter=True)
 
-            pair = frozenset(((j, l), (cj, cl)))
-            if pair not in visited:
-                visited.add(pair)
-                primary_list.append((j, l))
-                conjugate_list.append((cj, cl))
-
-    def _to_array(lst):
-        if lst:
-            return np.array(lst, dtype=np.intp)
-        return np.empty((0, 2), dtype=np.intp)
-
-    return _to_array(primary_list), _to_array(conjugate_list), _to_array(self_conj_list)
-
-
-def psf2otf(psf: np.ndarray, output_size: Tuple[int, int]) -> np.ndarray:
+def resize_kernel(kernel: np.ndarray, target_shape: tuple) -> np.ndarray:
     """
-    Convert a spatial-domain PSF to a frequency-domain OTF.
-    Parameters:
-    psf : ndarray, shape (ph, pw)
-        Spatial-domain point-spread function.
-    output_size : tuple of (int, int)
-        Desired (rows, cols) of the output OTF.
-    Returns:
-    otf : ndarray, shape *output_size*, complex128
-        Frequency-domain optical transfer function.
+    Ресайз ядра с сохранением энергии.
     """
-    ph, pw = psf.shape
-    padded = np.zeros(output_size, dtype=np.float64)
-    padded[:ph, :pw] = psf
+    current_h, current_w = kernel.shape
+    target_h, target_w = target_shape
+    
+    zoom_h = target_h / current_h
+    zoom_w = target_w / current_w
+    
+    k_new = zoom(kernel, (zoom_h, zoom_w), order=1, prefilter=False)
+    
+    k_sum = k_new.sum()
+    if k_sum > 1e-12:
+        k_new /= k_sum
+        
+    return k_new
 
-    shift_y = -(ph // 2)
-    shift_x = -(pw // 2)
-    padded = np.roll(padded, shift=(shift_y, shift_x), axis=(0, 1))
-
-    return np.fft.fft2(padded)
-
-
-def otf2psf(
-    otf: np.ndarray,
-    psf_size: Tuple[int, int] | None = None,
-) -> np.ndarray:
-    """
-    Convert a frequency-domain OTF to a spatial-domain PSF.
-    Parameters:
-    otf : ndarray, shape (m, n), complex
-        Frequency-domain OTF.
-    psf_size : tuple of (int, int) or None
-        If given, crop the output to this centred (rows, cols) region.
-        If None, return the full-size PSF.
-
-    Returns:
-    psf : ndarray, shape psf_size or (m, n), float64
-        Spatial-domain PSF.
-    """
-    m, n = otf.shape
-    psf_full = np.real(np.fft.ifft2(otf))
-    psf_full = np.fft.fftshift(psf_full)
-
-    if psf_size is None:
-        return psf_full
-
-    kh, kw = psf_size
-    cy, cx = m // 2, n // 2
-    top = cy - kh // 2
-    left = cx - kw // 2
-    return psf_full[top:top + kh, left:left + kw]
-
-
-def estimate_noise_sigma(
-    image: np.ndarray,
-    sigma_floor: float = 2.0,
-) -> float:
-    """
-    Estimate the standard deviation of additive white Gaussian noise
-    from a single image.
-
-    Parameters:
-    image : ndarray, shape (H, W)
-        Observed image. The estimator is scale-invariant (linear).
-        If image is in [0, 1], returns sigma in [0, 1].
-        If image is in [0, 255], returns sigma in [0, 255].
-    sigma_floor : float
-        Minimum returned sigma.
-        For [0, 1] images, default 0.005 is appropriate.
-        For [0, 255] images, use ~1.0.
-
-    Returns:
-    sigma : float
-        Estimated noise standard deviation.
-    """
-    laplacian_kernel = np.array([
-        [0,  1, 0],
-        [1, -4, 1],
-        [0,  1, 0],
-    ], dtype=np.float64)
-
+def edgetaper(image: np.ndarray, kernel_shape: tuple) -> np.ndarray:
+    """Сглаживает края изображения."""
     from scipy.signal import fftconvolve
-    residual = fftconvolve(image, laplacian_kernel, mode='valid')
+    h, w = image.shape
+    kh, kw = kernel_shape
+    
+    wy = np.ones(h)
+    if h > kh:
+        idx = np.arange(kh)
+        vals = 0.5 * (1 - np.cos(np.pi * idx / (kh - 1)))
+        wy[:kh] = vals
+        wy[-kh:] = vals[::-1]
+        
+    wx = np.ones(w)
+    if w > kw:
+        idx = np.arange(kw)
+        vals = 0.5 * (1 - np.cos(np.pi * idx / (kw - 1)))
+        wx[:kw] = vals
+        wx[-kw:] = vals[::-1]
+        
+    alpha = np.outer(wy, wx)
+    
+    sigma = min(kh, kw) / 5.0
+    y_grid, x_grid = np.ogrid[-kh//2:kh//2, -kw//2:kw//2]
+    gauss = np.exp(-(x_grid**2 + y_grid**2)/(2*sigma**2))
+    gauss /= gauss.sum()
+    
+    blurred = fftconvolve(image, gauss, mode='same')
+    return alpha * image + (1 - alpha) * blurred
 
-    sigma = np.median(np.abs(residual)) / (0.6745 * np.sqrt(20.0))
-    return float(max(sigma, sigma_floor))
-
-
-def complex_sign(z: np.ndarray) -> np.ndarray:
+def process_kernel_spatial(k: np.ndarray, threshold_ratio: float = 0.05) -> np.ndarray:
     """
-    Parameters:
-    z : ndarray (complex or real)
-        Input array.
-
-    Returns:
-    s : ndarray
-        Complex sign, same shape and dtype as input.
+    Очистка ядра в пространственной области:
+    1. Hard Thresholding (убирает жирность/туман).
+    2. Оставление только самой большой компоненты связности (убирает шум вдалеке).
+    3. Центрирование (Center of Mass).
     """
-    magnitude = np.abs(z)
-    out = np.zeros_like(z)
-    mask = magnitude > 0.0
-    out[mask] = z[mask] / magnitude[mask]
-    return out
+    # 1. Thresholding
+    k_max = k.max()
+    # Обнуляем все, что меньше 5-10% от пика
+    mask = k > (k_max * threshold_ratio)
+    k_clean = k * mask
+    
+    # 2. Largest Connected Component (если ядро разбилось на части)
+    labeled, n_components = label(mask)
+    if n_components > 1:
+        sizes = [np.sum(labeled == i) for i in range(1, n_components + 1)]
+        largest_label = np.argmax(sizes) + 1
+        k_clean[labeled != largest_label] = 0
+    
+    # 3. Centering
+    # Вычисляем центр масс
+    if k_clean.sum() > 1e-12:
+        cy, cx = center_of_mass(k_clean)
+        h, w = k.shape
+        dy = (h // 2) - cy
+        dx = (w // 2) - cx
+        
+        # Сдвигаем ядро в центр массива
+        k_clean = shift(k_clean, (dy, dx), order=0, mode='constant', cval=0)
+    
+    # Нормализация
+    k_sum = k_clean.sum()
+    if k_sum > 1e-12:
+        k_clean /= k_sum
+        
+    return k_clean

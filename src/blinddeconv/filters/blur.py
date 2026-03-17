@@ -322,7 +322,7 @@ class Identical_kernel(FilterBase):
         """Инициализация идентичного фильтра."""
         super().__init__(1, 'blur')
 
-    def discription(self) -> str:
+    def description(self) -> str:
         """Возвращает название способа смаза в файловой системе."""
         return f"|I_"
 

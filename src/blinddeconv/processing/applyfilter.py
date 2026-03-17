@@ -103,7 +103,7 @@ class ModuleFilter:
             
             cv.imwrite(str(new_path), filtered_image)
             img_obj.add_preprocessed_blurred_path(str(img_obj.get_blurred()), str(new_path))
-            img_obj.add_to_current_filter(filter_processor.discription()) 
+            img_obj.add_to_current_filter(filter_processor.description()) 
 
     def _copy_original_to_blurred(self, img_obj: Image) -> None:
         """Копирует оригинальное изображение в смазанное, ядро - единичное."""
