@@ -2,9 +2,15 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop, feature/automation-system ]
+    branches: 
+      - main
+      - develop
+      - 'feature/*'     
+      - 'bugfix/*'      
+      - 'hotfix/*'       
+      - 'release/*'        
   pull_request:
-    branches: [ main, develop, feature/automation-system ]
+    branches: [ main, develop ]
 
 jobs:
   quality:
