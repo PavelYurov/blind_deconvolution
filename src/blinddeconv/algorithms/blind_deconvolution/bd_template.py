@@ -62,7 +62,7 @@ class BlindDeconvTemplate(DeconvolutionAlgorithm):
             'time': time.time() - start_time,
             # TODO: add relevant hyperparams / diagnostics
         }
-
+        x_final = None
         x_final = x_final * 255.0
         x_final = np.round(x_final).astype(np.int16)
         h = 0
