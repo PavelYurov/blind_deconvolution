@@ -298,7 +298,7 @@ def Deblur_GL_CG_4(Y_b, k, W, we, max_iter):
 
     r = b - Ax
     rho_1 = 0.0
-
+    p = None
     for i in range(max_iter):
         rho = np.sum(r * r)
 
