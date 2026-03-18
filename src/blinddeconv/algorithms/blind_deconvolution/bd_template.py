@@ -65,6 +65,7 @@ class BlindDeconvTemplate(DeconvolutionAlgorithm):
 
         x_final = x_final * 255.0
         x_final = np.round(x_final).astype(np.int16)
+        h = 0
         return x_final, h #restored image, kernel
 
     # ── Interface methods ────────────────────────────────────────────────

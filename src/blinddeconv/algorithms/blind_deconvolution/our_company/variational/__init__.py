@@ -1,1 +1,0 @@
-# Variational blind deconvolution methods
