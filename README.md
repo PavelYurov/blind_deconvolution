@@ -1,6 +1,6 @@
 # Исследование методов Blind Image Deconvolution
 
-[![CI](https://github.com/PavelYurov/blind_deconvolution/actions/workflows/ci.yml/badge.svg?branch=feature/automation-system)](https://github.com/PavelYurov/blind_deconvolution/actions/workflows/ci.yml)
+[![CI](https://github.com/PavelYurov/blind_deconvolution/actions/workflows/ci.yml/badge.svg?branch=feature/module-redesign)](https://github.com/PavelYurov/blind_deconvolution/actions/workflows/ci.yml)
 
 ## Руководитель проекта 
 
