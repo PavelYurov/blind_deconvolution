@@ -51,16 +51,31 @@ from blinddeconv.algorithms.base import DeconvolutionAlgorithm
 from .solvers import create_data, solvex_var_l4_sar
 from .utils import fspecial_gaussian
 
+from scipy.ndimage import shift as _ndshift
+
 
 class BCSNSP_SR(DeconvolutionAlgorithm):
     """
     Super-resolution via Bayesian Combination of Sparse and Non-Sparse Priors.
 
+    Modes
+    -----
+    ``'upscale'``  (default) — real upscaling.
+        Input : LR image  (m × n).
+        Output: HR image  (m*res × n*res).
+        Generates L pseudo-frames from the single input via sub-pixel shifts,
+        then reconstructs a larger HR image.
+
+    ``'benchmark'`` — simulation / self-test.
+        Input : HR image  (M × N).
+        Output: HR image  (M × N)  — same size.
+        Degrades the HR input into LR frames, then restores it.
+
     Parameters
     ----------
-    res           : int   — magnification / downsampling factor.
-    L             : int   — number of simulated LR frames.
-    sigma         : float — simulated observation noise σ.
+    res           : int   — magnification factor.
+    L             : int   — number of (simulated) LR frames.
+    sigma         : float — assumed observation noise σ.
     blur_size     : int   — PSF kernel size (odd).
     blur_sigma    : float — PSF Gaussian σ.
     lambda_prior  : float — trade-off L1-TV vs SAR, in [0, 1].
@@ -68,11 +83,13 @@ class BCSNSP_SR(DeconvolutionAlgorithm):
     thr           : float — convergence threshold.
     method        : str   — ``'variational'`` or ``'degenerate'``.
     estimate_reg  : bool  — update registration per iteration.
-    max_shift     : float — max random sub-pixel shift for simulation.
-    max_theta     : float — max random rotation (rad) for simulation.
+    max_shift     : float — max sub-pixel shift (in LR pixels for upscale,
+                            in HR pixels for benchmark).
+    max_theta     : float — max random rotation (rad) for benchmark mode.
     pcg_thr       : float — PCG solver tolerance.
     pcg_maxit     : int   — PCG max iterations.
     pcg_minit     : int   — PCG min iterations.
+    mode          : str   — ``'upscale'`` or ``'benchmark'``.
     verbose       : bool  — print iteration info.
     seed          : int or None — random seed for reproducibility.
     """
@@ -89,11 +106,12 @@ class BCSNSP_SR(DeconvolutionAlgorithm):
         thr: float = 1e-4,
         method: str = 'variational',
         estimate_reg: bool = True,
-        max_shift: float = 1.0,
+        max_shift: float = 0.5,
         max_theta: float = 0.01,
         pcg_thr: float = 1e-6,
         pcg_maxit: int = 100,
         pcg_minit: int = 10,
+        mode: str = 'upscale',
         verbose: bool = False,
         seed: int | None = None,
     ):
@@ -114,6 +132,7 @@ class BCSNSP_SR(DeconvolutionAlgorithm):
         self.pcg_thr = pcg_thr
         self.pcg_maxit = pcg_maxit
         self.pcg_minit = pcg_minit
+        self.mode = mode
         self.verbose = verbose
         self.seed = seed
 
@@ -138,7 +157,93 @@ class BCSNSP_SR(DeconvolutionAlgorithm):
         if img.max() > 1.0:
             img /= 255.0
 
-        # Crop to dimensions divisible by res
+        h = fspecial_gaussian(self.blur_size, self.blur_sigma)
+
+        if self.mode == 'benchmark':
+            x_vec, out, M, N = self._process_benchmark(img, h)
+        else:
+            x_vec, out, M, N = self._process_upscale(img, h)
+
+        # ── Output ───────────────────────────────────────────────────────
+        x_img = x_vec.reshape(M, N, order='F')
+        x_img = np.clip(x_img, 0.0, 1.0)
+
+        self.hyperparams = {
+            'res': self.res,
+            'L': self.L,
+            'sigma': self.sigma,
+            'lambda_prior': self.lambda_prior,
+            'method': self.method,
+            'mode': self.mode,
+            'iterations': out['iterations'],
+            'input_shape': img.shape,
+            'output_shape': (M, N),
+            'xconv': out['xconv'],
+            'time': time.time() - start_time,
+        }
+        if out['history']['PSNRs']:
+            self.hyperparams['final_psnr'] = out['history']['PSNRs'][-1]
+        self.history = out['history']
+
+        x_final = (x_img * 255.0).clip(0, 255).astype(np.int16)
+        kernel = np.zeros((3, 3), dtype=np.float64)
+        return x_final, kernel
+
+    # ── Upscale mode (real SR: input LR → output HR bigger) ─────────────
+    def _process_upscale(self, img, h):
+        """
+        Input: single LR image (m × n).
+        Creates L pseudo-frames via sub-pixel shifts.
+        Output: HR image vector of size (m*res × n*res).
+        """
+        m, n = img.shape
+        M = m * self.res
+        N = n * self.res
+
+        # Generate L frames from single input via sub-pixel shifts
+        # Frame 0 = original, frames 1..L-1 = shifted copies
+        sx_lr = np.zeros(self.L)   # shifts in LR pixel space
+        sy_lr = np.zeros(self.L)
+
+        frames_vec = [img.ravel(order='F')]
+        for k in range(1, self.L):
+            sx_lr[k] = (np.random.rand() * 2 - 1) * self.max_shift
+            sy_lr[k] = (np.random.rand() * 2 - 1) * self.max_shift
+            # scipy.ndimage.shift takes [row_shift, col_shift] = [dy, dx]
+            shifted = _ndshift(img, [sy_lr[k], sx_lr[k]],
+                               order=1, mode='reflect')
+            frames_vec.append(shifted.ravel(order='F'))
+
+        y = np.concatenate(frames_vec)
+
+        # Convert LR-pixel shifts to HR-pixel shifts for the solver
+        sx_hr = sx_lr * self.res
+        sy_hr = sy_lr * self.res
+        theta_hr = np.zeros(self.L)
+
+        x_vec, out = solvex_var_l4_sar(
+            y, M=M, N=N, m=m, n=n, res=self.res, L=self.L, h=h,
+            sx=sx_hr, sy=sy_hr, theta=theta_hr,
+            xtrue=None,
+            method=self.method,
+            lambda_prior=self.lambda_prior,
+            maxit=self.maxit,
+            thr=self.thr,
+            pcg_thr=self.pcg_thr,
+            pcg_maxit=self.pcg_maxit,
+            pcg_minit=self.pcg_minit,
+            estimate_registration=False,  # shifts are known exactly
+            verbose=self.verbose,
+        )
+        return x_vec, out, M, N
+
+    # ── Benchmark mode (simulation: input HR → degrade → restore HR) ────
+    def _process_benchmark(self, img, h):
+        """
+        Input: HR image (M × N).
+        Degrades into L LR frames, then reconstructs.
+        Output: HR image vector (same M × N size).
+        """
         M_raw, N_raw = img.shape
         m = M_raw // self.res
         n = N_raw // self.res
@@ -146,10 +251,6 @@ class BCSNSP_SR(DeconvolutionAlgorithm):
         N = n * self.res
         img = img[:M, :N]
 
-        # PSF
-        h = fspecial_gaussian(self.blur_size, self.blur_sigma)
-
-        # ── 2. Generate registration parameters ─────────────────────────
         sx_true = np.zeros(self.L)
         sy_true = np.zeros(self.L)
         theta_true = np.zeros(self.L)
@@ -158,12 +259,9 @@ class BCSNSP_SR(DeconvolutionAlgorithm):
             sy_true[k] = (np.random.rand() * 2 - 1) * self.max_shift
             theta_true[k] = (np.random.rand() * 2 - 1) * self.max_theta
 
-        # ── 3. Simulate LR observations ─────────────────────────────────
         y, _W = create_data(img, h, M, N, self.res, self.L,
                             sx_true, sy_true, theta_true, self.sigma)
 
-        # ── 4. Run SR solver ─────────────────────────────────────────────
-        # Start with slightly perturbed registration
         sx_init = sx_true.copy()
         sy_init = sy_true.copy()
         theta_init = theta_true.copy()
@@ -188,28 +286,7 @@ class BCSNSP_SR(DeconvolutionAlgorithm):
             estimate_registration=self.estimate_reg,
             verbose=self.verbose,
         )
-
-        # ── 5. Output ───────────────────────────────────────────────────
-        x_img = x_vec.reshape(M, N, order='F')
-        x_img = np.clip(x_img, 0.0, 1.0)
-
-        self.hyperparams = {
-            'res': self.res,
-            'L': self.L,
-            'sigma': self.sigma,
-            'lambda_prior': self.lambda_prior,
-            'method': self.method,
-            'iterations': out['iterations'],
-            'final_psnr': (out['history']['PSNRs'][-1]
-                           if out['history']['PSNRs'] else None),
-            'xconv': out['xconv'],
-            'time': time.time() - start_time,
-        }
-        self.history = out['history']
-
-        x_final = (x_img * 255.0).clip(0, 255).astype(np.int16)
-        kernel = np.zeros((3, 3), dtype=np.float64)
-        return x_final, kernel
+        return x_vec, out, M, N
 
     # ── Interface methods ────────────────────────────────────────────────
     def get_param(self) -> List[Tuple[str, Any]]:
@@ -229,6 +306,7 @@ class BCSNSP_SR(DeconvolutionAlgorithm):
             ('pcg_thr', self.pcg_thr),
             ('pcg_maxit', self.pcg_maxit),
             ('pcg_minit', self.pcg_minit),
+            ('mode', self.mode),
             ('verbose', self.verbose),
             ('seed', self.seed),
         ]
