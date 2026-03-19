@@ -106,16 +106,15 @@ Desktop.ini
 ~$*
 *.bak
 
-# Прочие папки проекта
+# Miscellaneous directories
 /restored/
-/blured/
 /blurred/
 /data/
 /dataset/
 /images_dataset/
 /implementations/
 /kernels/
-/parametrs/
+/parameters/
 /results/
 /dataset_blurred/
 /alg_test/
