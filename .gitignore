@@ -124,41 +124,15 @@ Desktop.ini
 /docs/_build/
 /reports/
 
-# Прочие файлы
-/benchmark_generation.ipynb
-/benchmark_generation_1.ipynb
-/bind_dataset.py
-/bind_dataset_1.py
+# Miscellaneous files
+/benchmark_generation*.ipynb
+/bind_dataset*.py
 /generate_dataset.py
 /generator.py
-/main5.ipynb
-/main_2.ipynb
-/main3.ipynb
-/main4.ipynb
-/test_bind.ipynb
-/test_bind_1.ipynb
-/test_full_process.ipynb
-/test_param_search.ipynb
-/test_process.ipynb
-/test.ipynb
-/main.ipynb
-/main6.ipynb
-/main7.ipynb
-/main8.ipynb
-/main9.ipynb
-/main10.ipynb
-/main**.ipynb
+/main*.ipynb
+/test*.ipynb
 /extensions.py
-/prompt.txt
 /.dependency_state.json
 
-# Лишние медиа
-/algorithms/**/*.png
-/algorithms/**/*.jpg
-/algorithms/**/*.jpeg
-/algorithms/**/*.bmp
-/algorithms/**/*.tif
-/algorithms/**/*.tiff
-/algorithms/**/*.gif
-/algorithms/**/*.webp
-/algorithms/**/*.svg
+# Unnecessary media files
+/algorithms/**/*.{png,jpg,jpeg,bmp,tif,tiff,gif,webp,svg}
