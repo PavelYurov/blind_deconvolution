@@ -63,7 +63,7 @@ class ModuleClear:
             ('algorithm', np.array([])),
             ('blurred_array', np.array([])),
             ('current_filter', None),
-            ('filters', np.array([])),
+            ('filters', {}),
             ('preprocessed_blurred_path',{})
         ]
         
