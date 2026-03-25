@@ -427,7 +427,6 @@ def solve_image_bregman(v: np.ndarray, beta: float,
     -------
     w : 2-D array — proximal solution, same shape as *v*
     """
-    global _lut_cache
 
     key = (beta, alpha)
     lut_range = 10.0

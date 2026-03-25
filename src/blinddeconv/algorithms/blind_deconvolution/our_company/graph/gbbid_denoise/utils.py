@@ -61,6 +61,7 @@ from scipy.signal import fftconvolve
 from scipy.ndimage import convolve as ndimage_convolve
 from scipy.ndimage import correlate as ndimage_correlate
 from scipy.interpolate import interp1d
+from scipy.fft import dstn, idstn
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -1000,3 +1001,264 @@ def solve_image(v, beta, alpha):
     orig_shape = v.shape
     w = interp_func(v.ravel())
     return w.reshape(orig_shape)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Optimal FFT size  (from opt_fft_size.m)
+# ═════════════════════════════════════════════════════════════════════════════
+
+_OPT_FFT_LUT = None
+
+
+def _build_opt_fft_lut(lut_size: int = 4096) -> np.ndarray:
+    """Build LUT of optimal FFT sizes (products of small primes 2,3,5,7
+    with optional single factors of 11 or 13)."""
+    lut = np.zeros(lut_size + 1, dtype=np.int64)
+
+    e2 = 1
+    while e2 <= lut_size:
+        e3 = e2
+        while e3 <= lut_size:
+            e5 = e3
+            while e5 <= lut_size:
+                e7 = e5
+                while e7 <= lut_size:
+                    if e7 <= lut_size:
+                        lut[e7] = e7
+                    if e7 * 11 <= lut_size:
+                        lut[e7 * 11] = e7 * 11
+                    if e7 * 13 <= lut_size:
+                        lut[e7 * 13] = e7 * 13
+                    e7 *= 7
+                e5 *= 5
+            e3 *= 3
+        e2 *= 2
+
+    nn = 0
+    for i in range(lut_size, 0, -1):
+        if lut[i] != 0:
+            nn = i
+        else:
+            lut[i] = nn
+    return lut
+
+
+def opt_fft_size(n) -> np.ndarray:
+    """
+    Compute optimal FFT data length(s).
+    Equivalent to MATLAB opt_fft_size.m.
+    """
+    global _OPT_FFT_LUT
+    if _OPT_FFT_LUT is None:
+        _OPT_FFT_LUT = _build_opt_fft_lut()
+
+    n = np.asarray(n, dtype=np.int64)
+    scalar_input = n.ndim == 0
+    n = np.atleast_1d(n)
+
+    lut_size = len(_OPT_FFT_LUT) - 1
+    m = np.zeros_like(n)
+    for i in range(n.size):
+        nn = n.flat[i]
+        if 1 <= nn <= lut_size:
+            m.flat[i] = _OPT_FFT_LUT[nn]
+        else:
+            m.flat[i] = -1
+
+    if scalar_input:
+        return int(m.flat[0])
+    return m
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# wrap_boundary_liu  (from cho_code/wrap_boundary_liu.m, Liu & Jia ICIP 2008)
+# ═════════════════════════════════════════════════════════════════════════════
+
+def _solve_min_laplacian(boundary_image: np.ndarray) -> np.ndarray:
+    """
+    Solve Laplace equation with Dirichlet boundary conditions via DST.
+    Equivalent to the nested solve_min_laplacian in wrap_boundary_liu.m.
+    """
+    H, W = boundary_image.shape
+    boundary_image = boundary_image.copy()
+
+    boundary_image[1:-1, 1:-1] = 0.0
+
+    f_bp = np.zeros((H, W), dtype=np.float64)
+    f_bp[1:H - 1, 1:W - 1] = (
+        -4.0 * boundary_image[1:H - 1, 1:W - 1]
+        + boundary_image[1:H - 1, 2:W]
+        + boundary_image[1:H - 1, 0:W - 2]
+        + boundary_image[0:H - 2, 1:W - 1]
+        + boundary_image[2:H,     1:W - 1]
+    )
+
+    f1 = -f_bp
+    f2 = f1[1:H - 1, 1:W - 1]
+
+    f2sin = dstn(f2, type=1)
+
+    x = np.arange(1, W - 1)
+    y = np.arange(1, H - 1)
+    xx, yy = np.meshgrid(x, y)
+    denom = (2.0 * np.cos(np.pi * xx / (W - 1)) - 2.0) + \
+            (2.0 * np.cos(np.pi * yy / (H - 1)) - 2.0)
+
+    f3 = f2sin / denom
+
+    img_tt = idstn(f3, type=1)
+
+    img_direct = boundary_image.copy()
+    img_direct[1:H - 1, 1:W - 1] = img_tt
+
+    return img_direct
+
+
+def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
+    """
+    Pad image so boundaries are circularly smooth for FFT-based deconvolution.
+    Equivalent to MATLAB wrap_boundary_liu.m (Cho, based on Liu & Jia ICIP 2008).
+
+    Parameters
+    ----------
+    img      : (H, W) or (H, W, Ch) input image
+    img_size : (H_out, W_out) target padded size
+    """
+    if img.ndim == 2:
+        img = img[:, :, np.newaxis]
+
+    H, W, Ch = img.shape
+    H_out, W_out = img_size[0], img_size[1]
+    H_w = H_out - H
+    W_w = W_out - W
+
+    ret = np.zeros((H_out, W_out, Ch), dtype=np.float64)
+
+    for ch in range(Ch):
+        alpha = 1
+        HG = img[:, :, ch]
+
+        r_A = np.zeros((alpha * 2 + H_w, W), dtype=np.float64)
+        r_A[:alpha, :] = HG[-alpha:, :]
+        r_A[-alpha:, :] = HG[:alpha, :]
+
+        if H_w > 1:
+            a = np.arange(H_w, dtype=np.float64) / (H_w - 1)
+        else:
+            a = np.array([0.0])
+        r_A[alpha:alpha + H_w, 0] = (
+            (1 - a) * r_A[alpha - 1, 0] + a * r_A[-alpha, 0]
+        )
+        r_A[alpha:alpha + H_w, -1] = (
+            (1 - a) * r_A[alpha - 1, -1] + a * r_A[-alpha, -1]
+        )
+
+        A2 = _solve_min_laplacian(r_A)
+        A = A2
+
+        r_B = np.zeros((H, alpha * 2 + W_w), dtype=np.float64)
+        r_B[:, :alpha] = HG[:, -alpha:]
+        r_B[:, -alpha:] = HG[:, :alpha]
+
+        if W_w > 1:
+            a = np.arange(W_w, dtype=np.float64) / (W_w - 1)
+        else:
+            a = np.array([0.0])
+        r_B[0, alpha:alpha + W_w] = (
+            (1 - a) * r_B[0, alpha - 1] + a * r_B[0, -alpha]
+        )
+        r_B[-1, alpha:alpha + W_w] = (
+            (1 - a) * r_B[-1, alpha - 1] + a * r_B[-1, -alpha]
+        )
+
+        B2 = _solve_min_laplacian(r_B)
+        B = B2
+
+        r_C = np.zeros((alpha * 2 + H_w, alpha * 2 + W_w), dtype=np.float64)
+        r_C[:alpha, :] = B[-alpha:, :]
+        r_C[-alpha:, :] = B[:alpha, :]
+        r_C[:, :alpha] = A[:, -alpha:]
+        r_C[:, -alpha:] = A[:, :alpha]
+
+        C2 = _solve_min_laplacian(r_C)
+        C = C2
+
+        A = A[:H_w, :]
+        B = B[:, 1:W_w + 1]
+        C = C[1:H_w + 1, 1:W_w + 1]
+
+        ret[:, :, ch] = np.block([[HG, B], [A, C]])
+
+    if ret.shape[2] == 1:
+        return ret[:, :, 0]
+    return ret
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Bilateral filter  (from bilateral_filter.m)
+# ═════════════════════════════════════════════════════════════════════════════
+
+def _fspecial_gaussian(size: int, sigma: float) -> np.ndarray:
+    """Equivalent to MATLAB fspecial('gaussian', size, sigma)."""
+    radius = (size - 1) / 2.0
+    y, x = np.mgrid[-radius:radius + 1, -radius:radius + 1]
+    g = np.exp(-(x * x + y * y) / (2.0 * sigma * sigma))
+    return g / g.sum()
+
+
+def bilateral_filter(img: np.ndarray, sigma_s: float,
+                     sigma: float) -> np.ndarray:
+    """
+    Bilateral filter.
+    Equivalent to MATLAB bilateral_filter.m for grayscale images.
+
+    Parameters
+    ----------
+    img     : (H, W) float image
+    sigma_s : spatial sigma
+    sigma   : range sigma
+    """
+    if img.ndim == 2:
+        img = img[:, :, np.newaxis]
+    was_2d = img.shape[2] == 1
+
+    h, w, d = img.shape
+    img = img.astype(np.float32)
+
+    lab = img.copy()
+    sigma = sigma * np.sqrt(d)
+
+    fr = int(np.ceil(sigma_s * 3))
+
+    p_img = np.pad(img, ((fr, fr), (fr, fr), (0, 0)), mode='edge')
+    p_lab = np.pad(lab, ((fr, fr), (fr, fr), (0, 0)), mode='edge')
+
+    r_img = np.zeros((h, w, d), dtype=np.float32)
+    w_sum = np.zeros((h, w), dtype=np.float32)
+
+    spatial_weight = _fspecial_gaussian(2 * fr + 1, sigma_s)
+    ss = sigma * sigma
+
+    for y_off in range(-fr, fr + 1):
+        for x_off in range(-fr, fr + 1):
+            w_s = spatial_weight[y_off + fr, x_off + fr]
+
+            n_img = p_img[fr + y_off:fr + y_off + h,
+                          fr + x_off:fr + x_off + w, :]
+            n_lab = p_lab[fr + y_off:fr + y_off + h,
+                          fr + x_off:fr + x_off + w, :]
+
+            f_diff = lab - n_lab
+            f_dist = np.sum(f_diff ** 2, axis=2)
+
+            w_f = np.exp(-0.5 * f_dist / ss)
+            w_t = w_s * w_f
+
+            r_img += n_img * w_t[:, :, np.newaxis]
+            w_sum += w_t
+
+    r_img = r_img / w_sum[:, :, np.newaxis]
+
+    if was_2d:
+        return r_img[:, :, 0]
+    return r_img

@@ -56,6 +56,9 @@ from .utils import (
     kernel_filter,
     solve_image,
     clear_solve_image_cache,
+    opt_fft_size,
+    wrap_boundary_liu,
+    bilateral_filter,
 )
 
 
@@ -209,6 +212,94 @@ def TV_denoising(I, weight, max_it):
     # Crop borders
     x = x[border[0]:I_h - border[0], border[1]:I_w - border[1]]
     return x
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Configurable denoiser dispatcher
+# ═════════════════════════════════════════════════════════════════════════════
+
+def _guided_filter(I, p, radius, eps):
+    """He et al. ECCV 2010 guided filter (self-guided)."""
+    from scipy.ndimage import uniform_filter
+    size = 2 * radius + 1
+    mean_I = uniform_filter(I, size)
+    mean_p = uniform_filter(p, size)
+    corr_Ip = uniform_filter(I * p, size)
+    var_I = uniform_filter(I * I, size) - mean_I * mean_I
+    a = (corr_Ip - mean_I * mean_p) / (var_I + eps)
+    b = mean_p - a * mean_I
+    mean_a = uniform_filter(a, size)
+    mean_b = uniform_filter(b, size)
+    return mean_a * I + mean_b
+
+
+def apply_denoiser(img, method, **params):
+    """
+    Apply a denoising method to a 2D image.
+
+    Parameters
+    ----------
+    img : 2D array
+    method : str — 'tv'|'nlm'|'bilateral'|'guided'|'bm3d'|'none' (or None)
+    **params : method-specific keyword arguments:
+        tv:        mu (0.01), gamma (0.1), max_it (10)
+        nlm:       patch_size (5), patch_distance (6), h (auto), sigma (auto)
+        bilateral: sigma_color (auto), sigma_spatial (1.0)
+        guided:    radius (5), eps (0.01)
+        bm3d:      sigma_psd (auto)
+
+    Returns
+    -------
+    denoised : 2D array
+    """
+    if method is None or method == 'none':
+        return img.copy()
+
+    if method == 'tv':
+        mu = params.get('mu', 0.01)
+        gamma = params.get('gamma', 0.1)
+        max_it = params.get('max_it', 10)
+        return TV_denoising(img, (mu, gamma), max_it)
+
+    elif method == 'nlm':
+        from skimage.restoration import denoise_nl_means, estimate_sigma
+        sigma_est = params.get('sigma', None)
+        if sigma_est is None:
+            sigma_est = float(estimate_sigma(img))
+        patch_size = params.get('patch_size', 5)
+        patch_distance = params.get('patch_distance', 6)
+        h = params.get('h', 0.8 * sigma_est)
+        return denoise_nl_means(
+            img, h=h, patch_size=patch_size,
+            patch_distance=patch_distance, fast_mode=True)
+
+    elif method == 'bilateral':
+        from skimage.restoration import denoise_bilateral, estimate_sigma
+        sigma_color = params.get('sigma_color', None)
+        if sigma_color is None:
+            sigma_color = float(estimate_sigma(img))
+        sigma_spatial = params.get('sigma_spatial', 1.0)
+        return denoise_bilateral(
+            img, sigma_color=sigma_color, sigma_spatial=sigma_spatial)
+
+    elif method == 'guided':
+        radius = params.get('radius', 5)
+        eps = params.get('eps', 0.01)
+        return _guided_filter(img, img, radius, eps)
+
+    elif method == 'bm3d':
+        try:
+            import bm3d as bm3d_lib
+        except ImportError:
+            raise ImportError("bm3d package required: pip install bm3d")
+        from skimage.restoration import estimate_sigma
+        sigma_psd = params.get('sigma_psd', None)
+        if sigma_psd is None:
+            sigma_psd = float(estimate_sigma(img))
+        return bm3d_lib.bm3d(img, sigma_psd=sigma_psd)
+
+    else:
+        raise ValueError(f"Unknown denoiser method: {method}")
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -426,8 +517,8 @@ def kernel_solver_L2(Y, b, k_size, M, lambda_val):
 # ═════════════════════════════════════════════════════════════════════════════
 
 def bid_rgtv_c2f_cg(Y_b, k_estimate_size, show_intermediate=False,
-                     tv_weight=(0.01, 0.1), tv_max_it=10,
-                     prefilter='none', prefilter_strength=None):
+                     preprocess='tv', preprocess_params=None,
+                     pre_kernel='none', pre_kernel_params=None):
     """
     Blind image deblurring from coarse to fine using RGTV.
 
@@ -438,12 +529,12 @@ def bid_rgtv_c2f_cg(Y_b, k_estimate_size, show_intermediate=False,
     Y_b : 2D array — blurred image (border-cropped)
     k_estimate_size : int — estimated kernel size (odd)
     show_intermediate : bool — (ignored in Python, no display)
-    tv_weight : tuple (mu, gamma) — TV denoising regularization. Default (0.01, 0.1).
-    tv_max_it : int — TV denoising iterations. Default 10.
-    prefilter : str — pre-denoising before kernel estimation:
-        'none', 'bilateral', 'guided', 'nlm', 'bm3d'. Default 'none'.
-    prefilter_strength : float or None — noise sigma for prefilter.
-        None = auto-estimate. Default None.
+    preprocess : str — denoiser before pyramid: 'tv'|'nlm'|'bilateral'|
+                 'guided'|'bm3d'|'none'. Default 'tv' (original behaviour).
+    preprocess_params : dict or None — kwargs for preprocess denoiser.
+    pre_kernel : str — denoiser before kernel estimation step:
+                 same options. Default 'none'.
+    pre_kernel_params : dict or None — kwargs for pre_kernel denoiser.
 
     Returns
     -------
@@ -458,12 +549,8 @@ def bid_rgtv_c2f_cg(Y_b, k_estimate_size, show_intermediate=False,
     k_size = np.zeros(level_num, dtype=int)
     image_size = np.zeros((level_num, 2), dtype=int)
 
-    # Pre-filter if requested (reduces noise before kernel estimation)
-    Y_input = apply_prefilter(Y_b, prefilter, prefilter_strength) \
-        if prefilter != 'none' else Y_b
-
-    # Level 0 (finest): TV denoising
-    image_pyramid[0] = TV_denoising(Y_input, tv_weight, tv_max_it)
+    # Level 0 (finest): configurable preprocessing denoiser
+    image_pyramid[0] = apply_denoiser(Y_b, preprocess, **(preprocess_params or {}))
 
     k_size[0] = k_estimate_size
     image_size[0] = image_pyramid[0].shape
@@ -535,12 +622,19 @@ def bid_rgtv_c2f_cg(Y_b, k_estimate_size, show_intermediate=False,
                 padsize[1]:w - padsize[1]
             ]
 
+            # Optional pre-kernel denoiser
+            if pre_kernel is not None and pre_kernel != 'none':
+                Y_for_kernel = apply_denoiser(
+                    Y_r_rgtv_cg, pre_kernel, **(pre_kernel_params or {}))
+            else:
+                Y_for_kernel = Y_r_rgtv_cg
+
             # Kernel estimation
             t_s = 0.1
             t_r = 0.3
-            M = informative_edge_mask_adaptive_mine(Y_r_rgtv_cg, t_s, t_r, 5)
+            M = informative_edge_mask_adaptive_mine(Y_for_kernel, t_s, t_r, 5)
             k_estimate = kernel_solver_L2(
-                Y_r_rgtv_cg, image_pyramid[level],
+                Y_for_kernel, image_pyramid[level],
                 int(k_size[level]), M, lambda_val)
 
             # Wavelet filtering at finer levels
@@ -664,7 +758,8 @@ def fast_deconv(yin, k, lambda_val, alpha, yout0=None):
 # Deconvolution_FHLP  (from Deconvolution_FHLP.m)
 # ═════════════════════════════════════════════════════════════════════════════
 
-def Deconvolution_FHLP(y, kernel, lambda_val=2e3, alpha=0.5):
+def Deconvolution_FHLP(y, kernel, lambda_val=2e3, alpha=0.5,
+                       edgetaper_iters=4):
     """
     Non-blind deconvolution using Fast Hyper-Laplacian Priors (NIPS 2009).
 
@@ -676,6 +771,8 @@ def Deconvolution_FHLP(y, kernel, lambda_val=2e3, alpha=0.5):
     kernel : 2D array — estimated blur kernel
     lambda_val : float — data-fidelity weight (default 2e3)
     alpha : float — hyper-Laplacian exponent (default 0.5)
+    edgetaper_iters : int — number of edgetaper passes (default 4,
+                     matching original Krishnan & Fergus code)
 
     Returns
     -------
@@ -692,7 +789,7 @@ def Deconvolution_FHLP(y, kernel, lambda_val=2e3, alpha=0.5):
     y_padded = np.pad(y, ks, mode='edge')
 
     # Edgetaper to handle circular boundary conditions
-    for _ in range(4):
+    for _ in range(edgetaper_iters):
         y_padded = edgetaper(y_padded, kernel)
 
     # Clear persistent LUT cache (matches MATLAB: clear persistent)
@@ -708,159 +805,191 @@ def Deconvolution_FHLP(y, kernel, lambda_val=2e3, alpha=0.5):
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# Pre-filtering for kernel estimation
+# deblurring_adm_aniso — TV-l2 non-blind deconv via ADM / Split Bregman
+# (from deblurring_adm_aniso.m, Pan et al.)
 # ═════════════════════════════════════════════════════════════════════════════
 
-def _guided_filter(I, p, radius, eps):
+def deblurring_adm_aniso(B, k, lambda_tv, alpha=1):
     """
-    Guided image filter (He et al., ECCV 2010).
-    Self-guided when I == p: edge-preserving smoothing.
-    """
-    from scipy.ndimage import uniform_filter
-    size = 2 * radius + 1
-    mean_I = uniform_filter(I, size=size, mode='nearest')
-    mean_p = uniform_filter(p, size=size, mode='nearest')
-    corr_Ip = uniform_filter(I * p, size=size, mode='nearest')
-    corr_II = uniform_filter(I * I, size=size, mode='nearest')
-
-    var_I = corr_II - mean_I * mean_I
-    cov_Ip = corr_Ip - mean_I * mean_p
-
-    a = cov_Ip / (var_I + eps)
-    b = mean_p - a * mean_I
-
-    mean_a = uniform_filter(a, size=size, mode='nearest')
-    mean_b = uniform_filter(b, size=size, mode='nearest')
-    return mean_a * I + mean_b
-
-
-def apply_prefilter(img, method, sigma_est=None):
-    """
-    Apply pre-denoising filter before kernel estimation.
+    TV-l2 deblurring via ADM / Split Bregman with anisotropic TV.
 
     Parameters
     ----------
-    img : 2D array [0,1] — input blurred image
-    method : str — 'bilateral', 'guided', 'nlm', 'bm3d'
-    sigma_est : float or None — estimated noise std dev.
-                If None, auto-estimated from the image.
+    B          : (m, n) blurred image (single channel, possibly boundary-wrapped)
+    k          : blur kernel (odd-sized)
+    lambda_tv  : regularisation weight
+    alpha      : norm exponent (1 = aniso TV with soft threshold)
 
     Returns
     -------
-    filtered : 2D array — denoised image
+    I : (m, n) deblurred image
     """
-    if method == 'none' or method is None:
-        return img
+    beta = 1.0 / lambda_tv
+    beta_min = 0.001
 
-    if sigma_est is None:
-        from skimage.restoration import estimate_sigma
-        sigma_est = estimate_sigma(img)
-        if sigma_est < 1e-6:
-            return img
+    m, n = B.shape
+    I = B.copy()
 
-    if method == 'bilateral':
-        from skimage.restoration import denoise_bilateral
-        return denoise_bilateral(
-            img, sigma_color=sigma_est, sigma_spatial=3,
-            channel_axis=None)
+    Nomin1, Denom1, Denom2 = _computeDenominator(B, k)
 
-    elif method == 'nlm':
-        from skimage.restoration import denoise_nl_means
-        return denoise_nl_means(
-            img, h=0.8 * sigma_est, fast_mode=True,
-            patch_size=5, patch_distance=13, sigma=sigma_est,
-            channel_axis=None)
+    Ix = np.concatenate([np.diff(I, n=1, axis=1),
+                         I[:, 0:1] - I[:, -1:]], axis=1)
+    Iy = np.concatenate([np.diff(I, n=1, axis=0),
+                         I[0:1, :] - I[-1:, :]], axis=0)
 
-    elif method == 'guided':
-        return _guided_filter(img, img, radius=4, eps=sigma_est ** 2)
+    while beta > beta_min:
+        gamma = 1.0 / (2.0 * beta)
+        Denom = Denom1 + gamma * Denom2
 
-    elif method == 'bm3d':
-        try:
-            import bm3d as bm3d_lib
-            return bm3d_lib.bm3d(img, sigma_psd=sigma_est)
-        except ImportError:
-            raise ImportError(
-                "bm3d package not installed. Install with: pip install bm3d")
+        if alpha == 1:
+            Wx = np.maximum(np.abs(Ix) - beta * lambda_tv, 0.0) * np.sign(Ix)
+            Wy = np.maximum(np.abs(Iy) - beta * lambda_tv, 0.0) * np.sign(Iy)
+        else:
+            raise NotImplementedError(
+                f"deblurring_adm_aniso: alpha={alpha} not implemented; "
+                f"only alpha=1 supported"
+            )
 
-    else:
-        raise ValueError(f"Unknown prefilter method: {method}")
+        Wxx = np.concatenate([Wx[:, -1:] - Wx[:, 0:1],
+                              -np.diff(Wx, n=1, axis=1)], axis=1)
+        Wxx = Wxx + np.concatenate([Wy[-1:, :] - Wy[0:1, :],
+                                     -np.diff(Wy, n=1, axis=0)], axis=0)
+
+        Fyout = (Nomin1 + gamma * fft2(Wxx)) / Denom
+        I = np.real(ifft2(Fyout))
+
+        Ix = np.concatenate([np.diff(I, n=1, axis=1),
+                             I[:, 0:1] - I[:, -1:]], axis=1)
+        Iy = np.concatenate([np.diff(I, n=1, axis=0),
+                             I[0:1, :] - I[-1:, :]], axis=0)
+
+        beta = beta / 2.0
+
+    return I
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# Unified non-blind deconvolution dispatcher
+# L0Restoration — non-blind deconv with L0 gradient prior
+# (from L0Restoration.m, Xu et al. SIGGRAPH Asia 2013)
 # ═════════════════════════════════════════════════════════════════════════════
 
-def non_blind_deconv(y, kernel, method='fhlp', **params):
+def L0Restoration(Im, kernel, lambda_grad, kappa=2.0):
     """
-    Non-blind deconvolution with various methods.
+    Image restoration with L0 gradient prior.
 
-    All methods apply edge-padding + edgetaper preprocessing
-    to reduce circular boundary artifacts.
+    Solves:  S* = argmin_S  ||S*k - B||^2 + lambda * |nabla S|_0
 
     Parameters
     ----------
-    y : 2D array — blurred image
-    kernel : 2D array — estimated blur kernel
-    method : str — one of:
-        'fhlp'   — Hyper-Laplacian prior (Krishnan & Fergus 2009).
-                   Best for clean/low-noise images.
-        'wiener' — Wiener filter. Set balance higher for noisy images.
-        'rl'     — Richardson-Lucy. Natural Poisson noise model.
-                   Good for Poisson + moderate Gaussian noise.
-        'tv'     — Total Variation deconv (FHLP with alpha=1.0).
-                   More robust to strong noise than alpha=0.5.
-    **params : method-specific keyword arguments:
-        fhlp:   lambda_val (float, default 2e3), alpha (float, default 0.5)
-        wiener: balance (float, default 1e-3; higher = more regularization)
-        rl:     num_iter (int, default 30)
-        tv:     lambda_val (float, default 500)
+    Im          : (H, W) blurred image (original size, NOT wrapped)
+    kernel      : (kh, kw) blur kernel
+    lambda_grad : weight for L0 gradient prior
+    kappa       : ADM update ratio (default 2.0)
 
     Returns
     -------
-    x : 2D array — deblurred image (same size as y)
+    S : (H, W) restored image cropped to original size
     """
-    kernel = kernel.copy().astype(np.float64)
-    kernel[kernel == 0] = 1e-10
-    kernel = kernel / kernel.sum()
+    H_orig, W_orig = Im.shape[0], Im.shape[1]
 
-    ks = (kernel.shape[0] - 1) // 2
+    target_size = opt_fft_size(
+        np.array([H_orig, W_orig]) + np.array(kernel.shape[:2]) - 1
+    )
+    Im = wrap_boundary_liu(Im, tuple(target_size))
 
-    # Pad with replicate boundaries
-    y_padded = np.pad(y, ks, mode='edge')
+    S = Im.copy()
+    betamax = 1e5
 
-    # Edgetaper to reduce circular boundary artifacts
-    for _ in range(4):
-        y_padded = edgetaper(y_padded, kernel)
+    fx = np.array([[1, -1]], dtype=np.float64)
+    fy = np.array([[1], [-1]], dtype=np.float64)
 
-    if method == 'fhlp':
-        lambda_val = params.get('lambda_val', 2e3)
-        alpha = params.get('alpha', 0.5)
-        clear_solve_image_cache()
-        result = fast_deconv(y_padded, kernel, lambda_val, alpha)
+    N, M = Im.shape[:2]
+    sizeI2D = (N, M)
 
-    elif method == 'wiener':
-        from skimage.restoration import wiener
-        balance = params.get('balance', 1e-3)
-        result = wiener(y_padded, kernel, balance)
+    otfFx = psf2otf(fx, sizeI2D)
+    otfFy = psf2otf(fy, sizeI2D)
 
-    elif method == 'rl':
-        from skimage.restoration import richardson_lucy
-        num_iter = params.get('num_iter', 30)
-        # RL requires non-negative input
-        y_padded = np.clip(y_padded, 0, None)
-        result = richardson_lucy(y_padded, kernel,
-                                 num_iter=num_iter, clip=False)
+    KER = psf2otf(kernel, sizeI2D)
+    Den_KER = np.abs(KER) ** 2
 
-    elif method == 'tv':
-        lambda_val = params.get('lambda_val', 500.0)
-        clear_solve_image_cache()
-        result = fast_deconv(y_padded, kernel, lambda_val, 1.0)
+    Denormin2 = np.abs(otfFx) ** 2 + np.abs(otfFy) ** 2
 
-    else:
-        raise ValueError(
-            f"Unknown non-blind method: '{method}'. "
-            f"Choose from: 'fhlp', 'wiener', 'rl', 'tv'")
+    Normin1 = np.conj(KER) * fft2(S)
 
-    # Crop padding
-    result = result[ks:result.shape[0] - ks, ks:result.shape[1] - ks]
+    beta = 2 * lambda_grad
+    while beta < betamax:
+        Denormin = Den_KER + beta * Denormin2
+
+        h = np.concatenate([np.diff(S, n=1, axis=1),
+                            S[:, 0:1] - S[:, -1:]], axis=1)
+        v = np.concatenate([np.diff(S, n=1, axis=0),
+                            S[0:1, :] - S[-1:, :]], axis=0)
+
+        t = (h ** 2 + v ** 2) < lambda_grad / beta
+        h[t] = 0.0
+        v[t] = 0.0
+
+        Normin2_val = np.concatenate([h[:, -1:] - h[:, 0:1],
+                                      -np.diff(h, n=1, axis=1)], axis=1)
+        Normin2_val = Normin2_val + np.concatenate(
+            [v[-1:, :] - v[0:1, :],
+             -np.diff(v, n=1, axis=0)], axis=0)
+
+        FS = (Normin1 + beta * fft2(Normin2_val)) / Denormin
+        S = np.real(ifft2(FS))
+        beta = beta * kappa
+
+    S = S[:H_orig, :W_orig]
+    return S
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# ringing_artifacts_removal — combined TV + L0 + bilateral blend
+# (from ringing_artfcts_removal.m, Pan et al.)
+# ═════════════════════════════════════════════════════════════════════════════
+
+def ringing_artifacts_removal(y, kernel, lambda_tv=2e-3, lambda_l0=2e-3,
+                              weight_ring=0.5):
+    """
+    Remove ringing artifacts in non-blind deconvolution.
+
+    Combines TV deconvolution (wrap_boundary_liu + ADM) and L0 deconvolution,
+    using a bilateral filter on the difference to suppress ringing while
+    preserving edges.
+
+    Parameters
+    ----------
+    y           : (H, W) blurred image
+    kernel      : blur kernel
+    lambda_tv   : weight for TV deconvolution
+    lambda_l0   : weight for L0 deconvolution
+    weight_ring : ringing suppression weight (0 = TV only)
+
+    Returns
+    -------
+    result : (H, W) deblurred image
+    """
+    H, W = y.shape[:2]
+
+    target_size = opt_fft_size(
+        np.array([H, W]) + np.array(kernel.shape[:2]) - 1
+    )
+    y_pad = wrap_boundary_liu(y, tuple(target_size))
+
+    # TV deblurring
+    Latent_tv = deblurring_adm_aniso(y_pad, kernel, lambda_tv, 1)
+    Latent_tv = Latent_tv[:H, :W]
+
+    if weight_ring == 0:
+        return Latent_tv
+
+    # L0 deblurring (L0Restoration wraps internally)
+    Latent_l0 = L0Restoration(y_pad, kernel, lambda_l0, 2)
+    Latent_l0 = Latent_l0[:H, :W]
+
+    # Bilateral filter on the difference
+    diff_img = Latent_tv - Latent_l0
+    bf_diff = bilateral_filter(diff_img, 3, 0.1)
+
+    result = Latent_tv - weight_ring * bf_diff
     return result
