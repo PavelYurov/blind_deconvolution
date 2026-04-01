@@ -1,0 +1,482 @@
+[
+    {
+        "image_path": "images\\new_datasete\\distorted\\cameraman_linear_gaussian.png",
+        "x": 0.6484202088366722,
+        "y": 0.13343662575742032
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\boy_spiral_gaussian.png",
+        "x": 0.5102236115173437,
+        "y": 0.009892990761999343
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\boy_spiral_poisson.png",
+        "x": 0.5102236115173437,
+        "y": 0.03418582939595477
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\boy_libra_pink.png",
+        "x": 0.4410822399715344,
+        "y": 0.025811262987275374
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\childs_w_spiral_gauss.png",
+        "x": 0.39767233626258186,
+        "y": 0.024553864385237156
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\drawing_s_spiral_.png",
+        "x": 0.29951333419027953,
+        "y": 0.0
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\airplane_heliod_poisson.png",
+        "x": 0.8855307365158887,
+        "y": 0.06273027896424188
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\clock_defocus_gauss.png",
+        "x": 0.6238202970597831,
+        "y": 0.0053297414822566225
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\flags_defocusmotion_gauss.png",
+        "x": 0.7791724959916966,
+        "y": 0.007386241506210478
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\lenna_motion_poisson.png",
+        "x": 0.7075008921356557,
+        "y": 0.03143548923666073
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\monarch_motion_poisson.png",
+        "x": 0.8115326414617839,
+        "y": 0.031662461050221746
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\street_dendric_gauss.png",
+        "x": 0.6576681792438007,
+        "y": 0.06496956961894718
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\temple_dendric_gauss.png",
+        "x": 0.48344925449276294,
+        "y": 0.08910944131881127
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\cameraman_comet_poisson.png",
+        "x": 0.6000701486822313,
+        "y": 0.0882259107707829
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\boy_comet_pink.png",
+        "x": 0.7145828500442541,
+        "y": 0.049229929653893945
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\childs_pacman_brown.png",
+        "x": 0.5408416947937,
+        "y": 0.06133937147603452
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\drawing_dendric_brown.png",
+        "x": 0.3849327227092736,
+        "y": 0.03378089474194945
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\drawing_dendric_pink.png",
+        "x": 0.3849327227092736,
+        "y": 0.033123012986513045
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\airplane_dendric_impulse.png",
+        "x": 0.9035455044771338,
+        "y": 0.11098896601349895
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\clock_spiral_poisson.png",
+        "x": 0.5368984898600538,
+        "y": 0.022006955232248715
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\flags_spiral_poisson.png",
+        "x": 0.6384340944381485,
+        "y": 0.0330729874275959
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\lenna_libra_gauss.png",
+        "x": 0.5380679869561511,
+        "y": 0.10577363150791375
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\monarch_s_spiral_gauss.png",
+        "x": 0.552565595509001,
+        "y": 0.13453761785754398
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\street_heliod_poisson.png",
+        "x": 0.6805556788337819,
+        "y": 0.08194302187354152
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\temple_heliod_pink.png",
+        "x": 0.46181094992816657,
+        "y": 0.008030597626432046
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\childs_s_spiral_brown.png",
+        "x": 0.3014794152609494,
+        "y": 0.03759978985614887
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\childs_thick_motion_gauss.png",
+        "x": 0.7863079783428393,
+        "y": 0.10016868498689835
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\drawing_defocusmotion_impulse.png",
+        "x": 0.6432158155466815,
+        "y": 0.10598365760935957
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\drawing_pacman_gauss.png",
+        "x": 0.46165124471042573,
+        "y": 0.060600922087225506
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\airplane_pacman_.png",
+        "x": 0.9039840676368488,
+        "y": 0.0
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\airplane_s_spiral_gauss.png",
+        "x": 0.8661420561279779,
+        "y": 0.13827814599935473
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\clock_thick_motion_gauss.png",
+        "x": 0.8081059391264221,
+        "y": 0.07235292893695466
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\clock_s_spiral_pink.png",
+        "x": 0.4195168332775861,
+        "y": 0.11772955766986004
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\flags_heliod_brown.png",
+        "x": 0.6095394466338744,
+        "y": 0.03265031890696868
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\flags_big_spiral_.png",
+        "x": 0.6141689920378651,
+        "y": 0.0
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\lenna_dendric_.png",
+        "x": 0.5463349758099938,
+        "y": 0.0
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\lenna_linear_brown.png",
+        "x": 0.7075008921356557,
+        "y": 0.010043346869724523
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\monarch_small_pacman_pink.png",
+        "x": 0.639902955374124,
+        "y": 0.11601584500031836
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\monarch_big_defocus_gauss.png",
+        "x": 0.7480592044475723,
+        "y": 0.15269718921746955
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\street_z_spiral_gauss.png",
+        "x": 0.636896625223609,
+        "y": 0.14753222224398238
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\street_sigma_impulse.png",
+        "x": 0.7846806045116724,
+        "y": 0.13829111064188837
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\temple_sigma_impulse.png",
+        "x": 0.6668856790530422,
+        "y": 0.09049917699302523
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\temple_thick_motion_poisson.png",
+        "x": 0.7649205180749651,
+        "y": 0.05576362256126044
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\cameraman_heliod_impulse.png",
+        "x": 0.5068208656585997,
+        "y": 0.12933817146362248
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\cameraman_egg_gauss.png",
+        "x": 0.4419199893296919,
+        "y": 0.1055941751394065
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\drawing_egg_gauss.png",
+        "x": 0.2852423346445675,
+        "y": 0.12747421434654826
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\clock_egg_pink.png",
+        "x": 0.39548947266946366,
+        "y": 0.07056816156513263
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\cameraman_z_spiral_pink.png",
+        "x": 0.4737846791058011,
+        "y": 0.10506274970511009
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\boy_z_spiral_impulse.png",
+        "x": 0.4175087738413183,
+        "y": 0.04751130952502136
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\boy_w_spiral_brown.png",
+        "x": 0.47320586891449673,
+        "y": 0.019752670587822985
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\monarch_w_spiral_brown.png",
+        "x": 0.6126503866389527,
+        "y": 0.14272159195811612
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\barn_w_spiral_gauss.png",
+        "x": 0.3309946481189864,
+        "y": 0.0487952449823455
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\barn_small_egg_poisson.png",
+        "x": 0.2883518425499307,
+        "y": 0.026590740081471387
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\barn_z_spiral_pink.png",
+        "x": 0.287334099473456,
+        "y": 0.005549824490844957
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\bridge_z_spiral_brown.png",
+        "x": 0.3316399832792991,
+        "y": 0.009219823177708308
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\bridge_small_egg_.png",
+        "x": 0.3441400957586946,
+        "y": 0.0
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\img3_groundtruth_img_libra_gauss.png",
+        "x": 0.37871730861910763,
+        "y": 0.07842604802891151
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\img3_groundtruth_img_triangle_impulse.png",
+        "x": 0.3914526096509898,
+        "y": 0.05607612216239505
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\img15_groundtruth_img_triangle_poisson.png",
+        "x": 0.5225928185983072,
+        "y": 0.07719515629311136
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\img15_groundtruth_img_moon_poisson.png",
+        "x": 0.5074445222241276,
+        "y": 0.04818731549880079
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\img15_groundtruth_img_hook_pink.png",
+        "x": 0.5318218749362155,
+        "y": 0.0518575333821259
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\img16_groundtruth_img_hook_defocus_.png",
+        "x": 0.24264713905074112,
+        "y": 0.0
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\img16_groundtruth_img_linear_gauss.png",
+        "x": 0.4531422157381128,
+        "y": 0.0022457292553792474
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\img18_groundtruth_img_defocusmotion_gauss.png",
+        "x": 0.4382458521967587,
+        "y": 0.009695371526643404
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\img18_groundtruth_img_sigma_impulse.png",
+        "x": 0.4848771682805066,
+        "y": 0.057554800001136
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\img24_groundtruth_img_sigma_.png",
+        "x": 0.4570923900141981,
+        "y": 0.0
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\img24_groundtruth_img_defocus_gauss.png",
+        "x": 0.6228986859173501,
+        "y": 0.0
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\img40_groundtruth_img_defocus_gauss.png",
+        "x": 0.6210842890341325,
+        "y": 0.05225494627900462
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\img40_groundtruth_img_triangle_pink.png",
+        "x": 0.2511069750492452,
+        "y": 0.015163412434177903
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\manmade_01_hook_defocus_.png",
+        "x": 0.12696054006872565,
+        "y": 0.0
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\manmade_01_w_spiral_gauss.png",
+        "x": 0.12593346937277303,
+        "y": 0.027437072283159752
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\natural_02_w_spiral_.png",
+        "x": 0.48680347184939937,
+        "y": 0.0
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\natural_s_spiral_impulse.png",
+        "x": 0.4242134210493514,
+        "y": 0.03420018753537124
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\obama_s_spiral_impulse.png",
+        "x": 0.4793378206478696,
+        "y": 0.03705393329413359
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\obama_moon_gauss.png",
+        "x": 0.4671481283144669,
+        "y": 0.14208240365238578
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\saturated_moon_gauss.png",
+        "x": 0.22034845050056245,
+        "y": 0.09013227331648149
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\saturated_02_thick_motion_poisson.png",
+        "x": 0.5645502073459865,
+        "y": 0.0040746135221993995
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\saturated_img6_linear_poisson.png",
+        "x": 0.6955255632076661,
+        "y": 0.0029684483675652684
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\saturated_img6_libra_impulse.png",
+        "x": 0.5117716900807575,
+        "y": 0.017335897490939056
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\text_libra_impulse.png",
+        "x": 0.3691128404219836,
+        "y": 0.014426045880192973
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\text_s_spiral_pink.png",
+        "x": 0.37274863834931327,
+        "y": 0.007424726595125775
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\text_s_spiral_pink.png",
+        "x": 0.37274863834931327,
+        "y": 0.01509241255903726
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\img40_groundtruth_img_triangle_pink.png",
+        "x": 0.2511069750492452,
+        "y": 0.03283554371738859
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\barn_z_spiral_pink.png",
+        "x": 0.287334099473456,
+        "y": 0.012341125146985876
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\cameraman_z_spiral_pink.png",
+        "x": 0.4737846791058011,
+        "y": 0.1789289443407472
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\monarch_small_pacman_pink.png",
+        "x": 0.639902955374124,
+        "y": 0.23486801662682905
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\temple_heliod_pink.png",
+        "x": 0.46181094992816657,
+        "y": 0.025228346564605042
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\boy_comet_pink.png",
+        "x": 0.7145828500442541,
+        "y": 0.08856334532980004
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\bridge_z_spiral_brown.png",
+        "x": 0.3316399832792991,
+        "y": 0.03299722659840881
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\lenna_linear_brown.png",
+        "x": 0.7075008921356557,
+        "y": 0.2296526998373971
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\flags_heliod_brown.png",
+        "x": 0.6095394466338744,
+        "y": 0.23134248015349695
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\childs_pacman_brown.png",
+        "x": 0.5408416947937,
+        "y": 0.1682487313429742
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\monarch_w_spiral_brown.png",
+        "x": 0.6126503866389527,
+        "y": 0.11631959332952774
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\lenna_linear_brown_1.png",
+        "x": 0.7075008921356557,
+        "y": 0.13646944458388732
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\lenna_linear_brown.png",
+        "x": 0.7075008921356557,
+        "y": 0.14550410008625392
+    },
+    {
+        "image_path": "images\\new_datasete\\distorted\\flags_heliod_brown.png",
+        "x": 0.6095394466338744,
+        "y": 0.15870548938418144
+    }
+]

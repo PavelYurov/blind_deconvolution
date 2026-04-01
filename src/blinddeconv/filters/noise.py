@@ -384,7 +384,7 @@ class Pink_Noise(FilterBase):
 
     def filter(self, img):
         """Применяет розовый шум к изображению."""
-        noise = pink_noise_2d(img.shape, 2) * self.noise_level
+        noise = pink_noise_2d(img.shape, 1) * self.noise_level
         res = np.clip(img + noise, 0.0, 255.0).astype(np.int16)
         return res
         
@@ -417,7 +417,7 @@ class Brown_Noise(FilterBase):
 
     def filter(self, img):
         """Применяет коричневый шум к изображению."""
-        noise = pink_noise_2d(img.shape, 4) * self.noise_level
+        noise = pink_noise_2d(img.shape, 2) * self.noise_level
         res = np.clip(img + noise, 0.0, 255.0).astype(np.int16)
         return res
         

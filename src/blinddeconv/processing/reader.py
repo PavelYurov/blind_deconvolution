@@ -110,18 +110,19 @@ class ModuleReader:
         img_obj = Image(original_image_path, color)
         img_obj.set_blurred(blurred_image_path)
         img_obj.set_current_filter(filter_description)
+        # ing_obj.add_fil
 
-        psnr_blured, ssim_blured = calculate_metrics(original, blurred)
+        psnr_blured, ssim_blured = calculate_metrics(original, blurred, data_range=1.0)
 
-        img_obj.add_blurred_PSNR(psnr_blured,blurred_image_path)
-        img_obj.add_blurred_SSIM(ssim_blured,blurred_image_path)
+        img_obj.add_blurred_PSNR(psnr_blured,str(blurred_image_path))
+        img_obj.add_blurred_SSIM(ssim_blured,str(blurred_image_path))
 
         
         if original_kernel_path:
             if not os.path.exists(original_kernel_path):
                 print(f"Kernel not found: {original_kernel_path}")
             else:
-                img_obj.add_original_kernel(original_kernel_path, blurred_image_path)
+                img_obj.add_original_kernel(str(original_kernel_path), str(blurred_image_path))
         
         self.processing.images = np.append(self.processing.images, img_obj)
         return img_obj

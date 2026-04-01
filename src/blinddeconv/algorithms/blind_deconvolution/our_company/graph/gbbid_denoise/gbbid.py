@@ -116,6 +116,35 @@ class GBBID(DeconvolutionAlgorithm):
     impulse_params : dict or None — kwargs for impulse preprocessing.
                       Defaults: {'density_threshold': 0.005, 'max_window': 7,
                                  'outlier_window': 5, 'outlier_threshold': 0.15}
+    screenot_preprocess : str — ScreeNOT SVD thresholding denoising:
+                      'auto'  — apply patch-based ScreeNOT (default)
+                      'none'  — disabled
+    screenot_params : dict or None — kwargs for ScreeNOT.
+                      Defaults: {'k': 10, 'strategy': 'i', 'mode': 'full'}
+                      mode='full': treat image as matrix (no artifacts).
+                      mode='patch': patch-based (needs patch_size, stride).
+    act_preprocess : str — ACT curvelet denoising (Eslahi & Aghagolzadeh TIP 2016):
+                      'auto'  — apply ACT (requires curvelops)
+                      'none'  — disabled (default)
+                      Cannot be used together with screenot_preprocess='auto'.
+    act_params : dict or None — kwargs for ACT.
+                      Defaults: {'noise_var': None, 'threshold_setting': 's'}
+                      noise_var=None: blind MAD estimation.
+                      noise_var=float: known AWGN variance σ².
+                      noise_var=ndarray: FFT-PSD (DC at [0,0], scale σ²×N).
+                      threshold_setting: 's' (soft), 'h' (hard), 'ksigma'.
+                      If noise_var is None AND noise_estimation is enabled,
+                      σ² from Chen/Pyatykh is automatically used instead
+                      of blind MAD (much more accurate for correlated noise).
+    pre_nonblind : str — denoiser applied to y BEFORE non-blind step:
+                      'bm3d'|'nlm'|'bilateral'|'guided'|'tv'|'act'|'none'.
+                      Default 'none'.  For correlated noise, 'bm3d' is
+                      recommended — non-blind methods assume white noise
+                      and produce color artifacts otherwise.
+    pre_nonblind_params : dict or None — kwargs for pre_nonblind denoiser.
+                      bm3d: {'sigma_psd': auto from noise_estimation}
+                      act:  {'noise_var': auto, 'threshold_setting': 's'}
+                      Other: same as preprocess params.
     """
 
     def __init__(
@@ -137,6 +166,12 @@ class GBBID(DeconvolutionAlgorithm):
         noise_preprocess_params: dict = None,
         impulse_preprocess: str = 'auto',
         impulse_params: dict = None,
+        screenot_preprocess: str = 'none',
+        screenot_params: dict = None,
+        act_preprocess: str = 'none',
+        act_params: dict = None,
+        pre_nonblind: str = 'none',
+        pre_nonblind_params: dict = None,
     ):
         super().__init__(name='GBBID')
 
@@ -157,6 +192,12 @@ class GBBID(DeconvolutionAlgorithm):
         self.noise_preprocess_params = noise_preprocess_params
         self.impulse_preprocess = impulse_preprocess
         self.impulse_params = impulse_params
+        self.screenot_preprocess = screenot_preprocess
+        self.screenot_params = screenot_params
+        self.act_preprocess = act_preprocess
+        self.act_params = act_params
+        self.pre_nonblind = pre_nonblind
+        self.pre_nonblind_params = pre_nonblind_params
 
         self.history: Dict[str, list] = {'kernel_diff': []}
         self.hyperparams: Dict[str, Any] = {}
@@ -208,6 +249,71 @@ class GBBID(DeconvolutionAlgorithm):
                 else:
                     y = yg.copy()
 
+        # ── 2¾. ScreeNOT SVD thresholding denoising ─────────────────
+        screenot_info = None
+        if self.screenot_preprocess == 'auto':
+            from .screenot import screenot_denoise
+            sp = self.screenot_params or {}
+            yg, screenot_info = screenot_denoise(
+                yg,
+                k=sp.get('k', 10),
+                strategy=sp.get('strategy', 'i'),
+                mode=sp.get('mode', 'full'),
+                patch_size=sp.get('patch_size', 8),
+                stride=sp.get('stride', 3),
+            )
+            # Also denoise the full image for non-blind step
+            if y.ndim == 3:
+                for ch in range(y.shape[2]):
+                    y[:, :, ch], _ = screenot_denoise(
+                        y[:, :, ch],
+                        k=sp.get('k', 10),
+                        strategy=sp.get('strategy', 'i'),
+                        mode=sp.get('mode', 'full'),
+                        patch_size=sp.get('patch_size', 8),
+                        stride=sp.get('stride', 3),
+                    )
+            else:
+                y = yg.copy()
+
+        # ── 2¾a. Noise estimation (moved BEFORE ACT) ────────────────
+        #    So that σ² is available for ACT and pre_nonblind.
+        noise_info = None
+        if self.noise_estimation != 'none':
+            noise_info = self._estimate_noise(yg)
+
+        # ── 2¾b. ACT curvelet denoising ──────────────────────────────
+        act_info = None
+        if self.act_preprocess == 'auto':
+            if self.screenot_preprocess == 'auto':
+                raise ValueError(
+                    "screenot_preprocess and act_preprocess cannot both "
+                    "be 'auto'. Choose one denoiser.")
+            from .act_denoise import act_denoise
+            ap = self.act_params or {}
+            # If user did not specify noise_var AND we have a noise
+            # estimate, use σ² from Chen/Pyatykh instead of blind MAD.
+            # This is critical for correlated noise where MAD on the
+            # finest curvelet scale severely underestimates total σ.
+            act_noise_var = ap.get('noise_var', None)
+            if act_noise_var is None and noise_info is not None:
+                act_noise_var = noise_info.get('sigma_norm', 0.0) ** 2
+            yg, act_info = act_denoise(
+                yg,
+                noise_var=act_noise_var,
+                threshold_setting=ap.get('threshold_setting', 's'),
+            )
+            # Also denoise the full image for non-blind step
+            if y.ndim == 3:
+                for ch in range(y.shape[2]):
+                    y[:, :, ch], _ = act_denoise(
+                        y[:, :, ch],
+                        noise_var=act_noise_var,
+                        threshold_setting=ap.get('threshold_setting', 's'),
+                    )
+            else:
+                y = yg.copy()
+
         # ── 3. Crop borders ─────────────────────────────────────────────
         # MATLAB: Y_b(border+1:end-border, border+1:end-border)
         b = self.border
@@ -224,11 +330,6 @@ class GBBID(DeconvolutionAlgorithm):
                 yg_cropped = yg[b:-b, b:-b]
             else:
                 yg_cropped = yg
-
-        # ── 3½. Noise estimation ────────────────────────────────────
-        noise_info = None
-        if self.noise_estimation != 'none':
-            noise_info = self._estimate_noise(yg)
 
         # ── Effective parameters (auto-adapted or user-specified) ────
         eff_pp = self.preprocess_params
@@ -248,6 +349,13 @@ class GBBID(DeconvolutionAlgorithm):
             pre_kernel=self.pre_kernel,
             pre_kernel_params=eff_pkp,
         )
+
+        # ── 4½. Pre-nonblind denoising ───────────────────────────────
+        #    Non-blind methods (FHLP, TV, L0) assume white noise.
+        #    Correlated noise (1/f, 1/f²) causes color artifacts.
+        #    Applying a denoiser to y before non-blind suppresses this.
+        if self.pre_nonblind not in (None, 'none'):
+            y = self._apply_pre_nonblind(y, noise_info)
 
         # ── 5. Non-blind restoration ──────────────────────────────────
         nb = self.nonblind_method
@@ -283,6 +391,14 @@ class GBBID(DeconvolutionAlgorithm):
             'impulse_preprocess': self.impulse_preprocess,
             'impulse_info': {k: v for k, v in (impulse_info or {}).items()
                             if k != 'impulse_mask'} if impulse_info else None,
+            'screenot_preprocess': self.screenot_preprocess,
+            'screenot_params': self.screenot_params,
+            'screenot_info': screenot_info,
+            'act_preprocess': self.act_preprocess,
+            'act_params': self.act_params,
+            'act_info': act_info,
+            'pre_nonblind': self.pre_nonblind,
+            'pre_nonblind_params': self.pre_nonblind_params,
             'noise_info': noise_info,
             'psd_info': {k: v for k, v in (psd_info or {}).items()
                          if k != 'psd_2d'} if psd_info else None,
@@ -406,6 +522,70 @@ class GBBID(DeconvolutionAlgorithm):
 
         return yg_out, psd_info
 
+    # ── Pre-nonblind denoising ────────────────────────────────────────
+    def _apply_pre_nonblind(self, y, noise_info):
+        """Denoise y before non-blind deconvolution.
+
+        Non-blind methods (FHLP / TV-ADM / L0 / ringing_removal) all
+        assume white Gaussian noise.  Correlated noise (1/f, 1/f²)
+        violates this assumption and causes structured artifacts
+        ('wrong colors', ringing amplification).
+
+        Applying a denoiser to y here suppresses the correlated noise
+        component, letting the non-blind step work correctly.
+
+        Parameters
+        ----------
+        y : ndarray, H×W or H×W×C, float64 [0,1]
+        noise_info : dict or None — from _estimate_noise()
+
+        Returns
+        -------
+        y_denoised : ndarray, same shape as y
+        """
+        method = self.pre_nonblind
+        params = dict(self.pre_nonblind_params or {})
+
+        # Auto-fill sigma from noise estimation if available
+        sigma = None
+        if noise_info is not None:
+            sigma = noise_info.get('sigma_norm', None)
+
+        if method == 'act':
+            from .act_denoise import act_denoise
+            nv = params.get('noise_var', None)
+            if nv is None and sigma is not None:
+                nv = sigma ** 2
+            ts = params.get('threshold_setting', 's')
+            if y.ndim == 3:
+                for ch in range(y.shape[2]):
+                    y[:, :, ch], _ = act_denoise(
+                        y[:, :, ch], noise_var=nv,
+                        threshold_setting=ts)
+            else:
+                y, _ = act_denoise(y, noise_var=nv,
+                                   threshold_setting=ts)
+            return y
+
+        # For standard denoisers (bm3d, nlm, bilateral, guided, tv),
+        # auto-fill sigma_psd / h / sigma_color from noise estimation.
+        if method == 'bm3d' and 'sigma_psd' not in params and sigma is not None:
+            params['sigma_psd'] = sigma
+        elif method == 'nlm' and 'h' not in params and sigma is not None:
+            params['h'] = 0.8 * sigma
+        elif method == 'bilateral' and 'sigma_color' not in params and sigma is not None:
+            params['sigma_color'] = sigma
+        elif method == 'guided' and 'eps' not in params and sigma is not None:
+            params['eps'] = sigma ** 2 * 4
+
+        if y.ndim == 3:
+            for ch in range(y.shape[2]):
+                y[:, :, ch] = apply_denoiser(
+                    y[:, :, ch], method, **params)
+        else:
+            y = apply_denoiser(y, method, **params)
+        return y
+
     # ── Noise estimation helpers ─────────────────────────────────────────
     def _estimate_noise(self, yg):
         """Estimate noise level from grayscale image (float64 [0, 1])."""
@@ -484,6 +664,12 @@ class GBBID(DeconvolutionAlgorithm):
             ('noise_preprocess_params', self.noise_preprocess_params),
             ('impulse_preprocess', self.impulse_preprocess),
             ('impulse_params', self.impulse_params),
+            ('screenot_preprocess', self.screenot_preprocess),
+            ('screenot_params', self.screenot_params),
+            ('act_preprocess', self.act_preprocess),
+            ('act_params', self.act_params),
+            ('pre_nonblind', self.pre_nonblind),
+            ('pre_nonblind_params', self.pre_nonblind_params),
         ]
 
     def change_param(self, params: Dict[str, Any]) -> None:

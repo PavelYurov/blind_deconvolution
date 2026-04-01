@@ -173,7 +173,7 @@ class ModuleDisplay:
             pass
 
     def _crop_kernel_image(self, kernel_image: np.ndarray, padding: int = 10) -> np.ndarray:
-        """Обрезает изображение ядра до его содержимого с добавлением отступа."""
+        """Обрезает изображение ядра симметрично вокруг центра масс с добавлением отступа."""
         if kernel_image is None or kernel_image.size == 0:
             return kernel_image
 
@@ -181,18 +181,51 @@ class ModuleDisplay:
         if coords is None:
             return kernel_image
 
+        moments = cv.moments(kernel_image)
+        if moments['m00'] == 0:
+            return kernel_image
+
+        cx = moments['m10'] / moments['m00']
+        cy = moments['m01'] / moments['m00']
+
         x, y, w, h = cv.boundingRect(coords)
-        
+
+        radius_x = int(math.ceil(max(cx - x, (x + w) - cx) + padding))
+        radius_y = int(math.ceil(max(cy - y, (y + h) - cy) + padding))
+
+        cx_int = int(round(cx))
+        cy_int = int(round(cy))
+
         img_h, img_w = kernel_image.shape[:2]
 
-        start_x = max(0, x - padding)
-        start_y = max(0, y - padding)
-        end_x = min(img_w, x + w + padding)
-        end_y = min(img_h, y + h + padding)
+        src_x1 = max(0, cx_int - radius_x)
+        src_y1 = max(0, cy_int - radius_y)
+        src_x2 = min(img_w, cx_int + radius_x + 1)
+        src_y2 = min(img_h, cy_int + radius_y + 1)
 
-        cropped_kernel = kernel_image[start_y:end_y, start_x:end_x]
+        target_w = 2 * radius_x + 1
+        target_h = 2 * radius_y + 1
 
-        return cropped_kernel
+        dst_x1 = src_x1 - (cx_int - radius_x)
+        dst_y1 = src_y1 - (cy_int - radius_y)
+
+        cropped = np.zeros((target_h, target_w), dtype=kernel_image.dtype)
+        cropped[dst_y1:dst_y1 + (src_y2 - src_y1), dst_x1:dst_x1 + (src_x2 - src_x1)] = \
+            kernel_image[src_y1:src_y2, src_x1:src_x2]
+
+        return cropped
+
+    def _pad_kernel_to_size(self, kernel_image: np.ndarray, target_h: int, target_w: int) -> np.ndarray:
+        """Дополняет ядро нулями до целевого размера, центрируя содержимое."""
+        h, w = kernel_image.shape[:2]
+        if h >= target_h and w >= target_w:
+            return kernel_image
+
+        padded = np.zeros((target_h, target_w), dtype=kernel_image.dtype)
+        y_offset = (target_h - h) // 2
+        x_offset = (target_w - w) // 2
+        padded[y_offset:y_offset + h, x_offset:x_offset + w] = kernel_image
+        return padded
     
     def _plot_kernels_line(self, 
                            img_obj: Image, 
@@ -206,27 +239,56 @@ class ModuleDisplay:
                            kernel_size) -> int:
         """Отрисовка строки с ядрами с сохранением оригинальных пропорций."""
         axes[line, 0].axis('off')
-        
+
+        # --- Первый проход: собираем все обрезанные ядра в линии ---
+        cropped_original = None
         original_kernel_path = original_kernels.get(str(blurred_path))
         if original_kernel_path:
-            original_kernel = cv.imread(str(original_kernel_path), cv.IMREAD_GRAYSCALE)
-            
-            if original_kernel is not None:
-                cropped_kernel = self._crop_kernel_image(original_kernel)
+            raw = cv.imread(str(original_kernel_path), cv.IMREAD_GRAYSCALE)
+            if raw is not None:
+                cropped_original = self._crop_kernel_image(raw)
+                if cropped_original is not None and cropped_original.size == 0:
+                    cropped_original = None
 
-                if cropped_kernel is not None and cropped_kernel.size > 0:
-                    axes[line, 1].imshow(cropped_kernel, cmap='gray')
-                    axes[line, 1].set_title("original kernel", fontsize=10)
-                    axes[line, 1].set_aspect('equal', adjustable='box')
-                    axes[line, 1].axis('off')
+        cropped_restored = {}
+        for alg_name in alg_arr:
+            kernel_path = kernels.get((str(blurred_path), str(alg_name)))
+            if kernel_path:
+                raw = cv.imread(str(kernel_path), cv.IMREAD_GRAYSCALE)
+                if raw is not None:
+                    cropped = self._crop_kernel_image(raw)
+                    if cropped is not None and cropped.size > 0:
+                        cropped_restored[alg_name] = cropped
+
+        # --- Определяем максимальный размер среди всех ядер в линии ---
+        max_h, max_w = 0, 0
+        if cropped_original is not None:
+            max_h = max(max_h, cropped_original.shape[0])
+            max_w = max(max_w, cropped_original.shape[1])
+        for cr in cropped_restored.values():
+            max_h = max(max_h, cr.shape[0])
+            max_w = max(max_w, cr.shape[1])
+
+        # --- Второй проход: выводим ядра, дополненные до единого размера ---
+        if cropped_original is not None and max_h > 0 and max_w > 0:
+            padded = self._pad_kernel_to_size(cropped_original, max_h, max_w)
+            axes[line, 1].imshow(padded, cmap='gray')
+            axes[line, 1].set_title("original kernel", fontsize=10)
+            axes[line, 1].set_aspect('equal', adjustable='box')
+            axes[line, 1].axis('off')
 
         axes[line, 2].axis('off')
-        
+
         for col, alg_name in enumerate(alg_arr, 3):
             axes[line, col].axis('off')
-            self._plot_restored_kernel(img_obj, blurred_path, alg_name, kernels, 
-                                    axes, line, col, kernel_intencity_scale)
-        
+            cropped = cropped_restored.get(alg_name)
+            if cropped is not None and max_h > 0 and max_w > 0:
+                padded = self._pad_kernel_to_size(cropped, max_h, max_w)
+                padded_display = np.clip(padded * kernel_intencity_scale, 0, 255).astype(np.uint8)
+                axes[line, col].imshow(padded_display, cmap='gray')
+                axes[line, col].set_title(f"{alg_name} kernel", fontsize=10)
+                axes[line, col].set_aspect('equal', adjustable='box')
+
         return line + 1
 
     def _plot_restored_kernel(self, 

@@ -25,6 +25,7 @@ from .utils import (
     imread,
     float_img_to_int,
     prepare_image_for_metric,
+    calculate_metrics,
 )
 
 
@@ -161,7 +162,7 @@ class ModulePreprocessing:
                 
                 filtered_image = prepare_image_for_metric(filtered_image)
                 
-                psnr_val, ssim_val = self._calculate_metrics(original_image, 
+                psnr_val, ssim_val = calculate_metrics(original_image, 
                                                              filtered_image, 
                                                              data_range=1.0)
                 
