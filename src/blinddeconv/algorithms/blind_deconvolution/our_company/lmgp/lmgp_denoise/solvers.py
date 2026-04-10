@@ -722,7 +722,7 @@ def blind_deconv(y, lambda_lmg, lambda_grad, opts):
     # ── Gamma correction ──────────────────────────────────────
     gamma_correct = opts.get('gamma_correct', 1.0)
     if gamma_correct != 1:
-        y = y ** gamma_correct
+        y = np.maximum(y, 0.0) ** gamma_correct
 
     kernel_size = opts['kernel_size']
     if isinstance(kernel_size, (list, tuple, np.ndarray)):
