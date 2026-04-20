@@ -2,16 +2,44 @@
 
 [![CI](https://github.com/PavelYurov/blind_deconvolution/actions/workflows/ci.yml/badge.svg?branch=feature/module-redesign)](https://github.com/PavelYurov/blind_deconvolution/actions/workflows/ci.yml)
 
-## Руководитель проекта 
-
-- Парфенов Денис Васильевич, promasterden@yandex.ru
-
 ## Участники проекта
 
-- Беззаборов А.А., КМБО-01-22, antonbezzaborov929@gmail.com - Тимлид-разработчик, Higher-Order, Geometric и Multiscale методы; Super Resolution алгормитмы; фреймворк
-- Юров П.И., КМБО-01-22, pavel.yurov0425@gmail.com - Разработчик (фреймворк), Low-Rank, Sparse и Robust Optimization методы; Noise Estimation, Denoising алгоритмы; фреймворк
-- Куропатов К.Л., КМБО-01-22, konstantinkuropatov@gmail.com - Разработчик (теоретик), Variational Bayesian методы с различными Priors; теория
-- Малыш Я.В., КМБО-03-22, mrgeroixyu@gmail.com - Разработчик, эксперименты, wrapper для open source code методов Blind Deconvolution; интеграция алгоритмов во фреймворк
+**Руководитель проекта**  
+
+Парфенов Денис Васильевич, promasterden@yandex.ru
+
+**Тимлид-разработчик**
+
+Беззаборов А.А., КМБО-01-22, antonbezzaborov929@gmail.com  
+- Higher-Order, Geometric и Multiscale методы  
+- Super Resolution алгоритмы  
+- Оптимизация гиперпараметров, визуализация экспериментов и качества методов
+- Архитектура фреймворка
+- Исследование и координация разработки
+
+**Разработчик (оптимизация и архитектура)**
+
+Юров П.И., КМБО-01-22, pavel.yurov0425@gmail.com  
+- Low-Rank, Sparse и Robust Optimization методы  
+- Noise Estimation, Denoising алгоритмы
+- Модели всех видов искажений изображений (noise & blur)
+- Проектирование и создание архитектуры фреймворка
+- Ускорение и оптимизация методов
+
+**Разработчик (теоретик)**
+
+Куропатов К.Л., КМБО-01-22, konstantinkuropatov@gmail.com  
+- Variational Bayesian Inference методы  
+- Теоретическое обоснование методов фреймворка
+- Формирование наборов данных разных категорий изображений для экспериментов
+- Углубленное исследование имплементированных методов
+
+**Разработчик (эксперименты и интеграция)**  
+
+Малыш Я.В., КМБО-03-22, mrgeroixyu@gmail.com    
+- Интеграция third-party алгоритмов во фреймворк
+- Разработка Wrapper-ов для Open-Source методов Blind Deconvolution
+- Проведение экспериментов для third-party методов
 
 ## Описание проекта
 
