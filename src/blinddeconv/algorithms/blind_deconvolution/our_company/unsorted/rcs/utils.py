@@ -966,40 +966,121 @@ def imresize(im: np.ndarray, scale_or_shape, method: str = 'bilinear') -> np.nda
     """
     Resize image, approximating MATLAB imresize behaviour.
 
+    Uses cv2.resize with INTER_AREA for downscaling (anti-aliased, matching
+    MATLAB's default anti-aliasing) and the requested interpolation for
+    upscaling.
+
     Parameters
     ----------
     im             : 2D or 3D array
     scale_or_shape : float (scale factor) or tuple (target_rows, target_cols)
     method         : 'bilinear' (order=1) or 'nearest' (order=0) or 'bicubic' (order=3)
     """
-    order = {'nearest': 0, 'bilinear': 1, 'bicubic': 3}.get(method, 1)
+    import cv2
+
+    interp_map = {
+        'nearest': cv2.INTER_NEAREST,
+        'bilinear': cv2.INTER_LINEAR,
+        'bicubic': cv2.INTER_CUBIC,
+    }
 
     if isinstance(scale_or_shape, (int, float)):
         scale = float(scale_or_shape)
-        if im.ndim == 2:
-            return zoom(im, scale, order=order)
-        else:
-            return np.stack(
-                [zoom(im[:, :, c], scale, order=order)
-                 for c in range(im.shape[2])],
-                axis=2
-            )
+        new_h = max(1, int(round(im.shape[0] * scale)))
+        new_w = max(1, int(round(im.shape[1] * scale)))
     else:
-        target_h, target_w = scale_or_shape
-        if im.ndim == 2:
-            zoom_h = target_h / im.shape[0]
-            zoom_w = target_w / im.shape[1]
-            out = zoom(im, (zoom_h, zoom_w), order=order)
-            return out[:target_h, :target_w]
-        else:
-            zoom_h = target_h / im.shape[0]
-            zoom_w = target_w / im.shape[1]
-            out = np.stack(
-                [zoom(im[:, :, c], (zoom_h, zoom_w), order=order)
-                 for c in range(im.shape[2])],
-                axis=2
-            )
-            return out[:target_h, :target_w, :]
+        new_h, new_w = int(scale_or_shape[0]), int(scale_or_shape[1])
+
+    interp = interp_map.get(method, cv2.INTER_LINEAR)
+
+    # Use INTER_AREA for downscaling (proper anti-aliasing), except nearest
+    is_downscale = (new_h < im.shape[0]) or (new_w < im.shape[1])
+    if is_downscale and method != 'nearest':
+        interp = cv2.INTER_AREA
+
+    im_f64 = im.astype(np.float64)
+    # cv2.resize takes (width, height)
+    return cv2.resize(im_f64, (new_w, new_h), interpolation=interp)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Pre-trained MoG priors  (from deblur_code_1_2/priors/*.mat)
+# ═════════════════════════════════════════════════════════════════════════════
+
+# Default priors extracted from MATLAB linear_street_4.mat — trained on natural
+# images of a street scene using estimate_priors2.m.  8 scales, 4 components.
+_DEFAULT_PRIORS_STREET_4 = [
+    {'pi': np.array([[0.3424340310728903, 0.40767651333052146, 0.07812420385914433, 0.1717652517374289]]),
+     'gamma': np.array([[0.29802001130266303, 3.0573335190267334, 0.0014491231427730406, 0.01704592730142977]])},
+    {'pi': np.array([[0.3190705041263619, 0.09596426181604158, 0.3879939885023601, 0.19697124555521656]]),
+     'gamma': np.array([[0.6353124313785059, 0.0028742740247449322, 5.9569282007663, 0.03574942831297822]])},
+    {'pi': np.array([[0.09976787553775796, 0.3548257534999502, 0.21415238959909377, 0.33125398136318857]]),
+     'gamma': np.array([[0.004147895133134799, 9.91287418753391, 0.052356814834793375, 1.0760367256192498]])},
+    {'pi': np.array([[0.0806457697881914, 0.3531087529161156, 0.33509045272367893, 0.23115502457201323]]),
+     'gamma': np.array([[0.0050454695734232, 16.54712911833657, 1.5114534596710867, 0.0603056841619064]])},
+    {'pi': np.array([[0.3837669289986711, 0.2549862266831338, 0.05017782885585161, 0.31106901546234117]]),
+     'gamma': np.array([[2.1968983384539866, 0.0629588203406576, 0.004338338495067549, 31.45072207040538]])},
+    {'pi': np.array([[0.2361579503716776, 0.02410007746499708, 0.3889560888676661, 0.3507858832956606]]),
+     'gamma': np.array([[0.0494504494719423, 0.002400522386224243, 27.772678182031825, 1.3818254410186852]])},
+    {'pi': np.array([[0.3750836558156682, 0.2278563970606603, 0.3907337897732923, 0.006326157350377128]]),
+     'gamma': np.array([[30.87423860368161, 0.03422103832974795, 1.3676396026917672, 0.0006615342462320538]])},
+    {'pi': np.array([[0.36546849898726225, 0.4444363146286955, 0.003820813210408265, 0.18627437317363424]]),
+     'gamma': np.array([[0.665507621417974, 21.146669814425323, 0.00031931372931303, 0.023160504210950776]])},
+]
+
+
+def get_default_priors(prior_name: str = 'street',
+                       num_components: int = 4) -> list:
+    """
+    Return built-in pre-trained MoG priors for image gradients.
+
+    These were trained by Fergus et al. on natural images using
+    estimate_priors2.m and stored in the MATLAB distribution as .mat files.
+
+    Parameters
+    ----------
+    prior_name     : 'street' — trained on street scene (default)
+    num_components : int — must be 4 (only 4-component priors are built-in)
+
+    Returns
+    -------
+    priors : list of 8 dicts, each with 'pi' (1, C) and 'gamma' (1, C)
+    """
+    if num_components != 4:
+        raise ValueError(
+            f"Built-in priors only available for 4 components, got {num_components}")
+    if prior_name == 'street':
+        return [dict(p) for p in _DEFAULT_PRIORS_STREET_4]
+    raise ValueError(f"Unknown prior name: {prior_name!r}. Available: 'street'")
+
+
+def load_matlab_priors(mat_path: str) -> list:
+    """
+    Load pre-trained MoG priors from a MATLAB .mat file.
+
+    The file must contain a variable ``priors`` which is a (1, N) struct
+    array with fields ``pi`` (1, C) and ``gamma`` (1, C).
+
+    Parameters
+    ----------
+    mat_path : path to .mat file (e.g. 'linear_street_4.mat')
+
+    Returns
+    -------
+    priors : list of N dicts, each with 'pi' (1, C) and 'gamma' (1, C)
+    """
+    import scipy.io as sio
+    mat = sio.loadmat(mat_path)
+    if 'priors' not in mat:
+        raise KeyError(f"No 'priors' variable found in {mat_path}")
+    raw = mat['priors']
+    result = []
+    for b in range(raw.shape[1]):
+        result.append({
+            'pi': np.asarray(raw[0, b]['pi'], dtype=np.float64),
+            'gamma': np.asarray(raw[0, b]['gamma'], dtype=np.float64),
+        })
+    return result
 
 
 # ═════════════════════════════════════════════════════════════════════════════

@@ -71,6 +71,8 @@ from .utils import (
     reconsEdge3,
     train_ensemble_get,
     estimate_priors_from_images,
+    get_default_priors,
+    load_matlab_priors,
 )
 
 
@@ -81,7 +83,9 @@ class RCS_BD(DeconvolutionAlgorithm):
     Parameters
     ----------
     kernel_size      : int — spatial support of the unknown PSF (square, odd).
-    num_scales       : int — number of coarse-to-fine pyramid levels.
+    num_scales       : int or None — number of coarse-to-fine pyramid levels.
+                       If None (default), computed from kernel_size using the
+                       MATLAB formula: ceil(-log(3/K)/log(sqrt(2)))+1.
     resize_step      : float — scale factor between levels (default sqrt(2)).
     resize_mode      : str — interpolation for pyramid building
                        ('matlab_bilinear', 'matlab_nearest', 'matlab_bicubic').
@@ -133,13 +137,16 @@ class RCS_BD(DeconvolutionAlgorithm):
     patch_location   : tuple — (x, y) 0-based top-left corner of patch.
                        None = auto or use automatic_patch.
     priors           : list or None — pre-computed MoG priors.
-                       If None, uniform non-informative priors are used.
+                       If None, built-in pre-trained priors (from Fergus et al.
+                       MATLAB distribution, trained on natural images) are used.
+                       Can also pass result of load_matlab_priors() or
+                       estimate_priors_from_images().
     """
 
     def __init__(
         self,
         kernel_size: int = 25,
-        num_scales: int = 5,
+        num_scales: int = None,
         resize_step: float = np.sqrt(2),
         resize_mode: str = 'matlab_bilinear',
         gamma_correction: float = 2.2,
@@ -161,7 +168,7 @@ class RCS_BD(DeconvolutionAlgorithm):
         gradient_mode: str = 'haar',
         rescale_then_grad: bool = False,
         lucy_its: int = 10,
-        kernel_threshold: float = 7.0,
+        kernel_threshold: float = 10.0,
         scale_offset: int = 0,
         fft_mode: bool = True,
         blur_lock: bool = True,
@@ -178,7 +185,12 @@ class RCS_BD(DeconvolutionAlgorithm):
         super().__init__(name='RCS-BD')
 
         self.kernel_size = kernel_size
-        self.num_scales = num_scales
+        # MATLAB formula: NUM_SCALES = ceil(-log(3/K)/log(sqrt(2)))+1
+        if num_scales is None:
+            self.num_scales = int(np.ceil(-np.log(3.0 / kernel_size)
+                                          / np.log(np.sqrt(2)))) + 1
+        else:
+            self.num_scales = num_scales
         self.resize_step = resize_step
         self.resize_mode = resize_mode
         self.gamma_correction = gamma_correction
@@ -551,16 +563,11 @@ class RCS_BD(DeconvolutionAlgorithm):
         if self.priors is not None:
             priors_list = self.priors
         else:
-            # Auto-estimate MoG priors from input image
-            # MATLAB estimate_priors2 uses INTENSITY_SCALING=1/256 on the
-            # raw (pre-gamma) grayscale image.  This creates priors whose
-            # precision values are calibrated for [0,1]-scale gradients,
-            # which --- when applied to the gamma-corrected data --- act as
-            # strong sparsity-inducing priors on image gradients.
-            obs_im_for_priors = obs_im_raw.astype(np.float64) / 256.0
-            priors_list = estimate_priors_from_images(
-                [obs_im_for_priors], self.image_components,
-                NUM_SCALES, self.gradient_mode)
+            # Use built-in pre-trained MoG priors from Fergus et al.
+            # These were trained on sharp natural images and capture the
+            # heavy-tailed gradient distribution essential for the algorithm.
+            priors_list = get_default_priors(
+                'street', self.image_components)
 
         # ─────────────────────────────────────────────────────────────────
         # 6.  MAIN MULTI-SCALE LOOP  (deblur.m main loop)
@@ -791,3 +798,33 @@ class RCS_BD(DeconvolutionAlgorithm):
 
     def get_hyperparams(self) -> dict:
         return self.hyperparams
+
+    @staticmethod
+    def train_priors(image_paths: list,
+                     num_components: int = 4,
+                     num_scales: int = 8) -> list:
+        """
+        Train MoG priors from a set of sharp natural images.
+
+        This runs the EM algorithm (GaussianMixtures1D) on image gradients
+        at multiple scales, producing the pi/gamma parameters needed by the
+        variational inference.
+
+        Parameters
+        ----------
+        image_paths : list of str — paths to sharp (unblurred) images
+        num_components : int — number of Gaussian components (default 4)
+        num_scales : int — number of scale levels (default 8)
+
+        Returns
+        -------
+        priors : list of dicts with 'pi' (1, C) and 'gamma' (1, C)
+        """
+        import cv2 as cv
+        images = []
+        for p in image_paths:
+            im = cv.imread(str(p), cv.IMREAD_GRAYSCALE)
+            if im is None:
+                raise FileNotFoundError(f"Cannot read image: {p}")
+            images.append(im.astype(np.float64))
+        return estimate_priors_from_images(images, num_components, num_scales)
