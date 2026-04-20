@@ -35,6 +35,7 @@ class DeconvolutionAlgorithm(abc.ABC):
         super().__init__()
         self.name = name
         self.timer = -1
+        self._callback = None
     
     @abc.abstractmethod
     def change_param(self, param: Dict[str, Any]) -> None:
@@ -100,6 +101,19 @@ class DeconvolutionAlgorithm(abc.ABC):
             Время выполнения в секундах (-1 если не запускался).
         """
         return self.timer
+    
+    def set_callback(self, callback) -> None:
+        """
+        Установка callback-функции, вызываемой на каждой итерации.
+
+        Parameters
+        ----------
+        callback : callable or None
+            Функция вида callback(state: dict).
+            state содержит как минимум: 'iteration', 'scale', 'kernel'.
+            Может также содержать: 'image', 'metrics' и др.
+        """
+        self._callback = callback
     
     def import_param_from_file(self, file: str) -> None:
         """

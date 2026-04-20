@@ -33,6 +33,8 @@ dependencies = [
   "jsonschema>=4.0.0",
   "bm3d",
   "curvelets",
+  "cython",
+  "xelatex",
 ]
 
 [project.optional-dependencies]
