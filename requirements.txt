@@ -8,6 +8,9 @@ opencv-python
 oct2py
 pydantic
 pydantic_settings
+bm3d
+curvelets
+cython
 
 # Machine learning
 numpy

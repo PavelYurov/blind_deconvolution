@@ -122,6 +122,11 @@ Desktop.ini
 /preprocess/
 /docs/_build/
 /reports/
+/validate_images/
+/presentation_graphics/
+/presentation_graphics_tmp/
+/images/compare_data/
+
 
 # Miscellaneous files
 /benchmark_generation*.ipynb

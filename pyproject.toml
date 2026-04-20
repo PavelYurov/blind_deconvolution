@@ -31,6 +31,9 @@ dependencies = [
   "pydantic_settings>=2.12.0",
   "pyyaml>=6.0",
   "jsonschema>=4.0.0",
+  "bm3d",
+  "curvelets",
+  "cython",
 ]
 
 [project.optional-dependencies]

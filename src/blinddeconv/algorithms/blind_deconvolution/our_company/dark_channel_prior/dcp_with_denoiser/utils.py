@@ -63,7 +63,7 @@ MATLAB → Python conversion notes (CRITICAL differences):
 
 import numpy as np
 from scipy.signal import convolve2d, fftconvolve
-from scipy.ndimage import map_coordinates, uniform_filter
+from scipy.ndimage import map_coordinates
 from scipy.fft import dstn, idstn
 
 
@@ -431,7 +431,7 @@ def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
 # Dark Channel  (from dark_channel.m)
 # ═════════════════════════════════════════════════════════════════════════════
 
-def dark_channel(I: np.ndarray, patch_size: int, dc_quantile: float = 0.0):
+def dark_channel(I: np.ndarray, patch_size: int):
     """
     Compute the dark channel of an image.
     Equivalent to MATLAB dark_channel.m.
@@ -440,10 +440,6 @@ def dark_channel(I: np.ndarray, patch_size: int, dc_quantile: float = 0.0):
     ----------
     I : (M, N) or (M, N, C) image, float64
     patch_size : odd integer — patch window size
-    dc_quantile : float in [0, 1) — quantile instead of strict min.
-                  0.0 = strict minimum (original behaviour).
-                  Values like 0.05 ignore the darkest 5% of pixels in
-                  each patch, making the dark channel robust to noise.
 
     Returns
     -------
@@ -452,6 +448,12 @@ def dark_channel(I: np.ndarray, patch_size: int, dc_quantile: float = 0.0):
               minimising pixel within each patch.  This matches MATLAB's
               convention because assign_dark_channel_to_pixel uses it
               with column-major linear indexing.
+
+    MATLAB details:
+        padarray(I, [p p], 'replicate') → np.pad with mode='edge'
+        min(patch, [], 3) → min over channels (axis=2 in 3D)
+        [val, idx] = min(tmp(:)) → min of column-major flattened 2D patch
+        The returned idx is 1-based column-major.
     """
     if I.ndim == 2:
         I = I[:, :, np.newaxis]
@@ -461,32 +463,26 @@ def dark_channel(I: np.ndarray, patch_size: int, dc_quantile: float = 0.0):
     J_index = np.zeros((M, N), dtype=np.int64)
 
     p = patch_size // 2
+    # MATLAB: padarray(I, [p p], 'replicate')
     I_pad = np.pad(I, ((p, p), (p, p), (0, 0)), mode='edge')
-
-    use_quantile = dc_quantile > 0.0
 
     for m in range(M):
         for n in range(N):
-            patch = I_pad[m:m + patch_size, n:n + patch_size, :]
-            tmp = np.min(patch, axis=2)
+            patch = I_pad[m:m + patch_size, n:n + patch_size, :]  # (ps, ps, C)
+            # min over channels
+            tmp = np.min(patch, axis=2)  # (ps, ps)
+            # MATLAB: [tmp_val, tmp_idx] = min(tmp(:))
+            # tmp(:) in MATLAB is column-major flattening.
+            # We flatten in 'F' (Fortran/column-major) order to match.
             tmp_flat = tmp.flatten(order='F')
-
-            if use_quantile:
-                # Use quantile: find the value at dc_quantile percentile
-                q_val = np.quantile(tmp_flat, dc_quantile)
-                # Pick the index of the value closest to the quantile
-                candidates = np.where(tmp_flat >= q_val)[0]
-                tmp_idx = candidates[np.argmin(tmp_flat[candidates])]
-            else:
-                tmp_idx = np.argmin(tmp_flat)
-
+            tmp_idx = np.argmin(tmp_flat)  # 0-based
             J[m, n] = tmp_flat[tmp_idx]
-            J_index[m, n] = tmp_idx + 1
+            J_index[m, n] = tmp_idx + 1  # 1-based to match MATLAB
 
     return J, J_index
 
 
-def dark_channel_fast(I: np.ndarray, patch_size: int, dc_quantile: float = 0.0):
+def dark_channel_fast(I: np.ndarray, patch_size: int):
     """
     Fast (vectorised) dark channel computation.
     Produces the same J as the loop version but J_index uses the same
@@ -499,29 +495,25 @@ def dark_channel_fast(I: np.ndarray, patch_size: int, dc_quantile: float = 0.0):
     p = patch_size // 2
     I_pad = np.pad(I, ((p, p), (p, p), (0, 0)), mode='edge')
 
+    # Min across channels first
     if C > 1:
         I_min = np.min(I_pad, axis=2)
     else:
         I_min = I_pad[:, :, 0]
 
+    # Sliding-window min using a simple approach:
+    # For each row, compute running min over columns, then over rows.
+    # Use stride_tricks or a loop-based approach.
+
     J = np.zeros((M, N), dtype=np.float64)
     J_index = np.zeros((M, N), dtype=np.int64)
-
-    use_quantile = dc_quantile > 0.0
 
     for m in range(M):
         for n in range(N):
             patch = I_pad[m:m + patch_size, n:n + patch_size, :]
             tmp = np.min(patch, axis=2)
             tmp_flat = tmp.flatten(order='F')
-
-            if use_quantile:
-                q_val = np.quantile(tmp_flat, dc_quantile)
-                candidates = np.where(tmp_flat >= q_val)[0]
-                idx = candidates[np.argmin(tmp_flat[candidates])]
-            else:
-                idx = np.argmin(tmp_flat)
-
+            idx = np.argmin(tmp_flat)
             J[m, n] = tmp_flat[idx]
             J_index[m, n] = idx + 1
 
@@ -742,48 +734,8 @@ def _histc(data: np.ndarray, edges: np.ndarray) -> np.ndarray:
     return counts[:len(edges)]
 
 
-def guided_filter(I: np.ndarray, p: np.ndarray,
-                  radius: int, eps: float) -> np.ndarray:
-    """
-    Guided image filter (He, Sun, Tang, TPAMI 2013).
-
-    Edge-preserving smoothing that uses *I* as a guide for filtering *p*.
-    For self-guided denoising set I = p.
-    """
-    ksize = 2 * radius + 1
-    mean_I = uniform_filter(I.astype(np.float64), size=ksize, mode='reflect')
-    mean_p = uniform_filter(p.astype(np.float64), size=ksize, mode='reflect')
-    corr_I = uniform_filter((I * I).astype(np.float64), size=ksize, mode='reflect')
-    corr_Ip = uniform_filter((I * p).astype(np.float64), size=ksize, mode='reflect')
-
-    var_I = corr_I - mean_I * mean_I
-    cov_Ip = corr_Ip - mean_I * mean_p
-
-    a = cov_Ip / (var_I + eps)
-    b = mean_p - a * mean_I
-
-    mean_a = uniform_filter(a, size=ksize, mode='reflect')
-    mean_b = uniform_filter(b, size=ksize, mode='reflect')
-
-    q = mean_a * I + mean_b
-    return q
-
-
-def estimate_noise_sigma(img: np.ndarray) -> float:
-    """
-    Robust noise standard-deviation estimate (Donoho & Johnstone MAD).
-
-    Uses the horizontal finite-difference as a high-pass filter.
-    σ = median(|∇x img|) / (√2 · 0.6745)
-    """
-    gx = np.diff(img.astype(np.float64), axis=1)
-    sigma = np.median(np.abs(gx)) / (np.sqrt(2.0) * 0.6745)
-    return float(sigma)
-
-
 def threshold_pxpy_v1(latent: np.ndarray, psf_size,
-                      threshold=None,
-                      denoise_eps=None, denoise_radius=2):
+                      threshold=None):
     """
     Gradient thresholding for kernel estimation.
     Equivalent to MATLAB cho_code/threshold_pxpy_v1.m.
@@ -793,9 +745,6 @@ def threshold_pxpy_v1(latent: np.ndarray, psf_size,
     latent : (M, N) image
     psf_size : scalar or array-like — kernel size (max used)
     threshold : float or None — if None, estimate from histogram
-    denoise_eps : float or None — guided filter regularisation eps.
-                  None = disabled (original behaviour).
-    denoise_radius : int — guided filter window radius (default 2).
 
     Returns
     -------
@@ -814,10 +763,7 @@ def threshold_pxpy_v1(latent: np.ndarray, psf_size,
     if b_estimate_threshold:
         threshold = 0.0
 
-    if denoise_eps is not None and denoise_eps > 0:
-        denoised = guided_filter(latent, latent, denoise_radius, denoise_eps)
-    else:
-        denoised = latent
+    denoised = latent
 
     dx = np.array([[-1, 1], [0, 0]], dtype=np.float64)
     dy = np.array([[-1, 0], [1, 0]], dtype=np.float64)
@@ -908,7 +854,7 @@ def _fspecial_gaussian(size: int, sigma: float) -> np.ndarray:
 
 
 def bilateral_filter(img: np.ndarray, sigma_s: float,
-                     sigma: float, s_size: int = None) -> np.ndarray:
+                     sigma: float) -> np.ndarray:
     """
     Bilateral filter.
     Equivalent to MATLAB bilateral_filter.m for grayscale images.
@@ -924,8 +870,6 @@ def bilateral_filter(img: np.ndarray, sigma_s: float,
     img : (H, W) or (H, W, D) float image
     sigma_s : spatial sigma
     sigma : range sigma
-    s_size : int or None — if given, overrides the filter radius
-             (MATLAB: if exist('s_size','var') fr = s_size)
 
     Returns
     -------
@@ -942,10 +886,7 @@ def bilateral_filter(img: np.ndarray, sigma_s: float,
     lab = img.copy()
     sigma = sigma * np.sqrt(d)
 
-    if s_size is not None:
-        fr = s_size
-    else:
-        fr = int(np.ceil(sigma_s * 3))
+    fr = int(np.ceil(sigma_s * 3))
 
     # MATLAB: padarray(img, [fr fr], 'replicate')
     p_img = np.pad(img, ((fr, fr), (fr, fr), (0, 0)), mode='edge')
