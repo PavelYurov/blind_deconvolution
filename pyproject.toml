@@ -34,7 +34,6 @@ dependencies = [
   "bm3d",
   "curvelets",
   "cython",
-  "xelatex",
 ]
 
 [project.optional-dependencies]
