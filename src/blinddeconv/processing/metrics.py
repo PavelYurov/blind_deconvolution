@@ -3,8 +3,87 @@ import numpy as np
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 from typing import Callable, Optional, Tuple
 
-def PSNR(original: np.ndarray, 
-         restored: np.ndarray) -> float:
+
+# ═══════════════════════════════════════════════════════════════════
+# Shift-alignment helper (used when aligned=True in PSNR/SSIM).
+#
+# Blind deconvolution has a fundamental translation ambiguity:
+#   B = I * k = (I shifted by -d) * (k shifted by +d)
+# so the reconstructed latent is typically offset by a few pixels
+# relative to the ground-truth — which destroys pixel-wise metrics
+# even when the reconstruction looks visually correct.
+#
+# The aligned=True variants search the best integer shift in the
+# range [-max_shift, +max_shift] on both axes and return the metric
+# on the overlapping region (cropped by the shift amount and by an
+# additional border to avoid evaluating on ringing / boundary rows).
+# This matches the shift-aligned evaluation protocol used in Levin's,
+# Sun's and Köhler's blind-deblurring benchmarks.
+# ═══════════════════════════════════════════════════════════════════
+
+def _align_shift(original: np.ndarray,
+                 restored: np.ndarray,
+                 max_shift: int = 8,
+                 border: int = 4,
+                 data_range: Optional[float] = None
+                 ) -> Tuple[np.ndarray, np.ndarray, Tuple[int, int]]:
+    """
+    Find the integer (dy, dx) in [-max_shift, max_shift]^2 that
+    maximises PSNR between ``original`` and ``restored`` on the
+    overlapping central region (minus ``border`` pixels).
+
+    Returns the two already-cropped arrays and the best shift.
+    Works for 2D (grayscale) and 3D (H, W, C) images.
+    """
+    a = np.asarray(original)
+    b = np.asarray(restored)
+    if a.shape != b.shape:
+        raise ValueError(
+            f"shape mismatch in _align_shift: {a.shape} vs {b.shape}")
+
+    if data_range is None:
+        data_range = 255.0 if a.dtype.kind in 'ui' else 1.0
+
+    H, W = a.shape[:2]
+    ms = int(max_shift)
+    bd = int(border)
+    inner_h = H - 2 * (ms + bd)
+    inner_w = W - 2 * (ms + bd)
+    if inner_h <= 0 or inner_w <= 0:
+        # Image too small — fall back to zero shift with just border crop.
+        ms = 0
+        inner_h = H - 2 * bd
+        inner_w = W - 2 * bd
+        if inner_h <= 0 or inner_w <= 0:
+            return a, b, (0, 0)
+
+    # Fixed central window in the ORIGINAL.
+    y0 = ms + bd
+    x0 = ms + bd
+    a_win = a[y0:y0 + inner_h, x0:x0 + inner_w]
+
+    best_mse = np.inf
+    best_dy, best_dx = 0, 0
+    for dy in range(-ms, ms + 1):
+        for dx in range(-ms, ms + 1):
+            b_win = b[y0 + dy:y0 + dy + inner_h,
+                      x0 + dx:x0 + dx + inner_w]
+            diff = a_win.astype(np.float64) - b_win.astype(np.float64)
+            mse = float(np.mean(diff * diff))
+            if mse < best_mse:
+                best_mse = mse
+                best_dy, best_dx = dy, dx
+
+    b_aligned = b[y0 + best_dy:y0 + best_dy + inner_h,
+                  x0 + best_dx:x0 + best_dx + inner_w]
+    return a_win, b_aligned, (best_dy, best_dx)
+
+
+def PSNR(original: np.ndarray,
+         restored: np.ndarray,
+         aligned: bool = True,
+         max_shift: int = 8,
+         border: int = 4) -> float:
     """
     Вычисляет отношение пикового сигнала к шуму (PSNR) между изображениями.
 
@@ -13,17 +92,34 @@ def PSNR(original: np.ndarray,
     Аргументы:
         original (ndarray): Исходное изображение
         restored (ndarray): Восстановленное/обработанное изображение
+        aligned (bool): Если True (по умолчанию), перед вычислением
+            PSNR выполняется поиск оптимального целочисленного сдвига
+            ``restored`` относительно ``original`` в окне
+            ``[-max_shift, +max_shift]`` по обеим осям; это компенсирует
+            translation-ambiguity слепой деконволюции.
+            Если False — стандартный попиксельный PSNR.
+        max_shift (int): Полуширина окна поиска сдвига (только при
+            aligned=True).
+        border (int): Дополнительный отступ от границы (px), который
+            выбрасывается из оценки, чтобы не считать на ringing-артефактах.
 
     Возвращает:
         Значение PSNR в децибелах (dB)
     """
+    if not aligned:
+        return peak_signal_noise_ratio(original, restored)
 
-    return peak_signal_noise_ratio(original, restored)
+    a_win, b_win, _ = _align_shift(original, restored,
+                                   max_shift=max_shift, border=border)
+    return peak_signal_noise_ratio(a_win, b_win)
 
 
-def SSIM(original: np.ndarray, 
-         restored: np.ndarray, 
-         data_range: Optional[float] = None) -> float:
+def SSIM(original: np.ndarray,
+         restored: np.ndarray,
+         data_range: Optional[float] = None,
+         aligned: bool = True,
+         max_shift: int = 8,
+         border: int = 4) -> float:
     """
     Вычисляет индекс структурного сходства (SSIM) между изображениями.
 
@@ -33,12 +129,31 @@ def SSIM(original: np.ndarray,
         original: Исходное изображение
         restored: Восстановленное/обработанное изображение
         data_range (Optional[float]): Верхний предел значений
+        aligned (bool): Если True (по умолчанию), перед вычислением
+            SSIM выполняется поиск оптимального целочисленного сдвига
+            ``restored`` относительно ``original`` в окне
+            ``[-max_shift, +max_shift]`` по обеим осям (сдвиг
+            подбирается по MSE, что эквивалентно максимизации PSNR).
+            Если False — стандартный SSIM.
+        max_shift (int): Полуширина окна поиска сдвига (только при
+            aligned=True).
+        border (int): Дополнительный отступ от границы (px).
 
     Возвращает:
         Значение SSIM в диапазоне от 0 до 1
     """
+    if not aligned:
+        return structural_similarity(original, restored, data_range=data_range)
 
-    return structural_similarity(original, restored, data_range=data_range)
+    a_win, b_win, _ = _align_shift(original, restored,
+                                   max_shift=max_shift, border=border,
+                                   data_range=data_range)
+    # SSIM requires channel_axis for multichannel input.
+    if a_win.ndim == 3:
+        return structural_similarity(a_win, b_win,
+                                     data_range=data_range,
+                                     channel_axis=-1)
+    return structural_similarity(a_win, b_win, data_range=data_range)
 
 
 def calculate_sml(image: np.ndarray) -> float:

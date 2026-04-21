@@ -136,12 +136,19 @@ def conjgrad(x, b, max_it, tol, ax_func, func_param):
         rsold = rsnew
     return x
 
+def _matlab_round(x):
+    # MATLAB ``round`` is round-half-away-from-zero; Python's built-in
+    # ``round`` is banker's rounding (round-half-to-even).  For shifts
+    # of exactly 0.5 these differ by 1 pixel which propagates through
+    # the whole pyramid and destroys PSNR/SSIM.
+    return int(np.floor(np.abs(x) + 0.5) * np.sign(x)) if x != 0 else 0
+
 def adjust_psf_center(psf):
     rows, cols = psf.shape
     X, Y = np.meshgrid(np.arange(1, cols + 1, dtype=np.float64), np.arange(1, rows + 1, dtype=np.float64))
     if np.sum(psf) == 0: return psf
     xc1, yc1 = np.sum(psf * X), np.sum(psf * Y)
-    xshift, yshift = round((cols + 1) / 2.0 - xc1), round((rows + 1) / 2.0 - yc1)
+    xshift, yshift = _matlab_round((cols + 1) / 2.0 - xc1), _matlab_round((rows + 1) / 2.0 - yc1)
     out_rows, out_cols = np.meshgrid(np.arange(rows, dtype=np.float64), np.arange(cols, dtype=np.float64), indexing='ij')
     return map_coordinates(psf, [out_rows - yshift, out_cols - xshift], order=1, mode='constant', cval=0.0).reshape(rows, cols)
 

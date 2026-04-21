@@ -518,7 +518,8 @@ def kernel_solver_L2(Y, b, k_size, M, lambda_val):
 
 def bid_rgtv_c2f_cg(Y_b, k_estimate_size, show_intermediate=False,
                      preprocess='tv', preprocess_params=None,
-                     pre_kernel='none', pre_kernel_params=None):
+                     pre_kernel='none', pre_kernel_params=None,
+                     iteration_callback=None):
     """
     Blind image deblurring from coarse to fine using RGTV.
 
@@ -648,6 +649,20 @@ def bid_rgtv_c2f_cg(Y_b, k_estimate_size, show_intermediate=False,
                 k_estimate = kernel_centralize(k_estimate, 0.1)
 
             lambda_val = lambda_val / 1.2
+
+            # ── Callback ──────────────────────────────────────
+            if iteration_callback is not None:
+                iteration_callback({
+                    'iteration': iter_main,
+                    'scale': level,
+                    'num_scales': level_num,
+                    'kernel': k_estimate.copy(),
+                    'image': Y_r_rgtv_cg,
+                    'metrics': {
+                        'lambda_val': float(lambda_val),
+                        'mu': float(mu),
+                    },
+                })
 
     return k_estimate, Y_r_rgtv_cg
 

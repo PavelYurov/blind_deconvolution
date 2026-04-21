@@ -212,6 +212,20 @@ class LMGP_BD(DeconvolutionAlgorithm):
                           bm3d: {'sigma_psd': auto from noise_estimation}
                           act:  {'noise_var': auto, 'threshold_setting': 's'}
                           Other: same as preprocess params.
+
+    Histogram equalization (applied ONLY to the grayscale image ``yg``
+    used for blind kernel estimation, right before the coarse-to-fine
+    loop.  The non-blind step operates on the original colour ``y``, so
+    the final intensity distribution is NOT affected by equalization):
+    histogram_eq : str — 'clahe' | 'global' | 'none'.  Default 'none'.
+                   'clahe'  : Contrast-Limited Adaptive Histogram
+                              Equalization (local, recommended).
+                   'global' : standard global histogram equalization.
+    histogram_eq_params : dict or None.
+                   CLAHE:  {'clip_limit': float (default 0.01),
+                            'nbins': int (default 256),
+                            'kernel_size': int or None (default None)}.
+                   Global: no parameters.
     """
 
     def __init__(
@@ -270,6 +284,12 @@ class LMGP_BD(DeconvolutionAlgorithm):
         act_params: dict = None,
         pre_nonblind: str = 'none',
         pre_nonblind_params: dict = None,
+        # ── Histogram equalization (applied to yg before blind) ──
+        histogram_eq: str = 'none',
+        histogram_eq_params: dict = None,
+        # ── Surgical eq for kernel estimation only (inside blind loop) ─
+        kernel_eq: str = 'none',
+        kernel_eq_params: dict = None,
     ):
         super().__init__(name='LMGP-BD')
 
@@ -323,6 +343,10 @@ class LMGP_BD(DeconvolutionAlgorithm):
         self.act_params = act_params
         self.pre_nonblind = pre_nonblind
         self.pre_nonblind_params = pre_nonblind_params
+        self.histogram_eq = histogram_eq
+        self.histogram_eq_params = histogram_eq_params
+        self.kernel_eq = kernel_eq
+        self.kernel_eq_params = kernel_eq_params
 
         self.history: Dict[str, list] = {'kernel_diff': []}
         self.hyperparams: Dict[str, Any] = {}
@@ -454,6 +478,13 @@ class LMGP_BD(DeconvolutionAlgorithm):
         if self.noise_preprocess != 'none':
             yg, psd_info = self._apply_noise_preprocess(yg)
 
+        # ── 2f. Histogram equalization (yg only — improves kernel est.) ─
+        # Applied only to the grayscale image used for blind kernel
+        # estimation.  The non-blind step operates on the original y,
+        # so we do not need to preserve a pre-eq copy.
+        if self.histogram_eq not in (None, 'none'):
+            yg = self._apply_histogram_eq(yg)
+
         # ── 3. Blind kernel estimation ──────────────────────────────────
         opts = {
             'kernel_size': self.kernel_size,
@@ -479,10 +510,14 @@ class LMGP_BD(DeconvolutionAlgorithm):
             'use_soft_threshold': self.use_soft_threshold,
             'softmax_tau': self.softmax_tau,
             'kernel_reg_weight': self.kernel_reg_weight,
+            # Surgical histogram eq for kernel estimation only.
+            'kernel_eq': self.kernel_eq,
+            'kernel_eq_params': self.kernel_eq_params,
         }
 
         kernel, interim_latent = blind_deconv(
             yg, self.lambda_lmg, self.lambda_grad, opts,
+            iteration_callback=self._callback,
         )
 
         # ── 3½. Pre-nonblind denoising ────────────────────────────────
@@ -552,6 +587,10 @@ class LMGP_BD(DeconvolutionAlgorithm):
             'act_info': act_info,
             'pre_nonblind': self.pre_nonblind,
             'pre_nonblind_params': self.pre_nonblind_params,
+            'histogram_eq': self.histogram_eq,
+            'histogram_eq_params': self.histogram_eq_params,
+            'kernel_eq': self.kernel_eq,
+            'kernel_eq_params': self.kernel_eq_params,
             'noise_info': noise_info,
             'psd_info': {k: v for k, v in (psd_info or {}).items()
                          if k != 'psd_2d'} if psd_info else None,
@@ -652,6 +691,43 @@ class LMGP_BD(DeconvolutionAlgorithm):
         finally:
             self.preprocess = saved
         return y
+
+    # ── Histogram equalization ────────────────────────────────────────
+    def _apply_histogram_eq(self, img):
+        """Apply histogram equalization to a [0, 1] grayscale image.
+
+        Used BEFORE the blind step to enhance contrast and make salient
+        edges more prominent for kernel estimation.  Only the grayscale
+        image ``yg`` is equalized; the colour ``y`` fed to the non-blind
+        step is untouched, so the final intensity distribution is
+        preserved.
+
+        Options
+        -------
+        'clahe'  : Contrast-Limited Adaptive Histogram Equalization
+                   (recommended — local, avoids over-amplification).
+                   Params: {'clip_limit': float (default 0.01),
+                            'nbins': int (default 256),
+                            'kernel_size': int or None (default None)}.
+        'global' : standard global histogram equalization (no params).
+        """
+        from skimage.exposure import equalize_adapthist, equalize_hist
+        method = self.histogram_eq
+        p = self.histogram_eq_params or {}
+
+        if method == 'clahe':
+            return equalize_adapthist(
+                img,
+                clip_limit=p.get('clip_limit', 0.01),
+                nbins=p.get('nbins', 256),
+                kernel_size=p.get('kernel_size', None),
+            )
+        elif method == 'global':
+            return equalize_hist(img)
+        else:
+            raise ValueError(
+                f"Unknown histogram_eq='{method}'. "
+                f"Choose from: 'clahe', 'global', 'none'")
 
     # ── PSD-based noise preprocessing ────────────────────────────────────
     def _apply_noise_preprocess(self, yg):
@@ -910,6 +986,10 @@ class LMGP_BD(DeconvolutionAlgorithm):
             ('act_params', self.act_params),
             ('pre_nonblind', self.pre_nonblind),
             ('pre_nonblind_params', self.pre_nonblind_params),
+            ('histogram_eq', self.histogram_eq),
+            ('histogram_eq_params', self.histogram_eq_params),
+            ('kernel_eq', self.kernel_eq),
+            ('kernel_eq_params', self.kernel_eq_params),
         ]
 
     def change_param(self, params: Dict[str, Any]) -> None:
