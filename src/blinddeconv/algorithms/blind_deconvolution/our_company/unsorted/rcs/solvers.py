@@ -1307,6 +1307,22 @@ def richardson_lucy(obs_im, kernel_estimates, gamma_correction=2.2,
     # Histogram matching
     out = histmatch(out, np.clip(obs_im, 0, 255).astype(np.uint8))
 
+    # Edge crop: borders corrupted by RL deconvolution — replace with
+    # original blurred image (matching MATLAB fiddle_lucy3.m EDGE_CROP=1)
+    # MATLAB: out(edge_offset+1:end-edge_offset-1, ...)
+    edge_offset = blur_kernel.shape[0] // 2
+    eo_end = edge_offset + 1  # MATLAB removes one extra pixel from the end
+    if edge_offset > 0 and eo_end < min(out.shape[0], out.shape[1]) // 2:
+        obs_ref = np.clip(obs_im, 0, 255).astype(np.uint8)
+        if out.ndim == 2 and obs_ref.ndim == 3:
+            obs_ref = obs_ref[:, :, 0]
+        elif out.ndim == 3 and obs_ref.ndim == 2:
+            obs_ref = obs_ref[:, :, np.newaxis]
+        full_out = obs_ref.copy()
+        full_out[edge_offset:-eo_end, edge_offset:-eo_end] = \
+            out[edge_offset:-eo_end, edge_offset:-eo_end]
+        out = full_out
+
     return out, blur_kernel
 
 
