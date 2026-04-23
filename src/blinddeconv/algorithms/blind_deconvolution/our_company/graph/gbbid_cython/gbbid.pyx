@@ -348,6 +348,7 @@ class GBBID(DeconvolutionAlgorithm):
             preprocess_params=eff_pp,
             pre_kernel=self.pre_kernel,
             pre_kernel_params=eff_pkp,
+            iteration_callback=self._callback,
         )
 
         # ── 4½. Pre-nonblind denoising ───────────────────────────────

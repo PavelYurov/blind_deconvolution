@@ -1,8 +1,8 @@
 """
-build_cython.py  —  Build all .pyx modules in dcp_cython.
+build_cython.py  —  Build all .pyx modules in pmp_cython.
 
 Usage (from any directory):
-    python  <path-to>/dcp_cython/build_cython.py
+    python  <path-to>/pmp_cython/build_cython.py
 
 The script:
   1. Compiles every .pyx → .c   (Cython.Compiler)
@@ -12,7 +12,7 @@ The script:
   5. Removes .c from source dir + temp build dirs
 
 Output layout:
-    dcp_cython/
+    pmp_cython/
         *.pyx                  ← sources (untouched)
         build_cython.py        ← this script
         __init__.py
@@ -33,9 +33,6 @@ from pathlib import Path
 PKG_DIR = Path(__file__).resolve().parent
 PYD_DIR = PKG_DIR / "_build_pyd"
 C_DIR   = PKG_DIR / "_build_c"
-# Рядом лежит пакет dcp_cython_pyd, из которого реально импортируется
-# скомпилированный код.  Кладём туда же, чтобы новый билд сразу применялся.
-INSTALL_DIR = PKG_DIR.parent / "dcp_cython_pyd"
 
 # ── All .pyx modules to compile ──────────────────────────────
 PYX_MODULES = sorted(
@@ -51,31 +48,8 @@ print(f"[build] Modules     : {PYX_MODULES}")
 def cythonize_all():
     """Stage 1: .pyx → .c via Cython compiler."""
     from Cython.Compiler.Main import compile as cy_compile, CompilationOptions
-    from Cython.Compiler import Options
 
-    # Глобальные директивы компиляции Cython:
-    # ── производительность ──────────────────────────────────────────────
-    #   boundscheck=False       — отключает проверки границ массивов
-    #   wraparound=False        — отключает поддержку отрицательных индексов
-    #   initializedcheck=False  — не проверять инициализацию memoryview
-    #   nonecheck=False         — не проверять None при доступе к атрибутам
-    #   cdivision=True          — C-семантика для / и % (для ЦЕЛЫХ чисел;
-    #                             на float64 НЕ ВЛИЯЕТ, семантика IEEE та же).
-    # Эти директивы не меняют результаты с плавающей точкой, они только
-    # убирают Python-обёртки вокруг обращений к памяти.
-    directives = {
-        'language_level': 3,
-        'boundscheck': False,
-        'wraparound': False,
-        'cdivision': True,
-        'initializedcheck': False,
-        'nonecheck': False,
-        'infer_types': True,
-    }
-    opts = CompilationOptions(
-        language_level=3,
-        compiler_directives=directives,
-    )
+    opts = CompilationOptions(language_level=3)
     c_files = {}
     for mod in PYX_MODULES:
         pyx = str(PKG_DIR / f"{mod}.pyx")
@@ -94,23 +68,17 @@ def build_extensions(c_files):
     from setuptools.command.build_ext import build_ext
 
     # Use short temp dir to dodge Windows MAX_PATH
-    tmp_root = Path(tempfile.gettempdir()) / "cython_dcp"
+    tmp_root = Path(tempfile.gettempdir()) / "cython_pmp"
     tmp_root.mkdir(exist_ok=True)
 
     # ── Compiler optimisation flags ──────────────────────────
-    # NOTE: никаких fast-math флагов. Они реассоциируют FP-операции,
-    # контрактят FMA, меняют обработку денормалов — и через десятки
-    # итераций деконволюции результат расходится с чистым Python.
-    # /O2 и -O3 сами по себе строго IEEE-754 совместимы.
     if sys.platform.startswith('win'):
-        # /fp:precise — дефолт MSVC, ставим явно на случай унаследованных настроек.
-        extra_compile_args = ['/O2', '/fp:precise']
-        extra_link_args    = []
+        extra_compile_args = ['/O2', '/fp:fast', '/GL']
+        extra_link_args    = ['/LTCG']
     else:
-        # -fno-fast-math на всякий случай (перебивает возможный -ffast-math из env).
-        # -fno-finite-math-only оставляет корректную обработку NaN/Inf.
-        extra_compile_args = ['-O3', '-fno-fast-math', '-fno-finite-math-only']
-        extra_link_args    = []
+        extra_compile_args = ['-O3', '-ffast-math', '-flto',
+                              '-march=native', '-funroll-loops']
+        extra_link_args    = ['-flto']
 
     ext_suffix = sysconfig.get_config_var("EXT_SUFFIX") or ".pyd"
     built = {}
@@ -124,10 +92,6 @@ def build_extensions(c_files):
             include_dirs=[np.get_include()],
             extra_compile_args=extra_compile_args,
             extra_link_args=extra_link_args,
-            define_macros=[
-                # Silence numpy deprecation warnings from cimport numpy.
-                ('NPY_NO_DEPRECATED_API', 'NPY_1_7_API_VERSION'),
-            ],
         )
 
         dist = Distribution({"ext_modules": [ext]})
@@ -155,22 +119,11 @@ def install_and_cleanup(built, c_files, tmp_root):
     PYD_DIR.mkdir(exist_ok=True)
     C_DIR.mkdir(exist_ok=True)
 
-    # Copy .pyd into _build_pyd/ AND into sibling dcp_cython_pyd/
+    # Copy .pyd into _build_pyd/
     for mod, pyd_path in built.items():
         dest = PYD_DIR / Path(pyd_path).name
         shutil.copy2(pyd_path, dest)
         print(f"  install {dest.relative_to(PKG_DIR)}")
-        if INSTALL_DIR.exists():
-            # Удаляем старые .pyd этого модуля (с любым суффиксом)
-            # чтобы Python подхватил свежий, а не закешированный.
-            for old in INSTALL_DIR.glob(f"{mod}.*.pyd"):
-                try:
-                    old.unlink()
-                except OSError:
-                    pass
-            dest_install = INSTALL_DIR / Path(pyd_path).name
-            shutil.copy2(pyd_path, dest_install)
-            print(f"  install ../{dest_install.relative_to(INSTALL_DIR.parent)}")
 
     # Move .c into _build_c/
     for mod, c_path in c_files.items():
@@ -207,7 +160,7 @@ def main():
     install_and_cleanup(built, c_files, tmp_root)
 
     print(f"\n[build] Successfully built {len(built)}/{len(PYX_MODULES)} modules")
-    for mod in sorted(built.keys()):
+    for mod in sorted(built):
         print(f"  ✓ {mod}")
 
 

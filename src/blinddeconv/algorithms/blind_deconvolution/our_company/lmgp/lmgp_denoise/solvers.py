@@ -426,7 +426,8 @@ def L0Restoration(Im, kernel, lambda_grad, kappa=2.0):
 # blind_deconv_main  (from blind_deconv_main.m)
 # ═════════════════════════════════════════════════════════════════════════════
 
-def blind_deconv_main(blur_B, k, lambda_lmg, lambda_grad, threshold, opts):
+def blind_deconv_main(blur_B, k, lambda_lmg, lambda_grad, threshold, opts,
+                      iteration_callback=None):
     """
     Single-scale blind deconvolution.
     Equivalent to MATLAB blind_deconv_main.m.
@@ -472,8 +473,38 @@ def blind_deconv_main(blur_B, k, lambda_lmg, lambda_grad, threshold, opts):
     blur_B_w = wrap_boundary_liu(blur_B, tuple(target_size))
     blur_B_tmp = blur_B_w[:H, :W]
 
-    Bx = convolve2d(blur_B_tmp, dx, mode='valid')
-    By = convolve2d(blur_B_tmp, dy, mode='valid')
+    # ── Surgical histogram equalization for KERNEL ESTIMATION only ──
+    # Applied SYMMETRICALLY to both gradient sources (blur_B_tmp and
+    # S below): this keeps the grad(B) vs grad(S)*k matching in
+    # estimate_psf self-consistent, while leaving the latent update
+    # (L0_LMG_deblur) and non-blind restoration untouched.
+    kernel_eq_method = opts.get('kernel_eq', 'none')
+    kernel_eq_params = opts.get('kernel_eq_params', None) or {}
+
+    def _apply_kernel_eq(img):
+        if kernel_eq_method in (None, 'none'):
+            return img
+        # Safe-guard: eq expects [0, 1]; clip briefly without altering
+        # the copy stored by callers (we only transform a local copy).
+        from skimage.exposure import equalize_adapthist, equalize_hist
+        img_c = np.clip(img, 0.0, 1.0)
+        if kernel_eq_method == 'clahe':
+            return equalize_adapthist(
+                img_c,
+                clip_limit=kernel_eq_params.get('clip_limit', 0.003),
+                nbins=kernel_eq_params.get('nbins', 256),
+                kernel_size=kernel_eq_params.get('kernel_size', None),
+            )
+        elif kernel_eq_method == 'global':
+            return equalize_hist(img_c)
+        raise ValueError(
+            f"Unknown kernel_eq='{kernel_eq_method}'. "
+            f"Choose from: 'clahe', 'global', 'none'")
+
+    blur_B_for_grad = _apply_kernel_eq(blur_B_tmp)
+
+    Bx = convolve2d(blur_B_for_grad, dx, mode='valid')
+    By = convolve2d(blur_B_for_grad, dy, mode='valid')
 
     # Pre-smooth blurred-image gradients to suppress noise
     grad_smooth_sigma = opts.get('grad_smooth_sigma', None)
@@ -519,8 +550,15 @@ def blind_deconv_main(blur_B, k, lambda_lmg, lambda_grad, threshold, opts):
             S = S[:H, :W]
 
         # ── 2. Gradient thresholding ──────────────────────────
+        # If kernel_eq is enabled, equalize S BEFORE computing grads
+        # for kernel estimation (symmetric with blur_B_for_grad above).
+        # The original S is kept untouched for the callback and is NOT
+        # mutated — L0_LMG_deblur already fed it to the next iteration
+        # via blur_B_w, which is independent of this transformation.
+        S_for_grad = _apply_kernel_eq(S)
+
         latent_x, latent_y, threshold = threshold_pxpy_v1(
-            S, max(k.shape), threshold,
+            S_for_grad, max(k.shape), threshold,
             denoise_eps=denoise_eps, denoise_radius=denoise_radius,
             ensemble_denoise=ensemble_denoise,
             denoise_type=denoise_type,
@@ -552,6 +590,21 @@ def blind_deconv_main(blur_B, k, lambda_lmg, lambda_grad, threshold, opts):
             lambda_lmg = max(lambda_lmg / 1.1, 1e-4)
         if lambda_grad != 0:
             lambda_grad = max(lambda_grad / 1.1, 1e-4)
+
+        # ── Callback ──────────────────────────────────────────
+        if iteration_callback is not None:
+            iteration_callback({
+                'iteration': _iter,
+                'scale': opts.get('_current_scale', 0),
+                'num_scales': opts.get('scales', 1),
+                'kernel': k.copy(),
+                'image': S,
+                'metrics': {
+                    'kernel_diff': float(np.linalg.norm(k - k_prev)),
+                    'lambda_lmg': lambda_lmg,
+                    'lambda_grad': lambda_grad,
+                },
+            })
 
     # Final cleanup
     k[k < 0] = 0.0
@@ -698,7 +751,7 @@ def _resizeKer(k, ret, k1, k2):
     return k
 
 
-def blind_deconv(y, lambda_lmg, lambda_grad, opts):
+def blind_deconv(y, lambda_lmg, lambda_grad, opts, iteration_callback=None):
     """
     Multi-scale blind deconvolution.
     Equivalent to MATLAB blind_deconv.m.
@@ -738,6 +791,9 @@ def blind_deconv(y, lambda_lmg, lambda_grad, opts):
     k1list = k1list + (k1list % 2 == 0)    # ensure odd
     k2list = k1list.copy()                  # square kernels
 
+    # Expose pyramid depth to blind_deconv_main (for callback state)
+    opts['scales'] = num_scales
+
     threshold = None
     ks = None
     interim_latent = None
@@ -754,16 +810,16 @@ def blind_deconv(y, lambda_lmg, lambda_grad, opts):
         cret = retv[s_idx]
         ys = _downSmpImC(y, cret)
 
-        print(f'Processing scale {s_idx + 1}/{num_scales}; '
-              f'kernel size {k1list[s_idx]}x{k2list[s_idx]}; '
-              f'image size {ys.shape[0]}x{ys.shape[1]}')
-
         # At coarsest level, estimate initial threshold
         if s_idx == num_scales - 1:
             _, _, threshold = threshold_pxpy_v1(ys, max(ks.shape))
 
+        # Expose 0-based scale index (0 = finest) for the callback.
+        opts['_current_scale'] = s_idx
+
         ks, lambda_lmg, lambda_grad, interim_latent = blind_deconv_main(
-            ys, ks, lambda_lmg, lambda_grad, threshold, opts
+            ys, ks, lambda_lmg, lambda_grad, threshold, opts,
+            iteration_callback=iteration_callback,
         )
 
         # Centre and clean kernel

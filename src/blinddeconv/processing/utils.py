@@ -391,14 +391,27 @@ def generate_unique_file_path(directory: Path,
 
 def calculate_metrics(original_image: np.ndarray, 
                        restored_image: np.ndarray, 
-                       data_range: Optional[float] = None) -> tuple[float, float]:
-    """Расчет метрик восстановления."""
+                       data_range: Optional[float] = None,
+                       aligned: bool = True,
+                       max_shift: int = 8,
+                       border: int = 4) -> tuple[float, float]:
+    """Расчет метрик восстановления.
+
+    По умолчанию ``aligned=True`` — используется shift-aligned вариант
+    PSNR/SSIM (поиск оптимального целочисленного сдвига восстановленного
+    изображения относительно оригинала в окне ``[-max_shift, +max_shift]``).
+    Это компенсирует translation-ambiguity слепой деконволюции.
+    """
     try:
-        psnr_val = metrics.PSNR(original_image, restored_image)
+        psnr_val = metrics.PSNR(original_image, restored_image,
+                                aligned=aligned, max_shift=max_shift,
+                                border=border)
     except:
         psnr_val = math.nan
     try:
-        ssim_val = metrics.SSIM(original_image, restored_image, data_range=data_range)
+        ssim_val = metrics.SSIM(original_image, restored_image,
+                                data_range=data_range, aligned=aligned,
+                                max_shift=max_shift, border=border)
     except:
         ssim_val = math.nan 
     return psnr_val, ssim_val 

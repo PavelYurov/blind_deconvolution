@@ -450,8 +450,17 @@ def adjust_psf_center(psf: np.ndarray) -> np.ndarray:
     xc2 = (cols + 1) / 2.0
     yc2 = (rows + 1) / 2.0
 
-    xshift = round(xc2 - xc1)
-    yshift = round(yc2 - yc1)
+    # MATLAB ``round`` uses round-half-away-from-zero, while Python's
+    # built-in ``round`` uses banker's rounding (round-half-to-even).
+    # For shifts of exactly ±0.5, ±1.5, ±2.5, … this differs by one
+    # pixel, which then propagates through every pyramid scale and can
+    # offset the final latent by several pixels relative to GT — killing
+    # PSNR/SSIM even when the kernel shape itself is correct.
+    def _matlab_round(x: float) -> int:
+        return int(np.floor(np.abs(x) + 0.5) * np.sign(x)) if x != 0 else 0
+
+    xshift = _matlab_round(xc2 - xc1)
+    yshift = _matlab_round(yc2 - yc1)
 
     # MATLAB warpProjective2: for each output pixel at 1-based (x,y),
     # sample input at (x - xshift, y - yshift).
