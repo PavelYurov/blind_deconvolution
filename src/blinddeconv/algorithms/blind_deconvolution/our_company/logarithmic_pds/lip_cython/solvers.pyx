@@ -144,7 +144,9 @@ def blind(f, MK, NK, beta, u, k, outer_iters=140, inner_iters=5,
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Table 1  →  blind_pd (FAST CYTHON VERSION)
+# Condat-Vũ variant on MM-majorant  →  blind_cv  (FAST CYTHON VERSION)
+# (own construction — NOT the PD algorithm from the paper; see ``blind_pd``
+#  below for the paper-faithful Table 1 variant.)
 # ─────────────────────────────────────────────────────────────────────────────
 
 cdef void compute_w(double[:, ::1] u, double[:, ::1] w, double epsilon) noexcept:
@@ -183,23 +185,43 @@ cdef void compute_pd_primal_update(double[:, ::1] u, double[:, ::1] u_old, doubl
                                    double[:, ::1] grad_data, double[:, :, ::1] p,
                                    double tau_pd, double theta) noexcept:
     cdef int M = u.shape[0], N = u.shape[1], i, j, prev_i, prev_j
-    cdef double div_p, u_new
+    cdef double div_p, u_new, u_prev
     for i in range(M):
         prev_i = i - 1 if i - 1 >= 0 else M - 1
         for j in range(N):
             prev_j = j - 1 if j - 1 >= 0 else N - 1
             div_p = (p[0, i, j] - p[0, i, prev_j]) + (p[1, i, j] - p[1, prev_i, j])
 
-            u_new = u[i, j] - tau_pd * grad_data[i, j] + tau_pd * div_p
+            u_prev = u[i, j]
+            u_new = u_prev - tau_pd * grad_data[i, j] + tau_pd * div_p
             if u_new < 0.0: u_new = 0.0
 
-            u_old[i, j] = u[i, j]
+            u_old[i, j] = u_prev
             u[i, j] = u_new
-            u_bar[i, j] = u_new + theta * (u_new - u_old[i, j])
+            u_bar[i, j] = u_new + theta * (u_new - u_prev)
 
-def blind_pd(f, MK, NK, beta, u, k, outer_iters=140, inner_iters=5,
+def blind_cv(f, MK, NK, beta, u, k, outer_iters=140, inner_iters=5,
              tau_param=1e-3, k_step=1e-3, blind_denoise_fn=None):
-    
+    """
+    Condat-Vũ primal-dual splitting on the MM-majorised weighted-TV
+    subproblem (Cython-accelerated, own construction — NOT from the paper).
+
+    Mirrors ``blind_cv`` in ``lip_denoise/solvers.py`` bit-for-bit:
+        * outer loop:   MM weights ``w = √(ε + |∇u|²)`` recomputed from u,
+                        radius ``1 / (w + τ_param)`` frozen for inner loop.
+        * inner loop:   dual step (ball projection) + primal step
+                        ``u ← [u − τ·∇f(u) + τ·div(p)]_+``, over-relaxed.
+        * kernel step:  OUTSIDE inner loop, projected gradient descent,
+                        centre-of-mass re-centring (k, u, p compensated).
+
+    Convergence condition (Condat 2013, Thm. 3.1):
+        ``1/τ − σ·‖∇‖² > L_f / 2`` with L_f = β, ‖∇‖² = 8.
+        → σ = 0.99·β/16,  τ = 0.99/β.
+
+    Boundary condition: **periodic** (to match the Python reference's
+    ``np.roll`` formulation).  The data-fidelity gradient uses spatial
+    valid/full convolutions, so those terms are boundary-correct.
+    """
     cdef double epsilon = 1e-3
     u = np.ascontiguousarray(u, dtype=np.float64)
     k = np.ascontiguousarray(k, dtype=np.float64)
@@ -257,6 +279,235 @@ def blind_pd(f, MK, NK, beta, u, k, outer_iters=140, inner_iters=5,
                 p[0] = np.roll(p[0], -dx, axis=1)
                 p[1] = np.roll(p[1], -dy, axis=0)
                 p[1] = np.roll(p[1], -dx, axis=1)
+
+    return u, k
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Table 1 of Perrone & Favaro (2016)  →  blind_pd
+# Paper-faithful primal-dual solver for the non-convex log-TV prior.
+# Implementation is pure NumPy (kept identical to the ``lip_denoise`` version
+# — ``точь-в-точь как Python``).  The CV solver above carries the Cython
+# speedups.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _grad_neumann(u):
+    """Forward differences with Neumann (zero at last row/col) boundary."""
+    gx = np.zeros_like(u)
+    gy = np.zeros_like(u)
+    gx[:, :-1] = u[:, 1:] - u[:, :-1]
+    gy[:-1, :] = u[1:, :] - u[:-1, :]
+    return gx, gy
+
+
+def _div_neumann(px, py):
+    """
+    Divergence operator — adjoint of ``_grad_neumann`` under
+    ``<∇u, p> = -<u, div p>``.  Standard Chambolle-2004 construction.
+    """
+    dx = np.zeros_like(px)
+    dx[:, 1:-1] = px[:, 1:-1] - px[:, :-2]
+    dx[:, 0]    = px[:, 0]
+    dx[:, -1]   = -px[:, -2]
+
+    dy = np.zeros_like(py)
+    dy[1:-1, :] = py[1:-1, :] - py[:-2, :]
+    dy[0, :]    = py[0, :]
+    dy[-1, :]   = -py[-2, :]
+    return dx + dy
+
+
+def _h_function(xi, mu, eps, sigma):
+    """
+    Solve eq. (25) of Perrone & Favaro (2016) per pixel:
+
+        H(ξ, μ, ε, σ) = argmin_ρ  (μ/2σ)·(ρ−1)²·ξ²  +  log(ρ²·ξ² + ε²)
+
+    Cardano closed-form in ρ (depressed cubic).  Identical numerics to the
+    ``lip_denoise`` reference implementation.
+    """
+    xi = np.asarray(xi, dtype=np.float64)
+    eps2 = eps * eps
+
+    rho = np.zeros_like(xi)
+    safe = xi > 1e-12
+    if not np.any(safe):
+        return rho
+
+    xi_s = xi[safe]
+    xi2 = xi_s * xi_s
+
+    c = eps2 / xi2 + 2.0 * sigma / (mu * xi2)
+    d = -eps2 / xi2
+
+    p = c - 1.0 / 3.0
+    q = -2.0 / 27.0 + c / 3.0 + d
+
+    disc = q * q / 4.0 + (p ** 3) / 27.0
+
+    rho_s = np.empty_like(xi_s)
+    three_real = disc < 0
+    one_real = ~three_real
+
+    if np.any(three_real):
+        p_t = p[three_real]
+        q_t = q[three_real]
+        xi2_t = xi2[three_real]
+        r = 2.0 * np.sqrt(-p_t / 3.0)
+        arg = (3.0 * q_t) / (2.0 * p_t) * np.sqrt(-3.0 / p_t)
+        arg = np.clip(arg, -1.0, 1.0)
+        phi = np.arccos(arg) / 3.0
+        t0 = r * np.cos(phi)
+        t1 = r * np.cos(phi - 2.0 * np.pi / 3.0)
+        t2 = r * np.cos(phi - 4.0 * np.pi / 3.0)
+        r0 = t0 + 1.0 / 3.0
+        r1 = t1 + 1.0 / 3.0
+        r2 = t2 + 1.0 / 3.0
+
+        def _obj(rr):
+            return (mu / (2.0 * sigma)) * (rr - 1.0) ** 2 * xi2_t \
+                   + np.log(rr * rr * xi2_t + eps2)
+
+        o0 = _obj(r0); o1 = _obj(r1); o2 = _obj(r2)
+        stack_r = np.stack([r0, r1, r2], axis=0)
+        stack_o = np.stack([o0, o1, o2], axis=0)
+        best = np.argmin(stack_o, axis=0)
+        rho_s[three_real] = np.take_along_axis(stack_r, best[None], axis=0)[0]
+
+    if np.any(one_real):
+        p_o = p[one_real]
+        q_o = q[one_real]
+        disc_o = disc[one_real]
+        sqd = np.sqrt(np.maximum(disc_o, 0.0))
+        u3 = -q_o / 2.0 + sqd
+        v3 = -q_o / 2.0 - sqd
+        t = np.cbrt(u3) + np.cbrt(v3)
+        rho_s[one_real] = t + 1.0 / 3.0
+
+    rho_s = np.clip(rho_s, 0.0, 1.0)
+    rho[safe] = rho_s
+    return rho
+
+
+def _build_h_lut(mu, eps, sigma, xi_max=4.0, n_grid=4096):
+    """Pre-compute H(ξ) on a uniform grid for fast interpolation."""
+    xi_grid = np.linspace(0.0, xi_max, n_grid, dtype=np.float64)
+    h_grid = _h_function(xi_grid, mu=mu, eps=eps, sigma=sigma)
+    return xi_grid, h_grid
+
+
+def _h_lut_apply(xi, xi_grid, h_grid):
+    """Vectorised 1-D linear interpolation of a pre-computed H-LUT."""
+    return np.interp(xi, xi_grid, h_grid,
+                     left=h_grid[0], right=h_grid[-1])
+
+
+def blind_pd(f, MK, NK, beta, u, k,
+             outer_iters=30, inner_iters=50,
+             tau_param=1e-3, k_step=1e-3,
+             theta=1.0, pd_tau=None, pd_sigma=None,
+             h_mode='closed', h_lut_size=4096, h_lut_xi_max=4.0,
+             blind_denoise_fn=None):
+    """
+    Primal-dual blind deconvolution — Table 1 of Perrone & Favaro (2016).
+
+    Mirrors ``blind_pd`` in ``lip_denoise/solvers.py`` bit-for-bit.  Uses
+    Neumann boundary conditions via ``_grad_neumann`` / ``_div_neumann``
+    and the H-function from eq. (25).
+
+    Step sizes (balanced, paper-faithful):
+        ``pd_tau = pd_sigma = 0.99 / √‖K‖² ≈ 0.33``
+        with ``‖K‖² ≤ ‖k*‖² + ‖∇‖² ≤ 1 + 8 = 9``.
+    """
+    epsilon = float(tau_param)
+    mu = float(beta)
+
+    K_norm2 = 9.0
+    default_step = 0.99 / np.sqrt(K_norm2)
+    tau_pd = float(pd_tau) if pd_tau is not None else default_step
+    sigma_pd = float(pd_sigma) if pd_sigma is not None else tau_pd
+
+    h_mode_l = str(h_mode).lower()
+    if h_mode_l == 'lut':
+        _xi_grid, _h_grid = _build_h_lut(
+            mu=mu, eps=epsilon, sigma=sigma_pd,
+            xi_max=float(h_lut_xi_max), n_grid=int(h_lut_size))
+        def _H(xi_arr):
+            return _h_lut_apply(xi_arr, _xi_grid, _h_grid)
+    elif h_mode_l == 'closed':
+        def _H(xi_arr):
+            return _h_function(xi_arr, mu, epsilon, sigma_pd)
+    else:
+        raise ValueError(f"h_mode must be 'closed' or 'lut', got {h_mode!r}")
+
+    u = np.ascontiguousarray(u, dtype=np.float64)
+    k = np.ascontiguousarray(k, dtype=np.float64)
+    f = np.ascontiguousarray(f, dtype=np.float64)
+
+    Mu, Nu = u.shape
+    z1 = np.zeros_like(f)
+    z2x = np.zeros((Mu, Nu))
+    z2y = np.zeros((Mu, Nu))
+    u_tilde = u.copy()
+    u_bar = u.copy()
+
+    ys, xs = np.mgrid[0:MK, 0:NK]
+    cy_target = (MK - 1) / 2.0
+    cx_target = (NK - 1) / 2.0
+
+    for it in range(outer_iters):
+        for itt in range(inner_iters):
+            # z₁ ← (z₁ + σ(k*ū − f)) / (1 + σ)
+            Kub = convn_valid(u_bar, k)
+            z1 = (z1 + sigma_pd * (Kub - f)) / (1.0 + sigma_pd)
+
+            # z₂ ← (1 − H(‖ζ‖/σ, μ, ε, σ)) · ζ   where ζ = z₂ + σ·∇ū
+            gx, gy = _grad_neumann(u_bar)
+            zx = z2x + sigma_pd * gx
+            zy = z2y + sigma_pd * gy
+            xi = np.sqrt(zx * zx + zy * zy) / sigma_pd
+            H = _H(xi)
+            scale = 1.0 - H
+            z2x = scale * zx
+            z2y = scale * zy
+
+            # ũ ← ũ − τ (k₋ * z₁ + ∇* z₂),   ∇* = −div
+            Kstar_z1 = convn_full(z1, np.rot90(k, 2))
+            div_z2 = _div_neumann(z2x, z2y)
+            u_new = u_tilde - tau_pd * (Kstar_z1 - div_z2)
+
+            u_bar = u_new + theta * (u_new - u_tilde)
+            u_tilde = u_new
+
+        u = u_tilde
+
+        # Kernel step (Chan-Wong / blind.m style)
+        u_dk = blind_denoise_fn(u) if blind_denoise_fn is not None else u
+        synth = convn_valid(u_dk, k)
+        err = synth - f
+        gradk = convn_valid(np.rot90(u_dk, 2), err)
+        alpha_k = k_step * (k.max() + 1.0 / k.size) / \
+                  (np.abs(gradk).max() + 1e-30)
+        k = k - alpha_k * gradk
+        k = np.maximum(k, 0.0)
+        k_sum = k.sum()
+        if k_sum > 0:
+            k /= k_sum
+
+        # Kernel centre-of-mass re-centring
+        k_sum_c = k.sum()
+        if k_sum_c > 0:
+            cy = (ys * k).sum() / k_sum_c
+            cx = (xs * k).sum() / k_sum_c
+            dy = int(round(cy_target - cy))
+            dx = int(round(cx_target - cx))
+            if dy != 0 or dx != 0:
+                k = np.roll(np.roll(k, dy, axis=0), dx, axis=1)
+                u = np.roll(np.roll(u, -dy, axis=0), -dx, axis=1)
+                u_tilde = np.roll(np.roll(u_tilde, -dy, axis=0), -dx, axis=1)
+                u_bar = np.roll(np.roll(u_bar, -dy, axis=0), -dx, axis=1)
+                z2x = np.roll(np.roll(z2x, -dy, axis=0), -dx, axis=1)
+                z2y = np.roll(np.roll(z2y, -dy, axis=0), -dx, axis=1)
 
     return u, k
 
@@ -391,12 +642,31 @@ def coarse_to_fine(f: np.ndarray, MK: int, NK: int,
                 u, k = blind_pd(
                     fs, MKs, NKs, lam,
                     u, k,
+                    outer_iters=blind_params.get('pd_outer_iters', 30),
+                    inner_iters=blind_params.get('pd_inner_iters', 50),
+                    tau_param=tau,
+                    k_step=float(k_steps[phase]),
+                    theta=blind_params.get('pd_theta', 1.0),
+                    pd_tau=blind_params.get('pd_tau', None),
+                    pd_sigma=blind_params.get('pd_sigma', None),
+                    h_mode=blind_params.get('h_mode', 'closed'),
+                    h_lut_size=blind_params.get('h_lut_size', 4096),
+                    h_lut_xi_max=blind_params.get('h_lut_xi_max', 4.0),
+                    blind_denoise_fn=blind_denoise_fn,
+                )
+            elif method == 'cv':
+                u, k = blind_cv(
+                    fs, MKs, NKs, lam,
+                    u, k,
                     outer_iters=outer_iters,
                     inner_iters=inner_iters,
                     tau_param=tau,
-                    blind_denoise_fn=blind_denoise_fn,
                     k_step=float(k_steps[phase]),
+                    blind_denoise_fn=blind_denoise_fn,
                 )
+            else:
+                raise ValueError(
+                    f"Unknown method {method!r}. Choose 'mm', 'pd', or 'cv'.")
 
     return u, k
 

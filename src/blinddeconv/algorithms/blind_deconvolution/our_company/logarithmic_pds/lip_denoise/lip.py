@@ -338,14 +338,15 @@ class LIP_BD(DeconvolutionAlgorithm):
                 # default behaviour that already works on clean images.
                 sigma_floor = ap.get('sigma_floor', 0.002)
                 if sigma_n >= sigma_floor:
+                    # No implicit λ cap — preserves the original legacy
+                    # behaviour.  If you want a cap, pass it explicitly.
+                    lambda_cap = ap.get('lambda_cap', None)
                     lam_new = k_lambda / max(sigma_n, 1e-6)
-                    tau_new = k_tau * sigma_n ** 2
-                    alpha_new = k_alpha * sigma_n
-                    # Caps: keep parameters in sane ranges.
-                    self.lambda_val = float(np.clip(lam_new, 100.0,
-                                                   ap.get('lambda_cap', 1e5)))
-                    self.tau = float(max(ap.get('tau_floor', 1e-4), tau_new))
-                    self.final_alpha = float(max(1e-5, alpha_new))
+                    if lambda_cap is not None:
+                        lam_new = min(lam_new, float(lambda_cap))
+                    self.lambda_val = max(100.0, lam_new)
+                    self.tau = max(1e-6, k_tau * sigma_n ** 2)
+                    self.final_alpha = max(1e-5, k_alpha * sigma_n)
                     if self.verbose:
                         print(f"[{self.name}] auto_params(σ={sigma_n:.5f}): "
                               f"λ={self.lambda_val:.1f}, "
@@ -778,11 +779,14 @@ class LIP_BD(DeconvolutionAlgorithm):
 
         # Force heavy branch for signal-dependent noise even when σ looks
         # small — pca's sigma_norm is evaluated at mean brightness and may
-        # understate the Poisson component.  We still require a minimum
-        # σ so we don't kick in on genuinely clean images misclassified.
+        # understate the Poisson component.  Threshold chosen conservatively:
+        # at σ < ~0.01 the Poisson component is so mild that plain defaults
+        # still work, and forcing heavy (which switches in ACT + ringing
+        # removal) only blurs the result.
         force_heavy = False
         nt = (noise_info or {}).get('noise_type', None)
-        if nt in ('poisson', 'poisson_gaussian') and sigma >= 0.003:
+        force_heavy_sigma = float(amp.get('force_heavy_sigma', 0.01))
+        if nt in ('poisson', 'poisson_gaussian') and sigma >= force_heavy_sigma:
             force_heavy = True
 
         # ── 3) Clean branch — DO NOT alter denoisers or parameters.
@@ -864,8 +868,10 @@ class LIP_BD(DeconvolutionAlgorithm):
             }
 
         # preprocess (global denoise of f before blind pyramid).
-        # Poisson-like → ACT (locally adaptive in curvelet domain).
-        # Pure Gaussian → keep bilateral at moderate w, bm3d at heavy.
+        # Poisson-like → ACT (locally adaptive in curvelet domain — its
+        # ML-estimator estimates variance per subband from local energy,
+        # which naturally handles signal-dependent noise without VST).
+        # Pure Gaussian → bilateral at moderate w, bm3d at heavy.
         if poisson_like:
             self.preprocess = 'act'
             self.preprocess_params = {'threshold_setting': 's'}
@@ -880,14 +886,13 @@ class LIP_BD(DeconvolutionAlgorithm):
             self.preprocess_params = {'sigma': float(sigma)}
 
         # pre_nonblind (denoise of f before non-blind solve).
-        # Poisson-like → BM3D wrapped in generalized Anscombe VST.
-        # Pure Gaussian → BM3D / ensemble as before.
+        # Poisson-like → ACT again (it already handled preprocess well;
+        # reusing it here with a slightly stronger threshold cleans the
+        # residual inverse-filter amplification without BM3D-style blur).
+        # Pure Gaussian → BM3D or ensemble as before.
         if poisson_like:
-            self.pre_nonblind = 'bm3d'
-            self.pre_nonblind_params = {
-                'use_vst': True,
-                'sigma': float(max(sigma, 0.01)),
-            }
+            self.pre_nonblind = 'act'
+            self.pre_nonblind_params = {'threshold_setting': 's'}
         elif w < 0.6:
             self.pre_nonblind = 'bm3d'
             self.pre_nonblind_params = {'sigma': float(max(sigma, 0.01))}

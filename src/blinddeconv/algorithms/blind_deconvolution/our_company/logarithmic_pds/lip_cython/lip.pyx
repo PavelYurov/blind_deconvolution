@@ -167,6 +167,15 @@ class LIP_BD(DeconvolutionAlgorithm):
         gamma_correction: bool = False,
         gamma: float = 1.0,
         method: str = 'mm',
+        # ── Paper-faithful PD solver (Table 1) parameters ───────────────
+        pd_outer_iters: int = 30,
+        pd_inner_iters: int = 50,
+        pd_theta: float = 1.0,
+        pd_tau: float = None,
+        pd_sigma: float = None,
+        h_mode: str = 'closed',
+        h_lut_size: int = 4096,
+        h_lut_xi_max: float = 4.0,
         kernel_threshold: float = 0.05,
         final_deconv: str = 'tikhonov',
         final_alpha: float = 0.001,
@@ -189,6 +198,8 @@ class LIP_BD(DeconvolutionAlgorithm):
         pre_nonblind_params: dict = None,
         auto_params: dict = None,
         nb_params: dict = None,
+        auto_mode: str = 'off',
+        auto_mode_params: dict = None,
     ):
         super().__init__(name='LIP-BD')
 
@@ -213,6 +224,15 @@ class LIP_BD(DeconvolutionAlgorithm):
         self.gamma_corr = gamma_correction
         self.gamma = gamma
         self.method = method.lower()
+        # Paper-faithful PD solver (Table 1) parameters
+        self.pd_outer_iters = int(pd_outer_iters)
+        self.pd_inner_iters = int(pd_inner_iters)
+        self.pd_theta = float(pd_theta)
+        self.pd_tau = pd_tau
+        self.pd_sigma = pd_sigma
+        self.h_mode = h_mode
+        self.h_lut_size = int(h_lut_size)
+        self.h_lut_xi_max = float(h_lut_xi_max)
         self.kernel_threshold = kernel_threshold
         self.final_deconv = final_deconv.lower()
         self.final_alpha = final_alpha
@@ -236,6 +256,24 @@ class LIP_BD(DeconvolutionAlgorithm):
         self.pre_nonblind_params = pre_nonblind_params
         self.auto_params = auto_params
         self.nb_params = nb_params
+        self.auto_mode = (auto_mode or 'off').lower()
+        self.auto_mode_params = auto_mode_params
+
+        # Snapshot of defaults used by the robust orchestrator so that
+        # soft-blending always starts from the values the user supplied,
+        # not from values overwritten on a previous process() call.
+        self._defaults_snapshot = {
+            'lambda_val': float(lambda_val),
+            'tau': float(tau),
+            'final_alpha': float(final_alpha),
+            'final_deconv': self.final_deconv,
+            'preprocess': preprocess,
+            'preprocess_params': preprocess_params,
+            'blind_denoise': blind_denoise,
+            'blind_denoise_params': blind_denoise_params,
+            'pre_nonblind': pre_nonblind,
+            'pre_nonblind_params': pre_nonblind_params,
+        }
 
         self.history: Dict[str, list] = {'kernel_diff': []}
         self.hyperparams: Dict[str, Any] = {}
@@ -278,6 +316,15 @@ class LIP_BD(DeconvolutionAlgorithm):
         noise_info = None
         if self.noise_estimation != 'none':
             noise_info = self._estimate_noise(f)
+        elif self.auto_mode == 'robust':
+            # Orchestrator requires σ — force PCA estimator if user left it off.
+            self.noise_estimation = 'pca'
+            noise_info = self._estimate_noise(f)
+
+        # ── 4b¼. Robust orchestrator (soft-weighted auto config) ────────
+        orchestrator_info = None
+        if self.auto_mode == 'robust':
+            orchestrator_info = self._orchestrate_robust(noise_info)
 
         # ── 4b½. Auto-params (λ, τ, α) from σ ─────────────────────────
         if self.auto_params is not None and noise_info is not None:
@@ -287,14 +334,28 @@ class LIP_BD(DeconvolutionAlgorithm):
                 k_lambda = ap.get('k_lambda', 5000.0)
                 k_tau = ap.get('k_tau', 10.0)
                 k_alpha = ap.get('k_alpha', 0.1)
-                self.lambda_val = max(100.0, k_lambda / max(sigma_n, 1e-6))
-                self.tau = max(1e-6, k_tau * sigma_n ** 2)
-                self.final_alpha = max(1e-5, k_alpha * sigma_n)
-                if self.verbose:
-                    print(f"[{self.name}] auto_params(σ={sigma_n:.5f}): "
-                          f"λ={self.lambda_val:.1f}, "
-                          f"τ={self.tau:.6f}, "
-                          f"α={self.final_alpha:.5f}")
+                # Skip rescaling at essentially-clean inputs — otherwise
+                # τ collapses to ~1e-7 and λ explodes, wrecking the
+                # default behaviour that already works on clean images.
+                sigma_floor = ap.get('sigma_floor', 0.002)
+                if sigma_n >= sigma_floor:
+                    # No implicit λ cap — preserves the original legacy
+                    # behaviour.  If you want a cap, pass it explicitly.
+                    lambda_cap = ap.get('lambda_cap', None)
+                    lam_new = k_lambda / max(sigma_n, 1e-6)
+                    if lambda_cap is not None:
+                        lam_new = min(lam_new, float(lambda_cap))
+                    self.lambda_val = max(100.0, lam_new)
+                    self.tau = max(1e-6, k_tau * sigma_n ** 2)
+                    self.final_alpha = max(1e-5, k_alpha * sigma_n)
+                    if self.verbose:
+                        print(f"[{self.name}] auto_params(σ={sigma_n:.5f}): "
+                              f"λ={self.lambda_val:.1f}, "
+                              f"τ={self.tau:.6f}, "
+                              f"α={self.final_alpha:.5f}")
+                elif self.verbose:
+                    print(f"[{self.name}] auto_params skipped "
+                          f"(σ={sigma_n:.5f} < floor={sigma_floor})")
 
         # ── 4c. ScreeNOT SVD denoising ──────────────────────────────────
         screenot_info = None
@@ -345,13 +406,22 @@ class LIP_BD(DeconvolutionAlgorithm):
                 return self._apply_blind_denoise(u_arr, noise_info)
 
         # ── 6. PSF estimation (blind step) ──────────────────────────────
-        if self.method in ('mm', 'pd'):
+        if self.method in ('mm', 'pd', 'cv'):
             blind_params = {
                 'outer_iters': self.outer_iters,
                 'inner_iters': self.inner_iters,
                 'tau': self.tau,
                 'k_step': self.k_step,
                 'u_step': self.u_step,
+                # Paper-faithful PD (Table 1) overrides
+                'pd_outer_iters': self.pd_outer_iters,
+                'pd_inner_iters': self.pd_inner_iters,
+                'pd_theta': self.pd_theta,
+                'pd_tau': self.pd_tau,
+                'pd_sigma': self.pd_sigma,
+                'h_mode': self.h_mode,
+                'h_lut_size': self.h_lut_size,
+                'h_lut_xi_max': self.h_lut_xi_max,
             }
             ctf_params = {
                 'final_lambda': self.lambda_val,
@@ -363,7 +433,8 @@ class LIP_BD(DeconvolutionAlgorithm):
                 verbose=self.verbose, method=self.method,
                 blind_denoise_fn=blind_denoise_fn)
         else:
-            raise ValueError(f"Unknown method '{self.method}'. Choose 'mm' or 'pd'.")
+            raise ValueError(
+                f"Unknown method '{self.method}'. Choose 'mm', 'pd', or 'cv'.")
 
         # ── 6b. Kernel thresholding ─────────────────────────────────────
         k[k < self.kernel_threshold * k.max()] = 0.0
@@ -385,6 +456,33 @@ class LIP_BD(DeconvolutionAlgorithm):
                 lambda_l0=nbp.get('lambda_l0', 2e-3),
                 weight_ring=nbp.get('weight_ring', 1.0),
             )
+        elif self.final_deconv == 'blend':
+            # Weighted average of tikhonov (sharp, keeps details) and
+            # ringing_removal (smoother, fewer inverse-filter artifacts).
+            # Useful when the kernel is well-estimated and the input is
+            # essentially clean: tikhonov gives detail back, ringing_removal
+            # suppresses the inverse-filter ripples.
+            from .solvers import ringing_artifacts_removal
+            nbp = self.nb_params or {}
+            blend_w = float(nbp.get('blend_weight', 0.5))  # weight of RR
+
+            f_pad = pad_image(f, (MK, NK))
+            f_pad = edgetaper(f_pad, k)
+            u_tik = tikhonov_filter(f_pad, k, alpha=self.final_alpha)
+            u_tik = crop_image(u_tik, (M_orig, N_orig), (MK, NK))
+
+            u_rr = ringing_artifacts_removal(
+                f, k,
+                lambda_tv=nbp.get('lambda_tv', 1e-3),
+                lambda_l0=nbp.get('lambda_l0', 2e-3),
+                weight_ring=nbp.get('weight_ring', 1.0),
+            )
+
+            # Shapes may differ by at most a pad — normalise to tikhonov crop.
+            h = min(u_tik.shape[0], u_rr.shape[0])
+            w = min(u_tik.shape[1], u_rr.shape[1])
+            u_restored = ((1.0 - blend_w) * u_tik[:h, :w]
+                          + blend_w * u_rr[:h, :w])
         elif self.final_deconv == 'adaptive_lp':
             from .non_blind import adaptive_lp_deconv
             nbp = self.nb_params or {}
@@ -411,7 +509,7 @@ class LIP_BD(DeconvolutionAlgorithm):
             raise ValueError(
                 f"Unknown final_deconv '{self.final_deconv}'. "
                 "Choose 'tikhonov', 'wiener', 'ringing_removal', "
-                "or 'adaptive_lp'."
+                "'adaptive_lp', or 'blend'."
             )
 
         # ── Restore original dimensions (make_size_odd may have trimmed) ─
@@ -450,6 +548,8 @@ class LIP_BD(DeconvolutionAlgorithm):
             'blind_denoise': self.blind_denoise,
             'pre_nonblind': self.pre_nonblind,
             'auto_params': self.auto_params,
+            'auto_mode': self.auto_mode,
+            'orchestrator': orchestrator_info,
             'time': time.time() - start_time,
         }
 
@@ -475,11 +575,24 @@ class LIP_BD(DeconvolutionAlgorithm):
 
     # ── Universal denoiser dispatch ───────────────────────────────────
     def _apply_denoise(self, img, method, params, noise_info):
-        """Apply a spatial denoiser to a single-channel image [0, 1]."""
+        """Apply a spatial denoiser to a single-channel image [0, 1].
+
+        Supports a ``use_vst`` flag in ``params``: when True and
+        ``noise_info`` contains Poisson-Gaussian parameters ``a``, ``b``
+        (from pyatykh_noise_reconstruction), applies a generalized
+        Anscombe variance-stabilizing transform around the denoiser so
+        the method operates on approximately white AWGN with σ≈1.
+        """
         if method is None or method == 'none':
             return img
         p = dict(params or {})
         sigma = noise_info.get('sigma_norm', None) if noise_info else None
+
+        # ── Generalized Anscombe VST wrapper ─────────────────────────
+        # Enable by setting params['use_vst']=True.  Only effective if
+        # noise_info carries a (and/or b) from the PCA estimator.
+        if p.pop('use_vst', False) and noise_info is not None:
+            return self._apply_denoise_vst(img, method, p, noise_info)
 
         if method == 'tv':
             from skimage.restoration import denoise_tv_chambolle
@@ -529,11 +642,92 @@ class LIP_BD(DeconvolutionAlgorithm):
                                     threshold_setting=ts)
             return result
 
+        elif method == 'ensemble':
+            # Average several denoisers. Motivation: different denoisers
+            # make uncorrelated errors on heavy/unknown noise, so a simple
+            # mean of their outputs is more robust than picking one.
+            # Only enabled for the high-noise regime — on clean images the
+            # cumulative smoothing hurts detail.
+            sig = p.get('sigma', sigma if sigma else 0.05)
+            members = p.get('members', ('bm3d', 'nlm', 'bilateral'))
+            weights = p.get('weights', None)
+            outs = []
+            for m in members:
+                sub_params = dict(p)
+                sub_params['sigma'] = sig
+                # Avoid infinite recursion.
+                if m == 'ensemble':
+                    continue
+                outs.append(self._apply_denoise(img, m, sub_params, noise_info))
+            if not outs:
+                return img
+            if weights is None:
+                return np.mean(np.stack(outs, axis=0), axis=0)
+            ws = np.asarray(weights, dtype=np.float64)
+            ws = ws / ws.sum()
+            stacked = np.stack(outs, axis=0)
+            return np.tensordot(ws, stacked, axes=(0, 0))
+
         else:
             raise ValueError(
                 f"Unknown denoiser='{method}'. Choose from: "
                 f"'tv', 'nlm', 'bilateral', 'guided', 'bm3d', "
-                f"'act', 'none'")
+                f"'act', 'ensemble', 'none'")
+
+    # ── Generalized Anscombe VST wrapper around a denoiser ──────────
+    def _apply_denoise_vst(self, img, method, params, noise_info):
+        """Generalized Anscombe VST → denoise → inverse VST.
+
+        For Poisson-Gaussian noise  Var[y] = a·y + b  (pyatykh scale,
+        [0,255]), the transform
+
+            z = (2/√A)·√(A·img + (3/8)A² + B)
+
+        with  A = a/255, B = b/255²  (in [0,1] coords) yields z with
+        approximately unit variance.  We rescale z into [0,1] so that
+        generic denoisers (BM3D, NLM, ...) receive a sensible input,
+        then invert.
+
+        Falls back to a plain denoise call if PCA parameters are
+        unavailable or degenerate (pure Gaussian).
+        """
+        a = float(noise_info.get('a', 0.0) or 0.0) if noise_info else 0.0
+        b = float(noise_info.get('b', 0.0) or 0.0) if noise_info else 0.0
+        A = a / 255.0
+        B = b / (255.0 ** 2)
+
+        # If there is essentially no Poisson component, VST degenerates
+        # to y/√B — just denoise normally in the original domain.
+        if A < 1e-8:
+            sub = dict(params)
+            sub.setdefault('sigma', noise_info.get('sigma_norm', None)
+                           if noise_info else None)
+            return self._apply_denoise(img, method, sub, noise_info)
+
+        # Forward generalized Anscombe.
+        inner = np.maximum(A * img + (3.0 / 8.0) * A * A + B, 0.0)
+        z = (2.0 / np.sqrt(A)) * np.sqrt(inner)
+
+        # Rescale to [0,1] so off-the-shelf denoisers behave.
+        zmax = float(max(z.max(), 1e-6))
+        z_scaled = z / zmax
+        sigma_scaled = 1.0 / zmax   # unit variance in z → 1/zmax after scaling
+
+        sub = dict(params)
+        sub['sigma'] = sigma_scaled
+        sub['weight'] = max(0.005, 2.0 * sigma_scaled)   # for TV
+        sub['sigma_color'] = sigma_scaled                # for bilateral
+        # Pass a fake noise_info carrying σ_scaled as gaussian so the
+        # inner denoiser uses it directly.
+        inner_info = {'sigma_norm': sigma_scaled, 'method': 'vst'}
+        denoised_scaled = self._apply_denoise(
+            z_scaled, method, sub, inner_info)
+
+        z_clean = denoised_scaled * zmax
+
+        # Biased inverse of generalized Anscombe (fine for our use).
+        x_rec = (z_clean / 2.0) ** 2 - (3.0 / 8.0) * A - B / max(A, 1e-8)
+        return np.clip(x_rec, 0.0, 1.0)
 
     # ── Noise estimation ─────────────────────────────────────────────
     def _estimate_noise(self, yg):
@@ -548,6 +742,198 @@ class LIP_BD(DeconvolutionAlgorithm):
             result['method'] = 'pca'
             return result
         return None
+
+    # ── Robust orchestrator ──────────────────────────────────────────
+    def _orchestrate_robust(self, noise_info):
+        """Soft-weighted auto configuration of the noise pipeline.
+
+        Policy:
+            • Clean regime  (σ ≤ σ_clean) — do NOT touch any user defaults.
+              Only choose final_deconv when the user asked for 'auto'
+              (clean → 'blend' with weight 0.5).
+            • Heavy regime  (σ  > σ_clean) — switch to noise-robust
+              config: σ-scaled λ/τ/α, stronger denoisers, and (if 'auto')
+              ringing_removal as the non-blind step.
+
+        Always starts by resetting mutable fields from the __init__
+        snapshot, so repeated process() calls are deterministic.
+        """
+        snap = self._defaults_snapshot
+        amp = dict(self.auto_mode_params or {})
+
+        # ── 1) Reset from snapshot — avoid sticky state between calls. ─
+        self.lambda_val = snap['lambda_val']
+        self.tau = snap['tau']
+        self.final_alpha = snap['final_alpha']
+        self.preprocess = snap['preprocess']
+        self.preprocess_params = snap['preprocess_params']
+        self.blind_denoise = snap['blind_denoise']
+        self.blind_denoise_params = snap['blind_denoise_params']
+        self.pre_nonblind = snap['pre_nonblind']
+        self.pre_nonblind_params = snap['pre_nonblind_params']
+
+        # ── 2) Read σ.  If noise estimator failed or returned 0 — treat
+        #      as clean (be conservative: don't invent noise).
+        sigma = 0.0
+        if noise_info is not None:
+            sigma = float(noise_info.get('sigma_norm', 0.0) or 0.0)
+
+        sigma_clean = float(amp.get('sigma_clean', 0.005))
+        sigma_heavy = float(amp.get('sigma_heavy', 0.05))
+        blend_weight_clean = float(amp.get('blend_weight', 0.5))
+
+        # Force heavy branch for signal-dependent noise even when σ looks
+        # small — pca's sigma_norm is evaluated at mean brightness and may
+        # understate the Poisson component.  Threshold chosen conservatively:
+        # at σ < ~0.01 the Poisson component is so mild that plain defaults
+        # still work, and forcing heavy (which switches in ACT + ringing
+        # removal) only blurs the result.
+        force_heavy = False
+        nt = (noise_info or {}).get('noise_type', None)
+        force_heavy_sigma = float(amp.get('force_heavy_sigma', 0.01))
+        if nt in ('poisson', 'poisson_gaussian') and sigma >= force_heavy_sigma:
+            force_heavy = True
+
+        # ── 3) Clean branch — DO NOT alter denoisers or parameters.
+        #      Only resolve final_deconv='auto'.
+        if sigma <= sigma_clean and not force_heavy:
+            w = 0.0
+            regime = 'clean'
+            if snap['final_deconv'] == 'auto':
+                self.final_deconv = 'blend'
+                # Inject blend_weight if the user did not set nb_params.
+                if self.nb_params is None:
+                    self.nb_params = {'blend_weight': blend_weight_clean}
+                elif 'blend_weight' not in self.nb_params:
+                    self.nb_params = dict(self.nb_params)
+                    self.nb_params['blend_weight'] = blend_weight_clean
+            if self.verbose:
+                print(f"[{self.name}] orchestrator(σ={sigma:.5f}, clean): "
+                      f"defaults kept, final_deconv={self.final_deconv}")
+            return {
+                'sigma_norm': sigma, 'w': w, 'regime': regime,
+                'final_deconv': self.final_deconv,
+                'preprocess': self.preprocess,
+                'blind_denoise': self.blind_denoise,
+                'pre_nonblind': self.pre_nonblind,
+                'lambda_val': float(self.lambda_val),
+                'tau': float(self.tau),
+                'final_alpha': float(self.final_alpha),
+            }
+
+        # ── 4) Heavy branch — smooth weight between σ_clean and σ_heavy.
+        w = 1.0 if sigma >= sigma_heavy else (
+            (sigma - sigma_clean) / (sigma_heavy - sigma_clean))
+        regime = 'heavy' if w > 0.95 else 'medium'
+
+        # ── 4a) Noise-type-aware routing.  PCA returns noise_type ∈
+        #       {'gaussian', 'poisson', 'poisson_gaussian', 'unknown'}.
+        #       For signal-dependent cases we:
+        #         – prefer ACT in preprocess (locally adaptive curvelet
+        #           thresholding, robust to non-white noise);
+        #         – use BM3D + generalized Anscombe VST in pre_nonblind
+        #           (gaussian-assuming denoiser stabilised for Poisson).
+        noise_type = (noise_info or {}).get('noise_type', 'gaussian')
+        poisson_like = noise_type in ('poisson', 'poisson_gaussian',
+                                      'unknown')
+
+        # λ/τ/α: blend defaults toward σ-scaled values.
+        k_lambda = float(amp.get('k_lambda', 5000.0))
+        k_tau = float(amp.get('k_tau', 10.0))
+        k_alpha = float(amp.get('k_alpha', 0.1))
+        lam_cap = float(amp.get('lambda_cap', 1e5))
+        tau_floor = float(amp.get('tau_floor', 1e-4))
+
+        lam_noisy = float(np.clip(k_lambda / max(sigma, 1e-6),
+                                  100.0, lam_cap))
+        tau_noisy = max(tau_floor, k_tau * sigma ** 2)
+        alpha_noisy = max(1e-5, k_alpha * sigma)
+
+        self.lambda_val = (1.0 - w) * snap['lambda_val'] + w * lam_noisy
+        self.tau = max(tau_floor, (1.0 - w) * snap['tau'] + w * tau_noisy)
+        self.final_alpha = max(1e-5,
+                               (1.0 - w) * snap['final_alpha']
+                               + w * alpha_noisy)
+
+        # blind_denoise: edge-preserving smoothing of u before gradk.
+        # For Poisson-like noise inside the blind loop we still use
+        # bilateral (local, cheap) — Anscombe VST every iteration would
+        # be expensive and kernel estimation is forgiving.
+        if w < 0.5:
+            self.blind_denoise = 'bilateral'
+            self.blind_denoise_params = {
+                'sigma_color': float(max(sigma, 0.01)),
+                'sigma_space': 5.0,
+            }
+        else:
+            self.blind_denoise = 'bilateral'
+            self.blind_denoise_params = {
+                'sigma_color': float(max(2.0 * sigma, 0.02)),
+                'sigma_space': 7.0,
+            }
+
+        # preprocess (global denoise of f before blind pyramid).
+        # Poisson-like → ACT (locally adaptive in curvelet domain — its
+        # ML-estimator estimates variance per subband from local energy,
+        # which naturally handles signal-dependent noise without VST).
+        # Pure Gaussian → bilateral at moderate w, bm3d at heavy.
+        if poisson_like:
+            self.preprocess = 'act'
+            self.preprocess_params = {'threshold_setting': 's'}
+        elif w < 0.6:
+            self.preprocess = 'bilateral'
+            self.preprocess_params = {
+                'sigma_color': float(sigma),
+                'sigma_space': 5.0,
+            }
+        else:
+            self.preprocess = 'bm3d'
+            self.preprocess_params = {'sigma': float(sigma)}
+
+        # pre_nonblind (denoise of f before non-blind solve).
+        # Poisson-like → ACT again (it already handled preprocess well;
+        # reusing it here with a slightly stronger threshold cleans the
+        # residual inverse-filter amplification without BM3D-style blur).
+        # Pure Gaussian → BM3D or ensemble as before.
+        if poisson_like:
+            self.pre_nonblind = 'act'
+            self.pre_nonblind_params = {'threshold_setting': 's'}
+        elif w < 0.6:
+            self.pre_nonblind = 'bm3d'
+            self.pre_nonblind_params = {'sigma': float(max(sigma, 0.01))}
+        else:
+            self.pre_nonblind = 'ensemble'
+            self.pre_nonblind_params = {
+                'sigma': float(sigma),
+                'members': amp.get('ensemble_members',
+                                   ('bm3d', 'nlm', 'bilateral')),
+            }
+
+        # final_deconv: heavy noise → always ringing_removal when 'auto'.
+        if snap['final_deconv'] == 'auto':
+            self.final_deconv = 'ringing_removal'
+
+        info = {
+            'sigma_norm': sigma, 'w': float(w), 'regime': regime,
+            'noise_type': noise_type,
+            'poisson_like': bool(poisson_like),
+            'lambda_val': float(self.lambda_val),
+            'tau': float(self.tau),
+            'final_alpha': float(self.final_alpha),
+            'preprocess': self.preprocess,
+            'blind_denoise': self.blind_denoise,
+            'pre_nonblind': self.pre_nonblind,
+            'final_deconv': self.final_deconv,
+        }
+        if self.verbose:
+            print(f"[{self.name}] orchestrator(σ={sigma:.5f}, w={w:.2f}, "
+                  f"regime={regime}, type={noise_type}): "
+                  f"λ={self.lambda_val:.1f}, "
+                  f"τ={self.tau:.6f}, α={self.final_alpha:.5f}, "
+                  f"pre={self.preprocess}, blind={self.blind_denoise}, "
+                  f"pre_nb={self.pre_nonblind}, "
+                  f"final={self.final_deconv}")
+        return info
 
     # ── PSD-based noise preprocessing ────────────────────────────────
     def _apply_noise_preprocess(self, yg):
@@ -640,6 +1026,8 @@ class LIP_BD(DeconvolutionAlgorithm):
             ('pre_nonblind_params', self.pre_nonblind_params),
             ('auto_params', self.auto_params),
             ('nb_params', self.nb_params),
+            ('auto_mode', self.auto_mode),
+            ('auto_mode_params', self.auto_mode_params),
         ]
 
     def change_param(self, params: Dict[str, Any]) -> None:
@@ -652,6 +1040,14 @@ class LIP_BD(DeconvolutionAlgorithm):
                         np.asarray(value, dtype=np.float64)))
                 else:
                     setattr(self, key, value)
+                # Keep the orchestrator's default-snapshot in sync with
+                # parameters the user updates after construction — otherwise
+                # robust mode would keep blending toward stale values.
+                if key in self._defaults_snapshot:
+                    self._defaults_snapshot[key] = (
+                        float(value) if key in ('lambda_val', 'tau',
+                                                 'final_alpha')
+                        else value)
 
     def get_history(self) -> dict:
         return self.history
