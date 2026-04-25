@@ -9,12 +9,14 @@ Reference:
     Energy Minimization Methods in Computer Vision and Pattern Recognition
     (EMMCVPR), 2015.
 
-Implements two methods from the paper:
+Implements three methods from the paper:
     MM  — Majorization-Minimization (Table 2): gradient descent on the
           EM-majorised weighted-TV subproblem.
-    PD  — Primal-Dual / Condat-Vũ (Table 1): solves the same
-          weighted-TV subproblem with Condat-Vũ primal-dual splitting
-          (gradient of data fidelity, no FFT).
+    CV  — Condat-Vũ splitting on the MM-majorised weighted-TV subproblem
+          (data fidelity via spatial convolutions, no FFT).
+    PD  — Paper-faithful Primal-Dual (Table 1): solves the non-convex
+          log-TV energy directly via Chambolle-Pock / Möllenhoff
+          splitting (no MM outer majorisation).
 """
 
 import numpy as np
@@ -110,6 +112,15 @@ class LIP_BD(DeconvolutionAlgorithm):
         final_deconv: str = 'tikhonov',
         final_alpha: float = 0.001,
         verbose: bool = False,
+        # ── paper-faithful PD (method='pd') extras ──
+        pd_outer_iters: int = 30,
+        pd_inner_iters: int = 50,
+        pd_theta: float = 1.0,
+        pd_tau: float = None,
+        pd_sigma: float = None,
+        h_mode: str = 'closed',
+        h_lut_size: int = 4096,
+        h_lut_xi_max: float = 4.0,
     ):
         super().__init__(name='LIP-BD')
 
@@ -139,6 +150,16 @@ class LIP_BD(DeconvolutionAlgorithm):
         self.final_alpha = final_alpha
         self.verbose = verbose
 
+        # PD-specific (method='pd', paper-faithful)
+        self.pd_outer_iters = int(pd_outer_iters)
+        self.pd_inner_iters = int(pd_inner_iters)
+        self.pd_theta = float(pd_theta)
+        self.pd_tau = pd_tau
+        self.pd_sigma = pd_sigma
+        self.h_mode = str(h_mode)
+        self.h_lut_size = int(h_lut_size)
+        self.h_lut_xi_max = float(h_lut_xi_max)
+
         self.history: Dict[str, list] = {'kernel_diff': []}
         self.hyperparams: Dict[str, Any] = {}
 
@@ -165,7 +186,7 @@ class LIP_BD(DeconvolutionAlgorithm):
             f = gamma_correction(f, self.gamma)
 
         # ── 4. PSF estimation (blind step) ──────────────────────────────
-        if self.method == 'mm':
+        if self.method in ('mm', 'cv'):
             blind_params = {
                 'outer_iters': self.outer_iters,
                 'inner_iters': self.inner_iters,
@@ -179,14 +200,21 @@ class LIP_BD(DeconvolutionAlgorithm):
                 'scale_mult': self.scale_mult,
             }
             u, k = coarse_to_fine(f, MK, NK, blind_params, ctf_params,
-                                  verbose=self.verbose)
+                                  verbose=self.verbose, method=self.method)
         elif self.method == 'pd':
+            # Paper-faithful PD has its own iteration counts
             blind_params = {
-                'outer_iters': self.outer_iters,
-                'inner_iters': self.inner_iters,
+                'outer_iters': self.pd_outer_iters,
+                'inner_iters': self.pd_inner_iters,
                 'tau': self.tau,
                 'k_step': self.k_step,
                 'u_step': self.u_step,
+                'pd_theta': self.pd_theta,
+                'pd_tau': self.pd_tau,
+                'pd_sigma': self.pd_sigma,
+                'h_mode': self.h_mode,
+                'h_lut_size': self.h_lut_size,
+                'h_lut_xi_max': self.h_lut_xi_max,
             }
             ctf_params = {
                 'final_lambda': self.lambda_val,
@@ -196,7 +224,8 @@ class LIP_BD(DeconvolutionAlgorithm):
             u, k = coarse_to_fine(f, MK, NK, blind_params, ctf_params,
                                   verbose=self.verbose, method='pd')
         else:
-            raise ValueError(f"Unknown method '{self.method}'. Choose 'mm' or 'pd'.")
+            raise ValueError(
+                f"Unknown method '{self.method}'. Choose 'mm', 'pd', or 'cv'.")
 
         # ── 4b. Kernel thresholding ─────────────────────────────────────
         # Remove low-intensity noise from the estimated kernel.
