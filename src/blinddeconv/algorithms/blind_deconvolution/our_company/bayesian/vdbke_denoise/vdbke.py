@@ -193,8 +193,10 @@ class VDBKE(DeconvolutionAlgorithm):
         Параметры для pre_nonblind денойзера.
     final_deconv : str
         Метод не-слепой деконволюции:
-        'firls' (по умолчанию), 'ringing_removal', 'adaptive_lp',
-        'tikhonov', 'wiener'.
+        'firls' (по умолчанию), 'blend' (FIRLS + ringing_removal),
+        'ringing_removal', 'adaptive_lp', 'tikhonov', 'wiener', 'auto'.
+        'auto' разрешается оркестратором (auto_mode='robust') в 'blend'
+        на чистых/средних данных и 'ringing_removal' на сильном шуме.
     final_alpha : float
         Регуляризация для tikhonov/wiener.
     nb_params : dict or None
@@ -202,6 +204,23 @@ class VDBKE(DeconvolutionAlgorithm):
         - ringing_removal: {'lambda_tv': 1e-3, 'lambda_l0': 2e-3,
           'weight_ring': 1.0}
         - adaptive_lp: {'alpha': 0.8, 'two_stage': True}
+        - blend: те же ключи + 'blend_weight' (вес ringing_removal,
+          по умолчанию 0.5).
+    auto_mode : str
+        'off' (по умолчанию) — оркестратор выключен.
+        'robust' — мягкое автоконфигурирование шумового пайплайна
+        по оценённой σ. VDBKE довольно хорошо справляется с шумом
+        сам по себе, поэтому оркестратор намеренно консервативный:
+        не трогает screenot/act_preprocess/noise_preprocess, лишь
+        мягко поднимает λ-регуляризации, включает дешёвый bilateral
+        внутри блайнд-цикла и (для poisson-like шума) выбирает ACT
+        для pre_nonblind.
+    auto_mode_params : dict or None
+        Параметры оркестратора:
+        {'sigma_clean': 0.005, 'sigma_heavy': 0.05,
+         'force_heavy_sigma': 0.012,
+         'k_img_lambda1': 200.0, 'k_firls_lambda': 200.0,
+         'k_alpha': 0.1, 'blend_weight': 0.5}.
     """
 
     def __init__(
@@ -261,6 +280,8 @@ class VDBKE(DeconvolutionAlgorithm):
         final_deconv: str = 'firls',
         final_alpha: float = 0.001,
         nb_params: dict = None,
+        auto_mode: str = 'off',
+        auto_mode_params: dict = None,
     ):
         super().__init__(name='VDBKE')
 
@@ -329,6 +350,28 @@ class VDBKE(DeconvolutionAlgorithm):
         self.final_deconv = final_deconv
         self.final_alpha = final_alpha
         self.nb_params = nb_params
+        self.auto_mode = (auto_mode or 'off').lower()
+        self.auto_mode_params = auto_mode_params
+
+        # Snapshot of defaults for the robust orchestrator so soft
+        # blending always starts from the values supplied at construction
+        # time, not from values overwritten on a previous process() call.
+        self._defaults_snapshot = {
+            'img_lambda1': float(img_lambda1),
+            'firls_lambda': float(firls_lambda),
+            'final_alpha': float(final_alpha),
+            'final_deconv': final_deconv,
+            'preprocess': preprocess,
+            'preprocess_params': preprocess_params,
+            'blind_denoise': blind_denoise,
+            'blind_denoise_params': blind_denoise_params,
+            'pre_nonblind': pre_nonblind,
+            'pre_nonblind_params': pre_nonblind_params,
+            'impulse_preprocess': impulse_preprocess,
+            'act_preprocess': act_preprocess,
+            'screenot_preprocess': screenot_preprocess,
+            'kernel_threshold': float(kernel_threshold),
+        }
 
         self.history: Dict[str, list] = {'kernel_diff': []}
         self.hyperparams: Dict[str, Any] = {}
@@ -340,14 +383,35 @@ class VDBKE(DeconvolutionAlgorithm):
         start_time = time.time()
 
         # Convert to float64 [0, 1]
-        y = image.astype(np.float64)
-        if y.max() > 1.0:
-            y /= 255.0
+        y_in = image.astype(np.float64)
+        if y_in.max() > 1.0:
+            y_in /= 255.0
 
-        yorig = y.copy()
+        # Gamma correction first (so non-blind sees the same colour space
+        # as blind, mirroring LIP's single-image pipeline).
+        y_in = y_in ** self.gamma_correct
 
-        # Gamma correction
-        y = y ** self.gamma_correct
+        # Extract luminance: every denoising step in the chain is applied
+        # to a single 2-D channel.  For colour input, we run on Y of YCbCr
+        # and rebuild the cleaned RGB image afterwards — that way the
+        # non-blind step receives the *same* denoised signal as the kernel
+        # estimator (matching LIP semantics, where ``f`` carries every
+        # preprocess effect into non-blind).
+        has_color = (y_in.ndim == 3 and y_in.shape[2] == 3)
+        if has_color:
+            ycbcr_full = rgb2ycbcr(y_in)
+            y = ycbcr_full[:, :, 0].copy()
+        else:
+            ycbcr_full = None
+            y = y_in if y_in.ndim == 2 else y_in[:, :, 0].copy()
+
+        # ── Robust mode: force protective flags BEFORE the pipeline ─────
+        # impulse detection must run on the raw image (it uses the image
+        # itself to find spikes), so we cannot enable it retroactively
+        # from the orchestrator.  Force it here when robust mode is on
+        # and the user did not pick anything explicit.
+        if self.auto_mode == 'robust' and self.impulse_preprocess == 'none':
+            self.impulse_preprocess = 'auto'
 
         # ── 4a. Impulse noise detection & removal ───────────────────────
         impulse_info = None
@@ -374,6 +438,15 @@ class VDBKE(DeconvolutionAlgorithm):
                 print(f"[{self.name}] noise estimation "
                       f"({noise_info.get('method','?')}): "
                       f"σ={noise_info.get('sigma_norm', 0):.5f}")
+        elif self.auto_mode == 'robust':
+            # Orchestrator needs σ — force PCA if user left it 'none'.
+            self.noise_estimation = 'pca'
+            noise_info = self._estimate_noise(y)
+
+        # ── 4b¼. Robust orchestrator (soft-weighted auto config) ────────
+        orchestrator_info = None
+        if self.auto_mode == 'robust':
+            orchestrator_info = self._orchestrate_robust(noise_info)
 
         # ── 4b½. Auto-params from σ ────────────────────────────────────
         if self.auto_params and noise_info is not None:
@@ -435,27 +508,28 @@ class VDBKE(DeconvolutionAlgorithm):
 
         # ── 4c-4. Pre-pyramid spatial denoising ────────────────────────
         if self.preprocess not in (None, 'none'):
-            if y.ndim == 3 and y.shape[2] == 3:
-                y_gray = rgb2gray(y)
-            else:
-                y_gray = y
-            y_gray = self._apply_denoise(
-                y_gray, self.preprocess, self.preprocess_params, noise_info)
-            # Replace grayscale channel only (preserve color yorig)
-            y = y_gray
+            y = self._apply_denoise(
+                y, self.preprocess, self.preprocess_params, noise_info)
             if self.verbose:
                 print(f"[{self.name}] preprocess='{self.preprocess}' applied")
 
-        # Convert to grayscale for kernel estimation
+        # ── Rebuild cleaned full-resolution image for non-blind ─────────
+        # ``yorig`` carries every step of the denoising chain; the
+        # non-blind solver therefore sees the same signal that the
+        # kernel was estimated from, instead of the raw blurry input
+        # (this fixes the divergence with LIP).
+        if has_color:
+            ycbcr_clean = ycbcr_full.copy()
+            ycbcr_clean[:, :, 0] = y
+            yorig = ycbcr2rgb(ycbcr_clean)
+        else:
+            yorig = y.copy()
+
+        # Optional crop only for kernel estimation (non-blind still uses
+        # the full-resolution ``yorig``).
         if self.kernel_est_win is not None:
             w = self.kernel_est_win  # (r1, c1, r2, c2) 0-indexed
-            if y.ndim == 3 and y.shape[2] == 3:
-                y = rgb2gray(y[w[0]:w[2], w[1]:w[3], :])
-            else:
-                y = y[w[0]:w[2], w[1]:w[3]]
-        else:
-            if y.ndim == 3 and y.shape[2] == 3:
-                y = rgb2gray(y)
+            y = y[w[0]:w[2], w[1]:w[3]]
 
         blur_size = self.kernel_size  # (ks1, ks2)
 
@@ -660,7 +734,7 @@ class VDBKE(DeconvolutionAlgorithm):
             deblur = self._nonblind_channel_dispatch(
                 yorig, kernel, _freq_deconv)
 
-        else:  # default: 'firls'
+        else:  # default: 'firls' or 'blend'
             firls_opts = {
                 'lambda': self.firls_lambda,
                 'alpha': self.firls_alpha,
@@ -671,8 +745,32 @@ class VDBKE(DeconvolutionAlgorithm):
                 x_fov, _, _ = firls_deb_ubc(ch, k, firls_opts,
                                              verbose=self.verbose)
                 return x_fov
-            deblur = self._nonblind_channel_dispatch(
-                yorig, kernel, _firls)
+
+            if self.final_deconv == 'blend':
+                # Weighted average of FIRLS (sharp, sparse-prior detail)
+                # and ringing_removal (smoother, fewer inverse-filter
+                # ripples).  Both already cope with mild noise, so the
+                # blend keeps detail while suppressing residual ringing —
+                # a safer alternative than tikhonov+rr because tikhonov
+                # is much more noise-sensitive.
+                nbp = self.nb_params or {}
+                blend_w = float(nbp.get('blend_weight', 0.5))  # weight of RR
+                def _blend(ch, k):
+                    u_firls = _firls(ch, k)
+                    u_rr = ringing_artifacts_removal(
+                        ch, k,
+                        lambda_tv=nbp.get('lambda_tv', 1e-3),
+                        lambda_l0=nbp.get('lambda_l0', 2e-3),
+                        weight_ring=nbp.get('weight_ring', 1.0),
+                    )
+                    h = min(u_firls.shape[0], u_rr.shape[0])
+                    w_ = min(u_firls.shape[1], u_rr.shape[1])
+                    return ((1.0 - blend_w) * u_firls[:h, :w_]
+                            + blend_w * u_rr[:h, :w_])
+                deblur = self._nonblind_channel_dispatch(yorig, kernel, _blend)
+            else:  # 'firls'
+                deblur = self._nonblind_channel_dispatch(
+                    yorig, kernel, _firls)
 
         deblur = np.clip(deblur, 0.0, 1.0)
 
@@ -699,6 +797,8 @@ class VDBKE(DeconvolutionAlgorithm):
             'kernel_threshold': self.kernel_threshold,
             'pre_nonblind': self.pre_nonblind,
             'final_deconv': self.final_deconv,
+            'auto_mode': self.auto_mode,
+            'orchestrator': orchestrator_info,
             'time': time.time() - start_time,
         }
 
@@ -850,10 +950,20 @@ class VDBKE(DeconvolutionAlgorithm):
             sig = p.get('sigma', sigma if sigma else 0.05)
             return bm3d_lib.bm3d(img, sigma_psd=sig)
 
+        elif method == 'act':
+            from .act_denoise import act_denoise
+            nv = p.get('noise_var', None)
+            if nv is None and sigma is not None:
+                nv = sigma ** 2
+            ts = p.get('threshold_setting', 's')
+            result, _ = act_denoise(img, noise_var=nv,
+                                    threshold_setting=ts)
+            return result
+
         else:
             raise ValueError(
                 f"Unknown denoiser='{method}'. Choose from: "
-                f"'tv', 'nlm', 'bilateral', 'guided', 'bm3d', 'none'")
+                f"'tv', 'nlm', 'bilateral', 'guided', 'bm3d', 'act', 'none'")
 
     # ─────────────────────────────────────────────────────────────────────
     # Blind-loop denoiser (x_fov before kernel step)
@@ -912,6 +1022,160 @@ class VDBKE(DeconvolutionAlgorithm):
         return None
 
     # ─────────────────────────────────────────────────────────────────────
+    # Robust orchestrator (soft-weighted auto config for the noise pipeline)
+    # ─────────────────────────────────────────────────────────────────────
+    def _orchestrate_robust(self, noise_info):
+        """Conservative robust auto-config for VDBKE.
+
+        VDBKE is already noise-tolerant on its own (Dirichlet prior +
+        adaptive λ during image estimation).  Empirically, a *minimal*
+        intervention reproduces the best hand-tuned config the author
+        found:
+
+            impulse_preprocess='auto'  (forced earlier in process())
+            act_preprocess='auto'      (curvelet denoising on Y)
+            pre_nonblind='guided'      (light edge-preserving filter)
+            kernel_threshold ≈ 0.05    (kill spurious tails)
+
+        Aggressive choices that *kill the kernel* (collapse it to a
+        single pixel) were observed and removed:
+
+            ✗ ``blind_denoise='bilateral'`` — over-smooths u inside the
+              alternating loop, the gradient w.r.t. k vanishes, and α
+              concentrates on one pixel.
+            ✗ σ-scaling of img_lambda1 / firls_lambda with k≈200 — at
+              σ≈0.05 this raises img_lambda1 ~250× over its default and
+              suppresses the image step entirely; the kernel update sees
+              a zero-content image and collapses.
+            ✗ Adding extra ``preprocess`` on top of ``act_preprocess`` —
+              double smoothing destroys the high-frequency content the
+              kernel estimator relies on.
+
+        Policy:
+            • Clean regime (σ ≤ σ_clean) — keep all user defaults.
+              ``final_deconv='auto'`` → 'blend'.
+            • Heavy regime (σ  > σ_clean) — only enable the protective
+              flags above (when the user left them at 'none' / 0.0),
+              and route ``final_deconv='auto'`` to 'blend' (medium) or
+              'ringing_removal' (heavy).  Do NOT change λ-regularisation
+              or add blind_denoise.
+
+        Always resets mutable fields from the __init__ snapshot so
+        repeated process() calls are deterministic.
+        """
+        snap = self._defaults_snapshot
+        amp = dict(self.auto_mode_params or {})
+
+        # ── 1) Reset from snapshot ───────────────────────────────────
+        self.img_lambda1 = snap['img_lambda1']
+        self.firls_lambda = snap['firls_lambda']
+        self.final_alpha = snap['final_alpha']
+        self.preprocess = snap['preprocess']
+        self.preprocess_params = snap['preprocess_params']
+        self.blind_denoise = snap['blind_denoise']
+        self.blind_denoise_params = snap['blind_denoise_params']
+        self.pre_nonblind = snap['pre_nonblind']
+        self.pre_nonblind_params = snap['pre_nonblind_params']
+        self.act_preprocess = snap['act_preprocess']
+        self.kernel_threshold = snap['kernel_threshold']
+
+        # ── 2) σ + thresholds ────────────────────────────────────────
+        sigma = 0.0
+        if noise_info is not None:
+            sigma = float(noise_info.get('sigma_norm', 0.0) or 0.0)
+
+        sigma_clean = float(amp.get('sigma_clean', 0.005))
+        sigma_heavy = float(amp.get('sigma_heavy', 0.05))
+        blend_weight_clean = float(amp.get('blend_weight', 0.5))
+
+        force_heavy = False
+        nt = (noise_info or {}).get('noise_type', None)
+        force_heavy_sigma = float(amp.get('force_heavy_sigma', 0.012))
+        if nt in ('poisson', 'poisson_gaussian') and sigma >= force_heavy_sigma:
+            force_heavy = True
+
+        # ── 3) Clean branch — keep user defaults. ────────────────────
+        if sigma <= sigma_clean and not force_heavy:
+            regime = 'clean'
+            if snap['final_deconv'] == 'auto':
+                self.final_deconv = 'blend'
+                if self.nb_params is None:
+                    self.nb_params = {'blend_weight': blend_weight_clean}
+                elif 'blend_weight' not in self.nb_params:
+                    self.nb_params = dict(self.nb_params)
+                    self.nb_params['blend_weight'] = blend_weight_clean
+            if self.verbose:
+                print(f"[{self.name}] orchestrator(σ={sigma:.5f}, clean): "
+                      f"defaults kept, final_deconv={self.final_deconv}")
+            return {
+                'sigma_norm': sigma, 'w': 0.0, 'regime': regime,
+                'final_deconv': self.final_deconv,
+                'act_preprocess': self.act_preprocess,
+                'pre_nonblind': self.pre_nonblind,
+                'kernel_threshold': self.kernel_threshold,
+            }
+
+        # ── 4) Heavy/medium branch ───────────────────────────────────
+        w = 1.0 if sigma >= sigma_heavy else (
+            (sigma - sigma_clean) / max(sigma_heavy - sigma_clean, 1e-9))
+        w = float(np.clip(w, 0.0, 1.0))
+        regime = 'heavy' if w > 0.85 else 'medium'
+
+        noise_type = (noise_info or {}).get('noise_type', 'gaussian')
+        poisson_like = noise_type in ('poisson', 'poisson_gaussian',
+                                      'unknown')
+
+        # (a) ACT curvelet denoising — only enable if neither it nor
+        #     screenot is already chosen by the user.
+        if (snap['act_preprocess'] in (None, 'none')
+                and snap['screenot_preprocess'] in (None, 'none')):
+            self.act_preprocess = 'auto'
+
+        # (b) pre_nonblind — light guided filter unless user picked
+        #     something else.  Guided is fast, edge-preserving, and the
+        #     author confirmed it gives the best visual quality on heavy
+        #     noise.  For poisson-like noise we still use guided — ACT
+        #     is already doing the heavy lifting in (a).
+        if snap['pre_nonblind'] in (None, 'none'):
+            self.pre_nonblind = 'guided'
+            self.pre_nonblind_params = {
+                'radius': 4,
+                'eps': float(max(sigma, 0.01)) ** 2 * 4.0,
+            }
+
+        # (c) kernel_threshold — kill spurious tails on noisy ψ.  Only
+        #     bump if the user left it at 0 (off).
+        if snap['kernel_threshold'] <= 0.0:
+            self.kernel_threshold = float(amp.get('kernel_threshold', 0.05))
+
+        # (d) final_deconv routing.  FIRLS handles moderate noise well,
+        #     but its sparse prior amplifies kernel-mismatch ringing on
+        #     very noisy data — RR damps that explicitly.
+        if snap['final_deconv'] == 'auto':
+            self.final_deconv = 'ringing_removal' if w >= 0.85 else 'blend'
+
+        # NOTE: img_lambda1, firls_lambda, blind_denoise, preprocess,
+        # noise_preprocess are deliberately NOT touched — see docstring.
+
+        info = {
+            'sigma_norm': sigma, 'w': w, 'regime': regime,
+            'noise_type': noise_type,
+            'poisson_like': bool(poisson_like),
+            'act_preprocess': self.act_preprocess,
+            'pre_nonblind': self.pre_nonblind,
+            'kernel_threshold': self.kernel_threshold,
+            'final_deconv': self.final_deconv,
+        }
+        if self.verbose:
+            print(f"[{self.name}] orchestrator(σ={sigma:.5f}, w={w:.2f}, "
+                  f"regime={regime}, type={noise_type}): "
+                  f"act_pre={self.act_preprocess}, "
+                  f"pre_nb={self.pre_nonblind}, "
+                  f"k_thr={self.kernel_threshold:.3f}, "
+                  f"final={self.final_deconv}")
+        return info
+
+    # ─────────────────────────────────────────────────────────────────────
     # Framework interface methods
     # ─────────────────────────────────────────────────────────────────────
     def get_param(self) -> List[Tuple[str, Any]]:
@@ -953,6 +1217,8 @@ class VDBKE(DeconvolutionAlgorithm):
             ('final_deconv', self.final_deconv),
             ('final_alpha', self.final_alpha),
             ('nb_params', self.nb_params),
+            ('auto_mode', self.auto_mode),
+            ('auto_mode_params', self.auto_mode_params),
         ]
 
     def change_param(self, params: Dict[str, Any]) -> None:
@@ -962,6 +1228,13 @@ class VDBKE(DeconvolutionAlgorithm):
                     self.kernel_size = tuple(value)
                 else:
                     setattr(self, key, value)
+                # Keep the orchestrator's default-snapshot in sync with
+                # parameters the user updates after construction.
+                if key in self._defaults_snapshot:
+                    if key in ('img_lambda1', 'firls_lambda', 'final_alpha'):
+                        self._defaults_snapshot[key] = float(value)
+                    else:
+                        self._defaults_snapshot[key] = value
 
     def get_history(self) -> dict:
         return self.history

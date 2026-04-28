@@ -57,7 +57,7 @@ MATLAB -> Python conversion notes (CRITICAL differences):
 
 import numpy as np
 from numpy.fft import fft2, ifft2
-from scipy.ndimage import zoom, map_coordinates, gaussian_filter
+from scipy.ndimage import zoom, map_coordinates
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -150,14 +150,10 @@ def imresize(img: np.ndarray, output_size, method: str = 'bilinear') -> np.ndarr
     Resize an image.
     Approximates MATLAB ``imresize(img, [rows cols], method)``.
 
-    Uses ``scipy.ndimage.zoom`` internally with a Gaussian anti-aliasing
-    prefilter for downscaling — this matches MATLAB's default
-    ``Antialiasing=true`` behaviour.  Without the prefilter, downsampling
-    the blurred observation in the multi-scale loop introduces aliasing
-    into the gradient images ``y2{1}, y2{2}``, which directly corrupts
-    ``b`` and ``Ad`` in the Dirichlet kernel-estimation cost (eq. (16) of
-    Zhou et al., IEEE TIP 2015) and destabilises the kernel at the
-    coarse pyramid levels.
+    Uses ``scipy.ndimage.zoom`` internally.
+    Note: MATLAB applies antialiasing during downsampling by default;
+    this implementation does not, but the difference is negligible for
+    the multi-scale BID pipeline.
 
     Parameters
     ----------
@@ -180,48 +176,16 @@ def imresize(img: np.ndarray, output_size, method: str = 'bilinear') -> np.ndarr
     zoom_h = oh / h
     zoom_w = ow / w
 
-    # ── Anti-aliasing prefilter for downscaling (matches MATLAB imresize) ──
-    # MATLAB's bilinear imresize with Antialiasing=true convolves with a
-    # tent kernel whose support stretches by 1/scale.  The closest
-    # Gaussian equivalent has
-    #     sigma = (1/scale) / pi    (matches the cut-off of the tent)
-    # which is noticeably gentler than the textbook
-    #     sigma = sqrt((1/scale)^2 - 1) / 2
-    # used elsewhere.  Over-smoothing the pyramid here propagates into
-    # the gradient images used for kernel estimation and biases the
-    # estimate towards a wider blur kernel — exactly the symptom we want
-    # to avoid.  Use the gentler rule and cap sigma below at 0 so very
-    # mild downscales are essentially nearest-neighbour pre-filtered.
-    src = img
-    if zoom_h < 1.0 or zoom_w < 1.0:
-        sigma_h = max(0.0, (1.0 / zoom_h - 1.0) / np.pi) if zoom_h < 1.0 else 0.0
-        sigma_w = max(0.0, (1.0 / zoom_w - 1.0) / np.pi) if zoom_w < 1.0 else 0.0
-        if sigma_h > 1e-3 or sigma_w > 1e-3:
-            if img.ndim == 3:
-                src = gaussian_filter(img, sigma=(sigma_h, sigma_w, 0.0), mode='nearest')
-            else:
-                src = gaussian_filter(img, sigma=(sigma_h, sigma_w), mode='nearest')
-
-    if src.ndim == 3:
-        result = zoom(src, (zoom_h, zoom_w, 1), order=order)
+    if img.ndim == 3:
+        result = zoom(img, (zoom_h, zoom_w, 1), order=order)
     else:
-        result = zoom(src, (zoom_h, zoom_w), order=order)
+        result = zoom(img, (zoom_h, zoom_w), order=order)
 
     # Guarantee exact output shape (zoom may round differently)
     if result.shape[0] > oh:
         result = result[:oh]
     if result.shape[1] > ow:
         result = result[:, :ow]
-    if result.shape[0] < oh or result.shape[1] < ow:
-        # Pad replicate (rare rounding edge case)
-        pad_r = oh - result.shape[0]
-        pad_c = ow - result.shape[1]
-        if result.ndim == 3:
-            result = np.pad(result, ((0, max(0, pad_r)), (0, max(0, pad_c)), (0, 0)),
-                            mode='edge')
-        else:
-            result = np.pad(result, ((0, max(0, pad_r)), (0, max(0, pad_c))),
-                            mode='edge')
     return result
 
 
@@ -424,3 +388,155 @@ def comp_upto_shift(I1: np.ndarray, I2: np.ndarray):
     tI1 = map_coordinates(I1c, [rr, cc], order=1, mode='constant', cval=0.0)
 
     return ssde, tI1
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Gamma correction
+# ═════════════════════════════════════════════════════════════════════════════
+
+def gamma_correction(image: np.ndarray, gamma: float = 2.2) -> np.ndarray:
+    """
+    Apply power-law gamma correction: out = image ** gamma.
+
+    Parameters
+    ----------
+    image : ndarray, float [0, 1]
+    gamma : float — exponent (default 2.2, sRGB linearisation).
+
+    Returns
+    -------
+    corrected : ndarray, same shape.
+    """
+    return np.clip(image, 0.0, 1.0) ** gamma
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Tikhonov filter (FFT-based deconvolution)
+# ═════════════════════════════════════════════════════════════════════════════
+
+def tikhonov_filter(image: np.ndarray, kernel: np.ndarray,
+                    alpha: float = 0.001) -> np.ndarray:
+    """
+    FFT-based Tikhonov-regularised deconvolution.
+
+    Solves:  min_x  ||Kx - y||^2 + alpha * ||Lx||^2
+    where L is the discrete Laplacian.
+
+    Parameters
+    ----------
+    image  : (H, W) blurred image, float [0, 1].
+    kernel : blur kernel (odd size, sums to 1).
+    alpha  : regularization strength (default 0.001).
+
+    Returns
+    -------
+    deblurred : (H, W) float ndarray.
+    """
+    H, W = image.shape
+    K = psf2otf(kernel, (H, W))
+    Kt = np.conj(K)
+    dx = np.array([[1, -1]], dtype=np.float64)
+    dy = np.array([[1], [-1]], dtype=np.float64)
+    Dx = psf2otf(dx, (H, W))
+    Dy = psf2otf(dy, (H, W))
+    L = np.abs(Dx) ** 2 + np.abs(Dy) ** 2
+
+    Y = fft2(image)
+    X = (Kt * Y) / (Kt * K + alpha * L + 1e-10)
+    return np.real(ifft2(X))
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Wiener filter (FFT-based deconvolution)
+# ═════════════════════════════════════════════════════════════════════════════
+
+def wiener_filter(image: np.ndarray, kernel: np.ndarray,
+                  noise_snr: float = 0.001) -> np.ndarray:
+    """
+    FFT-based Wiener deconvolution.
+
+    Parameters
+    ----------
+    image     : (H, W) blurred image, float [0, 1].
+    kernel    : blur kernel.
+    noise_snr : noise-to-signal power ratio (default 0.001).
+
+    Returns
+    -------
+    deblurred : (H, W) float ndarray.
+    """
+    H, W = image.shape
+    K = psf2otf(kernel, (H, W))
+    Kt = np.conj(K)
+    Y = fft2(image)
+    X = (Kt * Y) / (np.abs(K) ** 2 + noise_snr + 1e-10)
+    return np.real(ifft2(X))
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# pad_image / crop_image / edgetaper — boundary handling for non-blind
+# ═════════════════════════════════════════════════════════════════════════════
+
+def pad_image(image: np.ndarray, kernel_shape: tuple) -> np.ndarray:
+    """Replicate-pad image by half-kernel-size on each side."""
+    ph = kernel_shape[0] // 2
+    pw = kernel_shape[1] // 2
+    return np.pad(image, ((ph, ph), (pw, pw)), mode='edge')
+
+
+def crop_image(image: np.ndarray, orig_shape: tuple,
+               kernel_shape: tuple) -> np.ndarray:
+    """Crop padded image back to original shape."""
+    ph = kernel_shape[0] // 2
+    pw = kernel_shape[1] // 2
+    return image[ph:ph + orig_shape[0], pw:pw + orig_shape[1]]
+
+
+def edgetaper(image: np.ndarray, kernel: np.ndarray) -> np.ndarray:
+    """
+    Taper image edges to reduce ringing in FFT-based deconvolution.
+    Approximation of MATLAB ``edgetaper``.
+
+    Parameters
+    ----------
+    image  : (H, W) float ndarray.
+    kernel : blur kernel.
+
+    Returns
+    -------
+    tapered : (H, W) float ndarray.
+    """
+    from scipy.signal import fftconvolve
+    H, W = image.shape
+    k = kernel.copy()
+    # Autocorrelation of the kernel
+    acf = fftconvolve(k, k[::-1, ::-1], mode='full')
+    acf /= acf.max()
+    ah, aw = acf.shape
+
+    # Build 2D blending weight from separable edge profiles
+    row_profile = acf[ah // 2, :]
+    col_profile = acf[:, aw // 2]
+    # Normalise to [0, 1]
+    row_w = np.ones(W, dtype=np.float64)
+    col_w = np.ones(H, dtype=np.float64)
+
+    hw = min(len(row_profile) // 2, W // 2)
+    hh = min(len(col_profile) // 2, H // 2)
+
+    rp_half = row_profile[len(row_profile) // 2:][:hw]
+    cp_half = col_profile[len(col_profile) // 2:][:hh]
+
+    for i in range(hw):
+        v = rp_half[i]
+        row_w[i] = min(row_w[i], v)
+        row_w[W - 1 - i] = min(row_w[W - 1 - i], v)
+    for i in range(hh):
+        v = cp_half[i]
+        col_w[i] = min(col_w[i], v)
+        col_w[H - 1 - i] = min(col_w[H - 1 - i], v)
+
+    weight = col_w[:, None] * row_w[None, :]
+
+    blurred = fftconvolve(image, kernel, mode='same')
+    return weight * image + (1 - weight) * blurred

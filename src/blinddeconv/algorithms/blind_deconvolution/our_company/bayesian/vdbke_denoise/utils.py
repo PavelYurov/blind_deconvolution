@@ -57,7 +57,7 @@ MATLAB -> Python conversion notes (CRITICAL differences):
 
 import numpy as np
 from numpy.fft import fft2, ifft2
-from scipy.ndimage import zoom, map_coordinates
+from scipy.ndimage import zoom, map_coordinates, gaussian_filter
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -150,10 +150,14 @@ def imresize(img: np.ndarray, output_size, method: str = 'bilinear') -> np.ndarr
     Resize an image.
     Approximates MATLAB ``imresize(img, [rows cols], method)``.
 
-    Uses ``scipy.ndimage.zoom`` internally.
-    Note: MATLAB applies antialiasing during downsampling by default;
-    this implementation does not, but the difference is negligible for
-    the multi-scale BID pipeline.
+    Uses ``scipy.ndimage.zoom`` internally with a Gaussian anti-aliasing
+    prefilter for downscaling — this matches MATLAB's default
+    ``Antialiasing=true`` behaviour.  Without the prefilter, downsampling
+    the blurred observation in the multi-scale loop introduces aliasing
+    into the gradient images ``y2{1}, y2{2}``, which directly corrupts
+    ``b`` and ``Ad`` in the Dirichlet kernel-estimation cost (eq. (16) of
+    Zhou et al., IEEE TIP 2015) and destabilises the kernel at the
+    coarse pyramid levels.
 
     Parameters
     ----------
@@ -176,16 +180,48 @@ def imresize(img: np.ndarray, output_size, method: str = 'bilinear') -> np.ndarr
     zoom_h = oh / h
     zoom_w = ow / w
 
-    if img.ndim == 3:
-        result = zoom(img, (zoom_h, zoom_w, 1), order=order)
+    # ── Anti-aliasing prefilter for downscaling (matches MATLAB imresize) ──
+    # MATLAB's bilinear imresize with Antialiasing=true convolves with a
+    # tent kernel whose support stretches by 1/scale.  The closest
+    # Gaussian equivalent has
+    #     sigma = (1/scale - 1) / pi    (matches the cut-off of the tent)
+    # which is noticeably gentler than the textbook
+    #     sigma = sqrt((1/scale)^2 - 1) / 2
+    # used elsewhere.  Over-smoothing the pyramid here propagates into
+    # the gradient images used for kernel estimation and biases the
+    # estimate towards a wider blur kernel — exactly the symptom we want
+    # to avoid.  Use the gentler rule and cap sigma below at 0 so very
+    # mild downscales are essentially nearest-neighbour pre-filtered.
+    src = img
+    if zoom_h < 1.0 or zoom_w < 1.0:
+        sigma_h = max(0.0, (1.0 / zoom_h - 1.0) / np.pi) if zoom_h < 1.0 else 0.0
+        sigma_w = max(0.0, (1.0 / zoom_w - 1.0) / np.pi) if zoom_w < 1.0 else 0.0
+        if sigma_h > 1e-3 or sigma_w > 1e-3:
+            if img.ndim == 3:
+                src = gaussian_filter(img, sigma=(sigma_h, sigma_w, 0.0), mode='nearest')
+            else:
+                src = gaussian_filter(img, sigma=(sigma_h, sigma_w), mode='nearest')
+
+    if src.ndim == 3:
+        result = zoom(src, (zoom_h, zoom_w, 1), order=order)
     else:
-        result = zoom(img, (zoom_h, zoom_w), order=order)
+        result = zoom(src, (zoom_h, zoom_w), order=order)
 
     # Guarantee exact output shape (zoom may round differently)
     if result.shape[0] > oh:
         result = result[:oh]
     if result.shape[1] > ow:
         result = result[:, :ow]
+    if result.shape[0] < oh or result.shape[1] < ow:
+        # Pad replicate (rare rounding edge case)
+        pad_r = oh - result.shape[0]
+        pad_c = ow - result.shape[1]
+        if result.ndim == 3:
+            result = np.pad(result, ((0, max(0, pad_r)), (0, max(0, pad_c)), (0, 0)),
+                            mode='edge')
+        else:
+            result = np.pad(result, ((0, max(0, pad_r)), (0, max(0, pad_c))),
+                            mode='edge')
     return result
 
 

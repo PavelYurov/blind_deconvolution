@@ -14,6 +14,7 @@ import numpy as np
 from numpy.fft import fft2, ifft2
 from scipy.signal import convolve2d
 from scipy.special import digamma, polygamma, gammaln
+from scipy.fft import dstn, idstn
 
 from .utils import psf2otf, valid_conv_by_fft
 
@@ -22,7 +23,7 @@ from .utils import psf2otf, valid_conv_by_fft
 # center_kernel_img_space  ←  center_kernel_img_space.m
 # ═════════════════════════════════════════════════════════════════════════════
 
-def center_kernel_img_space(x, k):
+def center_kernel_img_space(x, k, verbose=False):
     """
     Centre the kernel by translation so that boundary issues are mitigated.
     If the kernel is shifted, the image must also be shifted in the opposite
@@ -67,8 +68,9 @@ def center_kernel_img_space(x, k):
     offset_x = int(np.round(k.shape[1] // 2 + 1 - mu_x))
     offset_y = int(np.round(k.shape[0] // 2 + 1 - mu_y))
 
-    print(f'CenterKernel: weightedMean[{mu_x - 1:.6f} {mu_y - 1:.6f}] '
-          f'offset[{offset_x} {offset_y}]')
+    if verbose:
+        print(f'CenterKernel: weightedMean[{mu_x - 1:.6f} {mu_y - 1:.6f}] '
+              f'offset[{offset_x} {offset_y}]')
 
     # Build shift kernel (delta at the offset position)
     shift_kernel = np.zeros((abs(offset_y) * 2 + 1, abs(offset_x) * 2 + 1),
@@ -88,7 +90,7 @@ def center_kernel_img_space(x, k):
 # dirichlet_Adbc_fft  ←  dirichlet_Adbc_fft.m
 # ═════════════════════════════════════════════════════════════════════════════
 
-def dirichlet_Adbc_fft(x_list, y_list, m1, m2, lambda_C=0, C=None):
+def dirichlet_Adbc_fft(x_list, y_list, m1, m2, lambda_C=0, C=None, verbose=False):
     """
     Pre-compute Ad, b, and function handles (closures) for X'X products
     needed by the Dirichlet kernel estimation.
@@ -157,7 +159,8 @@ def dirichlet_Adbc_fft(x_list, y_list, m1, m2, lambda_C=0, C=None):
                 # Python: map i→m1-1-i, j→m2-1-j to match the reversed indexing
                 Ad[m1 - 1 - i, m2 - 1 - j] += np.sum(xx[i:i + rows_len, j:j + cols_len])
 
-    print(f'Ad_min={Ad.min():.6f},Ad_max={Ad.max():.6f}')
+    if verbose:
+        print(f'Ad_min={Ad.min():.6f},Ad_max={Ad.max():.6f}')
 
     # Optional Laplacian regularisation
     if lambda_C > 0 and C is not None:
@@ -218,14 +221,15 @@ def _dirichlet_cost_by_fft(alpha, lam, xtAx_func, Ad, b):
     -------
     f, atAa, Adta, bta, Sa, den1, Xalpha
     """
+    _EPS = 1e-30
     Sa = np.sum(alpha)
-    den1 = 2.0 * Sa * (Sa + 1.0)
+    den1 = 2.0 * Sa * (Sa + 1.0) + _EPS
     atAa, Xalpha = xtAx_func(alpha)
     Adta = np.sum(Ad * alpha)
     bta = np.sum(b * alpha)
-    temp = (alpha - 1.0) * (digamma(alpha) - digamma(Sa))
-    f = (lam * (np.sum(temp) + gammaln(Sa) - np.sum(gammaln(alpha.ravel())))
-         + (atAa + Adta) / den1 + bta / (2.0 * Sa))
+    temp = (alpha - 1.0) * (digamma(np.maximum(alpha, _EPS)) - digamma(max(Sa, _EPS)))
+    f = (lam * (np.sum(temp) + gammaln(max(Sa, _EPS)) - np.sum(gammaln(np.maximum(alpha.ravel(), _EPS))))
+         + (atAa + Adta) / den1 + bta / (2.0 * Sa + _EPS))
     return f, atAa, Adta, bta, Sa, den1, Xalpha
 
 
@@ -233,7 +237,7 @@ def _dirichlet_cost_by_fft(alpha, lam, xtAx_func, Ad, b):
 # kernel_estimation_filter_space_fft  ←  kernel_estimation_filter_space_fft.m
 # ═════════════════════════════════════════════════════════════════════════════
 
-def kernel_estimation_filter_space_fft(k, x_list, y_list, opt):
+def kernel_estimation_filter_space_fft(k, x_list, y_list, opt, verbose=False):
     """
     Gradient projection method for Dirichlet minimisation (FFT version).
 
@@ -270,7 +274,7 @@ def kernel_estimation_filter_space_fft(k, x_list, y_list, opt):
 
     # Compute A, Ad and b
     Ad, b, xtAx_func, Ax_func = dirichlet_Adbc_fft(
-        x_list, y_list, ks1, ks2, lambda_C, C)
+        x_list, y_list, ks1, ks2, lambda_C, C, verbose=verbose)
 
     # Initial cost
     f0, atAa, Adta, bta, Sa, den1, Xalpha = _dirichlet_cost_by_fft(
@@ -285,11 +289,12 @@ def kernel_estimation_filter_space_fft(k, x_list, y_list, opt):
 
     while itr < max_iter:
         # Compute gradient
-        den2 = den1 ** 2 / (4.0 * Sa + 2.0)
-        g = lam * (alpha - 1.0) * (polygamma(1, alpha) - polygamma(1, Sa))
+        _EPS_g = 1e-30
+        den2 = den1 ** 2 / (4.0 * Sa + 2.0 + _EPS_g)
+        g = lam * (alpha - 1.0) * (polygamma(1, np.maximum(alpha, _EPS_g)) - polygamma(1, max(Sa, _EPS_g)))
         Aa = Ax_func(Xalpha)
-        g = (g + (2.0 * Aa + Ad) / den1 + b / (2.0 * Sa)
-             - (atAa + Adta) / den2 - bta / (2.0 * Sa ** 2))
+        g = (g + (2.0 * Aa + Ad) / den1 + b / (2.0 * Sa + _EPS_g)
+             - (atAa + Adta) / den2 - bta / (2.0 * Sa ** 2 + _EPS_g))
 
         # Backtracking line search
         d = -g
@@ -324,8 +329,9 @@ def kernel_estimation_filter_space_fft(k, x_list, y_list, opt):
         if t < 1e-2 or rf < ng_min:
             break
 
-    print(f'DIter={itr},costcalls={costcalls},cost={fx[0]:.4f},'
-          f'cost={fx[-1]:.4f},rf={rf:.6f},Sa={Sa:.0f}')
+    if verbose:
+        print(f'DIter={itr},costcalls={costcalls},cost={fx[0]:.4f},'
+              f'cost={fx[-1]:.4f},rf={rf:.6f},Sa={Sa:.0f}')
 
     return alpha, fx, stepsize
 
@@ -428,7 +434,7 @@ def nbid_ngm_ubc_admm(B, k, pars):
         # Ktu = fft2(u-du) .* Kt
         Ktu = fft2(u - du) * Kt
 
-        invA = 1.0 / (KtK + lambda_v / lambda_u * DtD)
+        invA = 1.0 / (KtK + lambda_v / lambda_u * DtD + 1e-30)
         lam = lambda1 / lambda_v
 
         # Update v
@@ -442,8 +448,8 @@ def nbid_ngm_ubc_admm(B, k, pars):
             for _t in range(N2):
                 G1 = np.mean(v1)
                 G2 = np.mean(v2)
-                beta1 = lam * G1 / (v1 + G1) ** 2
-                beta2 = lam * G2 / (v2 + G2) ** 2
+                beta1 = lam * G1 / ((v1 + G1) ** 2 + 1e-30)
+                beta2 = lam * G2 / ((v2 + G2) ** 2 + 1e-30)
                 v1 = np.maximum(temp1 - beta1, 0.0)
                 v2 = np.maximum(temp2 - beta2, 0.0)
             v1 = s1 * v1
@@ -469,7 +475,7 @@ def nbid_ngm_ubc_admm(B, k, pars):
             t2 = np.abs(x2.ravel())
             G1 = np.mean(t1)
             G2 = np.mean(t2)
-            pcost_i = lambda1 * (np.sum(t1 / (t1 + G1)) + np.sum(t2 / (t2 + G2)))
+            pcost_i = lambda1 * (np.sum(t1 / (t1 + G1 + 1e-30)) + np.sum(t2 / (t2 + G2 + 1e-30)))
             Ax_fov = Ax[hks1:hks1 + m, hks2:hks2 + n]
             fcost_i = 0.5 * np.sum((Ax_fov - B) ** 2) + pcost_i
             print(f'Outer iteration {i}: fcost={fcost_i:.6f} pcost={pcost_i:.6f}')
@@ -489,6 +495,10 @@ def nbid_ngm_ubc_admm(B, k, pars):
     else:
         x_fov = x[hks1:hks1 + m, hks2:hks2 + n].copy()
 
+    # Replace NaN/Inf with 0 to prevent propagation
+    np.nan_to_num(x_fov, copy=False, nan=0.0, posinf=1.0, neginf=0.0)
+    np.nan_to_num(x, copy=False, nan=0.0, posinf=1.0, neginf=0.0)
+
     return x_fov, x
 
 
@@ -496,7 +506,7 @@ def nbid_ngm_ubc_admm(B, k, pars):
 # ss_ngm_dirichlet_ubc_img  ←  ss_ngm_dirichlet_ubc_img.m
 # ═════════════════════════════════════════════════════════════════════════════
 
-def ss_ngm_dirichlet_ubc_img(y, x, k, alpha0, pars):
+def ss_ngm_dirichlet_ubc_img(y, x, k, alpha0, pars, blind_denoise_fn=None, verbose=False):
     """
     Single-scale blind deconvolution: alternating latent-image (x) and
     kernel (k) estimation.
@@ -514,6 +524,10 @@ def ss_ngm_dirichlet_ubc_img(y, x, k, alpha0, pars):
         'img_pars'    — dict of parameters for nbid_ngm_ubc_admm
         'kernel_pars' — dict of parameters for kernel_estimation_filter_space_fft
         'k_tol'       — convergence tolerance on kernel change
+    blind_denoise_fn : callable or None
+        Optional denoiser applied to x_fov **before** gradient
+        computation for kernel estimation.  Signature: f(ndarray) -> ndarray.
+        Default None — no denoising (original behaviour).
 
     Returns
     -------
@@ -557,29 +571,43 @@ def ss_ngm_dirichlet_ubc_img(y, x, k, alpha0, pars):
     for i in range(xk_iter):
         # Adjust lambda with schedule
         img_pars['lambda1'] = lambda1 + delta_lambda * max(6 - (i + 1), 0)
-        img_pars['lambda_min'] = lambda_min / lambda1 * img_pars['lambda1']
+        img_pars['lambda_min'] = lambda_min / max(lambda1, 1e-30) * img_pars['lambda1']
 
         # Latent image estimation (Alg. 1)
         x_fov, x_full = nbid_ngm_ubc_admm(y, k, img_pars)
         img_pars['x0'] = x_full  # use full x as init for next iteration
 
+        # Optional inter-iteration denoising before gradient computation
+        x_for_grad = blind_denoise_fn(x_fov) if blind_denoise_fn is not None else x_fov
+
         # Gradient images of x for kernel estimation
-        x1 = [np.diff(x_fov, axis=0), np.diff(x_fov, axis=1)]
+        x1 = [np.diff(x_for_grad, axis=0), np.diff(x_for_grad, axis=1)]
 
         # Kernel estimation
         ker_opts['alpha0'] = alpha.copy()
-        alpha, fcost, _ = kernel_estimation_filter_space_fft(k, x1, y2, ker_opts)
+        alpha, fcost, _ = kernel_estimation_filter_space_fft(k, x1, y2, ker_opts, verbose=verbose)
         alpha0 = alpha.reshape(k1, k2)
 
         # Update kernel from Dirichlet parameters
         if ker_opts.get('mode', 0):
             # mode estimator
-            k = (alpha0 - 1.0) / (np.sum(alpha) - k1 * k2)
+            denom_mode = np.sum(alpha) - k1 * k2
+            if abs(denom_mode) < 1e-30:
+                denom_mode = 1e-30
+            k = (alpha0 - 1.0) / denom_mode
         else:
             # expectation estimator (default)
-            k = alpha0 / np.sum(alpha)
+            k = alpha0 / max(np.sum(alpha), 1e-30)
 
-        print(f'Iteration={i + 1}')
+        # Guard against NaN — fall back to previous kernel
+        if np.any(np.isnan(k)):
+            if k_old is not None:
+                k = k_old.copy()
+            else:
+                k = np.ones((k1, k2), dtype=np.float64) / (k1 * k2)
+
+        if verbose:
+            print(f'Iteration={i + 1}')
 
         # Convergence check (starts at iteration 5, MATLAB i>=5 is 1-indexed)
         if i >= 4 and k_old is not None:
@@ -596,7 +624,7 @@ def ss_ngm_dirichlet_ubc_img(y, x, k, alpha0, pars):
 # firls_deb_ubc  ←  firls_deb_ubc.m
 # ═════════════════════════════════════════════════════════════════════════════
 
-def firls_deb_ubc(y, h, opt):
+def firls_deb_ubc(y, h, opt, verbose=False):
     """
     Fast IRLS for image deblurring with undetermined boundary conditions.
     Uses 1st and 2nd order derivative filters + ADMM.
@@ -707,7 +735,7 @@ def firls_deb_ubc(y, h, opt):
 
     X_ = fft2(x)
     Ax_ = np.real(ifft2(H * X_))
-    invA = HH + beta_a / lambda_u * RR
+    invA = HH + beta_a / lambda_u * RR + 1e-30
 
     # Output containers
     opt_out = dict(opt)
@@ -716,20 +744,13 @@ def firls_deb_ubc(y, h, opt):
     while outer < N1:
         outer += 1
 
-        # ── W_* update (eq. 8 of Zhou et al., ICIP 2014).  The clamp
-        # ``min(beta, c * a^(alpha-2))`` is mathematically valid when
-        # a==0 (returns beta) but produces RuntimeWarnings in numpy
-        # because of the negative exponent.  Floor by a tiny epsilon to
-        # silence them while preserving the result (a^(alpha-2) becomes
-        # huge and is clipped by ``beta`` anyway).
-        eps_w = 1e-12
-        exp_w = alpha_p - 2.0
-        with np.errstate(divide='ignore', invalid='ignore'):
-            Wx  = np.minimum(beta, c * np.maximum(adx,  eps_w) ** exp_w)
-            Wy  = np.minimum(beta, c * np.maximum(ady,  eps_w) ** exp_w)
-            Wxx = np.minimum(beta, c * np.maximum(adxx, eps_w) ** exp_w) * w0
-            Wyy = np.minimum(beta, c * np.maximum(adyy, eps_w) ** exp_w) * w0
-            Wxy = np.minimum(beta, c * np.maximum(adxy, eps_w) ** exp_w) * w0
+        # Clamp derivatives away from zero before negative power (alpha_p - 2 < 0)
+        _eps_d = 1e-10
+        Wx  = np.minimum(beta, c * np.maximum(adx,  _eps_d) ** (alpha_p - 2))
+        Wy  = np.minimum(beta, c * np.maximum(ady,  _eps_d) ** (alpha_p - 2))
+        Wxx = np.minimum(beta, c * np.maximum(adxx, _eps_d) ** (alpha_p - 2)) * w0
+        Wyy = np.minimum(beta, c * np.maximum(adyy, _eps_d) ** (alpha_p - 2)) * w0
+        Wxy = np.minimum(beta, c * np.maximum(adxy, _eps_d) ** (alpha_p - 2)) * w0
 
         # Inner ADMM loop
         inner = 0
@@ -805,9 +826,374 @@ def firls_deb_ubc(y, h, opt):
                 np.linalg.norm(y - I_gt, 'fro')
                 / np.linalg.norm(x_fov_tmp - I_gt, 'fro'))
             opt_out.setdefault('isnr', []).append(isnr_val)
-            print(f'{msg}isnr={isnr_val:.6f},beta={beta:.6f}')
-        else:
+            if verbose:
+                print(f'{msg}isnr={isnr_val:.6f},beta={beta:.6f}')
+        elif verbose:
             print(f'{msg}beta={beta:.6f}')
 
     x_fov = x[hks1:hks1 + M1, hks2:hks2 + M2]
     return x_fov, x, opt_out
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# FFT-related helpers for non-blind deconvolution
+# ═════════════════════════════════════════════════════════════════════════════
+
+_OPT_FFT_LUT = None
+
+
+def _build_opt_fft_lut(max_n=4096):
+    """Build LUT mapping n -> next efficient FFT size (products of 2,3,5,7)."""
+    efficient = set()
+    p2 = 1
+    while p2 <= max_n:
+        p3 = 1
+        while p2 * p3 <= max_n:
+            p5 = 1
+            while p2 * p3 * p5 <= max_n:
+                p7 = 1
+                while p2 * p3 * p5 * p7 <= max_n:
+                    efficient.add(p2 * p3 * p5 * p7)
+                    p7 *= 7
+                p5 *= 5
+            p3 *= 3
+        p2 *= 2
+    eff_sorted = sorted(efficient)
+    lut = np.zeros(max_n + 1, dtype=np.int64)
+    idx = 0
+    for n_ in range(1, max_n + 1):
+        while idx < len(eff_sorted) and eff_sorted[idx] < n_:
+            idx += 1
+        lut[n_] = eff_sorted[idx] if idx < len(eff_sorted) else n_
+    return lut
+
+
+def opt_fft_size(n) -> np.ndarray:
+    """Optimal FFT data length(s) — smallest efficient size >= n."""
+    global _OPT_FFT_LUT
+    if _OPT_FFT_LUT is None:
+        _OPT_FFT_LUT = _build_opt_fft_lut()
+    n = np.asarray(n, dtype=np.int64)
+    scalar_input = n.ndim == 0
+    n = np.atleast_1d(n)
+    lut_size = len(_OPT_FFT_LUT) - 1
+    m = np.zeros_like(n)
+    for i in range(n.size):
+        nn = n.flat[i]
+        if 1 <= nn <= lut_size:
+            m.flat[i] = _OPT_FFT_LUT[nn]
+        else:
+            m.flat[i] = int(nn)
+    if scalar_input:
+        return int(m.flat[0])
+    return m
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# wrap_boundary_liu (Liu & Jia ICIP 2008)
+# ═════════════════════════════════════════════════════════════════════════════
+
+def _solve_min_laplacian(boundary_image: np.ndarray) -> np.ndarray:
+    """Solve Laplace eq. with Dirichlet BC via DST-I."""
+    H, W = boundary_image.shape
+    bi = boundary_image.copy()
+    bi[1:-1, 1:-1] = 0.0
+
+    f_bp = np.zeros((H, W), dtype=np.float64)
+    f_bp[1:H-1, 1:W-1] = (
+        -4.0 * bi[1:H-1, 1:W-1]
+        + bi[1:H-1, 2:W] + bi[1:H-1, 0:W-2]
+        + bi[0:H-2, 1:W-1] + bi[2:H, 1:W-1]
+    )
+    f1 = -f_bp
+    f2 = f1[1:H-1, 1:W-1]
+    f2sin = dstn(f2, type=1)
+
+    x = np.arange(1, W - 1)
+    y = np.arange(1, H - 1)
+    xx, yy = np.meshgrid(x, y)
+    denom = (2.0 * np.cos(np.pi * xx / (W - 1)) - 2.0) + \
+            (2.0 * np.cos(np.pi * yy / (H - 1)) - 2.0)
+
+    f3 = f2sin / denom
+    img_tt = idstn(f3, type=1)
+
+    result = bi.copy()
+    result[1:H-1, 1:W-1] = img_tt
+    return result
+
+
+def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
+    """Pad image so boundaries are circularly smooth for FFT-based deconv."""
+    if img.ndim == 2:
+        img = img[:, :, np.newaxis]
+    H, W, Ch = img.shape
+    H_out, W_out = img_size[0], img_size[1]
+    H_w = H_out - H
+    W_w = W_out - W
+
+    ret = np.zeros((H_out, W_out, Ch), dtype=np.float64)
+
+    for ch in range(Ch):
+        alpha = 1
+        HG = img[:, :, ch]
+
+        r_A = np.zeros((alpha * 2 + H_w, W), dtype=np.float64)
+        r_A[:alpha, :] = HG[-alpha:, :]
+        r_A[-alpha:, :] = HG[:alpha, :]
+        if H_w > 1:
+            a = np.arange(H_w, dtype=np.float64) / (H_w - 1)
+        else:
+            a = np.array([0.0])
+        r_A[alpha:alpha + H_w, 0] = (
+            (1 - a) * r_A[alpha - 1, 0] + a * r_A[-alpha, 0])
+        r_A[alpha:alpha + H_w, -1] = (
+            (1 - a) * r_A[alpha - 1, -1] + a * r_A[-alpha, -1])
+
+        A2 = _solve_min_laplacian(
+            r_A[alpha - 1: alpha + H_w + 1, :])
+
+        r_B = np.zeros((H, alpha * 2 + W_w), dtype=np.float64)
+        r_B[:, :alpha] = HG[:, -alpha:]
+        r_B[:, -alpha:] = HG[:, :alpha]
+        if W_w > 1:
+            b = np.arange(W_w, dtype=np.float64) / (W_w - 1)
+        else:
+            b = np.array([0.0])
+        r_B[0, alpha:alpha + W_w] = (
+            (1 - b) * r_B[0, alpha - 1] + b * r_B[0, -alpha])
+        r_B[-1, alpha:alpha + W_w] = (
+            (1 - b) * r_B[-1, alpha - 1] + b * r_B[-1, -alpha])
+
+        B2 = _solve_min_laplacian(
+            r_B[:, alpha - 1: alpha + W_w + 1])
+
+        ret[:H, :W, ch] = HG
+        ret[H:, :W, ch] = A2[1:-1, :]
+        ret[:H, W:, ch] = B2[:, 1:-1]
+
+        if H_w > 0 and W_w > 0:
+            r_C = np.zeros((H_w + 2, W_w + 2), dtype=np.float64)
+            r_C[0, :-1] = ret[H - 1, W - 1:, ch]
+            r_C[0, -1]  = ret[H - 1, 0, ch]
+            r_C[-1, :-1] = ret[0, W - 1:, ch]
+            r_C[-1, -1]  = ret[0, 0, ch]
+            r_C[:-1, 0]  = ret[H - 1:, W - 1, ch]
+            r_C[-1, 0]   = ret[0, W - 1, ch]
+            r_C[:-1, -1] = ret[H - 1:, 0, ch]
+            r_C[-1, -1]  = ret[0, 0, ch]
+            C2 = _solve_min_laplacian(r_C)
+            ret[H:, W:, ch] = C2[1:-1, 1:-1]
+
+    if Ch == 1:
+        return ret[:, :, 0]
+    return ret
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# TV deblurring (ADM anisotropic — Split Bregman)
+# ═════════════════════════════════════════════════════════════════════════════
+
+def _computeDenominator(B, k):
+    """Pre-compute frequency-domain terms for ADM TV deblurring."""
+    m, n = B.shape
+    otf_k = psf2otf(k, (m, n))
+    Nomin1 = np.conj(otf_k) * fft2(B)
+    Denom1 = np.abs(otf_k) ** 2
+
+    dx = np.array([[1, -1]], dtype=np.float64)
+    dy = np.array([[1], [-1]], dtype=np.float64)
+    Denom2 = (np.abs(psf2otf(dx, (m, n))) ** 2 +
+              np.abs(psf2otf(dy, (m, n))) ** 2)
+    return Nomin1, Denom1, Denom2
+
+
+def deblurring_adm_aniso(B, k, lambda_tv, alpha):
+    """TV-l2 deblurring via ADM/Split Bregman with anisotropic TV."""
+    beta = 1.0 / lambda_tv
+    beta_min = 0.001
+    m, n = B.shape
+    I = B.copy()
+    Nomin1, Denom1, Denom2 = _computeDenominator(B, k)
+
+    Ix = np.concatenate([np.diff(I, axis=1),
+                         I[:, 0:1] - I[:, -1:]], axis=1)
+    Iy = np.concatenate([np.diff(I, axis=0),
+                         I[0:1, :] - I[-1:, :]], axis=0)
+
+    while beta > beta_min:
+        gamma = 1.0 / (2.0 * beta)
+        Denom = Denom1 + gamma * Denom2
+
+        Wx = np.maximum(np.abs(Ix) - beta * lambda_tv, 0.0) * np.sign(Ix)
+        Wy = np.maximum(np.abs(Iy) - beta * lambda_tv, 0.0) * np.sign(Iy)
+
+        Wxx = np.concatenate([Wx[:, -1:] - Wx[:, 0:1],
+                              -np.diff(Wx, axis=1)], axis=1)
+        Wxx = Wxx + np.concatenate([Wy[-1:, :] - Wy[0:1, :],
+                                     -np.diff(Wy, axis=0)], axis=0)
+
+        Fyout = (Nomin1 + gamma * fft2(Wxx)) / Denom
+        I = np.real(ifft2(Fyout))
+
+        Ix = np.concatenate([np.diff(I, axis=1),
+                             I[:, 0:1] - I[:, -1:]], axis=1)
+        Iy = np.concatenate([np.diff(I, axis=0),
+                             I[0:1, :] - I[-1:, :]], axis=0)
+        beta = beta / 2.0
+
+    return I
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# L0 gradient restoration
+# ═════════════════════════════════════════════════════════════════════════════
+
+def L0Restoration(Im, kernel, lambda_grad, kappa=2.0):
+    """Image restoration with L0 gradient prior."""
+    H_orig, W_orig = Im.shape[0], Im.shape[1]
+    target_size = opt_fft_size(
+        np.array([H_orig, W_orig]) + np.array(kernel.shape[:2]) - 1)
+    Im_w = wrap_boundary_liu(Im, tuple(target_size))
+
+    if Im_w.ndim == 2:
+        Im_w = Im_w[:, :, np.newaxis]
+    N, M, D = Im_w.shape
+
+    S = Im_w.copy()
+    betamax = 1e5
+
+    fx = np.array([[1, -1]], dtype=np.float64)
+    fy = np.array([[1], [-1]], dtype=np.float64)
+
+    otfFx = psf2otf(fx, (N, M))
+    otfFy = psf2otf(fy, (N, M))
+    KER = psf2otf(kernel, (N, M))
+    Den_KER = np.abs(KER) ** 2
+    Denormin2 = np.abs(otfFx) ** 2 + np.abs(otfFy) ** 2
+    Denormin2 = np.tile(Denormin2[:, :, np.newaxis], (1, 1, D))
+    KER = np.tile(KER[:, :, np.newaxis], (1, 1, D))
+    Den_KER = np.tile(Den_KER[:, :, np.newaxis], (1, 1, D))
+
+    Normin1 = np.conj(KER) * fft2(S, axes=(0, 1))
+
+    beta_val = 2 * lambda_grad
+    while beta_val < betamax:
+        Denormin = Den_KER + beta_val * Denormin2
+
+        h = np.concatenate([np.diff(S, axis=1),
+                            S[:, 0:1, :] - S[:, -1:, :]], axis=1)
+        v = np.concatenate([np.diff(S, axis=0),
+                            S[0:1, :, :] - S[-1:, :, :]], axis=0)
+
+        grad_sq = np.sum(h ** 2 + v ** 2, axis=2)
+        t = grad_sq < lambda_grad / beta_val
+        t3 = np.tile(t[:, :, np.newaxis], (1, 1, D))
+        h[t3] = 0
+        v[t3] = 0
+
+        Normin2 = np.concatenate([h[:, -1:, :] - h[:, 0:1, :],
+                                  -np.diff(h, axis=1)], axis=1)
+        Normin2 += np.concatenate([v[-1:, :, :] - v[0:1, :, :],
+                                   -np.diff(v, axis=0)], axis=0)
+
+        FS = (Normin1 + beta_val * fft2(Normin2, axes=(0, 1))) / Denormin
+        S = np.real(ifft2(FS, axes=(0, 1)))
+        beta_val *= kappa
+
+    S = S[:H_orig, :W_orig, :]
+    if D == 1:
+        S = S[:, :, 0]
+    return S
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Bilateral filter
+# ═════════════════════════════════════════════════════════════════════════════
+
+def _fspecial_gaussian(size, sigma):
+    """2-D Gaussian kernel."""
+    x = np.arange(size) - size // 2
+    g = np.exp(-x ** 2 / (2 * sigma ** 2))
+    h = np.outer(g, g)
+    return h / h.sum()
+
+
+def bilateral_filter(img, sigma_s, sigma):
+    """Bilateral filter for grayscale images."""
+    was_2d = img.ndim == 2
+    if was_2d:
+        img = img[:, :, np.newaxis]
+    h, w, d = img.shape
+    img = img.astype(np.float32)
+    lab = img.copy()
+    sigma = sigma * np.sqrt(d)
+    fr = int(np.ceil(sigma_s * 3))
+
+    p_img = np.pad(img, ((fr, fr), (fr, fr), (0, 0)), mode='edge')
+    p_lab = np.pad(lab, ((fr, fr), (fr, fr), (0, 0)), mode='edge')
+
+    r_img = np.zeros((h, w, d), dtype=np.float32)
+    w_sum = np.zeros((h, w), dtype=np.float32)
+    spatial_weight = _fspecial_gaussian(2 * fr + 1, sigma_s)
+    ss = sigma * sigma
+
+    for yy in range(-fr, fr + 1):
+        for xx in range(-fr, fr + 1):
+            w_s = spatial_weight[yy + fr, xx + fr]
+            n_img = p_img[fr + yy:fr + yy + h, fr + xx:fr + xx + w, :]
+            n_lab = p_lab[fr + yy:fr + yy + h, fr + xx:fr + xx + w, :]
+            f_diff = lab - n_lab
+            f_dist = np.sum(f_diff ** 2, axis=2)
+            w_f = np.exp(-0.5 * f_dist / ss)
+            w_t = w_s * w_f
+            r_img += n_img * w_t[:, :, np.newaxis]
+            w_sum += w_t
+
+    r_img = r_img / w_sum[:, :, np.newaxis]
+    if was_2d:
+        return r_img[:, :, 0]
+    return r_img
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Ringing artifacts removal (Pan et al. CVPR 2014)
+# ═════════════════════════════════════════════════════════════════════════════
+
+def ringing_artifacts_removal(y, kernel, lambda_tv=1e-3,
+                              lambda_l0=2e-3, weight_ring=1.0):
+    """
+    Non-blind deconvolution with ringing suppression.
+
+    Uses TV deconv + L0 deconv + bilateral filter on their difference
+    to identify and subtract ringing artifacts.
+
+    Parameters
+    ----------
+    y           : (H, W) blurred image (single channel, float [0,1])
+    kernel      : blur kernel
+    lambda_tv   : TV regularisation weight
+    lambda_l0   : L0 gradient prior weight
+    weight_ring : ringing suppression strength (0 = TV only)
+
+    Returns
+    -------
+    result : (H, W) deblurred image
+    """
+    H, W = y.shape[:2]
+    target_size = opt_fft_size(
+        np.array([H, W]) + np.array(kernel.shape[:2]) - 1)
+    y_pad = wrap_boundary_liu(y, tuple(target_size))
+
+    Latent_tv = deblurring_adm_aniso(y_pad, kernel, lambda_tv, 1)
+    Latent_tv = Latent_tv[:H, :W]
+
+    if weight_ring == 0:
+        return Latent_tv
+
+    Latent_l0 = L0Restoration(y, kernel, lambda_l0, 2)
+
+    diff_img = Latent_tv - Latent_l0
+    bf_diff = bilateral_filter(diff_img, 3, 0.1)
+    result = Latent_tv - weight_ring * bf_diff
+    return result

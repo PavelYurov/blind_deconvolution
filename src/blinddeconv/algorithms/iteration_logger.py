@@ -143,6 +143,7 @@ class IterationLogger:
 
             row['kernel_mse'] = float(np.mean((k_est_p - k_gt_p) ** 2))
             row['kernel_rmse'] = float(np.sqrt(row['kernel_mse']))
+            row['kernel_mae'] = float(np.mean(np.abs(k_est_p - k_gt_p)))
 
         # ── Сохранение ядра как PNG ──────────────────────────────────────
         if kernel is not None and local_iter % self.save_kernel_every == 0:

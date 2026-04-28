@@ -716,20 +716,11 @@ def firls_deb_ubc(y, h, opt):
     while outer < N1:
         outer += 1
 
-        # ── W_* update (eq. 8 of Zhou et al., ICIP 2014).  The clamp
-        # ``min(beta, c * a^(alpha-2))`` is mathematically valid when
-        # a==0 (returns beta) but produces RuntimeWarnings in numpy
-        # because of the negative exponent.  Floor by a tiny epsilon to
-        # silence them while preserving the result (a^(alpha-2) becomes
-        # huge and is clipped by ``beta`` anyway).
-        eps_w = 1e-12
-        exp_w = alpha_p - 2.0
-        with np.errstate(divide='ignore', invalid='ignore'):
-            Wx  = np.minimum(beta, c * np.maximum(adx,  eps_w) ** exp_w)
-            Wy  = np.minimum(beta, c * np.maximum(ady,  eps_w) ** exp_w)
-            Wxx = np.minimum(beta, c * np.maximum(adxx, eps_w) ** exp_w) * w0
-            Wyy = np.minimum(beta, c * np.maximum(adyy, eps_w) ** exp_w) * w0
-            Wxy = np.minimum(beta, c * np.maximum(adxy, eps_w) ** exp_w) * w0
+        Wx  = np.minimum(beta, c * adx  ** (alpha_p - 2))
+        Wy  = np.minimum(beta, c * ady  ** (alpha_p - 2))
+        Wxx = np.minimum(beta, c * adxx ** (alpha_p - 2)) * w0
+        Wyy = np.minimum(beta, c * adyy ** (alpha_p - 2)) * w0
+        Wxy = np.minimum(beta, c * adxy ** (alpha_p - 2)) * w0
 
         # Inner ADMM loop
         inner = 0

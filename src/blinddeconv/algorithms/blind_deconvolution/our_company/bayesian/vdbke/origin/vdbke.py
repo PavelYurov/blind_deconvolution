@@ -68,24 +68,8 @@ class VDBKE(DeconvolutionAlgorithm):
         kernel_cost_display: int = 0,
         kernel_mode: int = 0,
         kernel_Laplacian_filter=None,
-        # NOTE on ``kernel_lambda_C``.
-        # Originally I set this to 100.0 to match Sun-dataset/real-data
-        # tests in the paper, but those tests use real-world 640×640
-        # blurred photos with motion kernels of 13–27 px.  The user's
-        # pipeline applies *synthetic* motion/defocus blur on much
-        # smaller images, where ``lambda_C=100`` over-regularises the
-        # kernel and introduces a sub-pixel shift bias («ступеньки» /
-        # «звон» in the deblurred image).  Default 0 = pure Dirichlet
-        # prior; advanced users can set 0.01 (Levin-style) or 100
-        # (Sun-style) explicitly.
         kernel_lambda_C: float = 0.0,
         # ── image estimation parameters ──
-        # NOTE on ``img_lambda1``.
-        # Lowering this to 0.0002 (Sun default) on the user's pipeline
-        # under-regularises the latent image so the kernel absorbs
-        # noise-driven gradients and develops a faint halo («тень»).
-        # 0.002 is a calibrated middle ground that works well for the
-        # synthetic-blur scenarios used here.
         img_lambda1: float = 0.002,
         img_lambda_min: float = 0.01,
         img_lambda_max: float = 1.0,
@@ -99,12 +83,6 @@ class VDBKE(DeconvolutionAlgorithm):
         xk_iter: int = 20,
         k_tol: float = 5e-4,
         # ── non-blind deconvolution (FIRLS) parameters ──
-        # NOTE on ``firls_lambda``.
-        # 0.0002 (Sun) under-regularises the inversion on the user's
-        # pipeline and produces visible ringing / staircase artefacts
-        # near edges.  0.002 keeps the inversion stable while still
-        # leaving high-frequency detail thanks to the hyper-Laplacian
-        # prior (alpha = 2/3).
         firls_lambda: float = 0.002,
         firls_alpha: float = 2.0 / 3.0,
         firls_out_iter: int = 5,

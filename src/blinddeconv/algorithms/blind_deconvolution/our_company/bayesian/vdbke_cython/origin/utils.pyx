@@ -1,6 +1,6 @@
 import numpy as np
 from numpy.fft import fft2, ifft2
-from scipy.ndimage import zoom, map_coordinates, gaussian_filter
+from scipy.ndimage import zoom, map_coordinates
 
 cimport numpy as cnp
 cimport cython
@@ -52,36 +52,15 @@ def imresize(img: np.ndarray, output_size, method: str = 'bilinear') -> np.ndarr
     zoom_h = oh / h
     zoom_w = ow / w
 
-    # Anti-aliasing prefilter for downscaling (matches MATLAB imresize Antialiasing=true).
-    # sigma = (1/scale - 1)/pi  (gentle, matches the tent-kernel cut-off).
-    src = img
-    if zoom_h < 1.0 or zoom_w < 1.0:
-        sigma_h = max(0.0, (1.0 / zoom_h - 1.0) / np.pi) if zoom_h < 1.0 else 0.0
-        sigma_w = max(0.0, (1.0 / zoom_w - 1.0) / np.pi) if zoom_w < 1.0 else 0.0
-        if sigma_h > 1e-3 or sigma_w > 1e-3:
-            if img.ndim == 3:
-                src = gaussian_filter(img, sigma=(sigma_h, sigma_w, 0.0), mode='nearest')
-            else:
-                src = gaussian_filter(img, sigma=(sigma_h, sigma_w), mode='nearest')
-
-    if src.ndim == 3:
-        result = zoom(src, (zoom_h, zoom_w, 1), order=order)
+    if img.ndim == 3:
+        result = zoom(img, (zoom_h, zoom_w, 1), order=order)
     else:
-        result = zoom(src, (zoom_h, zoom_w), order=order)
+        result = zoom(img, (zoom_h, zoom_w), order=order)
 
     if result.shape[0] > oh:
         result = result[:oh]
     if result.shape[1] > ow:
         result = result[:, :ow]
-    if result.shape[0] < oh or result.shape[1] < ow:
-        pad_r = oh - result.shape[0]
-        pad_c = ow - result.shape[1]
-        if result.ndim == 3:
-            result = np.pad(result, ((0, max(0, pad_r)), (0, max(0, pad_c)), (0, 0)),
-                            mode='edge')
-        else:
-            result = np.pad(result, ((0, max(0, pad_r)), (0, max(0, pad_c))),
-                            mode='edge')
     return result
 
 def valid_conv_by_fft(cnp.ndarray[cnp.complex128_t, ndim=2] X_fft, cnp.ndarray[cnp.float64_t, ndim=2] h):
