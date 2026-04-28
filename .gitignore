@@ -129,7 +129,7 @@ Desktop.ini
 /reports/
 /validate_images/
 /presentation_graphics/
-/presentation_graphics_tmp/
+/presentation_graphics_*/
 /images/compare_data/
 
 
