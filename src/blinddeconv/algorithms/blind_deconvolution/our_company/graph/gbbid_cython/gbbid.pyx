@@ -172,6 +172,8 @@ class GBBID(DeconvolutionAlgorithm):
         act_params: dict = None,
         pre_nonblind: str = 'none',
         pre_nonblind_params: dict = None,
+        auto_mode: str = 'off',
+        auto_mode_params: dict = None,
     ):
         super().__init__(name='GBBID')
 
@@ -198,6 +200,25 @@ class GBBID(DeconvolutionAlgorithm):
         self.act_params = act_params
         self.pre_nonblind = pre_nonblind
         self.pre_nonblind_params = pre_nonblind_params
+        self.auto_mode = (auto_mode or 'off').lower()
+        self.auto_mode_params = auto_mode_params
+
+        # Snapshot of user-supplied defaults — used by the robust
+        # orchestrator so that soft-blending always starts from the
+        # values the user passed at construction, not from values that
+        # were overwritten on a previous process() call.
+        self._defaults_snapshot = {
+            'lambda_fhlp': float(lambda_fhlp),
+            'alpha_fhlp': float(alpha_fhlp),
+            'preprocess': preprocess,
+            'preprocess_params': preprocess_params,
+            'pre_kernel': pre_kernel,
+            'pre_kernel_params': pre_kernel_params,
+            'pre_nonblind': pre_nonblind,
+            'pre_nonblind_params': pre_nonblind_params,
+            'nonblind_method': nonblind_method,
+            'nonblind_params': nonblind_params,
+        }
 
         self.history: Dict[str, list] = {'kernel_diff': []}
         self.hyperparams: Dict[str, Any] = {}
@@ -281,6 +302,15 @@ class GBBID(DeconvolutionAlgorithm):
         noise_info = None
         if self.noise_estimation != 'none':
             noise_info = self._estimate_noise(yg)
+        elif self.auto_mode == 'robust':
+            # Orchestrator requires σ — force PCA estimator if user left it off.
+            self.noise_estimation = 'pyatykh'
+            noise_info = self._estimate_noise(yg)
+
+        # ── 2¾a½. Robust orchestrator (soft-weighted auto config) ───
+        orchestrator_info = None
+        if self.auto_mode == 'robust':
+            orchestrator_info = self._orchestrate_robust(noise_info)
 
         # ── 2¾b. ACT curvelet denoising ──────────────────────────────
         act_info = None
@@ -406,6 +436,8 @@ class GBBID(DeconvolutionAlgorithm):
             'effective_preprocess_params': eff_pp,
             'effective_pre_kernel_params': eff_pkp,
             'effective_nonblind_params': eff_nbp,
+            'auto_mode': self.auto_mode,
+            'orchestrator': orchestrator_info,
             'time': time.time() - start_time,
         }
 
@@ -455,6 +487,179 @@ class GBBID(DeconvolutionAlgorithm):
                 f"Unknown nonblind_method='{method}'. "
                 f"Choose from: 'fhlp', 'tv_adm', 'l0', 'ringing_removal', "
                 f"'adaptive_lp'")
+
+    # ── Robust orchestrator ──────────────────────────────────────────
+    def _orchestrate_robust(self, noise_info):
+        """Soft-weighted auto configuration of the GBBID noise pipeline.
+
+        Conservative mirror of LIP's orchestrator.  Designed to keep
+        ``kernel_solver_L2`` happy: avoids aggressive smoothing inside the
+        coarse-to-fine kernel-estimation loop, where over-denoised images
+        wipe out the fine gradients that ``informative_edge_mask_adaptive_mine``
+        relies on.
+
+        Policy:
+            • Clean regime  (σ ≤ σ_clean) — defaults are kept verbatim.
+              Only resolves ``nonblind_method='auto'`` to ``'fhlp'``.
+            • Heavy regime  (σ  > σ_clean) — soft blend toward σ-aware
+              configuration.
+        """
+        snap = self._defaults_snapshot
+        amp = dict(self.auto_mode_params or {})
+
+        # ── 1) Reset from snapshot — avoid sticky state between calls.
+        self.lambda_fhlp = snap['lambda_fhlp']
+        self.alpha_fhlp = snap['alpha_fhlp']
+        self.preprocess = snap['preprocess']
+        self.preprocess_params = snap['preprocess_params']
+        self.pre_kernel = snap['pre_kernel']
+        self.pre_kernel_params = snap['pre_kernel_params']
+        self.pre_nonblind = snap['pre_nonblind']
+        self.pre_nonblind_params = snap['pre_nonblind_params']
+        self.nonblind_method = snap['nonblind_method']
+        self.nonblind_params = snap['nonblind_params']
+
+        # ── 2) Read σ.
+        sigma = 0.0
+        if noise_info is not None:
+            sigma = float(noise_info.get('sigma_norm', 0.0) or 0.0)
+
+        sigma_clean = float(amp.get('sigma_clean', 0.005))
+        sigma_heavy = float(amp.get('sigma_heavy', 0.05))
+        force_heavy_sigma = float(amp.get('force_heavy_sigma', 0.01))
+
+        # Force heavy branch for signal-dependent noise even when σ is
+        # small — pca's sigma_norm is taken at mean brightness and may
+        # understate the Poisson component.
+        nt = (noise_info or {}).get('noise_type', None)
+        force_heavy = (nt in ('poisson', 'poisson_gaussian')
+                       and sigma >= force_heavy_sigma)
+
+        # ── 3) Clean branch — DO NOT alter denoisers or parameters.
+        #      Only resolve ``nonblind_method='auto'``.
+        if sigma <= sigma_clean and not force_heavy:
+            if snap['nonblind_method'] == 'auto':
+                self.nonblind_method = 'fhlp'
+            return {
+                'sigma_norm': sigma, 'w': 0.0, 'regime': 'clean',
+                'nonblind_method': self.nonblind_method,
+                'preprocess': self.preprocess,
+                'pre_kernel': self.pre_kernel,
+                'pre_nonblind': self.pre_nonblind,
+                'lambda_fhlp': float(self.lambda_fhlp),
+                'alpha_fhlp': float(self.alpha_fhlp),
+            }
+
+        # ── 4) Heavy branch — smooth weight between σ_clean and σ_heavy.
+        w = 1.0 if sigma >= sigma_heavy else (
+            (sigma - sigma_clean) / (sigma_heavy - sigma_clean))
+        regime = 'heavy' if w > 0.95 else 'medium'
+
+        noise_type = nt or 'gaussian'
+        poisson_like = noise_type in ('poisson', 'poisson_gaussian',
+                                      'unknown')
+
+        # ── 4a) λ_FHLP / α_FHLP: soft blend.
+        # FHLP λ controls data-fidelity weight in non-blind step.
+        # Higher σ → smaller λ (let prior win).  k_lambda_fhlp/σ gives
+        # ≈ 50/0.025 = 2000 at σ=0.025 — matches the snap default.
+        k_lambda_fhlp = float(amp.get('k_lambda_fhlp', 50.0))
+        k_alpha_fhlp = float(amp.get('k_alpha_fhlp', 0.6))
+        lam_noisy = float(np.clip(k_lambda_fhlp / max(sigma, 1e-6),
+                                  100.0, 1e5))
+        # α stays in [0.5, snap].  Heavier σ → α → 0.5 (more sparsity).
+        alpha_noisy = max(0.5, k_alpha_fhlp)
+
+        self.lambda_fhlp = (1.0 - w) * snap['lambda_fhlp'] + w * lam_noisy
+        self.alpha_fhlp = (1.0 - w) * snap['alpha_fhlp'] + w * alpha_noisy
+
+        # ── 4b) preprocess (single-pass, level-0 of pyramid).
+        #   Poisson-like → bilateral with σ-aware sigma_color (NOT ACT):
+        #     ACT used to be the natural choice for signal-dep noise, but
+        #     for GBBID specifically it is dangerous — ``kernel_solver_L2``
+        #     relies on informative edges from ``image_pyramid[level]``,
+        #     and curvelet thresholding can wipe out edges in mid-tones
+        #     when σ² is misestimated.  Bilateral with sigma_color tuned
+        #     to peak Poisson σ (~√(σ_norm) for signal-dep) is gentler.
+        #     ACT is reserved for ``pre_nonblind`` only (outside loop).
+        #   Gaussian, w<0.6 → bilateral.
+        #   Gaussian, w≥0.6 → bm3d.
+        if poisson_like:
+            # Effective σ in bright regions of a Poisson image is larger
+            # than the global σ_norm (which is averaged).  Boost
+            # sigma_color to handle the worst case without losing edges.
+            self.preprocess = 'bilateral'
+            self.preprocess_params = {
+                'sigma_color': float(max(2.0 * sigma, 0.02)),
+                'sigma_spatial': 3.0,
+            }
+        elif w < 0.6:
+            self.preprocess = 'bilateral'
+            self.preprocess_params = {
+                'sigma_color': float(max(sigma, 0.01)),
+                'sigma_spatial': 3.0,
+            }
+        else:
+            self.preprocess = 'bm3d'
+            self.preprocess_params = {'sigma_psd': float(sigma)}
+
+        # ── 4c) pre_kernel (in-loop denoiser of skeleton before kernel
+        # solver).  This is the DANGEROUS knob: smoothing inside the
+        # kernel loop can erase the informative edges that
+        # `kernel_solver_L2` and `informative_edge_mask_adaptive_mine`
+        # rely on.
+        #   Poisson-like → ALWAYS 'none'.  Per-iteration smoothing of a
+        #     signal-dependent-noise image with a single-σ filter erodes
+        #     dark-region detail and leaves bright-region noise alone
+        #     — worst of both worlds for kernel estimation.
+        #   Gaussian, w<0.5 → 'none' (defaults).
+        #   Gaussian, w≥0.5 → mild bilateral (sigma_color = 0.5·σ).
+        if (not poisson_like) and w >= 0.5:
+            self.pre_kernel = 'bilateral'
+            self.pre_kernel_params = {
+                'sigma_color': float(max(0.5 * sigma, 0.005)),
+                'sigma_spatial': 2.0,
+            }
+        # else: pre_kernel stays as snap['pre_kernel'] (default 'none')
+
+        # ── 4d) pre_nonblind (denoise of y before non-blind solve).
+        # Outside kernel loop — can be aggressive.
+        #   Poisson-like → ACT with explicit noise_var=σ² to avoid
+        #     blind-MAD underestimation; ACT here is safe because the
+        #     kernel is already estimated and ringing_removal handles
+        #     residuals.
+        #   Gaussian, w<0.6 → BM3D with sigma_psd=σ.
+        #   Gaussian, w≥0.6 → BM3D (apply_denoiser has no 'ensemble').
+        if poisson_like:
+            self.pre_nonblind = 'act'
+            self.pre_nonblind_params = {
+                'noise_var': float(sigma ** 2),
+                'threshold_setting': 's',
+            }
+        elif w < 0.6:
+            self.pre_nonblind = 'bm3d'
+            self.pre_nonblind_params = {'sigma_psd': float(max(sigma, 0.01))}
+        else:
+            self.pre_nonblind = 'bm3d'
+            self.pre_nonblind_params = {'sigma_psd': float(sigma)}
+
+        # ── 4e) nonblind_method: heavy noise → ringing_removal when 'auto'.
+        nb_auto_heavy = amp.get('nonblind_auto_heavy', 'ringing_removal')
+        if snap['nonblind_method'] == 'auto':
+            self.nonblind_method = nb_auto_heavy
+
+        info = {
+            'sigma_norm': sigma, 'w': float(w), 'regime': regime,
+            'noise_type': noise_type,
+            'poisson_like': bool(poisson_like),
+            'lambda_fhlp': float(self.lambda_fhlp),
+            'alpha_fhlp': float(self.alpha_fhlp),
+            'preprocess': self.preprocess,
+            'pre_kernel': self.pre_kernel,
+            'pre_nonblind': self.pre_nonblind,
+            'nonblind_method': self.nonblind_method,
+        }
+        return info
 
     # ── PSD-based noise preprocessing ────────────────────────────────────
     def _apply_noise_preprocess(self, yg):
@@ -671,12 +876,22 @@ class GBBID(DeconvolutionAlgorithm):
             ('act_params', self.act_params),
             ('pre_nonblind', self.pre_nonblind),
             ('pre_nonblind_params', self.pre_nonblind_params),
+            ('auto_mode', self.auto_mode),
+            ('auto_mode_params', self.auto_mode_params),
         ]
 
     def change_param(self, params: Dict[str, Any]) -> None:
         for key, value in params.items():
             if hasattr(self, key):
                 setattr(self, key, value)
+                # Keep the orchestrator's default-snapshot in sync with
+                # parameters the user updates after construction —
+                # otherwise robust mode would keep blending toward stale
+                # values from the original __init__.
+                if key in self._defaults_snapshot:
+                    self._defaults_snapshot[key] = (
+                        float(value) if key in ('lambda_fhlp', 'alpha_fhlp')
+                        else value)
 
     def get_history(self) -> dict:
         return self.history

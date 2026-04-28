@@ -298,6 +298,24 @@ def apply_denoiser(img, method, **params):
             sigma_psd = float(estimate_sigma(img))
         return bm3d_lib.bm3d(img, sigma_psd=sigma_psd)
 
+    elif method == 'act':
+        # Adaptive Curvelet Thresholding (Eslahi & Aghagolzadeh, TIP 2016).
+        # Locally adaptive in the curvelet domain — robust to non-white
+        # noise and signal-dependent (Poisson) components without needing
+        # a variance-stabilising transform.
+        #
+        # CRITICAL: if ``noise_var`` is None, ``act_denoise`` falls back
+        # to blind MAD on the finest curvelet scale.  For Poisson noise
+        # MAD is BIASED LOW (most low-noise pixels are in dark regions),
+        # which leads to under-thresholding in bright regions — fake
+        # edges that wreck downstream kernel estimation.  Always pass
+        # ``noise_var=sigma**2`` from a real noise estimator if you have one.
+        from .act_denoise import act_denoise
+        nv = params.get('noise_var', None)
+        ts = params.get('threshold_setting', 's')
+        result, _ = act_denoise(img, noise_var=nv, threshold_setting=ts)
+        return result
+
     else:
         raise ValueError(f"Unknown denoiser method: {method}")
 
@@ -593,7 +611,7 @@ def bid_rgtv_c2f_cg(Y_b, k_estimate_size, show_intermediate=False,
             ks = int(k_size[level])
             k_estimate = sk_resize(
                 k_estimate, (ks, ks),
-                order=1, anti_aliasing=False, preserve_range=True)
+                order=1, anti_aliasing=True, preserve_range=True)
             k_estimate[k_estimate < k_estimate.max() * 0.05] = 0.0
             k_sum = k_estimate.sum()
             if k_sum > 0:

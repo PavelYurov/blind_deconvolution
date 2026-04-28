@@ -33,9 +33,9 @@ from pathlib import Path
 PKG_DIR = Path(__file__).resolve().parent
 PYD_DIR = PKG_DIR / "_build_pyd"
 C_DIR   = PKG_DIR / "_build_c"
-# Рядом лежит пакет dcp_cython_pyd, из которого реально импортируется
+# Рядом лежит пакет gbbid_cython_pyd, из которого реально импортируется
 # скомпилированный код.  Кладём туда же, чтобы новый билд сразу применялся.
-INSTALL_DIR = PKG_DIR.parent / "dcp_cython_pyd"
+INSTALL_DIR = PKG_DIR.parent / "gbbid_cython_pyd"
 
 # ── All .pyx modules to compile ──────────────────────────────
 PYX_MODULES = sorted(
@@ -56,7 +56,13 @@ def cythonize_all():
     # Глобальные директивы компиляции Cython:
     # ── производительность ──────────────────────────────────────────────
     #   boundscheck=False       — отключает проверки границ массивов
-    #   wraparound=False        — отключает поддержку отрицательных индексов
+    #   wraparound=True         — ОБЯЗАТЕЛЬНО True: код использует D[-1],
+    #                             arr[-1] и т.п. для списков/кортежей/массивов.
+    #                             С wraparound=False это UB → на Windows
+    #                             либо 'NoneType is not subscriptable',
+    #                             либо 'There are no fields in dtype float64',
+    #                             либо ACCESS_VIOLATION (0xC0000005).
+    #                             Стоимость ~0 относительно boundscheck=False.
     #   initializedcheck=False  — не проверять инициализацию memoryview
     #   nonecheck=False         — не проверять None при доступе к атрибутам
     #   cdivision=True          — C-семантика для / и % (для ЦЕЛЫХ чисел;
@@ -66,7 +72,7 @@ def cythonize_all():
     directives = {
         'language_level': 3,
         'boundscheck': False,
-        'wraparound': False,
+        'wraparound': True,
         'cdivision': True,
         'initializedcheck': False,
         'nonecheck': False,

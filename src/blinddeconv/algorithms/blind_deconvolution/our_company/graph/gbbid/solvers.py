@@ -458,11 +458,13 @@ def bid_rgtv_c2f_cg(Y_b, k_estimate_size, show_intermediate=False):
 
     for i in range(1, level_num):
         image_size[i] = np.floor(image_size[i - 1] / np.log2(3)).astype(int)
+        # MATLAB imresize(..., 'bilinear') enables antialiasing when shrinking
+        # (default behaviour). Mirror that here.
         image_pyramid[i] = sk_resize(
             image_pyramid[i - 1],
             (int(image_size[i, 0]), int(image_size[i, 1])),
             order=1,     # bilinear
-            anti_aliasing=False,
+            anti_aliasing=True,
             preserve_range=True,
         )
         k_size[i] = int(np.floor(k_size[i - 1] / np.log2(3)))
@@ -493,7 +495,7 @@ def bid_rgtv_c2f_cg(Y_b, k_estimate_size, show_intermediate=False):
             ks = int(k_size[level])
             k_estimate = sk_resize(
                 k_estimate, (ks, ks),
-                order=1, anti_aliasing=False, preserve_range=True)
+                order=1, anti_aliasing=True, preserve_range=True)
             k_estimate[k_estimate < k_estimate.max() * 0.05] = 0.0
             k_sum = k_estimate.sum()
             if k_sum > 0:
