@@ -354,6 +354,36 @@ class BID_HBSP(DeconvolutionAlgorithm):
 
     General
     -------
+    auto_mode : str
+        'off' (default) — keep ALL user-supplied parameters as-is.
+        'robust'        — LIP-style soft orchestrator: estimate σ via
+                          PCA (forced if ``noise_estimation='none'``)
+                          and conditionally rewrite the noise pipeline:
+
+            * **Clean** (σ ≤ σ_clean): user defaults are kept untouched.
+              HBSP-core (β, α, λ_h, …) and all auxiliary denoisers stay
+              exactly as the user passed them.
+
+            * **Heavy** (σ > σ_clean): σ-driven choices for
+              ``preprocess`` / ``blind_denoise`` / ``pre_nonblind``
+              (bilateral / BM3D / ACT depending on σ and ``noise_type``)
+              and smooth blending of the shared non-blind weights
+              ``lambda_tv`` / ``lambda_l0`` / ``weight_ring`` (these
+              belong to ``ringing_removal``, not to HBSP-core).
+
+            HBSP-specific aux fields (``screenot_preprocess``,
+            ``act_preprocess``, ``noise_preprocess``, ``histogram_eq``,
+            ``impulse_preprocess``) and HBSP-core regularisers
+            (``noise_sigma``=1/√β, ``hs_scale``=1/α, ``lambda_h_*``,
+            ``cg_*``, ``max_iter``, ``beta_*``) are NEVER modified
+            — those are paper-tuned per Castro-Macías et al. 2024.
+
+    auto_mode_params : dict or None
+        Orchestrator knobs (see ``LIP_BD`` for the full list):
+            'sigma_clean' (default 0.005), 'sigma_heavy' (default 0.05),
+            'force_heavy_sigma' (default 0.01),
+            'k_lambda_tv', 'k_lambda_l0', 'k_weight_ring'.
+
     verbose : bool
         Print progress to stdout.  Default False.
 
@@ -421,6 +451,9 @@ class BID_HBSP(DeconvolutionAlgorithm):
         # ── Non-blind restoration ───────────────────────────────────────
         final_deconv: str = 'irls',
         nb_params: dict = None,
+        # ── Robust orchestrator ─────────────────────────────────────────
+        auto_mode: str = 'off',
+        auto_mode_params: dict = None,
         # General
         verbose: bool = False,
     ):
@@ -471,6 +504,27 @@ class BID_HBSP(DeconvolutionAlgorithm):
         # Non-blind
         self.final_deconv = final_deconv.lower()
         self.nb_params = nb_params
+
+        # Robust orchestrator (LIP-style scheme)
+        self.auto_mode = (auto_mode or 'off').lower()
+        self.auto_mode_params = auto_mode_params
+
+        # Snapshot of mutable fields from __init__.  The orchestrator
+        # resets to this at the start of every process() call so
+        # repeated runs are deterministic.  Mirrors LIP_BD's
+        # ``_defaults_snapshot``.  HBSP-specific extras
+        # (screenot/act/noise_preprocess/histogram_eq) are NOT managed
+        # by the orchestrator — they remain whatever the user set.
+        self._defaults_snapshot = {
+            'preprocess': preprocess,
+            'preprocess_params': preprocess_params,
+            'blind_denoise': blind_denoise,
+            'blind_denoise_params': blind_denoise_params,
+            'pre_nonblind': pre_nonblind,
+            'pre_nonblind_params': pre_nonblind_params,
+            'final_deconv': self.final_deconv,
+            'nb_params': nb_params,
+        }
 
         self.verbose = verbose
 
@@ -551,6 +605,19 @@ class BID_HBSP(DeconvolutionAlgorithm):
                 if self.verbose:
                     print(f"[{self.name}] auto_beta: noise_sigma "
                           f"overridden → {self.noise_sigma:.5f}")
+        elif self.auto_mode == 'robust':
+            # Orchestrator needs σ — auto-promote to PCA estimator.
+            self.noise_estimation = 'pca'
+            noise_info = self._estimate_noise(y_full)
+            if self.verbose and noise_info is not None:
+                sigma = noise_info.get('sigma_norm', 0)
+                print(f"[{self.name}] auto_mode='robust' → PCA noise "
+                      f"est.: σ={sigma:.5f} (σ_255={sigma * 255:.2f})")
+
+        # ── 3b'. Robust orchestrator ───────────────────────────
+        orchestrator_info = None
+        if self.auto_mode == 'robust':
+            orchestrator_info = self._orchestrate_robust(noise_info)
 
         # ── 3c. ScreeNOT SVD denoising ─────────────────────────
         screenot_info = None
@@ -782,6 +849,8 @@ class BID_HBSP(DeconvolutionAlgorithm):
             "histogram_eq": self.histogram_eq,
             "blind_denoise": self.blind_denoise,
             "pre_nonblind": self.pre_nonblind,
+            "auto_mode": self.auto_mode,
+            "orchestrator_info": orchestrator_info,
         }
 
         x_out = np.clip(np.round(x_final * 255.0), 0, 255).astype(np.int16)
@@ -1099,6 +1168,174 @@ class BID_HBSP(DeconvolutionAlgorithm):
     # ═══════════════════════════════════════════════════════════
     #  Private helpers: noise pipeline
     # ═══════════════════════════════════════════════════════════
+
+    # ── Robust orchestrator ───────────────────────────────────
+    def _orchestrate_robust(self, noise_info):
+        """Soft-weighted auto configuration of the noise pipeline.
+
+        Mirrors ``LIP_BD._orchestrate_robust`` — same overall scheme,
+        no preset-flipping.
+
+        Policy:
+            * Clean (σ ≤ σ_clean and not poisson-forced):
+                  do NOT touch any user defaults.  HBSP-core (β / α /
+                  λ_h / cg / max_iter) is paper-tuned and stays as
+                  passed by the user; auxiliary denoisers (preprocess,
+                  blind_denoise, pre_nonblind, screenot/act/...) are
+                  also kept as-is.
+            * Heavy (σ > σ_clean):
+                  σ-driven choices for ``preprocess`` /
+                  ``blind_denoise`` / ``pre_nonblind``, and smooth
+                  blending of NB weights ``lambda_tv`` / ``lambda_l0``
+                  / ``weight_ring`` (these belong to the shared
+                  non-blind step ``ringing_removal``, not to the HBSP
+                  core).
+
+        The HBSP core (``noise_sigma`` (β=1/σ²), ``hs_scale`` (α),
+        ``lambda_h_init/min``, ``cg_*``, ``max_iter``,
+        ``beta_*``) and the HBSP-specific aux denoisers
+        (``screenot_preprocess``, ``act_preprocess``,
+        ``noise_preprocess``, ``histogram_eq``,
+        ``impulse_preprocess``) are NEVER modified.
+        """
+        snap = self._defaults_snapshot
+        amp = dict(self.auto_mode_params or {})
+
+        # 1) Reset from snapshot — avoid sticky state between calls.
+        self.preprocess = snap['preprocess']
+        self.preprocess_params = snap['preprocess_params']
+        self.blind_denoise = snap['blind_denoise']
+        self.blind_denoise_params = snap['blind_denoise_params']
+        self.pre_nonblind = snap['pre_nonblind']
+        self.pre_nonblind_params = snap['pre_nonblind_params']
+        self.final_deconv = snap['final_deconv']
+        self.nb_params = snap['nb_params']
+
+        # 2) Read σ; missing/zero ⇒ treat as clean.
+        sigma = 0.0
+        if noise_info is not None:
+            sigma = float(noise_info.get('sigma_norm', 0.0) or 0.0)
+
+        sigma_clean = float(amp.get('sigma_clean', 0.005))
+        sigma_heavy = float(amp.get('sigma_heavy', 0.05))
+
+        force_heavy = False
+        nt = (noise_info or {}).get('noise_type', None)
+        force_heavy_sigma = float(amp.get('force_heavy_sigma', 0.01))
+        if nt in ('poisson', 'poisson_gaussian') and sigma >= force_heavy_sigma:
+            force_heavy = True
+
+        # 3) Clean branch — DO NOT alter denoisers or parameters.
+        if sigma <= sigma_clean and not force_heavy:
+            if self.verbose:
+                print(f"[{self.name}] orchestrator(σ={sigma:.5f}, clean): "
+                      f"defaults kept, final_deconv={self.final_deconv}")
+            return {
+                'sigma_norm': sigma, 'w': 0.0, 'regime': 'clean',
+                'noise_type': nt,
+                'preprocess': self.preprocess,
+                'blind_denoise': self.blind_denoise,
+                'pre_nonblind': self.pre_nonblind,
+                'final_deconv': self.final_deconv,
+            }
+
+        # 4) Heavy branch — smooth weight between σ_clean and σ_heavy.
+        w = 1.0 if sigma >= sigma_heavy else (
+            (sigma - sigma_clean) / max(sigma_heavy - sigma_clean, 1e-9))
+        w = float(np.clip(w, 0.0, 1.0))
+        regime = 'heavy' if w > 0.95 else 'medium'
+
+        noise_type = nt if nt is not None else 'gaussian'
+        poisson_like = noise_type in ('poisson', 'poisson_gaussian',
+                                      'unknown')
+
+        # 4a) Blind-loop denoiser — cheap edge-preserving bilateral.
+        if w < 0.5:
+            self.blind_denoise = 'bilateral'
+            self.blind_denoise_params = {
+                'sigma_color': float(max(sigma, 0.01)),
+                'sigma_space': 5.0,
+            }
+        else:
+            self.blind_denoise = 'bilateral'
+            self.blind_denoise_params = {
+                'sigma_color': float(max(2.0 * sigma, 0.02)),
+                'sigma_space': 7.0,
+            }
+
+        # 4b) Pre-pyramid global denoiser.
+        if poisson_like:
+            self.preprocess = 'act'
+            self.preprocess_params = {'threshold_setting': 's'}
+        elif w < 0.6:
+            self.preprocess = 'bilateral'
+            self.preprocess_params = {
+                'sigma_color': float(sigma),
+                'sigma_space': 5.0,
+            }
+        else:
+            self.preprocess = 'bm3d'
+            self.preprocess_params = {'sigma': float(sigma)}
+
+        # 4c) Pre-non-blind denoiser.
+        if poisson_like:
+            self.pre_nonblind = 'act'
+            self.pre_nonblind_params = {'threshold_setting': 's'}
+        elif w < 0.6:
+            self.pre_nonblind = 'bm3d'
+            self.pre_nonblind_params = {'sigma': float(max(sigma, 0.01))}
+        else:
+            # Heavy gaussian: BM3D with slightly inflated σ to clean
+            # inverse-filter amplification.  HBSP has no 'ensemble'
+            # denoiser available — just stronger BM3D here.
+            self.pre_nonblind = 'bm3d'
+            self.pre_nonblind_params = {
+                'sigma': float(max(1.5 * sigma, 0.02)),
+            }
+
+        # 4d) σ-blend of shared non-blind weights (ringing_removal).
+        # These belong to the NB step (same code path as ECP/LIP),
+        # NOT to the HBSP core, so it is safe to scale them with σ.
+        nb_default = dict(snap['nb_params'] or {})
+        lam_tv0 = float(nb_default.get('lambda_tv', 0.005))
+        lam_l00 = float(nb_default.get('lambda_l0', 0.002))
+        wring0 = float(nb_default.get('weight_ring', 0.5))
+
+        k_lambda_tv = float(amp.get('k_lambda_tv', 0.05))
+        k_lambda_l0 = float(amp.get('k_lambda_l0', 0.01))
+        k_weight_ring = float(amp.get('k_weight_ring', 1.0))
+
+        lam_tv_noisy = max(lam_tv0, k_lambda_tv * sigma)
+        lam_l0_noisy = max(lam_l00, k_lambda_l0 * sigma)
+        wring_noisy = min(2.0, wring0 + k_weight_ring * sigma)
+
+        nb_blended = dict(nb_default)
+        nb_blended['lambda_tv'] = (1.0 - w) * lam_tv0 + w * lam_tv_noisy
+        nb_blended['lambda_l0'] = (1.0 - w) * lam_l00 + w * lam_l0_noisy
+        nb_blended['weight_ring'] = (1.0 - w) * wring0 + w * wring_noisy
+        self.nb_params = nb_blended
+
+        info = {
+            'sigma_norm': sigma, 'w': float(w), 'regime': regime,
+            'noise_type': noise_type,
+            'poisson_like': bool(poisson_like),
+            'preprocess': self.preprocess,
+            'blind_denoise': self.blind_denoise,
+            'pre_nonblind': self.pre_nonblind,
+            'final_deconv': self.final_deconv,
+            'nb_lambda_tv': float(nb_blended['lambda_tv']),
+            'nb_lambda_l0': float(nb_blended['lambda_l0']),
+            'nb_weight_ring': float(nb_blended['weight_ring']),
+        }
+        if self.verbose:
+            print(f"[{self.name}] orchestrator(σ={sigma:.5f}, w={w:.2f}, "
+                  f"regime={regime}, type={noise_type}): "
+                  f"pre={self.preprocess}, blind={self.blind_denoise}, "
+                  f"pre_nb={self.pre_nonblind}, "
+                  f"nb(λtv={nb_blended['lambda_tv']:.4f}, "
+                  f"λl0={nb_blended['lambda_l0']:.4f}, "
+                  f"wring={nb_blended['weight_ring']:.3f})")
+        return info
 
     # ── Noise estimation ──────────────────────────────────────
     def _estimate_noise(self, yg):

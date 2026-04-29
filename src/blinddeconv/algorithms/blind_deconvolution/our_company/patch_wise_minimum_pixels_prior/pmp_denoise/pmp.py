@@ -29,7 +29,7 @@ Pipeline:
 
 import numpy as np
 import time
-from typing import Tuple, List, Any, Dict
+from typing import Tuple, List, Any, Dict, Optional
 
 # ── Framework base class import (DO NOT MODIFY) ─────────────────────────────
 import sys
@@ -280,6 +280,49 @@ class PMP_BD(DeconvolutionAlgorithm):
         wiener:      {'noise_snr': float (default 0.01)}.
         tikhonov:    {'alpha': float (default 0.01)}.
 
+    Robust Orchestrator (noise-aware autopilot)
+    -------------------------------------------
+
+    auto_mode : str
+        'off' (default) — keep ALL user-supplied parameters as-is.
+        'robust'        — estimate σ via PCA (forced if ``noise_estimation``
+                          is 'none') and pick between two presets:
+
+            * **Clean preset** (paper-faithful PMP, used when σ ≤ σ_clean):
+              ``denoise_eps=None``, ``ensemble_denoise=False``,
+              ``grad_smooth_sigma=None``, ``pmp_quantile=0.0``,
+              ``lambda_pmp=4e-3``, ``lambda_grad=4e-3``,
+              ``lambda_tv=1e-3``, ``lambda_l0=5e-4``,
+              ``blind_denoise='none'``, ``preprocess='none'``,
+              ``pre_nonblind='none'``, ``final_deconv='ringing_removal'``.
+
+            * **Heavy preset** (used when σ ≥ σ_heavy):
+              EXACTLY what the user passed to ``__init__`` —
+              i.e. the user's robustified configuration is preserved.
+
+            * **Medium regime** (σ_clean < σ < σ_heavy): numeric
+              hyperparameters are smoothly blended between the two
+              presets; discrete denoiser choices switch from clean
+              to heavy at ``w >= 0.5``.
+
+        ``impulse_preprocess`` is **never** modified by the orchestrator
+        because impulse noise is detected separately and is orthogonal
+        to σ.  The blind-step PMP core (``kernel_size``, ``xk_iter``,
+        ``gamma_correct``, ``k_thresh``, ``patch_r``) is never modified.
+
+    auto_mode_params : dict or None
+        Orchestrator knobs.  Keys:
+            'sigma_clean' (default 0.005) — σ below which the clean
+                preset is used in full.
+            'sigma_heavy' (default 0.05)  — σ at and above which the
+                heavy preset is used in full.
+            'force_heavy_sigma' (default 0.01) — for poisson-like noise
+                (PCA ``noise_type`` ∈ {'poisson', 'poisson_gaussian'}),
+                force the heavy branch when σ exceeds this value, even
+                if it is below ``sigma_clean`` on the σ map.
+            'clean_preset' (dict, optional) — override the clean preset
+                values.  Same keys as the heavy snapshot below.
+
     verbose : bool — print progress.  Default False.
     """
 
@@ -324,6 +367,9 @@ class PMP_BD(DeconvolutionAlgorithm):
         # ── Non-blind restoration ───────────────────────────────────────
         final_deconv: str = 'ringing_removal',
         nb_params: dict = None,
+        # ── Robust orchestrator ─────────────────────────────────────────
+        auto_mode: str = 'off',
+        auto_mode_params: Optional[dict] = None,
         verbose: bool = False,
     ):
         super().__init__(name='PMP-BD')
@@ -372,6 +418,62 @@ class PMP_BD(DeconvolutionAlgorithm):
         self.nb_params = nb_params
         self.verbose = verbose
 
+        # Robust orchestrator
+        self.auto_mode = (auto_mode or 'off').lower()
+        self.auto_mode_params = auto_mode_params
+
+        # Heavy preset = whatever the user passed to __init__.  The
+        # orchestrator restores from this snapshot at the start of every
+        # process() call so repeated runs are deterministic and so the
+        # clean-branch reset cannot leak into the heavy branch.
+        self._heavy_snapshot = {
+            'lambda_pmp': float(lambda_pmp),
+            'lambda_grad': float(lambda_grad),
+            'pmp_quantile': float(pmp_quantile),
+            'denoise_eps': denoise_eps,
+            'denoise_radius': int(denoise_radius),
+            'grad_smooth_sigma': grad_smooth_sigma,
+            'ensemble_denoise': bool(ensemble_denoise),
+            'estimate_noise_internal': bool(estimate_noise_internal),
+            'noise_sigma_mult': float(noise_sigma_mult),
+            'lambda_tv': float(lambda_tv),
+            'lambda_l0': float(lambda_l0),
+            'weight_ring': float(weight_ring),
+            'preprocess': preprocess,
+            'preprocess_params': preprocess_params,
+            'blind_denoise': blind_denoise,
+            'blind_denoise_params': blind_denoise_params,
+            'pre_nonblind': pre_nonblind,
+            'pre_nonblind_params': pre_nonblind_params,
+            'final_deconv': self.final_deconv,
+            'nb_params': nb_params,
+        }
+
+        # Paper-faithful clean preset.  Used by the orchestrator when
+        # σ ≤ σ_clean (no noise) so the algorithm stops over-smoothing.
+        self._clean_preset_default = {
+            'lambda_pmp': 4e-3,
+            'lambda_grad': 4e-3,
+            'pmp_quantile': 0.0,
+            'denoise_eps': None,
+            'denoise_radius': 2,
+            'grad_smooth_sigma': None,
+            'ensemble_denoise': False,
+            'estimate_noise_internal': False,
+            'noise_sigma_mult': 10.0,
+            'lambda_tv': 1e-3,
+            'lambda_l0': 5e-4,
+            'weight_ring': 1.0,
+            'preprocess': 'none',
+            'preprocess_params': None,
+            'blind_denoise': 'none',
+            'blind_denoise_params': None,
+            'pre_nonblind': 'none',
+            'pre_nonblind_params': None,
+            'final_deconv': 'ringing_removal',
+            'nb_params': None,
+        }
+
         self.history: Dict[str, list] = {'kernel_diff': []}
         self.hyperparams: Dict[str, Any] = {}
 
@@ -419,9 +521,24 @@ class PMP_BD(DeconvolutionAlgorithm):
                 sigma = noise_info.get('sigma_norm', 0)
                 print(f"[PMP-BD] Noise estimation ({self.noise_estimation}): "
                       f"σ={sigma:.5f} (σ_255={sigma * 255:.2f})")
+        elif self.auto_mode == 'robust':
+            # Orchestrator needs σ — auto-promote to PCA estimator.
+            self.noise_estimation = 'pca'
+            noise_info = self._estimate_noise(yg)
+            if self.verbose and noise_info is not None:
+                sigma = noise_info.get('sigma_norm', 0)
+                print(f"[PMP-BD] auto_mode='robust' → PCA noise est.: "
+                      f"σ={sigma:.5f} (σ_255={sigma * 255:.2f})")
+
+        # ── 3b'. Robust orchestrator (mutually exclusive with auto_params) ─
+        orchestrator_info = None
+        if self.auto_mode == 'robust':
+            orchestrator_info = self._orchestrate_robust(noise_info)
 
         # ── 3c. Auto-params from σ ──────────────────────────────────────
-        if self.auto_params is not None and noise_info is not None:
+        if (self.auto_mode != 'robust'
+                and self.auto_params is not None
+                and noise_info is not None):
             sigma_n = noise_info.get('sigma_norm', None)
             if sigma_n is not None and sigma_n > 0:
                 ap = self.auto_params if isinstance(self.auto_params, dict) else {}
@@ -601,6 +718,8 @@ class PMP_BD(DeconvolutionAlgorithm):
             'pre_nonblind': self.pre_nonblind,
             'auto_params': self.auto_params,
             'nb_params': self.nb_params,
+            'auto_mode': self.auto_mode,
+            'orchestrator_info': orchestrator_info,
             'time': time.time() - start_time,
         }
 
@@ -778,6 +897,170 @@ class PMP_BD(DeconvolutionAlgorithm):
         if self.blind_denoise == 'guided':
             p.setdefault('radius', 2)
         return self._apply_denoise(s, self.blind_denoise, p, noise_info)
+
+    # ── Robust orchestrator ─────────────────────────────────────────
+    def _orchestrate_robust(self, noise_info):
+        """Soft-weighted auto configuration of the noise pipeline.
+
+        Heavy preset = the user's __init__ values (their robustified
+        config).  Clean preset = paper-faithful PMP defaults that do not
+        smear edges on noise-free input.
+
+        Policy:
+            • σ ≤ σ_clean (and not poisson-forced):
+                  switch to the clean preset entirely (no smoothing,
+                  no auxiliary denoisers, paper λ values).
+            • σ ≥ σ_heavy:
+                  keep the user's heavy snapshot.
+            • in between:
+                  blend numeric hyperparameters between the two
+                  presets; switch discrete denoiser strings from
+                  clean → heavy at w ≥ 0.5.
+
+        ``impulse_preprocess`` is left untouched (it has its own
+        detector and is orthogonal to σ).  PMP core knobs
+        (kernel_size, xk_iter, gamma_correct, k_thresh, patch_r) are
+        never modified.
+
+        Always starts by resetting from the heavy snapshot so repeated
+        process() calls are deterministic.
+        """
+        heavy = self._heavy_snapshot
+        clean = dict(self._clean_preset_default)
+        amp = dict(self.auto_mode_params or {})
+        if isinstance(amp.get('clean_preset'), dict):
+            clean.update(amp['clean_preset'])
+
+        # ── 1) Reset all orchestrator-managed fields to heavy snapshot. ─
+        # (clean branch overrides them next; medium branch blends them).
+        for k, v in heavy.items():
+            setattr(self, k, v)
+
+        # ── 2) Read σ; missing/zero ⇒ treat as clean. ──────────────────
+        sigma = 0.0
+        if noise_info is not None:
+            sigma = float(noise_info.get('sigma_norm', 0.0) or 0.0)
+
+        sigma_clean = float(amp.get('sigma_clean', 0.005))
+        sigma_heavy = float(amp.get('sigma_heavy', 0.05))
+
+        force_heavy = False
+        nt = (noise_info or {}).get('noise_type', None)
+        force_heavy_sigma = float(amp.get('force_heavy_sigma', 0.01))
+        if nt in ('poisson', 'poisson_gaussian') and sigma >= force_heavy_sigma:
+            force_heavy = True
+
+        # Helper: list of numeric params to blend.
+        _numeric_keys = (
+            'lambda_pmp', 'lambda_grad', 'pmp_quantile',
+            'lambda_tv', 'lambda_l0', 'weight_ring',
+            'noise_sigma_mult',
+        )
+        # Helper: discrete (string / None / bool) params, clean-vs-heavy.
+        _discrete_keys = (
+            'denoise_eps', 'grad_smooth_sigma', 'ensemble_denoise',
+            'estimate_noise_internal',
+            'preprocess', 'preprocess_params',
+            'blind_denoise', 'blind_denoise_params',
+            'pre_nonblind', 'pre_nonblind_params',
+            'final_deconv', 'nb_params',
+        )
+
+        # ── 3) Clean branch — full clean preset. ───────────────────────
+        if sigma <= sigma_clean and not force_heavy:
+            for k in _numeric_keys + _discrete_keys:
+                if k in clean:
+                    setattr(self, k, clean[k])
+            info = {
+                'sigma_norm': sigma, 'w': 0.0, 'regime': 'clean',
+                'noise_type': nt,
+                'lambda_pmp': float(self.lambda_pmp),
+                'lambda_grad': float(self.lambda_grad),
+                'pmp_quantile': float(self.pmp_quantile),
+                'lambda_tv': float(self.lambda_tv),
+                'lambda_l0': float(self.lambda_l0),
+                'denoise_eps': self.denoise_eps,
+                'ensemble_denoise': self.ensemble_denoise,
+                'grad_smooth_sigma': self.grad_smooth_sigma,
+                'preprocess': self.preprocess,
+                'blind_denoise': self.blind_denoise,
+                'pre_nonblind': self.pre_nonblind,
+                'final_deconv': self.final_deconv,
+            }
+            if self.verbose:
+                print(f"[{self.name}] orchestrator(σ={sigma:.5f}, clean): "
+                      f"clean preset → λ_pmp={self.lambda_pmp:.4f}, "
+                      f"λ_grad={self.lambda_grad:.5f}, "
+                      f"q={self.pmp_quantile:.3f}, "
+                      f"denoise_eps={self.denoise_eps}, "
+                      f"ensemble={self.ensemble_denoise}, "
+                      f"σ_grad={self.grad_smooth_sigma}, "
+                      f"blind={self.blind_denoise}, "
+                      f"pre={self.preprocess}, pre_nb={self.pre_nonblind}")
+            return info
+
+        # ── 4) Heavy / medium branch — blend or use heavy. ─────────────
+        if sigma >= sigma_heavy or force_heavy:
+            w = 1.0
+            regime = 'heavy'
+        else:
+            w = (sigma - sigma_clean) / max(sigma_heavy - sigma_clean, 1e-9)
+            w = float(np.clip(w, 0.0, 1.0))
+            regime = 'medium' if w < 0.95 else 'heavy'
+
+        # 4a) Blend numeric hyperparameters between clean and heavy.
+        for k in _numeric_keys:
+            c_val = float(clean.get(k, heavy[k]))
+            h_val = float(heavy[k])
+            setattr(self, k, (1.0 - w) * c_val + w * h_val)
+
+        # 4b) Discrete params — flip from clean to heavy at w ≥ 0.5.
+        use_heavy_discrete = w >= 0.5
+        for k in _discrete_keys:
+            src = heavy if use_heavy_discrete else clean
+            if k in src:
+                setattr(self, k, src[k])
+
+        # 4c) Tame the denoise_eps in medium regime: scale heavy eps by
+        # w so the guided filter is not aggressive at borderline σ.
+        if use_heavy_discrete and isinstance(heavy.get('denoise_eps'), (int, float)):
+            self.denoise_eps = float(heavy['denoise_eps']) * float(w)
+        # Same idea for grad_smooth_sigma — the user's heavy value
+        # (e.g. 0.285) is too strong at medium σ.
+        if use_heavy_discrete and isinstance(heavy.get('grad_smooth_sigma'),
+                                              (int, float)):
+            self.grad_smooth_sigma = float(heavy['grad_smooth_sigma']) * float(w)
+
+        info = {
+            'sigma_norm': sigma, 'w': float(w), 'regime': regime,
+            'noise_type': nt,
+            'lambda_pmp': float(self.lambda_pmp),
+            'lambda_grad': float(self.lambda_grad),
+            'pmp_quantile': float(self.pmp_quantile),
+            'lambda_tv': float(self.lambda_tv),
+            'lambda_l0': float(self.lambda_l0),
+            'denoise_eps': self.denoise_eps,
+            'ensemble_denoise': self.ensemble_denoise,
+            'grad_smooth_sigma': self.grad_smooth_sigma,
+            'preprocess': self.preprocess,
+            'blind_denoise': self.blind_denoise,
+            'pre_nonblind': self.pre_nonblind,
+            'final_deconv': self.final_deconv,
+        }
+        if self.verbose:
+            print(f"[{self.name}] orchestrator(σ={sigma:.5f}, w={w:.2f}, "
+                  f"regime={regime}, type={nt}): "
+                  f"λ_pmp={self.lambda_pmp:.4f}, "
+                  f"λ_grad={self.lambda_grad:.5f}, "
+                  f"q={self.pmp_quantile:.3f}, "
+                  f"λ_tv={self.lambda_tv:.5f}, λ_l0={self.lambda_l0:.6f}, "
+                  f"denoise_eps={self.denoise_eps}, "
+                  f"ensemble={self.ensemble_denoise}, "
+                  f"σ_grad={self.grad_smooth_sigma}, "
+                  f"blind={self.blind_denoise}, "
+                  f"pre={self.preprocess}, pre_nb={self.pre_nonblind}, "
+                  f"final={self.final_deconv}")
+        return info
 
     # ── FFT-based non-blind methods ─────────────────────────────────
     @staticmethod
