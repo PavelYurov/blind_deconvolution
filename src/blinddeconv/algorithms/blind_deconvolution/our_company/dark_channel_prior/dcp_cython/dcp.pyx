@@ -287,6 +287,9 @@ class DCP_BD(DeconvolutionAlgorithm):
         # ── Non-blind restoration ───────────────────────────────────────
         final_deconv: str = 'ringing_removal',
         nb_params: dict = None,
+        # ── LIP-style robust orchestrator ───────────────────────────────
+        auto_mode: str = 'off',
+        auto_mode_params: dict = None,
         verbose: bool = False,
     ):
         super().__init__(name='DCP-BD')
@@ -326,7 +329,30 @@ class DCP_BD(DeconvolutionAlgorithm):
         # Non-blind
         self.final_deconv = final_deconv.lower()
         self.nb_params = nb_params
+
+        # LIP-style robust orchestrator
+        self.auto_mode = (auto_mode or 'off').lower()
+        self.auto_mode_params = auto_mode_params
+
         self.verbose = verbose
+
+        # Snapshot of user-provided values for orchestrator-managed groups.
+        self._defaults_snapshot = {
+            'preprocess':          preprocess,
+            'preprocess_params':   preprocess_params,
+            'pre_nonblind':        pre_nonblind,
+            'pre_nonblind_params': pre_nonblind_params,
+            'act_preprocess':      act_preprocess,
+            'act_params':          act_params,
+            'final_deconv':        self.final_deconv,
+            'nb_params':           nb_params,
+            'blind_hooks':         blind_hooks,
+            'ringing_weights': {
+                'lambda_tv':   lambda_tv,
+                'lambda_l0':   lambda_l0,
+                'weight_ring': weight_ring,
+            },
+        }
 
         self.history: Dict[str, list] = {'kernel_diff': []}
         self.hyperparams: Dict[str, Any] = {}
@@ -371,6 +397,12 @@ class DCP_BD(DeconvolutionAlgorithm):
                     max_window=ip.get('max_window', 7))
 
         # ── 3b. Noise estimation ────────────────────────────────────────
+        # Auto-promote to PCA when robust orchestrator is enabled.
+        if self.auto_mode == 'robust' and self.noise_estimation == 'none':
+            self.noise_estimation = 'pca'
+            if self.verbose:
+                print("[DCP-BD] auto_mode='robust' \u2192 "
+                      "forcing noise_estimation='pca'")
         noise_info = None
         if self.noise_estimation != 'none':
             noise_info = self._estimate_noise(yg)
@@ -398,6 +430,9 @@ class DCP_BD(DeconvolutionAlgorithm):
                           f"λ_grad={self.lambda_grad:.5f}, "
                           f"λ_tv={self.lambda_tv:.5f}, "
                           f"λ_l0={self.lambda_l0:.6f}")
+
+        # ── 3c'. LIP-style robust orchestrator ──────────────────────────
+        orchestrator_info = self._orchestrate_robust(noise_info)
 
         # ── 3d. ScreeNOT SVD denoising ──────────────────────────────────
         screenot_info = None
@@ -541,6 +576,9 @@ class DCP_BD(DeconvolutionAlgorithm):
             'blind_hooks': self.blind_hooks,
             'auto_params': self.auto_params,
             'nb_params': self.nb_params,
+            'auto_mode': self.auto_mode,
+            'auto_mode_params': self.auto_mode_params,
+            'orchestrator_info': orchestrator_info,
             'time': time.time() - start_time,
         }
 
@@ -690,7 +728,170 @@ class DCP_BD(DeconvolutionAlgorithm):
                 f"Choose from: 'auto', 'notch', 'bandstop', 'none'")
 
         return yg_out, psd_info
+    # ── LIP-style robust orchestrator (schema A) ──────────────────
+    def _orchestrate_robust(self, noise_info):
+        """Adjust orchestrator-managed groups based on estimated noise.
 
+        See dcp.py for full docstring.
+        """
+        info = {'triggered': False, 'mode': self.auto_mode}
+
+        if self.auto_mode != 'robust':
+            return info
+
+        snap = self._defaults_snapshot
+        p = self.auto_mode_params or {}
+        sigma_clean = float(p.get('sigma_clean', 0.005))
+        sigma_heavy = float(p.get('sigma_heavy', 0.05))
+        force_heavy_sigma = float(p.get('force_heavy_sigma', 0.01))
+        prefer_act = bool(p.get('prefer_act_for_gaussian', False))
+
+        sigma = None
+        ntype = 'unknown'
+        if noise_info is not None:
+            sigma = noise_info.get('sigma_norm', None)
+            ntype = noise_info.get('noise_type', 'unknown') or 'unknown'
+        if sigma is None:
+            sigma = 0.0
+
+        poisson_like = ntype in ('poisson', 'poisson_gaussian', 'unknown')
+        heavy = (sigma > sigma_clean) or (poisson_like and sigma > force_heavy_sigma)
+
+        info.update({
+            'triggered': True,
+            'sigma': float(sigma),
+            'noise_type': ntype,
+            'poisson_like': poisson_like,
+            'sigma_clean': sigma_clean,
+            'sigma_heavy': sigma_heavy,
+            'force_heavy_sigma': force_heavy_sigma,
+            'prefer_act_for_gaussian': prefer_act,
+        })
+
+        if not heavy:
+            info['branch'] = 'clean'
+            self.preprocess          = snap['preprocess']
+            self.preprocess_params   = snap['preprocess_params']
+            self.pre_nonblind        = snap['pre_nonblind']
+            self.pre_nonblind_params = snap['pre_nonblind_params']
+            self.act_preprocess      = snap['act_preprocess']
+            self.act_params          = snap['act_params']
+            self.final_deconv        = snap['final_deconv']
+            self.nb_params           = snap['nb_params']
+            self.blind_hooks         = snap['blind_hooks']
+            rw = snap['ringing_weights']
+            self.lambda_tv   = rw['lambda_tv']
+            self.lambda_l0   = rw['lambda_l0']
+            self.weight_ring = rw['weight_ring']
+            if self.verbose:
+                print(f"[DCP-BD][orchestrator] clean (σ={sigma:.5f}) "
+                      f"→ paper defaults restored")
+            return info
+
+        info['branch'] = 'heavy'
+        sigma_eff = max(sigma, 1e-3)
+
+        self.final_deconv = snap['final_deconv']
+        self.nb_params    = snap['nb_params']
+
+        if poisson_like or prefer_act:
+            info['route'] = 'act'
+            self.preprocess        = 'none'
+            self.preprocess_params = None
+            self.act_preprocess    = 'auto'
+            self.act_params        = {'noise_var': sigma_eff ** 2}
+            self.pre_nonblind      = 'act'
+            self.pre_nonblind_params = {'noise_var': sigma_eff ** 2}
+            self.blind_hooks = {
+                'latent_denoise': 'bilateral',
+                'latent_denoise_params': {
+                    'sigma_color': sigma_eff * 1.5,
+                    'sigma_space': 2.0,
+                },
+                'latent_denoise_decay': 0.8,
+                'grad_eq': 'none',
+                'kernel_smooth': 'gaussian',
+                'kernel_smooth_params': {'sigma': 0.3},
+            }
+        else:
+            w = (sigma - sigma_clean) / max(sigma_heavy - sigma_clean, 1e-6)
+            w = float(np.clip(w, 0.0, 1.0))
+            info['blend_weight'] = w
+
+            if w < 0.6:
+                info['route'] = 'gauss_light'
+                self.preprocess = 'bilateral'
+                self.preprocess_params = {
+                    'sigma_color': sigma_eff * 2.0,
+                    'sigma_space': 5.0,
+                }
+                self.act_preprocess    = 'none'
+                self.act_params        = None
+                self.pre_nonblind      = 'bm3d'
+                self.pre_nonblind_params = {'sigma': sigma_eff}
+                self.blind_hooks = {
+                    'latent_denoise': 'guided',
+                    'latent_denoise_params': {
+                        'radius': 2,
+                        'eps': max(1e-3, sigma_eff ** 2 * 2),
+                    },
+                    'latent_denoise_decay': 0.7,
+                    'grad_eq': 'none',
+                    'kernel_smooth': 'none',
+                }
+            else:
+                info['route'] = 'gauss_strong'
+                self.preprocess = 'bm3d'
+                self.preprocess_params = {'sigma': sigma_eff}
+                self.act_preprocess    = 'none'
+                self.act_params        = None
+                self.pre_nonblind      = 'bm3d'
+                self.pre_nonblind_params = {'sigma': sigma_eff * 1.5}
+                self.blind_hooks = {
+                    'latent_denoise': 'guided',
+                    'latent_denoise_params': {
+                        'radius': 4,
+                        'eps': max(5e-3, sigma_eff ** 2 * 4),
+                    },
+                    'latent_denoise_decay': 0.8,
+                    'grad_eq': 'none',
+                    'kernel_smooth': 'gaussian',
+                    'kernel_smooth_params': {'sigma': 0.4},
+                }
+
+        if self.auto_params is None and self.final_deconv == 'ringing_removal':
+            w = (sigma - sigma_clean) / max(sigma_heavy - sigma_clean, 1e-6)
+            w = float(np.clip(w, 0.0, 1.0))
+            rw = snap['ringing_weights']
+            noisy_tv   = sigma_eff * 0.5
+            noisy_l0   = sigma_eff * 0.025
+            noisy_ring = float(np.clip(sigma_eff * 50.0, 0.3, 1.0))
+            self.lambda_tv   = (1 - w) * rw['lambda_tv']   + w * noisy_tv
+            self.lambda_l0   = (1 - w) * rw['lambda_l0']   + w * noisy_l0
+            self.weight_ring = (1 - w) * rw['weight_ring'] + w * noisy_ring
+            info['nb_blend_applied'] = True
+            info['nb_blend_weight'] = w
+            info['nb_weights'] = {
+                'lambda_tv':   self.lambda_tv,
+                'lambda_l0':   self.lambda_l0,
+                'weight_ring': self.weight_ring,
+            }
+        else:
+            info['nb_blend_applied'] = False
+            info['nb_blend_skipped_reason'] = (
+                'user_auto_params_active' if self.auto_params is not None
+                else f"final_deconv={self.final_deconv!r}"
+            )
+
+        if self.verbose:
+            print(f"[DCP-BD][orchestrator] heavy/{info['route']} "
+                  f"σ={sigma:.5f} type={ntype} "
+                  f"preprocess={self.preprocess} "
+                  f"act={self.act_preprocess} "
+                  f"pre_nb={self.pre_nonblind} "
+                  f"nb_blend={info['nb_blend_applied']}")
+
+        return info
     # ── Build intra-loop hooks ────────────────────────────────────────
     def _build_blind_hooks(self, noise_info):
         """Create hook callbacks for the blind deconvolution loop.
@@ -846,6 +1047,8 @@ class DCP_BD(DeconvolutionAlgorithm):
             ('pre_nonblind', self.pre_nonblind),
             ('blind_hooks', self.blind_hooks),
             ('final_deconv', self.final_deconv),
+            ('auto_mode', self.auto_mode),
+            ('auto_mode_params', self.auto_mode_params),
             ('verbose', self.verbose),
         ]
 

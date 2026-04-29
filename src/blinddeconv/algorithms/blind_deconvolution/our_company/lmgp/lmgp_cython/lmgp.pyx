@@ -290,6 +290,22 @@ class LMGP_BD(DeconvolutionAlgorithm):
         # ── Surgical eq for kernel estimation only (inside blind loop) ─
         kernel_eq: str = 'none',
         kernel_eq_params: dict = None,
+        # ── LIP-style robust orchestrator (schema A) ─────────────
+        # When auto_mode='off' (default) the algorithm behaves
+        # exactly as before — no field is touched.
+        # When auto_mode='robust', after noise estimation the
+        # orchestrator may override (only for the current process()
+        # call) the following 5 groups of fields:
+        #   preprocess / preprocess_params
+        #   pre_nonblind / pre_nonblind_params
+        #   act_preprocess / act_params
+        #   nonblind_method / nonblind_params
+        #   ringing_removal NB weights: lambda_tv, lambda_l0, weight_ring
+        # Paper-tuned core (kernel_size, lambda_lmg, lambda_grad,
+        # xk_iter, gamma_correct, k_thresh, *_denoise_*, etc.) is
+        # never touched.  See _orchestrate_robust() for details.
+        auto_mode: str = 'off',
+        auto_mode_params: dict = None,
     ):
         super().__init__(name='LMGP-BD')
 
@@ -348,6 +364,28 @@ class LMGP_BD(DeconvolutionAlgorithm):
         self.kernel_eq = kernel_eq
         self.kernel_eq_params = kernel_eq_params
 
+        # ── Robust orchestrator state ────────────────────────────
+        self.auto_mode = auto_mode
+        self.auto_mode_params = auto_mode_params
+        # Snapshot user-supplied values for the 5 orchestrator-managed
+        # groups; orchestrator restores from snapshot at every call,
+        # so it stays idempotent across multiple process() runs.
+        self._defaults_snapshot = {
+            'preprocess':          preprocess,
+            'preprocess_params':   preprocess_params,
+            'pre_nonblind':        pre_nonblind,
+            'pre_nonblind_params': pre_nonblind_params,
+            'act_preprocess':      act_preprocess,
+            'act_params':          act_params,
+            'nonblind_method':     nonblind_method,
+            'nonblind_params':     nonblind_params,
+            'nb_params': {
+                'lambda_tv':   lambda_tv,
+                'lambda_l0':   lambda_l0,
+                'weight_ring': weight_ring,
+            },
+        }
+
         self.history: Dict[str, list] = {'kernel_diff': []}
         self.hyperparams: Dict[str, Any] = {}
 
@@ -395,9 +433,18 @@ class LMGP_BD(DeconvolutionAlgorithm):
                     y = yg.copy()
 
         # ── 2b. Noise estimation ─────────────────────────────────────────
+        # Robust mode auto-promotes noise_estimation to 'pca' if the
+        # user left it at 'none' (we need σ to make decisions).
+        if self.auto_mode == 'robust' and self.noise_estimation == 'none':
+            self.noise_estimation = 'pca'
         noise_info = None
         if self.noise_estimation != 'none':
             noise_info = self._estimate_noise(yg)
+
+        # ── 2b½. Robust orchestrator (schema A: clean / heavy) ──────────
+        orchestrator_info = None
+        if self.auto_mode == 'robust':
+            orchestrator_info = self._orchestrate_robust(noise_info)
 
         # ── 2c. Effective params (auto-adapted or user-specified) ────────
         overrides = {}
@@ -595,6 +642,9 @@ class LMGP_BD(DeconvolutionAlgorithm):
             'psd_info': {k: v for k, v in (psd_info or {}).items()
                          if k != 'psd_2d'} if psd_info else None,
             'effective_overrides': overrides if overrides else None,
+            'auto_mode': self.auto_mode,
+            'auto_mode_params': self.auto_mode_params,
+            'orchestrator_info': orchestrator_info,
             'time': time.time() - start_time,
         }
 
@@ -786,6 +836,122 @@ class LMGP_BD(DeconvolutionAlgorithm):
         return yg_out, psd_info
 
     # ── Noise estimation ─────────────────────────────────────────────────
+    # ── Robust orchestrator (LIP-style schema A) ───────────────────
+    def _orchestrate_robust(self, noise_info):
+        """σ-driven decision for the 5 orchestrator-managed groups.
+
+        See lmgp_denoise/lmgp.py for full docstring; behaviour mirrors
+        the pure-Python version exactly.
+        """
+        snap = self._defaults_snapshot
+
+        # Always restore snapshot first → idempotent.
+        self.preprocess          = snap['preprocess']
+        self.preprocess_params   = snap['preprocess_params']
+        self.pre_nonblind        = snap['pre_nonblind']
+        self.pre_nonblind_params = snap['pre_nonblind_params']
+        self.act_preprocess      = snap['act_preprocess']
+        self.act_params          = snap['act_params']
+        self.nonblind_method     = snap['nonblind_method']
+        self.nonblind_params     = snap['nonblind_params']
+        self.lambda_tv   = snap['nb_params']['lambda_tv']
+        self.lambda_l0   = snap['nb_params']['lambda_l0']
+        self.weight_ring = snap['nb_params']['weight_ring']
+
+        if noise_info is None:
+            return {'triggered': False, 'reason': 'no_noise_info',
+                    'branch': 'clean'}
+
+        sigma = float(noise_info.get('sigma_norm', 0.0) or 0.0)
+        ntype = noise_info.get('noise_type', 'unknown')
+        poisson_like = ntype in ('poisson', 'poisson_gaussian', 'unknown')
+
+        p = self.auto_mode_params or {}
+        sigma_clean = float(p.get('sigma_clean', 0.005))
+        sigma_heavy = float(p.get('sigma_heavy', 0.05))
+        force_sigma = float(p.get('force_heavy_sigma', 0.01))
+        prefer_act_gauss = bool(p.get('prefer_act_for_gaussian', False))
+
+        heavy = (sigma > sigma_clean) or (poisson_like and sigma > force_sigma)
+        if not heavy:
+            return {
+                'triggered': True, 'branch': 'clean',
+                'sigma': sigma, 'noise_type': ntype,
+                'sigma_clean': sigma_clean,
+            }
+
+        denom = max(sigma_heavy - sigma_clean, 1e-9)
+        w = max(0.0, min(1.0, (sigma - sigma_clean) / denom))
+
+        decisions = {
+            'triggered': True, 'branch': 'heavy',
+            'sigma': sigma, 'noise_type': ntype, 'w': w,
+            'sigma_clean': sigma_clean, 'sigma_heavy': sigma_heavy,
+            'poisson_like': poisson_like,
+            'prefer_act_for_gaussian': prefer_act_gauss,
+        }
+
+        use_act_branch = poisson_like or prefer_act_gauss
+
+        if use_act_branch:
+            self.preprocess          = 'none'
+            self.preprocess_params   = None
+            self.act_preprocess      = 'auto'
+            self.act_params = {
+                'noise_var': sigma ** 2,
+                'threshold_setting': 's',
+            }
+            self.pre_nonblind        = 'act'
+            self.pre_nonblind_params = {
+                'noise_var': sigma ** 2,
+                'threshold_setting': 's',
+            }
+            decisions['route'] = 'act'
+        else:
+            self.act_preprocess = 'none'
+            self.act_params     = None
+            if w < 0.6:
+                self.preprocess        = 'bilateral'
+                self.preprocess_params = {
+                    'sigma_color': max(0.01, sigma * 2.0),
+                    'sigma_space': 5.0,
+                }
+                self.pre_nonblind        = 'bm3d'
+                self.pre_nonblind_params = {'sigma': sigma}
+                decisions['route'] = 'gauss_light'
+            else:
+                self.preprocess        = 'bm3d'
+                self.preprocess_params = {'sigma': sigma}
+                self.pre_nonblind        = 'bm3d'
+                self.pre_nonblind_params = {'sigma': sigma * 1.5}
+                decisions['route'] = 'gauss_strong'
+
+        if self.nonblind_method == 'ringing_removal':
+            base = snap['nb_params']
+            noisy = {
+                'lambda_tv':   sigma * 0.5,
+                'lambda_l0':   sigma * 0.025,
+                'weight_ring': max(0.3, min(1.0, sigma * 50.0)),
+            }
+            self.lambda_tv = (
+                (1.0 - w) * float(base['lambda_tv']) + w * noisy['lambda_tv']
+            )
+            self.lambda_l0 = (
+                (1.0 - w) * float(base['lambda_l0']) + w * noisy['lambda_l0']
+            )
+            self.weight_ring = (
+                (1.0 - w) * float(base['weight_ring'])
+                + w * noisy['weight_ring']
+            )
+            decisions['nb_blend'] = {
+                'lambda_tv':   self.lambda_tv,
+                'lambda_l0':   self.lambda_l0,
+                'weight_ring': self.weight_ring,
+            }
+
+        return decisions
+
+    # ── Noise estimation ────────────────────────────────────────
     def _estimate_noise(self, yg):
         """Estimate noise level from grayscale image (float64 [0, 1])."""
         if self.noise_estimation == 'chen':
@@ -990,6 +1156,8 @@ class LMGP_BD(DeconvolutionAlgorithm):
             ('histogram_eq_params', self.histogram_eq_params),
             ('kernel_eq', self.kernel_eq),
             ('kernel_eq_params', self.kernel_eq_params),
+            ('auto_mode', self.auto_mode),
+            ('auto_mode_params', self.auto_mode_params),
         ]
 
     def change_param(self, params: Dict[str, Any]) -> None:
