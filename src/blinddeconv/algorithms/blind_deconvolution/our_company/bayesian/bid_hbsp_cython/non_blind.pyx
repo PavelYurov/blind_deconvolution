@@ -17,7 +17,7 @@ from scipy.ndimage import convolve1d
 from scipy.stats import entropy
 from scipy.fft import dstn, idstn
 
-__all__ = ['adaptive_lp_deconv', 'ringing_artifacts_removal']
+__all__ = ['adaptive_lp_deconv', 'ringing_artifacts_removal', 'firls_deconv']
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -441,8 +441,151 @@ def adaptive_lp_deconv(blurred, kernel, alpha=0.8, sigma_n=None,
     return np.clip(I_opt, 0, 1)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Ringing artifacts removal  (from Pan's codebase, self-contained)
+# ═════════════════════════════════════════════════════════════════════════════# FIRLS — Fast Iteratively Reweighted Least Squares for Lp deconvolution
+# Reference:
+#   X. Zhou, R. Molina, F. Zhou, A.K. Katsaggelos,
+#   "Fast iteratively reweighted least squares for Lp regularized
+#    image deconvolution and reconstruction", ICIP 2014.
+# ══════════════════════════════════════════════════════════════════════════
+
+def _firls_deb_core(y, h, lam, alpha, beta_a, epsilon_min,
+                    out_iter, inner_iter):
+    """Core FIRLS routine. Direct port of `firls_deb.m`."""
+    n1, n2 = y.shape
+
+    H = _psf2otf(h, (n1, n2))
+    Hx = _psf2otf(np.array([[1.0, -1.0]]), (n1, n2))
+    Hy = _psf2otf(np.array([[1.0], [-1.0]]), (n1, n2))
+
+    HH = H * np.conj(H)
+    HHx = Hx * np.conj(Hx)
+    HHy = Hy * np.conj(Hy)
+
+    Y = np.conj(H) * fft2(y)
+    RR = HHx + HHy
+    invA = HH + beta_a * RR
+
+    c = alpha * lam
+    beta = alpha * lam / (epsilon_min ** (2.0 - alpha))
+
+    x = y.copy()
+    dx = np.concatenate([np.diff(x, n=1, axis=1),
+                         x[:, 0:1] - x[:, -1:]], axis=1)
+    dy = np.concatenate([np.diff(x, n=1, axis=0),
+                         x[0:1, :] - x[-1:, :]], axis=0)
+    adx = np.abs(dx)
+    ady = np.abs(dy)
+
+    dvx = np.zeros_like(x)
+    dvy = np.zeros_like(x)
+
+    eps_pow = 1e-12
+
+    for _ in range(out_iter):
+        Wx = np.minimum(beta, c * np.maximum(adx, eps_pow) ** (alpha - 2.0))
+        Wy = np.minimum(beta, c * np.maximum(ady, eps_pow) ** (alpha - 2.0))
+
+        for _ in range(inner_iter):
+            vx = beta_a * (dx + dvx) / (Wx + beta_a)
+            vy = beta_a * (dy + dvy) / (Wy + beta_a)
+
+            dvx = dvx - vx + dx
+            dvy = dvy - vy + dy
+
+            tempx = vx - dvx
+            tempy = vy - dvy
+
+            adj_x = np.concatenate(
+                [tempx[:, -1:] - tempx[:, 0:1],
+                 -np.diff(tempx, n=1, axis=1)], axis=1)
+            adj_y = np.concatenate(
+                [tempy[-1:, :] - tempy[0:1, :],
+                 -np.diff(tempy, n=1, axis=0)], axis=0)
+
+            X = Y + beta_a * fft2(adj_x + adj_y)
+            X = X / invA
+            x = np.real(ifft2(X))
+
+            dx = np.concatenate([np.diff(x, n=1, axis=1),
+                                 x[:, 0:1] - x[:, -1:]], axis=1)
+            dy = np.concatenate([np.diff(x, n=1, axis=0),
+                                 x[0:1, :] - x[-1:, :]], axis=0)
+            adx = np.abs(dx)
+            ady = np.abs(dy)
+
+    return x
+
+
+def firls_deconv(blurred, kernel, lam=2e-5, alpha=0.8,
+                 epsilon_min=2.0 / 255.0, epsilon_max=20.0 / 255.0,
+                 beta_a=None, out_iter=5, inner_iter=3,
+                 boundary='wrap', clip=True, use_edgetaper=None):
+    """
+    Non-blind deconvolution via FIRLS (Zhou et al., ICIP 2014).
+
+    Solves    x* = argmin_x  0.5*||H x - y||^2 + lambda * ||grad x||_alpha^alpha
+    using fast iteratively reweighted least squares with an inner ADMM
+    split on the gradient variable. The Fourier-domain x-update assumes
+    circular boundary conditions; by default we apply Liu's smooth
+    Laplacian boundary extension to suppress periodic-wrap banding.
+
+    Parameters mirror the pure-Python twin in non_blind.py.
+    """
+    kernel = kernel.astype(np.float64)
+    kernel = np.maximum(kernel, 0.0)
+    s = kernel.sum()
+    if s <= 0:
+        raise ValueError("firls_deconv: kernel has zero sum.")
+    kernel = kernel / s
+
+    y = blurred.astype(np.float64)
+    if y.max() > 1.0:
+        y = y / 255.0
+
+    if beta_a is None:
+        beta_a = lam * alpha * (epsilon_max ** (alpha - 2.0))
+
+    if use_edgetaper is True:
+        boundary = 'reflect'
+    elif use_edgetaper is False:
+        boundary = 'none'
+
+    H_orig, W_orig = y.shape
+    kh, kw = kernel.shape
+
+    if boundary == 'wrap':
+        target_size = _opt_fft_size(
+            np.array([H_orig, W_orig]) + np.array([kh, kw]) - 1)
+        y_pad = _wrap_boundary_liu(y, tuple(target_size))
+        x_pad = _firls_deb_core(
+            y_pad, kernel, lam, alpha, beta_a,
+            epsilon_min, int(out_iter), int(inner_iter))
+        x = x_pad[:H_orig, :W_orig]
+
+    elif boundary == 'reflect':
+        pad_h, pad_w = kh, kw
+        y_pad = np.pad(y, ((pad_h, pad_h), (pad_w, pad_w)), mode='reflect')
+        x_pad = _firls_deb_core(
+            y_pad, kernel, lam, alpha, beta_a,
+            epsilon_min, int(out_iter), int(inner_iter))
+        x = x_pad[pad_h:pad_h + H_orig, pad_w:pad_w + W_orig]
+
+    elif boundary == 'none':
+        x = _firls_deb_core(
+            y, kernel, lam, alpha, beta_a,
+            epsilon_min, int(out_iter), int(inner_iter))
+
+    else:
+        raise ValueError(
+            f"firls_deconv: unknown boundary '{boundary}'. "
+            "Use 'wrap', 'reflect', or 'none'.")
+
+    if clip:
+        x = np.clip(x, 0.0, 1.0)
+    return x
+
+
+# ══════════════════════════════════════════════════════════════════════════# Ringing artifacts removal  (from Pan's codebase, self-contained)
 # ═════════════════════════════════════════════════════════════════════════════
 
 _OPT_FFT_LUT = None

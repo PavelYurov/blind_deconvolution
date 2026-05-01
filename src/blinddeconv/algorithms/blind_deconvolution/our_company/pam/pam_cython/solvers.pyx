@@ -371,13 +371,20 @@ def coarse_to_fine(f: np.ndarray, MK: int, NK: int,
             print(f"scale: {scale_idx + 1}  lambda: {lam:.6f}  "
                   f"MKs: {MKs}  NKs: {NKs}  iters: {blind_iters}")
 
-        # (1) Blind estimation
-        u, k = blind(fs, MKs, NKs,
-                      lam=lam, u=u, k=k,
-                      iters=blind_iters, visualize=visualize)
+        # CRITICAL: In MATLAB, blind_params.u is set BEFORE blind() is called,
+        # and MATLAB passes structs by value.  So dec() receives the PRE-blind u
+        # (the resized estimate from the previous scale), NOT the result of blind().
+        # blind() is used ONLY to estimate the kernel k.
+        u_pre_blind = u.copy()
 
-        # (2) Non-blind refinement
-        u = dec(fs, k, lam=lam, u=u,
+        # (1) Blind estimation — gives us a good kernel k
+        _, k = blind(fs, MKs, NKs,
+                     lam=lam, u=u, k=k,
+                     iters=blind_iters, visualize=visualize)
+
+        # (2) Non-blind refinement — reconstruct image with the good kernel
+        #     starting from the pre-blind u (matching MATLAB)
+        u = dec(fs, k, lam=lam, u=u_pre_blind,
                 iters=blind_iters, visualize=visualize)
 
     return u, k

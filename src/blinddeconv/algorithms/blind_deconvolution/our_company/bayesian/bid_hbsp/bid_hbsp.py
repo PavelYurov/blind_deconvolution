@@ -178,8 +178,8 @@ class BID_HBSP(DeconvolutionAlgorithm):
     def __init__(
         self,
         kernel_shape: Tuple[int, int],
-        hs_scale: float = 0.5,
-        noise_sigma: float = 0.01,
+        hs_scale: float = 0.01,
+        noise_sigma: float = 0.005,
         max_iter: int = 40,
         cg_iter: int = 50,
         cg_tol: float = 1e-6,
@@ -192,7 +192,7 @@ class BID_HBSP(DeconvolutionAlgorithm):
         jacobi_mode: str = "scalar",
         center_kernel: bool = True,
         # Kernel estimation
-        lambda_h_init: float = 1e3,
+        lambda_h_init: float = 100.0,
         lambda_h_min: float = 1.0,
         lambda_h_decay: float = 0.92,
         kernel_threshold: bool = True,

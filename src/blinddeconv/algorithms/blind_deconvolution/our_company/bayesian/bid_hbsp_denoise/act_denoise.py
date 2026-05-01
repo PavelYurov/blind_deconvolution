@@ -29,26 +29,35 @@ __all__ = ['act_denoise']
 # 1. UDCT operator factory
 # ═════════════════════════════════════════════════════════════════════════════
 
+def _choose_num_scales(H, W):
+    """Pick the number of UDCT scales (including lowpass) for an image.
+
+    Heuristic: ceil(log2(min(H,W))) - 2, clamped to [2, 4].
+    """
+    return max(2, min(4, int(np.ceil(np.log2(min(H, W)))) - 2))
+
+
+def _udct_pad_multiple(num_scales):
+    """Smallest factor each spatial dimension must divide for UDCT to
+    reconstruct exactly.
+
+    ``curvelets.numpy.UDCT`` silently produces large reconstruction error
+    when a dimension is not divisible by ``2**(num_scales-1)``.  Padding
+    each dim to a multiple of this value restores perfect reconstruction
+    and eliminates banding artifacts on non-square / odd-sized images.
+    """
+    return 1 << max(num_scales - 1, 0)
+
+
 def _make_udct(H, W, num_scales=None):
-    """Create a UDCT operator for the given (even) image size.
-
-    Parameters
-    ----------
-    H, W : int
-        Image height and width (must be even).
-    num_scales : int or None
-        Number of scales (including lowpass).  If None, chosen automatically
-        as  ceil(log2(min(H,W))) - 2  (clamped to >= 2), which gives a
-        decomposition depth similar to CurveLab defaults.
-
-    Returns
-    -------
-    udct_op : curvelets.numpy.UDCT
+    """Create a UDCT operator. (H, W) must already be padded to multiples
+    of ``_udct_pad_multiple(num_scales)`` -- otherwise the underlying UDCT
+    fails silently with bad reconstruction. See :func:`act_denoise`.
     """
     from curvelets.numpy import UDCT
 
     if num_scales is None:
-        num_scales = max(2, int(np.ceil(np.log2(min(H, W)))) - 2)
+        num_scales = _choose_num_scales(H, W)
 
     return UDCT(shape=(H, W), num_scales=num_scales, transform_kind='real')
 
@@ -280,16 +289,21 @@ def act_denoise(image, noise_var=None, threshold_setting='s'):
         raise ValueError(f"Expected 2D grayscale image, got shape {img.shape}")
     H, W = img.shape
 
-    # ── Pad to even dimensions (UDCT requires even sizes) ────────────────
-    pad_h = H % 2
-    pad_w = W % 2
+    # Pad to a UDCT-compatible shape.  UDCT silently breaks (huge
+    # reconstruction error -> block / banding artifacts) when a spatial
+    # dimension is not divisible by 2**(num_scales-1).  Pick num_scales
+    # from the original size, then pad each dim to the next multiple.
+    num_scales = _choose_num_scales(H, W)
+    pad_mult = _udct_pad_multiple(num_scales)
+    Hp = H + (-H) % pad_mult
+    Wp = W + (-W) % pad_mult
+    pad_h = Hp - H
+    pad_w = Wp - W
     if pad_h or pad_w:
         img = np.pad(img, ((0, pad_h), (0, pad_w)), mode='reflect')
-    Hp, Wp = img.shape
     N = Hp * Wp
 
-    # ── Create curvelet operator ─────────────────────────────────────────
-    udct_op = _make_udct(Hp, Wp)
+    udct_op = _make_udct(Hp, Wp, num_scales=num_scales)
 
     # ── Forward curvelet transform ───────────────────────────────────────
     c_struct = udct_op.forward(img)
@@ -297,13 +311,18 @@ def act_denoise(image, noise_var=None, threshold_setting='s'):
     # ── Noise variance estimation ────────────────────────────────────────
     blind = noise_var is None
     if blind:
-        # MAD on finest scale, first direction / first wedge.
-        # UDCT coefficients are complex; use .real for MAD.
-        finest_wedge = c_struct[-1][0][0]
-        vals = finest_wedge.real.ravel() if np.iscomplexobj(finest_wedge) \
-            else finest_wedge.ravel()
-        noise_std = float(
-            np.median(np.abs(vals - np.median(vals))) / 0.6745)
+        # MAD on the finest scale.  Non-square images give wedges of
+        # very different aspect ratios, so a single wedge is biased;
+        # aggregate MAD across all finest-scale wedges and take the
+        # median.
+        mads = []
+        for direction in c_struct[-1]:
+            for wedge in direction:
+                vals = wedge.real.ravel() if np.iscomplexobj(wedge) \
+                    else wedge.ravel()
+                mads.append(
+                    np.median(np.abs(vals - np.median(vals))) / 0.6745)
+        noise_std = float(np.median(mads))
         noise_var = noise_std ** 2
 
     # ── Build FFT-PSD ────────────────────────────────────────────────────

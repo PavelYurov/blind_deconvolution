@@ -61,6 +61,7 @@ MATLAB → Python conversion notes (CRITICAL differences):
 
 import numpy as np
 from scipy.signal import convolve2d as _scipy_convolve2d
+from scipy.fft import fft2 as _sp_fft2, ifft2 as _sp_ifft2, next_fast_len as _sp_next_fast_len
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -83,6 +84,17 @@ def conv2fft(a: np.ndarray, b: np.ndarray, mode: str = 'full') -> np.ndarray:
     Performs true convolution (equivalent to MATLAB conv2 but via FFT).
     Both inputs must be 2D.
 
+    Implementation note (vs original MATLAB):
+        The original conv2fft.m uses fftshift/ifftshift around the FFT
+        product.  When the FFTs are padded to exactly the linear-convolution
+        size  full_shape = (M+Mk-1, N+Nk-1)  (which they always are here),
+        that shift dance is redundant: plain  ifft(fft(a)*fft(b))  already
+        yields the linear convolution starting at index 0.  We drop it and
+        instead pad to  next_fast_len  to get FFT-friendly dimensions, then
+        crop back to full_shape.  This is mathematically equivalent up to
+        FP rounding and ~2-3x faster (pocketfft via scipy.fft + composite
+        sizes vs near-prime sizes that would arise from raw M+Mk-1).
+
     Parameters
     ----------
     a : (M, N) input array
@@ -99,28 +111,22 @@ def conv2fft(a: np.ndarray, b: np.ndarray, mode: str = 'full') -> np.ndarray:
     Nx1, Nx2 = a.shape
     NKx1, NKx2 = b.shape
 
-    full_shape = (Nx1 + NKx1 - 1, Nx2 + NKx2 - 1)
+    full_h = Nx1 + NKx1 - 1
+    full_w = Nx2 + NKx2 - 1
 
-    # MATLAB: fftshift(fftn(a, padded_size))
-    ahat = np.fft.fftshift(np.fft.fftn(a, s=full_shape))
-    bhat = np.fft.fftshift(np.fft.fftn(b, s=full_shape))
+    # FFT-friendly padded size (composite, fast for pocketfft).
+    pad_h = _sp_next_fast_len(full_h)
+    pad_w = _sp_next_fast_len(full_w)
 
-    chat = ahat * bhat
-
-    # MATLAB: real(ifftn(ifftshift(chat)))
-    c = np.real(np.fft.ifftn(np.fft.ifftshift(chat)))
+    A = _sp_fft2(a, s=(pad_h, pad_w))
+    B = _sp_fft2(b, s=(pad_h, pad_w))
+    c = _sp_ifft2(A * B).real[:full_h, :full_w]
 
     if mode == 'same':
-        # MATLAB: c(floor(NKx1/2)+[1:Nx1], floor(NKx2/2)+[1:Nx2])
-        # 1-based [floor(NKx1/2)+1 .. floor(NKx1/2)+Nx1]
-        # → 0-based [floor(NKx1/2) .. floor(NKx1/2)+Nx1)
         r0 = NKx1 // 2
         c0 = NKx2 // 2
         c = c[r0:r0 + Nx1, c0:c0 + Nx2]
     elif mode == 'valid':
-        # MATLAB: c(NKx1-1+[1:Nx1-NKx1+1], NKx2-1+[1:Nx2-NKx2+1])
-        # 1-based [NKx1 .. Nx1]
-        # → 0-based [NKx1-1 .. Nx1)
         c = c[NKx1 - 1:Nx1, NKx2 - 1:Nx2]
 
     return c

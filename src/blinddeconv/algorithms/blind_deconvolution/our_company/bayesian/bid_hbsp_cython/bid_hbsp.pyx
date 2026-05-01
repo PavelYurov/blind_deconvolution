@@ -526,11 +526,33 @@ class BID_HBSP(DeconvolutionAlgorithm):
                       f"(λ_tv={nbp.get('lambda_tv', 4e-3)}, "
                       f"λ_l0={nbp.get('lambda_l0', 2e-3)}, "
                       f"w_ring={nbp.get('weight_ring', 0.5)})")
+        elif self.final_deconv == 'firls':
+            from .non_blind import firls_deconv
+            nbp = self.nb_params or {}
+            x_final = firls_deconv(
+                y_nb, h,
+                lam=nbp.get('lam', 2e-5),
+                alpha=nbp.get('alpha', 0.8),
+                epsilon_min=nbp.get('epsilon_min', 2.0 / 255.0),
+                epsilon_max=nbp.get('epsilon_max', 20.0 / 255.0),
+                beta_a=nbp.get('beta_a', None),
+                out_iter=nbp.get('out_iter', 5),
+                inner_iter=nbp.get('inner_iter', 3),
+                boundary=nbp.get('boundary', 'wrap'),
+                use_edgetaper=nbp.get('use_edgetaper', None),
+            )
+            if self.verbose:
+                print(f"[{self.name}] Non-blind: FIRLS "
+                      f"(λ={nbp.get('lam', 2e-5)}, "
+                      f"α={nbp.get('alpha', 0.8)}, "
+                      f"out={nbp.get('out_iter', 5)}, "
+                      f"inner={nbp.get('inner_iter', 3)}, "
+                      f"boundary={nbp.get('boundary', 'wrap')})")
         else:
             raise ValueError(
                 f"Unknown final_deconv '{self.final_deconv}'. "
                 "Choose 'irls', 'adaptive_lp', 'wiener', 'tikhonov', "
-                "or 'ringing'.")
+                "'ringing', or 'firls'.")
 
         x_final = np.clip(x_final, 0.0, 1.0)
 
