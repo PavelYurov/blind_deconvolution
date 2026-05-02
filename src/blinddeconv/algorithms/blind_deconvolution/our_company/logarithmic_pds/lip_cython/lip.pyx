@@ -642,6 +642,22 @@ class LIP_BD(DeconvolutionAlgorithm):
                                     threshold_setting=ts)
             return result
 
+        elif method == 'vst_bm3d':
+            # Generalized Anscombe VST + BM3D denoising for Poisson-
+            # Gaussian noise.  Self-contained module (.vst); falls back
+            # to plain BM3D when the noise has no Poisson component.
+            from .vst import vst_bm3d_denoise
+            result, _ = vst_bm3d_denoise(
+                img,
+                noise_info=noise_info,
+                sigma=p.get('sigma', sigma),
+                a=p.get('a', None),
+                b=p.get('b', None),
+                stage_arg=p.get('stage_arg', None),
+                verbose=p.get('verbose', False),
+            )
+            return result
+
         elif method == 'ensemble':
             # Average several denoisers. Motivation: different denoisers
             # make uncorrelated errors on heavy/unknown noise, so a simple
@@ -672,7 +688,7 @@ class LIP_BD(DeconvolutionAlgorithm):
             raise ValueError(
                 f"Unknown denoiser='{method}'. Choose from: "
                 f"'tv', 'nlm', 'bilateral', 'guided', 'bm3d', "
-                f"'act', 'ensemble', 'none'")
+                f"'act', 'vst_bm3d', 'ensemble', 'none'")
 
     # ── Generalized Anscombe VST wrapper around a denoiser ──────────
     def _apply_denoise_vst(self, img, method, params, noise_info):
@@ -872,12 +888,39 @@ class LIP_BD(DeconvolutionAlgorithm):
                 'sigma_space': 7.0,
             }
 
+        # ── Choose Poisson-branch denoiser ────────────────────────
+        # 'act' (default)  — locally adaptive curvelet thresholding.
+        # 'vst_bm3d'       — Generalized Anscombe VST + BM3D.
+        # Selectable via auto_mode_params['poisson_denoiser'].  Default
+        # preserves the previous behaviour exactly.
+        poisson_denoiser = str(amp.get('poisson_denoiser', 'act')).lower()
+        if poisson_denoiser not in ('act', 'vst_bm3d'):
+            poisson_denoiser = 'act'
+
+        # ── Optional ACT on the Gaussian branch ─────────────────────
+        # By default the Gaussian branch uses bilateral / bm3d / ensemble.
+        # When these flags are set in auto_mode_params, ACT is used
+        # instead for the corresponding stage.  blind_denoise (inside the
+        # blind pyramid) stays bilateral regardless — it has to be
+        # cheap and is called every iteration.
+        gauss_act_preprocess = bool(amp.get('act_preprocess_gaussian', False))
+        gauss_act_pre_nonblind = bool(amp.get('act_pre_nonblind_gaussian', False))
+
         # preprocess (global denoise of f before blind pyramid).
         # Poisson-like → ACT (locally adaptive in curvelet domain — its
         # ML-estimator estimates variance per subband from local energy,
-        # which naturally handles signal-dependent noise without VST).
-        # Pure Gaussian → bilateral at moderate w, bm3d at heavy.
+        # which naturally handles signal-dependent noise without VST)
+        # OR VST+BM3D when poisson_denoiser='vst_bm3d'.
+        # Pure Gaussian → bilateral at moderate w, bm3d at heavy
+        # (or ACT when act_preprocess_gaussian=True).
         if poisson_like:
+            if poisson_denoiser == 'vst_bm3d':
+                self.preprocess = 'vst_bm3d'
+                self.preprocess_params = {}
+            else:
+                self.preprocess = 'act'
+                self.preprocess_params = {'threshold_setting': 's'}
+        elif gauss_act_preprocess:
             self.preprocess = 'act'
             self.preprocess_params = {'threshold_setting': 's'}
         elif w < 0.6:
@@ -893,9 +936,18 @@ class LIP_BD(DeconvolutionAlgorithm):
         # pre_nonblind (denoise of f before non-blind solve).
         # Poisson-like → ACT again (it already handled preprocess well;
         # reusing it here with a slightly stronger threshold cleans the
-        # residual inverse-filter amplification without BM3D-style blur).
-        # Pure Gaussian → BM3D or ensemble as before.
+        # residual inverse-filter amplification without BM3D-style blur)
+        # OR VST+BM3D when poisson_denoiser='vst_bm3d'.
+        # Pure Gaussian → BM3D or ensemble as before
+        # (or ACT when act_pre_nonblind_gaussian=True).
         if poisson_like:
+            if poisson_denoiser == 'vst_bm3d':
+                self.pre_nonblind = 'vst_bm3d'
+                self.pre_nonblind_params = {}
+            else:
+                self.pre_nonblind = 'act'
+                self.pre_nonblind_params = {'threshold_setting': 's'}
+        elif gauss_act_pre_nonblind:
             self.pre_nonblind = 'act'
             self.pre_nonblind_params = {'threshold_setting': 's'}
         elif w < 0.6:
@@ -917,6 +969,9 @@ class LIP_BD(DeconvolutionAlgorithm):
             'sigma_norm': sigma, 'w': float(w), 'regime': regime,
             'noise_type': noise_type,
             'poisson_like': bool(poisson_like),
+            'poisson_denoiser': poisson_denoiser,
+            'act_preprocess_gaussian': gauss_act_preprocess,
+            'act_pre_nonblind_gaussian': gauss_act_pre_nonblind,
             'lambda_val': float(self.lambda_val),
             'tau': float(self.tau),
             'final_alpha': float(self.final_alpha),

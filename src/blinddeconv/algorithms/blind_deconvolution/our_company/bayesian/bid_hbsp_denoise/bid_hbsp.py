@@ -1249,6 +1249,10 @@ class BID_HBSP(DeconvolutionAlgorithm):
 
         # 3) Clean branch — DO NOT alter denoisers or parameters.
         if sigma <= sigma_clean and not force_heavy:
+            # Resolve final_deconv='auto' for the clean regime: FIRLS
+            # (mild Tikhonov-like, preserves detail when noise is low).
+            if snap['final_deconv'] == 'auto':
+                self.final_deconv = 'firls'
             if self.verbose:
                 print(f"[{self.name}] orchestrator(σ={sigma:.5f}, clean): "
                       f"defaults kept, final_deconv={self.final_deconv}")
@@ -1285,10 +1289,23 @@ class BID_HBSP(DeconvolutionAlgorithm):
                 'sigma_space': 7.0,
             }
 
+        # ── Choose Poisson-branch denoiser ────────────────────────
+        # 'act' (default)  — locally adaptive curvelet thresholding.
+        # 'vst_bm3d'       — Generalized Anscombe VST + BM3D.
+        # Selectable via auto_mode_params['poisson_denoiser'].  Default
+        # preserves the previous behaviour exactly.
+        poisson_denoiser = str(amp.get('poisson_denoiser', 'act')).lower()
+        if poisson_denoiser not in ('act', 'vst_bm3d'):
+            poisson_denoiser = 'act'
+
         # 4b) Pre-pyramid global denoiser.
         if poisson_like:
-            self.preprocess = 'act'
-            self.preprocess_params = {'threshold_setting': 's'}
+            if poisson_denoiser == 'vst_bm3d':
+                self.preprocess = 'vst_bm3d'
+                self.preprocess_params = {}
+            else:
+                self.preprocess = 'act'
+                self.preprocess_params = {'threshold_setting': 's'}
         elif w < 0.6:
             self.preprocess = 'bilateral'
             self.preprocess_params = {
@@ -1301,8 +1318,12 @@ class BID_HBSP(DeconvolutionAlgorithm):
 
         # 4c) Pre-non-blind denoiser.
         if poisson_like:
-            self.pre_nonblind = 'act'
-            self.pre_nonblind_params = {'threshold_setting': 's'}
+            if poisson_denoiser == 'vst_bm3d':
+                self.pre_nonblind = 'vst_bm3d'
+                self.pre_nonblind_params = {}
+            else:
+                self.pre_nonblind = 'act'
+                self.pre_nonblind_params = {'threshold_setting': 's'}
         elif w < 0.6:
             self.pre_nonblind = 'bm3d'
             self.pre_nonblind_params = {'sigma': float(max(sigma, 0.01))}
@@ -1337,10 +1358,17 @@ class BID_HBSP(DeconvolutionAlgorithm):
         nb_blended['weight_ring'] = (1.0 - w) * wring0 + w * wring_noisy
         self.nb_params = nb_blended
 
+        # 4e) Resolve final_deconv='auto' for the heavy regime:
+        # ringing-removal (uses lambda_tv/lambda_l0/weight_ring tuned
+        # above and explicitly suppresses inverse-filter ringing).
+        if snap['final_deconv'] == 'auto':
+            self.final_deconv = 'ringing'
+
         info = {
             'sigma_norm': sigma, 'w': float(w), 'regime': regime,
             'noise_type': noise_type,
             'poisson_like': bool(poisson_like),
+            'poisson_denoiser': poisson_denoiser,
             'preprocess': self.preprocess,
             'blind_denoise': self.blind_denoise,
             'pre_nonblind': self.pre_nonblind,
@@ -1434,11 +1462,27 @@ class BID_HBSP(DeconvolutionAlgorithm):
                                     threshold_setting=ts)
             return result
 
+        elif method == 'vst_bm3d':
+            # Generalized Anscombe VST + BM3D denoising for Poisson-
+            # Gaussian noise.  Self-contained module (.vst); falls back
+            # to plain BM3D when the noise has no Poisson component.
+            from .vst import vst_bm3d_denoise
+            result, _ = vst_bm3d_denoise(
+                img,
+                noise_info=noise_info,
+                sigma=p.get('sigma', sigma),
+                a=p.get('a', None),
+                b=p.get('b', None),
+                stage_arg=p.get('stage_arg', None),
+                verbose=p.get('verbose', False),
+            )
+            return result
+
         else:
             raise ValueError(
                 f"Unknown denoiser='{method}'. Choose from: "
                 f"'tv', 'nlm', 'bilateral', 'guided', 'bm3d', "
-                f"'act', 'none'")
+                f"'act', 'vst_bm3d', 'none'")
 
     # ── Blind-loop denoiser ───────────────────────────────────
     def _apply_blind_denoise(self, img, noise_info):
