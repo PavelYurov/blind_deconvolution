@@ -277,6 +277,27 @@ class LIP_BD(DeconvolutionAlgorithm):
         self.history: Dict[str, list] = {'kernel_diff': []}
         self.hyperparams: Dict[str, Any] = {}
 
+    # ── Callback proxy ───────────────────────────────────────────────────
+    def _make_progress_proxy(self):
+        """Return a closure that translates solver events to IterationLogger
+        format and forwards them to self._callback (set via set_callback)."""
+        user_cb = self._callback
+        if user_cb is None:
+            return None
+        _meta = {'event', 'iter', 'scale', 'num_scales', 'kernel', 'image'}
+        def _proxy(event: dict) -> None:
+            if event.get('event') != 'iter':
+                return
+            user_cb({
+                'iteration':  event['iter'],
+                'scale':      event.get('scale', 0),
+                'num_scales': event.get('num_scales', 1),
+                'kernel':     event.get('kernel'),
+                'image':      event.get('image', None),
+                'metrics':    {k: v for k, v in event.items() if k not in _meta},
+            })
+        return _proxy
+
     # ── Main entry point ─────────────────────────────────────────────────
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         start_time = time.time()
@@ -426,7 +447,8 @@ class LIP_BD(DeconvolutionAlgorithm):
             u, k = coarse_to_fine(
                 f, MK, NK, blind_params, ctf_params,
                 verbose=self.verbose, method=self.method,
-                blind_denoise_fn=blind_denoise_fn)
+                blind_denoise_fn=blind_denoise_fn,
+                progress_callback=self._make_progress_proxy())
         else:
             raise ValueError(
                 f"Unknown method '{self.method}'. Choose 'mm', 'pd', or 'cv'.")

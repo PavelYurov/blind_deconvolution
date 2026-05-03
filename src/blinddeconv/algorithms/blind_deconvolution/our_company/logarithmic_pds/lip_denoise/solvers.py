@@ -139,7 +139,8 @@ def blind(f: np.ndarray, MK: int, NK: int, beta: float,
           tau: float = 1e-3,
           k_step: float = 1e-3,
           u_step: float = 1e-3,
-          blind_denoise_fn=None) -> tuple:
+          blind_denoise_fn=None,
+          progress_callback=None) -> tuple:
     """
     Core MM blind-deconvolution loop (Table 2 of the paper).
 
@@ -220,6 +221,17 @@ def blind(f: np.ndarray, MK: int, NK: int, beta: float,
             if k_sum > 0:
                 k /= k_sum
 
+        if progress_callback is not None:
+            try:
+                progress_callback({
+                    'event': 'iter',
+                    'iter': it,
+                    'kernel': k.copy(),
+                    'beta': beta,
+                })
+            except Exception:
+                pass
+
     return u, k
 
 
@@ -234,7 +246,8 @@ def blind_cv(f: np.ndarray, MK: int, NK: int, beta: float,
              inner_iters: int = 5,
              tau_param: float = 1e-3,
              k_step: float = 1e-3,
-             blind_denoise_fn=None) -> tuple:
+             blind_denoise_fn=None,
+             progress_callback=None) -> tuple:
     """
     Condat-Vũ primal-dual splitting on the MM-majorised weighted-TV subproblem.
 
@@ -380,6 +393,17 @@ def blind_cv(f: np.ndarray, MK: int, NK: int, beta: float,
                 p[0] = np.roll(p[0], -dx, axis=1)
                 p[1] = np.roll(p[1], -dy, axis=0)
                 p[1] = np.roll(p[1], -dx, axis=1)
+
+        if progress_callback is not None:
+            try:
+                progress_callback({
+                    'event': 'iter',
+                    'iter': it,
+                    'kernel': k.copy(),
+                    'beta': beta,
+                })
+            except Exception:
+                pass
 
     return u, k
 
@@ -561,7 +585,8 @@ def blind_pd(f: np.ndarray, MK: int, NK: int, beta: float,
              h_mode: str = 'closed',
              h_lut_size: int = 4096,
              h_lut_xi_max: float = 4.0,
-             blind_denoise_fn=None) -> tuple:
+             blind_denoise_fn=None,
+             progress_callback=None) -> tuple:
     """
     Primal-dual blind deconvolution  —  Table 1 of Perrone & Favaro (2016),
     "A Logarithmic Image Prior for Blind Deconvolution", IJCV 117.
@@ -766,6 +791,17 @@ def blind_pd(f: np.ndarray, MK: int, NK: int, beta: float,
                 z2x = np.roll(np.roll(z2x, -dy, axis=0), -dx, axis=1)
                 z2y = np.roll(np.roll(z2y, -dy, axis=0), -dx, axis=1)
 
+        if progress_callback is not None:
+            try:
+                progress_callback({
+                    'event': 'iter',
+                    'iter': it,
+                    'kernel': k.copy(),
+                    'beta': beta,
+                })
+            except Exception:
+                pass
+
     return u, k
 
 
@@ -874,7 +910,8 @@ def build_pyramid(f: np.ndarray, MK: int, NK: int,
 def coarse_to_fine(f: np.ndarray, MK: int, NK: int,
                    blind_params: dict, ctf_params: dict,
                    verbose: bool = False, method: str = 'mm',
-                   blind_denoise_fn=None):
+                   blind_denoise_fn=None,
+                   progress_callback=None):
     """
     Multi-scale coarse-to-fine blind deconvolution.
 
@@ -963,6 +1000,17 @@ def coarse_to_fine(f: np.ndarray, MK: int, NK: int,
 
         # Run solver for each step-size phase
         # MATLAB outer loop:  for i=1:length(params.k_step)
+        # Build a scale-aware callback wrapper so each event carries
+        # the current scale index and total number of scales.
+        if progress_callback is not None:
+            def _scale_cb(ev, _s=scale_idx, _ns=num_scales):
+                ev['scale'] = _s
+                ev['num_scales'] = _ns
+                progress_callback(ev)
+            _cb = _scale_cb
+        else:
+            _cb = None
+
         for phase in range(len(k_steps)):
             if method == 'mm':
                 u, k = blind(
@@ -974,6 +1022,7 @@ def coarse_to_fine(f: np.ndarray, MK: int, NK: int,
                     k_step=float(k_steps[phase]),
                     u_step=float(u_steps[phase]),
                     blind_denoise_fn=blind_denoise_fn,
+                    progress_callback=_cb,
                 )
             elif method == 'pd':
                 u, k = blind_pd(
@@ -989,6 +1038,7 @@ def coarse_to_fine(f: np.ndarray, MK: int, NK: int,
                     h_mode=blind_params.get('h_mode', 'closed'),
                     h_lut_size=blind_params.get('h_lut_size', 4096),
                     h_lut_xi_max=blind_params.get('h_lut_xi_max', 4.0),
+                    progress_callback=_cb,
                 )
             elif method == 'cv':
                 u, k = blind_cv(
@@ -999,6 +1049,7 @@ def coarse_to_fine(f: np.ndarray, MK: int, NK: int,
                     tau_param=tau,
                     blind_denoise_fn=blind_denoise_fn,
                     k_step=float(k_steps[phase]),
+                    progress_callback=_cb,
                 )
             else:
                 raise ValueError(

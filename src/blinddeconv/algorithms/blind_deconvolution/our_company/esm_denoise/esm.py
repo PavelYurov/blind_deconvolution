@@ -645,26 +645,42 @@ class ESM_BD(DeconvolutionAlgorithm):
         in ``self.history``.  Always returns a callable so the multi-scale
         solver records kernel snapshots even when no user callback is
         supplied."""
-        user_cb = self.progress_callback
+        user_cb = self._callback  # set via set_callback() in the base class
         history = self.history
 
         def proxy(event):
             try:
-                if event.get('event') == 'iter':
+                ev_type = event.get('event')
+                if ev_type == 'iter':
                     history['kernel_diff'].append(event.get('kernel_diff'))
                     history['iterations'].append({
                         k: v for k, v in event.items() if k != 'kernel'
                     })
-                elif event.get('event') == 'scale_end':
+                elif ev_type == 'scale_end':
                     history['scale_kernels'].append({
                         'scale': event.get('scale'),
                         'kernel': event.get('kernel'),
                     })
             except Exception:
                 pass
-            if user_cb is not None:
+            # Forward only 'iter' events to the user callback.
+            # Translate the solver's flat event dict into the format that
+            # IterationLogger (and other callbacks) expect:
+            #   solver key 'iter'  → 'iteration'
+            #   remaining keys     → nested under 'metrics'
+            if user_cb is not None and event.get('event') == 'iter':
                 try:
-                    user_cb(event)
+                    _meta = {'event', 'scale', 'num_scales',
+                             'kernel', 'image', 'iter'}
+                    user_cb({
+                        'iteration': event.get('iter', 0),
+                        'scale': event.get('scale', 0),
+                        'num_scales': event.get('num_scales', 1),
+                        'kernel': event.get('kernel'),
+                        'image': event.get('image', None),
+                        'metrics': {k: v for k, v in event.items()
+                                    if k not in _meta},
+                    })
                 except Exception:
                     pass
 
