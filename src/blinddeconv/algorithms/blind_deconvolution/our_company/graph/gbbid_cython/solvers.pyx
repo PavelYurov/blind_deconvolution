@@ -316,6 +316,16 @@ def apply_denoiser(img, method, **params):
         result, _ = act_denoise(img, noise_var=nv, threshold_setting=ts)
         return result
 
+    elif method == 'vst_bm3d':
+        from .vst import vst_bm3d_denoise
+        noise_info = params.get('noise_info', None)
+        a = params.get('a', None)
+        b = params.get('b', None)
+        sigma = params.get('sigma', None)
+        result, _ = vst_bm3d_denoise(img, noise_info=noise_info,
+                                     a=a, b=b, sigma=sigma)
+        return result
+
     else:
         raise ValueError(f"Unknown denoiser method: {method}")
 

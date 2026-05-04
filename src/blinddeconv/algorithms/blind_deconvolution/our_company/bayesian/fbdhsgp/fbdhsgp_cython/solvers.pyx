@@ -661,6 +661,7 @@ def ss_deb(
                     "h_min": float(h.min()),
                     "h_max": float(h.max()),
                     "h_sum": float(h.sum()),
+                    "kernel": h.copy(),
                 })
             except Exception:
                 pass

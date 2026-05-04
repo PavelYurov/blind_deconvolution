@@ -175,6 +175,36 @@ class GBBID(DeconvolutionAlgorithm):
         nonblind_auto_heavy — non-blind method to use in heavy regime when
                              ``nonblind_method='auto'``.
                              Default 'ringing_removal'.
+        poisson_denoiser   — denoiser used for Poisson-like noise in
+                             ``preprocess`` and ``pre_nonblind``:
+                             'act'      — Adaptive Curvelet Thresholding
+                                          (default; safe for edge preservation
+                                          only in pre_nonblind — preprocess
+                                          stays bilateral for GBBID).
+                             'vst_bm3d' — Generalized Anscombe VST + BM3D
+                                          (Mäkitalo–Foi 2013); applies GAT
+                                          before BM3D so that σ≈1 everywhere,
+                                          then inverts.  More accurate than
+                                          ACT for moderate-to-heavy Poisson.
+        act_preprocess_gaussian — bool (default False).  When True, use ACT
+                             instead of bilateral/bm3d for the preprocess
+                             stage on Gaussian/correlated noise.  ACT
+                             operates per curvelet subband and adapts to
+                             colored (1/f, 1/f²) spectra naturally, making
+                             it a good fit for pink/brown noise.
+                             WARNING: in GBBID this is risky — aggressive
+                             curvelet thresholding can erase edges that
+                             ``kernel_solver_L2`` relies on.  Enabled only
+                             when the kernel is large (k_estimate_size≥51)
+                             and σ is well-estimated.  Disabled by default.
+        act_pre_nonblind_gaussian — bool (default False).  When True, use
+                             ACT instead of BM3D for pre_nonblind on
+                             Gaussian/correlated noise.  This is safe
+                             (kernel already estimated) and well-suited for
+                             correlated noise: ACT's per-subband threshold
+                             captures both white and colored components,
+                             avoiding the color artifacts that BM3D can
+                             introduce when the noise is not white.
     """
 
     def __init__(
@@ -340,7 +370,7 @@ class GBBID(DeconvolutionAlgorithm):
         # ── 2¾a½. Robust orchestrator (soft-weighted auto config) ───
         orchestrator_info = None
         if self.auto_mode == 'robust':
-            orchestrator_info = self._orchestrate_robust(noise_info)
+            orchestrator_info = self._orchestrate_robust(noise_info, image=yg)
 
         # ── 2¾b. ACT curvelet denoising ──────────────────────────────
         act_info = None
@@ -519,7 +549,7 @@ class GBBID(DeconvolutionAlgorithm):
                 f"'adaptive_lp'")
 
     # ── Robust orchestrator ──────────────────────────────────────────
-    def _orchestrate_robust(self, noise_info):
+    def _orchestrate_robust(self, noise_info, image=None):
         """Soft-weighted auto configuration of the GBBID noise pipeline.
 
         Conservative mirror of LIP's orchestrator.  Designed to keep
@@ -615,24 +645,51 @@ class GBBID(DeconvolutionAlgorithm):
         self.alpha_fhlp = (1.0 - w) * snap['alpha_fhlp'] + w * alpha_noisy
 
         # ── 4b) preprocess (single-pass, level-0 of pyramid).
-        #   Poisson-like → bilateral with σ-aware sigma_color (NOT ACT):
-        #     ACT used to be the natural choice for signal-dep noise, but
-        #     for GBBID specifically it is dangerous — ``kernel_solver_L2``
-        #     relies on informative edges from ``image_pyramid[level]``,
-        #     and curvelet thresholding can wipe out edges in mid-tones
-        #     when σ² is misestimated.  Bilateral with sigma_color tuned
-        #     to peak Poisson σ (~√(σ_norm) for signal-dep) is gentler.
-        #     ACT is reserved for ``pre_nonblind`` only (outside loop).
+        #   Poisson-like → bilateral (default) OR vst_bm3d (optional).
+        #     Bilateral with sigma_color tuned to peak Poisson σ is the
+        #     conservative default: it preserves edges needed by
+        #     ``kernel_solver_L2`` / ``informative_edge_mask_adaptive_mine``.
+        #     vst_bm3d applies GAT → BM3D → inverse, which is more
+        #     accurate for moderate-to-heavy Poisson at the cost of
+        #     some edge softening.  Safe to use when the kernel size is
+        #     large enough that a slightly softer input still resolves
+        #     the PSF support.
+        #     ACT is NOT offered for preprocess in GBBID: curvelet
+        #     thresholding can wipe out mid-tone edges when σ² is
+        #     misestimated — see comments in LIP orchestrator.
         #   Gaussian, w<0.6 → bilateral.
         #   Gaussian, w≥0.6 → bm3d.
+        poisson_denoiser = str(amp.get('poisson_denoiser', 'act')).lower()
+        if poisson_denoiser not in ('act', 'vst_bm3d'):
+            poisson_denoiser = 'act'
+
+        gauss_act_preprocess = bool(amp.get('act_preprocess_gaussian', False))
+        gauss_act_pre_nonblind = bool(amp.get('act_pre_nonblind_gaussian', False))
+
+
         if poisson_like:
-            # Effective σ in bright regions of a Poisson image is larger
-            # than the global σ_norm (which is averaged).  Boost
-            # sigma_color to handle the worst case without losing edges.
-            self.preprocess = 'bilateral'
+            if poisson_denoiser == 'vst_bm3d':
+                self.preprocess = 'vst_bm3d'
+                self.preprocess_params = {'noise_info': noise_info}
+            else:
+                # Default: bilateral — gentle, preserves edges for kernel solver.
+                # Effective σ in bright regions of a Poisson image is larger
+                # than the global σ_norm (which is averaged).  Boost
+                # sigma_color to handle the worst case without losing edges.
+                self.preprocess = 'bilateral'
+                self.preprocess_params = {
+                    'sigma_color': float(max(2.0 * sigma, 0.02)),
+                    'sigma_spatial': 3.0,
+                }
+        elif gauss_act_preprocess:
+            # ACT for Gaussian/correlated noise: use Pyatykh scalar σ²
+            # (white noise assumption — avoids blind-MAD underestimation
+            # for 1/f noise where finest curvelet scale has less energy).
+            # NOTE: opt-in only — ACT can erase fine edges in GBBID.
+            self.preprocess = 'act'
             self.preprocess_params = {
-                'sigma_color': float(max(2.0 * sigma, 0.02)),
-                'sigma_spatial': 3.0,
+                'noise_var': float(sigma ** 2),
+                'threshold_setting': 's',
             }
         elif w < 0.6:
             self.preprocess = 'bilateral'
@@ -665,13 +722,31 @@ class GBBID(DeconvolutionAlgorithm):
 
         # ── 4d) pre_nonblind (denoise of y before non-blind solve).
         # Outside kernel loop — can be aggressive.
-        #   Poisson-like → ACT with explicit noise_var=σ² to avoid
-        #     blind-MAD underestimation; ACT here is safe because the
-        #     kernel is already estimated and ringing_removal handles
-        #     residuals.
-        #   Gaussian, w<0.6 → BM3D with sigma_psd=σ.
-        #   Gaussian, w≥0.6 → BM3D (apply_denoiser has no 'ensemble').
+        #   Poisson-like → ACT (default) or vst_bm3d (if poisson_denoiser
+        #     set in auto_mode_params).  Both are safe here: the kernel is
+        #     already estimated and ringing_removal handles residuals.
+        #     ACT: explicit noise_var=σ² avoids blind-MAD underestimation.
+        #     vst_bm3d: GAT→BM3D→inverse; more accurate for heavier Poisson.
+        #   Gaussian, w<0.6 → BM3D with sigma_psd=σ (or ACT via flag).
+        #   Gaussian, w≥0.6 → BM3D (or ACT via flag).
+        #   ACT (act_pre_nonblind_gaussian=True): per-subband curvelet
+        #     threshold handles correlated (pink/brown) noise well because
+        #     each curvelet subband has its own energy-based threshold.
+        #     noise_var=σ² from Pyatykh prevents blind-MAD underestimation.
         if poisson_like:
+            if poisson_denoiser == 'vst_bm3d':
+                self.pre_nonblind = 'vst_bm3d'
+                self.pre_nonblind_params = {'noise_info': noise_info}
+            else:
+                self.pre_nonblind = 'act'
+                self.pre_nonblind_params = {
+                    'noise_var': float(sigma ** 2),
+                    'threshold_setting': 's',
+                }
+        elif gauss_act_pre_nonblind:
+            # ACT for Gaussian/correlated noise in pre_nonblind.
+            # Safe here (kernel already estimated).  Use Pyatykh scalar σ²
+            # — more accurate than blind-MAD for 1/f noise.
             self.pre_nonblind = 'act'
             self.pre_nonblind_params = {
                 'noise_var': float(sigma ** 2),
@@ -693,6 +768,10 @@ class GBBID(DeconvolutionAlgorithm):
             'sigma_norm': sigma, 'w': float(w), 'regime': regime,
             'noise_type': noise_type,
             'poisson_like': bool(poisson_like),
+            'poisson_denoiser': poisson_denoiser,
+            'act_preprocess_gaussian': gauss_act_preprocess,
+            'act_pre_nonblind_gaussian': gauss_act_pre_nonblind,
+            'act_noise_var_type': 'pyatykh_scalar',
             'lambda_fhlp': float(self.lambda_fhlp),
             'alpha_fhlp': float(self.alpha_fhlp),
             'preprocess': self.preprocess,
@@ -812,6 +891,22 @@ class GBBID(DeconvolutionAlgorithm):
             else:
                 y, _ = act_denoise(y, noise_var=nv,
                                    threshold_setting=ts)
+            return y
+
+        if method == 'vst_bm3d':
+            from .vst import vst_bm3d_denoise
+            ni = params.get('noise_info', None)
+            a = params.get('a', None)
+            b = params.get('b', None)
+            sig = params.get('sigma', sigma)
+            if y.ndim == 3:
+                for ch in range(y.shape[2]):
+                    y[:, :, ch], _ = vst_bm3d_denoise(
+                        y[:, :, ch], noise_info=ni,
+                        a=a, b=b, sigma=sig)
+            else:
+                y, _ = vst_bm3d_denoise(y, noise_info=ni,
+                                        a=a, b=b, sigma=sig)
             return y
 
         # For standard denoisers (bm3d, nlm, bilateral, guided, tv),

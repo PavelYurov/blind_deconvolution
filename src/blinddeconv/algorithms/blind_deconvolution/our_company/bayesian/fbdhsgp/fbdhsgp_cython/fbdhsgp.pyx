@@ -1015,8 +1015,12 @@ class FBDHSGP(DeconvolutionAlgorithm):
 
     def _make_callback(self) -> CallbackType:
         user_cb = self.iter_callback
-        if user_cb is None and not self.collect_history:
+        # Also respect the base-class callback set via set_callback().
+        framework_cb = self._callback
+        if user_cb is None and framework_cb is None and not self.collect_history:
             return None
+
+        _meta = {'scope', 'iter', 'kernel', 'image'}
 
         def _wrapper(event: Dict[str, Any]) -> None:
             if self.collect_history:
@@ -1025,6 +1029,21 @@ class FBDHSGP(DeconvolutionAlgorithm):
                 bucket.append(dict(event))
             if user_cb is not None:
                 user_cb(event)
+            # Forward ss_deb events (outer kernel loop) to the framework
+            # callback in IterationLogger-compatible format.
+            if framework_cb is not None and event.get("scope") == "ss_deb":
+                try:
+                    framework_cb({
+                        'iteration':  event['iter'],
+                        'scale':      0,
+                        'num_scales': 1,
+                        'kernel':     event.get('kernel'),
+                        'image':      event.get('image', None),
+                        'metrics':    {k: v for k, v in event.items()
+                                       if k not in _meta},
+                    })
+                except Exception:
+                    pass
 
         return _wrapper
 

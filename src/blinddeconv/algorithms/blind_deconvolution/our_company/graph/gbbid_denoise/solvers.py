@@ -316,6 +316,24 @@ def apply_denoiser(img, method, **params):
         result, _ = act_denoise(img, noise_var=nv, threshold_setting=ts)
         return result
 
+    elif method == 'vst_bm3d':
+        # Generalized Anscombe VST + BM3D for Poisson–Gaussian noise.
+        # Forward GAT → BM3D at σ=1 → asymptotic inverse.
+        # Falls back to plain BM3D when there is no Poisson component
+        # (a ≈ 0).
+        from .vst import vst_bm3d_denoise
+        noise_info = params.get('noise_info', None)
+        result, _ = vst_bm3d_denoise(
+            img,
+            noise_info=noise_info,
+            a=params.get('a', None),
+            b=params.get('b', None),
+            sigma=params.get('sigma', None),
+            stage_arg=params.get('stage_arg', None),
+            verbose=params.get('verbose', False),
+        )
+        return result
+
     else:
         raise ValueError(f"Unknown denoiser method: {method}")
 
