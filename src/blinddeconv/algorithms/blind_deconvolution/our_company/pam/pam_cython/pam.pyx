@@ -119,6 +119,21 @@ class PAM_BD(DeconvolutionAlgorithm):
         sigma_heavy             = 0.05
         force_heavy_sigma       = 0.01    (poisson-like only)
         prefer_act_for_gaussian = False
+        poisson_denoiser        = 'act'   — denoiser for Poisson-like noise:
+                                  'act'      — Adaptive Curvelet Thresholding
+                                               (default; ACT in preprocess +
+                                               pre_nonblind).
+                                  'vst_bm3d' — Generalized Anscombe VST + BM3D
+                                               (Mäkitalo–Foi 2013); more
+                                               accurate for heavier Poisson.
+        act_preprocess_gaussian = False   — use ACT instead of bilateral/bm3d
+                                  for preprocess on Gaussian/correlated noise.
+                                  Best for colored (1/f, 1/f²) noise where
+                                  BM3D produces color artifacts.
+        act_pre_nonblind_gaussian = False — use ACT instead of bm3d for
+                                  pre_nonblind on Gaussian/correlated noise.
+                                  noise_var=σ² from Pyatykh (more accurate
+                                  than blind-MAD for colored noise).
     """
 
     def __init__(
@@ -153,6 +168,8 @@ class PAM_BD(DeconvolutionAlgorithm):
         auto_mode: str = 'off',
         auto_mode_params: dict = None,
         visualize: bool = False,
+        # -- Kernel threshold --
+        kernel_threshold: float = 0.0,
     ):
         super().__init__(name='PAM-BD')
 
@@ -190,6 +207,7 @@ class PAM_BD(DeconvolutionAlgorithm):
         self.auto_mode_params = auto_mode_params
 
         self.visualize = visualize
+        self.kernel_threshold = float(kernel_threshold)
 
         # Snapshot for orchestrator (used to restore on clean branch and
         # to compute the (1-w)*default + w*noisy lam blend on heavy branch).
@@ -360,6 +378,15 @@ class PAM_BD(DeconvolutionAlgorithm):
         pad_w = NK // 2
         u = u[pad_h:u.shape[0] - pad_h, pad_w:u.shape[1] - pad_w]
 
+        # -- Kernel threshold before non-blind --------------------------
+        if self.kernel_threshold > 0.0:
+            k_max = kernel.max()
+            if k_max > 0:
+                kernel[kernel < self.kernel_threshold * k_max] = 0.0
+                k_sum = kernel.sum()
+                if k_sum > 0:
+                    kernel /= k_sum
+
         # -- 13. Optional post-CTF non-blind restoration -----------------
         if self.final_nb not in (None, 'none'):
             # pre_nonblind is applied to the RAW input (not the pre-blind
@@ -444,6 +471,11 @@ class PAM_BD(DeconvolutionAlgorithm):
         sigma_heavy = float(p.get('sigma_heavy', 0.05))
         force_heavy_sigma = float(p.get('force_heavy_sigma', 0.01))
         prefer_act = bool(p.get('prefer_act_for_gaussian', False))
+        poisson_denoiser = str(p.get('poisson_denoiser', 'act')).lower()
+        if poisson_denoiser not in ('act', 'vst_bm3d'):
+            poisson_denoiser = 'act'
+        gauss_act_preprocess = bool(p.get('act_preprocess_gaussian', False))
+        gauss_act_pre_nonblind = bool(p.get('act_pre_nonblind_gaussian', False))
 
         sigma = None
         ntype = 'unknown'
@@ -465,6 +497,9 @@ class PAM_BD(DeconvolutionAlgorithm):
             'sigma_heavy': sigma_heavy,
             'force_heavy_sigma': force_heavy_sigma,
             'prefer_act_for_gaussian': prefer_act,
+            'poisson_denoiser': poisson_denoiser,
+            'act_preprocess_gaussian': gauss_act_preprocess,
+            'act_pre_nonblind_gaussian': gauss_act_pre_nonblind,
         })
 
         # -- Clean branch: restore user values, paper-pure run -----------
@@ -489,13 +524,22 @@ class PAM_BD(DeconvolutionAlgorithm):
         sigma_eff = max(sigma, 1e-3)
 
         if poisson_like or prefer_act:
-            info['route'] = 'act'
-            self.preprocess        = 'none'
-            self.preprocess_params = None
-            self.act_preprocess    = 'auto'
-            self.act_params        = {'noise_var': sigma_eff ** 2}
-            self.pre_nonblind      = 'act'
-            self.pre_nonblind_params = {'noise_var': sigma_eff ** 2}
+            if poisson_denoiser == 'vst_bm3d':
+                info['route'] = 'vst_bm3d'
+                self.preprocess        = 'vst_bm3d'
+                self.preprocess_params = {'noise_info': noise_info}
+                self.act_preprocess    = 'none'
+                self.act_params        = None
+                self.pre_nonblind      = 'vst_bm3d'
+                self.pre_nonblind_params = {'noise_info': noise_info}
+            else:
+                info['route'] = 'act'
+                self.preprocess        = 'none'
+                self.preprocess_params = None
+                self.act_preprocess    = 'auto'
+                self.act_params        = {'noise_var': sigma_eff ** 2}
+                self.pre_nonblind      = 'act'
+                self.pre_nonblind_params = {'noise_var': sigma_eff ** 2}
             self.final_nb          = 'ringing_removal'
             self.nb_params         = None
         else:
@@ -505,25 +549,57 @@ class PAM_BD(DeconvolutionAlgorithm):
 
             if w < 0.6:
                 info['route'] = 'gauss_light'
-                self.preprocess = 'bilateral'
-                self.preprocess_params = {
-                    'sigma_color': sigma_eff * 2.0,
-                    'sigma_space': 5.0,
-                }
-                self.act_preprocess    = 'none'
-                self.act_params        = None
-                self.pre_nonblind      = 'bm3d'
-                self.pre_nonblind_params = {'sigma': sigma_eff}
+                if gauss_act_preprocess:
+                    self.preprocess = 'act'
+                    self.preprocess_params = {
+                        'noise_var': float(sigma_eff ** 2),
+                        'threshold_setting': 's',
+                    }
+                    self.act_preprocess = 'none'
+                    self.act_params     = None
+                else:
+                    self.preprocess = 'bilateral'
+                    self.preprocess_params = {
+                        'sigma_color': sigma_eff * 2.0,
+                        'sigma_space': 5.0,
+                    }
+                    self.act_preprocess    = 'none'
+                    self.act_params        = None
+                if gauss_act_pre_nonblind:
+                    self.pre_nonblind = 'act'
+                    self.pre_nonblind_params = {
+                        'noise_var': float(sigma_eff ** 2),
+                        'threshold_setting': 's',
+                    }
+                else:
+                    self.pre_nonblind      = 'bm3d'
+                    self.pre_nonblind_params = {'sigma': sigma_eff}
                 self.final_nb          = 'ringing_removal'
                 self.nb_params         = None
             else:
                 info['route'] = 'gauss_strong'
-                self.preprocess = 'bm3d'
-                self.preprocess_params = {'sigma': sigma_eff}
-                self.act_preprocess    = 'none'
-                self.act_params        = None
-                self.pre_nonblind      = 'bm3d'
-                self.pre_nonblind_params = {'sigma': sigma_eff * 1.5}
+                if gauss_act_preprocess:
+                    self.preprocess = 'act'
+                    self.preprocess_params = {
+                        'noise_var': float(sigma_eff ** 2),
+                        'threshold_setting': 's',
+                    }
+                    self.act_preprocess = 'none'
+                    self.act_params     = None
+                else:
+                    self.preprocess = 'bm3d'
+                    self.preprocess_params = {'sigma': sigma_eff}
+                    self.act_preprocess    = 'none'
+                    self.act_params        = None
+                if gauss_act_pre_nonblind:
+                    self.pre_nonblind = 'act'
+                    self.pre_nonblind_params = {
+                        'noise_var': float(sigma_eff ** 2),
+                        'threshold_setting': 's',
+                    }
+                else:
+                    self.pre_nonblind      = 'bm3d'
+                    self.pre_nonblind_params = {'sigma': sigma_eff * 1.5}
                 self.final_nb          = 'ringing_removal'
                 self.nb_params         = None
 
@@ -684,9 +760,19 @@ class PAM_BD(DeconvolutionAlgorithm):
                                     threshold_setting=ts)
             return result
 
+        if method == 'vst_bm3d':
+            from .vst import vst_bm3d_denoise
+            ni = p.get('noise_info', None)
+            a = p.get('a', None)
+            b = p.get('b', None)
+            sig = p.get('sigma', sigma)
+            result, _ = vst_bm3d_denoise(img, noise_info=ni,
+                                         a=a, b=b, sigma=sig)
+            return result
+
         raise ValueError(
             f"Unknown denoiser='{method}'. Choose from: "
-            "'tv', 'nlm', 'bilateral', 'guided', 'bm3d', 'act', 'none'"
+            "'tv', 'nlm', 'bilateral', 'guided', 'bm3d', 'act', 'vst_bm3d', 'none'"
         )
 
     @staticmethod
@@ -785,6 +871,7 @@ class PAM_BD(DeconvolutionAlgorithm):
             ('auto_mode', self.auto_mode),
             ('auto_mode_params', self.auto_mode_params),
             ('visualize', self.visualize),
+            ('kernel_threshold', self.kernel_threshold),
         ]
 
     def change_param(self, params: Dict[str, Any]) -> None:

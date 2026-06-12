@@ -816,23 +816,23 @@ class BID_HBSP(DeconvolutionAlgorithm):
             nbp = self.nb_params or {}
             x_final = firls_deconv(
                 y_nb, h,
-                lam=nbp.get('lam', 2e-5),
-                alpha=nbp.get('alpha', 0.8),
-                epsilon_min=nbp.get('epsilon_min', 2.0 / 255.0),
+                lam=nbp.get('lam', 2e-4),
+                alpha=nbp.get('alpha', 2.0 / 3.0),
+                epsilon_min=nbp.get('epsilon_min', 2.55 / 255.0),
                 epsilon_max=nbp.get('epsilon_max', 20.0 / 255.0),
                 beta_a=nbp.get('beta_a', None),
+                lambda_u=nbp.get('lambda_u', 0.1),
                 out_iter=nbp.get('out_iter', 5),
-                inner_iter=nbp.get('inner_iter', 3),
-                boundary=nbp.get('boundary', 'wrap'),
-                use_edgetaper=nbp.get('use_edgetaper', None),
+                inner_iter=nbp.get('inner_iter', 4),
+                IF=nbp.get('IF', None),
             )
             if self.verbose:
-                print(f"[{self.name}] Non-blind: FIRLS "
-                      f"(λ={nbp.get('lam', 2e-5)}, "
-                      f"α={nbp.get('alpha', 0.8)}, "
+                print(f"[{self.name}] Non-blind: FIRLS-UBC "
+                      f"(λ={nbp.get('lam', 2e-4)}, "
+                      f"α={nbp.get('alpha', 2.0 / 3.0)}, "
+                      f"λ_u={nbp.get('lambda_u', 0.1)}, "
                       f"out={nbp.get('out_iter', 5)}, "
-                      f"inner={nbp.get('inner_iter', 3)}, "
-                      f"boundary={nbp.get('boundary', 'wrap')})")
+                      f"inner={nbp.get('inner_iter', 4)})")
         else:
             raise ValueError(
                 f"Unknown final_deconv '{self.final_deconv}'. "

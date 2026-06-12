@@ -168,6 +168,8 @@ class PAM_BD(DeconvolutionAlgorithm):
         auto_mode: str = 'off',
         auto_mode_params: dict = None,
         visualize: bool = False,
+        # -- Kernel threshold --
+        kernel_threshold: float = 0.0,
     ):
         super().__init__(name='PAM-BD')
 
@@ -205,6 +207,7 @@ class PAM_BD(DeconvolutionAlgorithm):
         self.auto_mode_params = auto_mode_params
 
         self.visualize = visualize
+        self.kernel_threshold = float(kernel_threshold)
 
         # Snapshot for orchestrator (used to restore on clean branch and
         # to compute the (1-w)*default + w*noisy lam blend on heavy branch).
@@ -374,6 +377,15 @@ class PAM_BD(DeconvolutionAlgorithm):
         pad_h = MK // 2
         pad_w = NK // 2
         u = u[pad_h:u.shape[0] - pad_h, pad_w:u.shape[1] - pad_w]
+
+        # -- Kernel threshold before non-blind --------------------------
+        if self.kernel_threshold > 0.0:
+            k_max = kernel.max()
+            if k_max > 0:
+                kernel[kernel < self.kernel_threshold * k_max] = 0.0
+                k_sum = kernel.sum()
+                if k_sum > 0:
+                    kernel /= k_sum
 
         # -- 13. Optional post-CTF non-blind restoration -----------------
         if self.final_nb not in (None, 'none'):
@@ -859,6 +871,7 @@ class PAM_BD(DeconvolutionAlgorithm):
             ('auto_mode', self.auto_mode),
             ('auto_mode_params', self.auto_mode_params),
             ('visualize', self.visualize),
+            ('kernel_threshold', self.kernel_threshold),
         ]
 
     def change_param(self, params: Dict[str, Any]) -> None:

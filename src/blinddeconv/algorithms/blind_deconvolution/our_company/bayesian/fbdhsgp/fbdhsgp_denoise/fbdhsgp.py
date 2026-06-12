@@ -185,6 +185,8 @@ class FBDHSGP(DeconvolutionAlgorithm):
         iter_callback: CallbackType = None,
         collect_history: bool = False,
         visualize: bool = False,
+        # -- Kernel threshold --
+        kernel_threshold: float = 0.0,
     ):
         super().__init__(name="FBDHSGP")
 
@@ -247,6 +249,7 @@ class FBDHSGP(DeconvolutionAlgorithm):
         self.iter_callback = iter_callback
         self.collect_history = bool(collect_history)
         self.visualize = bool(visualize)
+        self.kernel_threshold = float(kernel_threshold)
 
         # Snapshot for orchestrator clean-restore.
         self._defaults_snapshot = {
@@ -404,7 +407,16 @@ class FBDHSGP(DeconvolutionAlgorithm):
         sigma_for_bid = orchestrator_info.get("sigma_bid", self.sigma)
         kernel = self._multiscale_bid(y, sigma_override=sigma_for_bid)
 
-        # -- 10. Final non-blind dispatch -------------------------------
+        # -- 10. Kernel threshold before non-blind ---------------------
+        if self.kernel_threshold > 0.0:
+            k_max = kernel.max()
+            if k_max > 0:
+                kernel[kernel < self.kernel_threshold * k_max] = 0.0
+                k_sum = kernel.sum()
+                if k_sum > 0:
+                    kernel /= k_sum
+
+        # -- 11. Final non-blind dispatch -------------------------------
         x_final = self._run_final_nb(
             f_raw, y, kernel, noise_info, sigma_for_bid)
 

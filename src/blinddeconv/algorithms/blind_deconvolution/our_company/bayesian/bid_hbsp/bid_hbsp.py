@@ -197,7 +197,7 @@ class BID_HBSP(DeconvolutionAlgorithm):
         lambda_h_decay: float = 0.92,
         kernel_threshold: bool = True,
         # Noise
-        beta_update: bool = True,
+        beta_update: bool = False,
         beta_n_factor: float = 2.0,
         # General
         verbose: bool = False,
