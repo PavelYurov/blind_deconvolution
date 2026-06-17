@@ -43,7 +43,7 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
-from blinddeconv.algorithms.base import DeconvolutionAlgorithm
+from blinddeconv.algorithms.base import DeconvolutionAlgorithm 
 # ─────────────────────────────────────────────────────────────────────────────
 
 from .solvers import (
@@ -54,8 +54,8 @@ from .solvers import (
     L0Restoration,
     ringing_artifacts_removal,
 )
-from .non_blind import adaptive_lp_deconv
-from .impulse_noise_estimation import detect_impulse_noise, adaptive_median_filter
+from blinddeconv.algorithms.mod_denoise.non_blind import adaptive_lp_deconv
+from blinddeconv.algorithms.mod_denoise.impulse_noise_estimation import detect_impulse_noise, adaptive_median_filter
 from .utils import opt_fft_size, wrap_boundary_liu
 
 
@@ -333,7 +333,7 @@ class GBBID(DeconvolutionAlgorithm):
         # ── 2¾. ScreeNOT SVD thresholding denoising ─────────────────
         screenot_info = None
         if self.screenot_preprocess == 'auto':
-            from .screenot import screenot_denoise
+            from blinddeconv.algorithms.mod_denoise.screenot import screenot_denoise
             sp = self.screenot_params or {}
             yg, screenot_info = screenot_denoise(
                 yg,
@@ -379,7 +379,7 @@ class GBBID(DeconvolutionAlgorithm):
                 raise ValueError(
                     "screenot_preprocess and act_preprocess cannot both "
                     "be 'auto'. Choose one denoiser.")
-            from .act_denoise import act_denoise
+            from blinddeconv.algorithms.mod_denoise.act_denoise import act_denoise
             ap = self.act_params or {}
             # If user did not specify noise_var AND we have a noise
             # estimate, use σ² from Chen/Pyatykh instead of blind MAD.
@@ -794,7 +794,7 @@ class GBBID(DeconvolutionAlgorithm):
         yg_filtered : ndarray — preprocessed grayscale image [0, 1]
         psd_info : dict — PSD analysis results
         """
-        from .noise_psd_analysis import (
+        from blinddeconv.algorithms.mod_denoise.noise_psd_analysis import (
             analyze_noise_psd, noise_preprocess,
             prewhiten, notch_filter, bandstop_filter,
         )
@@ -878,7 +878,7 @@ class GBBID(DeconvolutionAlgorithm):
             sigma = noise_info.get('sigma_norm', None)
 
         if method == 'act':
-            from .act_denoise import act_denoise
+            from blinddeconv.algorithms.mod_denoise.act_denoise import act_denoise
             nv = params.get('noise_var', None)
             if nv is None and sigma is not None:
                 nv = sigma ** 2
@@ -894,7 +894,7 @@ class GBBID(DeconvolutionAlgorithm):
             return y
 
         if method == 'vst_bm3d':
-            from .vst import vst_bm3d_denoise
+            from blinddeconv.algorithms.mod_denoise.vst import vst_bm3d_denoise
             ni = params.get('noise_info', None)
             a = params.get('a', None)
             b = params.get('b', None)
@@ -932,12 +932,12 @@ class GBBID(DeconvolutionAlgorithm):
     def _estimate_noise(self, yg):
         """Estimate noise level from grayscale image (float64 [0, 1])."""
         if self.noise_estimation == 'chen':
-            from .chen_noise_estimate import estimate_noise_level
+            from blinddeconv.algorithms.mod_denoise.chen_noise_estimate import estimate_noise_level
             sigma = estimate_noise_level(yg)
             return {'method': 'chen', 'sigma_norm': sigma,
                     'sigma': sigma * 255.0}
         elif self.noise_estimation == 'pyatykh':
-            from .pyatykh_noise_reconstruction import estimate_noise_params
+            from blinddeconv.algorithms.mod_denoise.pyatykh_noise_reconstruction import estimate_noise_params
             result = estimate_noise_params(yg)
             result['method'] = 'pyatykh'
             return result

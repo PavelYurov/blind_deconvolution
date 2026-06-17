@@ -67,7 +67,7 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
-from blinddeconv.algorithms.base import DeconvolutionAlgorithm
+from blinddeconv.algorithms.base import DeconvolutionAlgorithm 
 # --------------------------------------------------------------------------
 
 from .solvers import frils_deb_ubc, ss_deb
@@ -296,7 +296,7 @@ class FBDHSGP(DeconvolutionAlgorithm):
         if self.auto_mode == "robust" and impulse_method == "none":
             impulse_method = "auto"
         if impulse_method == "auto":
-            from .impulse_noise_estimation import (
+            from blinddeconv.algorithms.mod_cython._build_pyd.impulse_noise_estimation import (
                 detect_impulse_noise, adaptive_median_filter,
             )
             ip = self.impulse_params or {}
@@ -336,7 +336,7 @@ class FBDHSGP(DeconvolutionAlgorithm):
                 raise ValueError(
                     "screenot_preprocess and act_preprocess cannot both "
                     "be 'auto'.")
-            from .screenot import screenot_denoise
+            from blinddeconv.algorithms.mod_cython._build_pyd.screenot import screenot_denoise
             sp = self.screenot_params or {}
             y, screenot_info = screenot_denoise(
                 y,
@@ -349,7 +349,7 @@ class FBDHSGP(DeconvolutionAlgorithm):
 
         act_info = None
         if self.act_preprocess == "auto":
-            from .act_denoise import act_denoise
+            from blinddeconv.algorithms.mod_cython._build_pyd.act_denoise import act_denoise
             ap = self.act_params or {}
             nv = ap.get("noise_var", None)
             if nv is None and noise_info is not None:
@@ -376,7 +376,7 @@ class FBDHSGP(DeconvolutionAlgorithm):
             and bool((self.auto_mode_params or {}).get("correlated_check", True))
         ):
             try:
-                from .noise_psd_analysis import analyze_noise_psd
+                from blinddeconv.algorithms.mod_cython._build_pyd.noise_psd_analysis import analyze_noise_psd
                 psd_for_orch = analyze_noise_psd(y)
                 if self.visualize:
                     print(f"[FBDHSGP] PSD: class={psd_for_orch.get('noise_class')} "
@@ -391,7 +391,7 @@ class FBDHSGP(DeconvolutionAlgorithm):
         # -- 7. VST denoising (Poisson route -> spatial denoise) --------
         vst_info = None
         if orchestrator_info.get("apply_vst", False):
-            from .vst import vst_bm3d_denoise
+            from blinddeconv.algorithms.mod_cython._build_pyd.vst import vst_bm3d_denoise
             y, vst_info = vst_bm3d_denoise(
                 y, noise_info=noise_info, verbose=self.visualize)
             f_raw = y.copy()
@@ -882,7 +882,7 @@ class FBDHSGP(DeconvolutionAlgorithm):
             return bm3d_lib.bm3d(img, sigma_psd=sig)
 
         if method == "act":
-            from .act_denoise import act_denoise
+            from blinddeconv.algorithms.mod_cython._build_pyd.act_denoise import act_denoise
             nv = p.get("noise_var", None)
             if nv is None and sigma is not None:
                 nv = sigma ** 2
@@ -891,7 +891,7 @@ class FBDHSGP(DeconvolutionAlgorithm):
             return result
 
         if method == "vst_bm3d":
-            from .vst import vst_bm3d_denoise
+            from blinddeconv.algorithms.mod_cython._build_pyd.vst import vst_bm3d_denoise
             result, _ = vst_bm3d_denoise(
                 img, noise_info=noise_info, verbose=self.visualize)
             return result
@@ -923,12 +923,12 @@ class FBDHSGP(DeconvolutionAlgorithm):
     # =========================================================================
     def _estimate_noise(self, yg):
         if self.noise_estimation == "chen":
-            from .chen_noise_estimate import estimate_noise_level
+            from blinddeconv.algorithms.mod_cython._build_pyd.chen_noise_estimate import estimate_noise_level
             sigma = estimate_noise_level(yg)
             return {"method": "chen", "sigma_norm": sigma,
                     "sigma": sigma * 255.0}
         if self.noise_estimation == "pca":
-            from .pyatykh_noise_reconstruction import estimate_noise_params
+            from blinddeconv.algorithms.mod_cython._build_pyd.pyatykh_noise_reconstruction import estimate_noise_params
             result = estimate_noise_params(yg)
             result["method"] = "pca"
             return result
@@ -938,7 +938,7 @@ class FBDHSGP(DeconvolutionAlgorithm):
     # PSD-based noise preprocessing
     # =========================================================================
     def _apply_noise_preprocess(self, yg):
-        from .noise_psd_analysis import (
+        from blinddeconv.algorithms.mod_cython._build_pyd.noise_psd_analysis import (
             analyze_noise_psd, noise_preprocess as _npp,
         )
         npp = self.noise_preprocess_params or {}

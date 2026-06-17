@@ -52,7 +52,7 @@ from .solvers import (
     deblurring_adm_aniso,
 )
 from .non_blind import adaptive_lp_deconv
-from .impulse_noise_estimation import detect_impulse_noise, adaptive_median_filter
+from blinddeconv.algorithms.mod_cython._build_pyd.impulse_noise_estimation import detect_impulse_noise, adaptive_median_filter
 from .utils import opt_fft_size, wrap_boundary_liu
 
 
@@ -461,7 +461,7 @@ class LMGP_BD(DeconvolutionAlgorithm):
         # ── 2d. ScreeNOT SVD denoising ────────────────────────────────────
         screenot_info = None
         if self.screenot_preprocess == 'auto':
-            from .screenot import screenot_denoise
+            from blinddeconv.algorithms.mod_cython._build_pyd.screenot import screenot_denoise
             sp = self.screenot_params or {}
             yg, screenot_info = screenot_denoise(
                 yg,
@@ -491,7 +491,7 @@ class LMGP_BD(DeconvolutionAlgorithm):
                 raise ValueError(
                     "screenot_preprocess and act_preprocess cannot both "
                     "be 'auto'. Choose one denoiser.")
-            from .act_denoise import act_denoise
+            from blinddeconv.algorithms.mod_cython._build_pyd.act_denoise import act_denoise
             ap = self.act_params or {}
             act_noise_var = ap.get('noise_var', None)
             if act_noise_var is None and noise_info is not None:
@@ -700,7 +700,7 @@ class LMGP_BD(DeconvolutionAlgorithm):
             sigma = noise_info.get('sigma_norm', None)
 
         if method == 'act':
-            from .act_denoise import act_denoise
+            from blinddeconv.algorithms.mod_cython._build_pyd.act_denoise import act_denoise
             nv = params.get('noise_var', None)
             if nv is None and sigma is not None:
                 nv = sigma ** 2
@@ -782,7 +782,7 @@ class LMGP_BD(DeconvolutionAlgorithm):
     # ── PSD-based noise preprocessing ────────────────────────────────────
     def _apply_noise_preprocess(self, yg):
         """Analyze noise PSD and apply spectral filtering."""
-        from .noise_psd_analysis import (
+        from blinddeconv.algorithms.mod_cython._build_pyd.noise_psd_analysis import (
             analyze_noise_psd, noise_preprocess,
             prewhiten, notch_filter, bandstop_filter,
         )
@@ -955,12 +955,12 @@ class LMGP_BD(DeconvolutionAlgorithm):
     def _estimate_noise(self, yg):
         """Estimate noise level from grayscale image (float64 [0, 1])."""
         if self.noise_estimation == 'chen':
-            from .chen_noise_estimate import estimate_noise_level
+            from blinddeconv.algorithms.mod_cython._build_pyd.chen_noise_estimate import estimate_noise_level
             sigma = estimate_noise_level(yg)
             return {'method': 'chen', 'sigma_norm': sigma,
                     'sigma': sigma * 255.0}
         elif self.noise_estimation == 'pca':
-            from .pyatykh_noise_reconstruction import estimate_noise_params
+            from blinddeconv.algorithms.mod_cython._build_pyd.pyatykh_noise_reconstruction import estimate_noise_params
             result = estimate_noise_params(yg)
             result['method'] = 'pca'
             return result

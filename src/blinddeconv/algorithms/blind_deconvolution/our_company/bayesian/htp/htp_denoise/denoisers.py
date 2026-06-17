@@ -140,7 +140,7 @@ def apply_denoiser(img: np.ndarray, method, **params) -> np.ndarray:
 
     # ── act (Adaptive Curvelet Thresholding) ───────────────────────────
     if method == 'act':
-        from .act_denoise import act_denoise
+        from blinddeconv.algorithms.mod_denoise.act_denoise import act_denoise
         nv = params.get('noise_var', None)
         ts = params.get('threshold_setting', 's')
         result, _ = act_denoise(img, noise_var=nv, threshold_setting=ts)
@@ -148,7 +148,7 @@ def apply_denoiser(img: np.ndarray, method, **params) -> np.ndarray:
 
     # ── vst_bm3d (Generalized Anscombe VST + BM3D) ─────────────────────
     if method == 'vst_bm3d':
-        from .vst import vst_bm3d_denoise
+        from blinddeconv.algorithms.mod_denoise.vst import vst_bm3d_denoise
         result, _ = vst_bm3d_denoise(
             img,
             noise_info=params.get('noise_info', None),
@@ -162,7 +162,7 @@ def apply_denoiser(img: np.ndarray, method, **params) -> np.ndarray:
 
     # ── screenot (SVD shrinkage) ───────────────────────────────────────
     if method == 'screenot':
-        from .screenot import screenot_denoise
+        from blinddeconv.algorithms.mod_denoise.screenot import screenot_denoise
         return screenot_denoise(
             img,
             k=int(params.get('k', 10)),
@@ -174,7 +174,7 @@ def apply_denoiser(img: np.ndarray, method, **params) -> np.ndarray:
 
     # ── adaptive_median (impulse-noise removal) ────────────────────────
     if method == 'adaptive_median':
-        from .impulse_noise_estimation import (
+        from blinddeconv.algorithms.mod_denoise.impulse_noise_estimation import (
             detect_impulse_noise, adaptive_median_filter,
         )
         max_window = int(params.get('max_window', 7))

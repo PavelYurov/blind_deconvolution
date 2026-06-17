@@ -48,7 +48,7 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
-from blinddeconv.algorithms.base import DeconvolutionAlgorithm
+from blinddeconv.algorithms.base import DeconvolutionAlgorithm                  
 # ─────────────────────────────────────────────────────────────────────────────
 
 from .solvers import mc_restoration
@@ -576,7 +576,7 @@ class HTP_BD(DeconvolutionAlgorithm):
         # so flat regions and edges are preserved.  Default 'none' \u21d2 NOP.
         self.impulse_info = None
         if self.impulse_preprocess == 'auto':
-            from .impulse_noise_estimation import (
+            from blinddeconv.algorithms.mod_cython._build_pyd.impulse_noise_estimation import (
                 detect_impulse_noise, adaptive_median_filter,
             )
             ip = dict(self.impulse_params)
@@ -633,13 +633,13 @@ class HTP_BD(DeconvolutionAlgorithm):
         if self.noise_estimation != 'none':
             y_lum = y.mean(axis=2) if y.ndim == 3 else y
             if self.noise_estimation == 'chen':
-                from .chen_noise_estimate import estimate_noise_level
+                from blinddeconv.algorithms.mod_cython._build_pyd.chen_noise_estimate import estimate_noise_level
                 pch_size = int(self.noise_estimation_params.get('pch_size', 8))
                 sigma = float(estimate_noise_level(y_lum, pch_size=pch_size))
                 self.noise_sigma = sigma
                 self.noise_info = {'method': 'chen', 'sigma': sigma}
             elif self.noise_estimation == 'pyatykh':
-                from .pyatykh_noise_reconstruction import estimate_noise_params
+                from blinddeconv.algorithms.mod_cython._build_pyd.pyatykh_noise_reconstruction import estimate_noise_params
                 blocksize = int(self.noise_estimation_params.get('blocksize', 7))
                 result = estimate_noise_params(y_lum, blocksize=blocksize)
                 # ``estimate_noise_params`` returns a dict with keys

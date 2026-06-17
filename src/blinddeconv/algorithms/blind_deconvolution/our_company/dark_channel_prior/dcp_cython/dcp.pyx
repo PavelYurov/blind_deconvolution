@@ -58,7 +58,7 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
-from blinddeconv.algorithms.base import DeconvolutionAlgorithm
+from blinddeconv.algorithms.base import DeconvolutionAlgorithm 
 # ─────────────────────────────────────────────────────────────────────────────
 
 from .solvers import blind_deconv, ringing_artifacts_removal
@@ -377,7 +377,7 @@ class DCP_BD(DeconvolutionAlgorithm):
         # ── 3a. Impulse noise detection & removal ───────────────────────
         impulse_info = None
         if self.impulse_preprocess == 'auto':
-            from .impulse_noise_estimation import (
+            from blinddeconv.algorithms.mod_cython._build_pyd.impulse_noise_estimation import (
                 detect_impulse_noise, adaptive_median_filter,
             )
             ip = self.impulse_params or {}
@@ -441,7 +441,7 @@ class DCP_BD(DeconvolutionAlgorithm):
                 raise ValueError(
                     "screenot_preprocess and act_preprocess cannot both "
                     "be 'auto'. Choose one denoiser.")
-            from .screenot import screenot_denoise
+            from blinddeconv.algorithms.mod_cython._build_pyd.screenot import screenot_denoise
             sp = self.screenot_params or {}
             yg, screenot_info = screenot_denoise(
                 yg,
@@ -458,7 +458,7 @@ class DCP_BD(DeconvolutionAlgorithm):
         # ── 3e. ACT curvelet denoising ──────────────────────────────────
         act_info = None
         if self.act_preprocess == 'auto':
-            from .act_denoise import act_denoise
+            from blinddeconv.algorithms.mod_cython._build_pyd.act_denoise import act_denoise
             ap = self.act_params or {}
             act_noise_var = ap.get('noise_var', None)
             if act_noise_var is None and noise_info is not None:
@@ -653,7 +653,7 @@ class DCP_BD(DeconvolutionAlgorithm):
             return bm3d_lib.bm3d(img, sigma_psd=sig)
 
         elif method == 'act':
-            from .act_denoise import act_denoise
+            from blinddeconv.algorithms.mod_cython._build_pyd.act_denoise import act_denoise
             nv = p.get('noise_var', None)
             if nv is None and sigma is not None:
                 nv = sigma ** 2
@@ -671,12 +671,12 @@ class DCP_BD(DeconvolutionAlgorithm):
     # ── Noise estimation ─────────────────────────────────────────────
     def _estimate_noise(self, yg):
         if self.noise_estimation == 'chen':
-            from .chen_noise_estimate import estimate_noise_level
+            from blinddeconv.algorithms.mod_cython._build_pyd.chen_noise_estimate import estimate_noise_level
             sigma = estimate_noise_level(yg)
             return {'method': 'chen', 'sigma_norm': sigma,
                     'sigma': sigma * 255.0}
         elif self.noise_estimation == 'pca':
-            from .pyatykh_noise_reconstruction import estimate_noise_params
+            from blinddeconv.algorithms.mod_cython._build_pyd.pyatykh_noise_reconstruction import estimate_noise_params
             result = estimate_noise_params(yg)
             result['method'] = 'pca'
             return result
@@ -684,7 +684,7 @@ class DCP_BD(DeconvolutionAlgorithm):
 
     # ── PSD-based noise preprocessing ────────────────────────────────
     def _apply_noise_preprocess(self, yg):
-        from .noise_psd_analysis import (
+        from blinddeconv.algorithms.mod_cython._build_pyd.noise_psd_analysis import (
             analyze_noise_psd, noise_preprocess,
             notch_filter, bandstop_filter,
         )

@@ -57,7 +57,7 @@ from .utils import (
     wiener_filter,
     tikhonov_filter,
 )
-from .impulse_noise_estimation import detect_impulse_noise, adaptive_median_filter
+from blinddeconv.algorithms.mod_denoise.impulse_noise_estimation import detect_impulse_noise, adaptive_median_filter
 
 
 class LIP_BD(DeconvolutionAlgorithm):
@@ -380,7 +380,7 @@ class LIP_BD(DeconvolutionAlgorithm):
         # ── 4c. ScreeNOT SVD denoising ──────────────────────────────────
         screenot_info = None
         if self.screenot_preprocess == 'auto':
-            from .screenot import screenot_denoise
+            from blinddeconv.algorithms.mod_denoise.screenot import screenot_denoise
             sp = self.screenot_params or {}
             f, screenot_info = screenot_denoise(
                 f,
@@ -398,7 +398,7 @@ class LIP_BD(DeconvolutionAlgorithm):
                 raise ValueError(
                     "screenot_preprocess and act_preprocess cannot both "
                     "be 'auto'. Choose one denoiser.")
-            from .act_denoise import act_denoise
+            from blinddeconv.algorithms.mod_denoise.act_denoise import act_denoise
             ap = self.act_params or {}
             act_noise_var = ap.get('noise_var', None)
             if act_noise_var is None and noise_info is not None:
@@ -501,7 +501,7 @@ class LIP_BD(DeconvolutionAlgorithm):
             u_restored = ((1.0 - blend_w) * u_tik[:h, :w]
                           + blend_w * u_rr[:h, :w])
         elif self.final_deconv == 'adaptive_lp':
-            from .non_blind import adaptive_lp_deconv
+            from blinddeconv.algorithms.mod_denoise.non_blind import adaptive_lp_deconv
             nbp = self.nb_params or {}
             sigma_n = None
             if noise_info is not None:
@@ -650,7 +650,7 @@ class LIP_BD(DeconvolutionAlgorithm):
             return bm3d_lib.bm3d(img, sigma_psd=sig)
 
         elif method == 'act':
-            from .act_denoise import act_denoise
+            from blinddeconv.algorithms.mod_denoise.act_denoise import act_denoise
             nv = p.get('noise_var', None)
             if nv is None and sigma is not None:
                 nv = sigma ** 2
@@ -663,7 +663,7 @@ class LIP_BD(DeconvolutionAlgorithm):
             # Generalized Anscombe VST + BM3D denoising for Poisson-
             # Gaussian noise.  Self-contained module (.vst); falls back
             # to plain BM3D when the noise has no Poisson component.
-            from .vst import vst_bm3d_denoise
+            from blinddeconv.algorithms.mod_denoise.vst import vst_bm3d_denoise
             result, _ = vst_bm3d_denoise(
                 img,
                 noise_info=noise_info,
@@ -765,12 +765,12 @@ class LIP_BD(DeconvolutionAlgorithm):
     # ── Noise estimation ─────────────────────────────────────────────
     def _estimate_noise(self, yg):
         if self.noise_estimation == 'chen':
-            from .chen_noise_estimate import estimate_noise_level
+            from blinddeconv.algorithms.mod_denoise.chen_noise_estimate import estimate_noise_level
             sigma = estimate_noise_level(yg)
             return {'method': 'chen', 'sigma_norm': sigma,
                     'sigma': sigma * 255.0}
         elif self.noise_estimation == 'pca':
-            from .pyatykh_noise_reconstruction import estimate_noise_params
+            from blinddeconv.algorithms.mod_denoise.pyatykh_noise_reconstruction import estimate_noise_params
             result = estimate_noise_params(yg)
             result['method'] = 'pca'
             return result
@@ -1009,7 +1009,7 @@ class LIP_BD(DeconvolutionAlgorithm):
 
     # ── PSD-based noise preprocessing ────────────────────────────────
     def _apply_noise_preprocess(self, yg):
-        from .noise_psd_analysis import (
+        from blinddeconv.algorithms.mod_denoise.noise_psd_analysis import (
             analyze_noise_psd, noise_preprocess,
             notch_filter, bandstop_filter,
         )

@@ -61,6 +61,28 @@ from .utils import (
     bilateral_filter,
 )
 
+# ── Framework base class import (DO NOT MODIFY) ─────────────────────────────
+import sys
+from pathlib import Path
+
+
+def _find_project_root(start: Path) -> Path:
+    path = start.resolve()
+    while not (path / "pyproject.toml").exists():
+        if path.parent == path:
+            raise RuntimeError("Cannot locate project root")
+        path = path.parent
+    return path
+
+
+_CURRENT_FILE = Path(__file__).resolve()
+_PROJECT_ROOT = _find_project_root(_CURRENT_FILE)
+_SRC_DIR = _PROJECT_ROOT / "src"
+_ALGORITHMS_DIR = _SRC_DIR / "blinddeconv" / "algorithms"
+
+for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
 
 # ═════════════════════════════════════════════════════════════════════════════
 # TV_denoising  (from TV_denoising.m)
@@ -310,7 +332,7 @@ def apply_denoiser(img, method, **params):
         # which leads to under-thresholding in bright regions — fake
         # edges that wreck downstream kernel estimation.  Always pass
         # ``noise_var=sigma**2`` from a real noise estimator if you have one.
-        from .act_denoise import act_denoise
+        from blinddeconv.algorithms.mod_denoise.act_denoise import act_denoise
         nv = params.get('noise_var', None)
         ts = params.get('threshold_setting', 's')
         result, _ = act_denoise(img, noise_var=nv, threshold_setting=ts)
@@ -321,7 +343,7 @@ def apply_denoiser(img, method, **params):
         # Forward GAT → BM3D at σ=1 → asymptotic inverse.
         # Falls back to plain BM3D when there is no Poisson component
         # (a ≈ 0).
-        from .vst import vst_bm3d_denoise
+        from blinddeconv.algorithms.mod_denoise.vst import vst_bm3d_denoise
         noise_info = params.get('noise_info', None)
         result, _ = vst_bm3d_denoise(
             img,

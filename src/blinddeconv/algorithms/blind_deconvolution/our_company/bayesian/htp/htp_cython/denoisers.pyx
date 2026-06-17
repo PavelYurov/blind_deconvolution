@@ -47,6 +47,26 @@ from scipy.ndimage import uniform_filter
 
 __all__ = ['apply_denoiser']
 
+from pathlib import Path
+
+
+def _find_project_root(start: Path) -> Path:
+    path = start.resolve()
+    while not (path / "pyproject.toml").exists():
+        if path.parent == path:
+            raise RuntimeError("Cannot locate project root")
+        path = path.parent
+    return path
+
+
+_CURRENT_FILE = Path(__file__).resolve()
+_PROJECT_ROOT = _find_project_root(_CURRENT_FILE)
+_SRC_DIR = _PROJECT_ROOT / "src"
+_ALGORITHMS_DIR = _SRC_DIR / "blinddeconv" / "algorithms"
+
+for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
 
 # ────────────────────────────────────────────────────────────────────────────
 # Self-guided filter (He et al., ECCV 2010) — small enough to keep inline
@@ -140,7 +160,7 @@ def apply_denoiser(img: np.ndarray, method, **params) -> np.ndarray:
 
     # ── act (Adaptive Curvelet Thresholding) ───────────────────────────
     if method == 'act':
-        from .act_denoise import act_denoise
+        from blinddeconv.algorithms.mod_cython._build_pyd.act_denoise import act_denoise
         nv = params.get('noise_var', None)
         ts = params.get('threshold_setting', 's')
         result, _ = act_denoise(img, noise_var=nv, threshold_setting=ts)
@@ -148,7 +168,7 @@ def apply_denoiser(img: np.ndarray, method, **params) -> np.ndarray:
 
     # ── vst_bm3d (Generalized Anscombe VST + BM3D) ─────────────────────
     if method == 'vst_bm3d':
-        from .vst import vst_bm3d_denoise
+        from blinddeconv.algorithms.mod_cython._build_pyd.vst import vst_bm3d_denoise
         result, _ = vst_bm3d_denoise(
             img,
             noise_info=params.get('noise_info', None),
@@ -162,7 +182,7 @@ def apply_denoiser(img: np.ndarray, method, **params) -> np.ndarray:
 
     # ── screenot (SVD shrinkage) ───────────────────────────────────────
     if method == 'screenot':
-        from .screenot import screenot_denoise
+        from blinddeconv.algorithms.mod_cython._build_pyd.screenot import screenot_denoise
         return screenot_denoise(
             img,
             k=int(params.get('k', 10)),
@@ -174,7 +194,7 @@ def apply_denoiser(img: np.ndarray, method, **params) -> np.ndarray:
 
     # ── adaptive_median (impulse-noise removal) ────────────────────────
     if method == 'adaptive_median':
-        from .impulse_noise_estimation import (
+        from blinddeconv.algorithms.mod_cython._build_pyd.impulse_noise_estimation import (
             detect_impulse_noise, adaptive_median_filter,
         )
         max_window = int(params.get('max_window', 7))
