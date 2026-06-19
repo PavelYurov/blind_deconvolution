@@ -139,7 +139,7 @@ ALGORITHM_CONFIGS: list[dict[str, Any]] = [
             "auto_mode":          "robust",
             "verbose":            False,
         },
-        "nb_params_keys": ["lambda_tv", "lambda_l0", "weight_ring"],.
+        "nb_params_keys": ["lambda_tv", "lambda_l0", "weight_ring"],
         "nb_params_base": {"blend_weight": 0.5},
         # Файл истории TPE-оптимизации (Iteration, params..., Objective).
         # Строка с минимальным Objective берётся как best_hpo-подсчет.
