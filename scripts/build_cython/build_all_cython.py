@@ -1,19 +1,18 @@
 """
-build_all_cython.py — Find and run every `build_cython.py` in the project.
+build_all_cython.py 
+Находит и запускает все build_cython.py в проекте.
 
-Scans the project tree for files named exactly ``build_cython.py`` and
-executes each of them in its own subprocess (using the current Python
-interpreter). Works from anywhere inside the project — the project root
-is auto-detected by walking up from this file.
+Сканирует дерево проекта на наличие скриптов называющихся build_cython.py
+и запускает каждый из них в своем собственнои подпроцессе. Работает из 
+любой позиции внутри проекта - корень проета детектится автоматически.
 
-Usage:
-    python scripts/build_cython/build_all_cython.py            # build everything
-    python scripts/build_cython/build_all_cython.py --list     # only list found scripts
-    python scripts/build_cython/build_all_cython.py --filter gbbid lip   # substring match on script path
-    python scripts/build_cython/build_all_cython.py --jobs 4   # parallel builds
-    python scripts/build_cython/build_all_cython.py --keep-going   # don't stop on first failure
+Использование:
+    python scripts/build_cython/build_all_cython.py            # собрать все
+    python scripts/build_cython/build_all_cython.py --list     # список найденных скриптов
+    python scripts/build_cython/build_all_cython.py --filter gbbid lip   # фильтр подстроки в пути к скрипту
+    python scripts/build_cython/build_all_cython.py --jobs 4   # параллельные потоки исполнения
+    python scripts/build_cython/build_all_cython.py --keep-going   # не прекращать сборку при возникновении ошибки
 
-Exits with non-zero code if any build failed.
 """
 
 from __future__ import annotations
@@ -27,10 +26,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 
-# ── Локализация корня проекта ────────────────────────────────────────────────
-# Этот скрипт лежит в <project>/scripts/build_cython/build_all_cython.py,
-# но мы не полагаемся на это: ищем ближайший родительский каталог, в котором
-# есть характерный для проекта маркер.
 _HERE = Path(__file__).resolve().parent
 _MARKERS = ("pyproject.toml", "setup.cfg", "requirements.txt", ".git")
 
@@ -43,14 +38,12 @@ def find_project_root(start: Path) -> Path:
         if cur.parent == cur:
             break
         cur = cur.parent
-    # Fallback — два уровня вверх от scripts/build_cython/
     return start.parents[1] if len(start.parents) >= 2 else start
 
 
 PROJECT_ROOT = find_project_root(_HERE)
 
 
-# ── Поиск всех build_cython.py ───────────────────────────────────────────────
 _SKIP_DIRS = {
     ".git", ".venv", "venv", "node_modules", "__pycache__",
     "build", "dist", ".mypy_cache", ".pytest_cache",
@@ -61,18 +54,15 @@ _SKIP_DIRS = {
 def find_build_scripts(root: Path) -> list[Path]:
     found: list[Path] = []
     for dirpath, dirnames, filenames in os.walk(root):
-        # отфильтровываем тяжёлые/служебные каталоги in-place
         dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
         if "build_cython.py" in filenames:
             p = Path(dirpath) / "build_cython.py"
-            # пропускаем самих себя
             if p.resolve() == Path(__file__).resolve():
                 continue
             found.append(p)
     return sorted(found)
 
 
-# ── Запуск одного билда ──────────────────────────────────────────────────────
 def run_one(script: Path) -> tuple[Path, int, float, str]:
     t0 = time.time()
     try:
@@ -93,7 +83,6 @@ def run_one(script: Path) -> tuple[Path, int, float, str]:
         return script, 1, time.time() - t0, f"[runner-error] {e!r}"
 
 
-# ── CLI ──────────────────────────────────────────────────────────────────────
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build every build_cython.py in the project.")
     parser.add_argument("--list", action="store_true",
@@ -128,7 +117,6 @@ def main() -> int:
     if args.list:
         return 0
 
-    # ── собственно сборка ────────────────────────────────────────────────
     results: list[tuple[Path, int, float, str]] = []
     failed: list[Path] = []
 
@@ -159,7 +147,6 @@ def main() -> int:
                     print("[build-all] Aborting — use --keep-going to continue past failures.")
                     break
 
-    # ── итоговый отчёт ───────────────────────────────────────────────────
     print(f"\n{'═' * 80}\n[build-all] SUMMARY")
     total_time = sum(r[2] for r in results)
     ok = sum(1 for r in results if r[1] == 0)

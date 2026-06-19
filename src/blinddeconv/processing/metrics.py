@@ -4,23 +4,6 @@ from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 from typing import Callable, Optional, Tuple
 
 
-# ═══════════════════════════════════════════════════════════════════
-# Shift-alignment helper (used when aligned=True in PSNR/SSIM).
-#
-# Blind deconvolution has a fundamental translation ambiguity:
-#   B = I * k = (I shifted by -d) * (k shifted by +d)
-# so the reconstructed latent is typically offset by a few pixels
-# relative to the ground-truth — which destroys pixel-wise metrics
-# even when the reconstruction looks visually correct.
-#
-# The aligned=True variants search the best integer shift in the
-# range [-max_shift, +max_shift] on both axes and return the metric
-# on the overlapping region (cropped by the shift amount and by an
-# additional border to avoid evaluating on ringing / boundary rows).
-# This matches the shift-aligned evaluation protocol used in Levin's,
-# Sun's and Köhler's blind-deblurring benchmarks.
-# ═══════════════════════════════════════════════════════════════════
-
 def _align_shift(original: np.ndarray,
                  restored: np.ndarray,
                  max_shift: int = 8,
@@ -28,12 +11,12 @@ def _align_shift(original: np.ndarray,
                  data_range: Optional[float] = None
                  ) -> Tuple[np.ndarray, np.ndarray, Tuple[int, int]]:
     """
-    Find the integer (dy, dx) in [-max_shift, max_shift]^2 that
-    maximises PSNR between ``original`` and ``restored`` on the
-    overlapping central region (minus ``border`` pixels).
+    Находит целые (dy, dx) в диапозоне [-max_shift, max_shift],
+    которые максимизируют метрику между оригинальным изображением
+    и восстановленным на пересекающемся центральном участке (без граничных пикселей).
 
-    Returns the two already-cropped arrays and the best shift.
-    Works for 2D (grayscale) and 3D (H, W, C) images.
+    Возвращает 2 обрезанных массива и лучший сдвиг.
+    Работает для 2D и 3D массивов.
     """
     a = np.asarray(original)
     b = np.asarray(restored)
@@ -50,14 +33,11 @@ def _align_shift(original: np.ndarray,
     inner_h = H - 2 * (ms + bd)
     inner_w = W - 2 * (ms + bd)
     if inner_h <= 0 or inner_w <= 0:
-        # Image too small — fall back to zero shift with just border crop.
         ms = 0
         inner_h = H - 2 * bd
         inner_w = W - 2 * bd
         if inner_h <= 0 or inner_w <= 0:
             return a, b, (0, 0)
-
-    # Fixed central window in the ORIGINAL.
     y0 = ms + bd
     x0 = ms + bd
     a_win = a[y0:y0 + inner_h, x0:x0 + inner_w]
@@ -94,8 +74,8 @@ def PSNR(original: np.ndarray,
         restored (ndarray): Восстановленное/обработанное изображение
         aligned (bool): Если True (по умолчанию), перед вычислением
             PSNR выполняется поиск оптимального целочисленного сдвига
-            ``restored`` относительно ``original`` в окне
-            ``[-max_shift, +max_shift]`` по обеим осям; это компенсирует
+            restored относительно original в окне
+            [-max_shift, +max_shift] по обеим осям; это компенсирует
             translation-ambiguity слепой деконволюции.
             Если False — стандартный попиксельный PSNR.
         max_shift (int): Полуширина окна поиска сдвига (только при
@@ -131,8 +111,8 @@ def SSIM(original: np.ndarray,
         data_range (Optional[float]): Верхний предел значений
         aligned (bool): Если True (по умолчанию), перед вычислением
             SSIM выполняется поиск оптимального целочисленного сдвига
-            ``restored`` относительно ``original`` в окне
-            ``[-max_shift, +max_shift]`` по обеим осям (сдвиг
+            restored относительно original в окне
+            [-max_shift, +max_shift] по обеим осям (сдвиг
             подбирается по MSE, что эквивалентно максимизации PSNR).
             Если False — стандартный SSIM.
         max_shift (int): Полуширина окна поиска сдвига (только при
@@ -148,7 +128,6 @@ def SSIM(original: np.ndarray,
     a_win, b_win, _ = _align_shift(original, restored,
                                    max_shift=max_shift, border=border,
                                    data_range=data_range)
-    # SSIM requires channel_axis for multichannel input.
     if a_win.ndim == 3:
         return structural_similarity(a_win, b_win,
                                      data_range=data_range,

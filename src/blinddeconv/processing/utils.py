@@ -395,12 +395,13 @@ def calculate_metrics(original_image: np.ndarray,
                        aligned: bool = True,
                        max_shift: int = 8,
                        border: int = 4) -> tuple[float, float]:
-    """Расчет метрик восстановления.
+    """
+    Расчет метрик восстановления.
 
-    По умолчанию ``aligned=True`` — используется shift-aligned вариант
+    По умолчанию aligned=True — используется shift-aligned вариант
     PSNR/SSIM (поиск оптимального целочисленного сдвига восстановленного
-    изображения относительно оригинала в окне ``[-max_shift, +max_shift]``).
-    Это компенсирует translation-ambiguity слепой деконволюции.
+    изображения относительно оригинала в окне [-max_shift, +max_shift]).
+    Это компенсирует нестабильность слепой деконволюции.
     """
     try:
         psnr_val = metrics.PSNR(original_image, restored_image,

@@ -1,26 +1,24 @@
 """
 impulse_noise_estimation.py
 
-Detection and removal of impulse (salt-and-pepper) noise.
+Обнаружение и подавление импульсного шума (типа "соль и перец").
 
-Impulse noise appears as isolated pixels at extreme values (0 or 255).
-It must be handled BEFORE blind deconvolution — otherwise the PSF
-estimation treats impulses as image features, and the blur kernel
-"smears" them into star-shaped artifacts.
+Импульсный шум проявляется в виде изолированных пикселей с экстремальными 
+значениями (0 или 255). Подавление такого шума до выполнения слепой 
+деконволюции является критически важным шагом. В противном случае алгоритмы 
+оценки функции рассеяния точки (PSF) воспринимают импульсы как полезные 
+детали изображения, а ядро размытия "размазывает" их, создавая характерные 
+звездообразные артефакты.
 
-Detection strategy (no reference image needed):
-    1. Histogram analysis: count pixels at/near extreme values (0, 255).
-    2. Local outlier detection: flag pixels whose value differs from
-       their local median by more than a threshold.
-    3. Combine both signals to decide presence/absence and estimate
-       impulse noise density.
-
-Removal:
-    Adaptive Median Filter (AMF) — applies median only to detected
-    impulse pixels, preserving all other pixels untouched.
-    This is critical: a standard median filter blurs the entire image.
-
-Dependencies: numpy, scipy (only).
+Метод не требует наличия эталонного изображения и включает два этапа:
+1. Обнаружение:
+   - Анализ гистограммы для поиска пикселей с экстремальными значениями.
+   - Поиск локальных выбросов (пикселей, сильно отличающихся от локальной медианы).
+   - Комбинирование сигналов для оценки плотности импульсного шума.
+2. Подавление:
+   - Использование адаптивного медианного фильтра (AMF). Фильтрация применяется 
+     исключительно к обнаруженным зашумленным пикселям, оставляя остальные 
+     без изменений, что предотвращает общее размытие изображения.
 """
 
 import numpy as np
@@ -34,22 +32,31 @@ __all__ = [
 ]
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# 1. Detection
-# ═════════════════════════════════════════════════════════════════════════════
-
 def _histogram_extremes(image, low_thresh=0.01, high_thresh=0.99):
     """
-    Count fraction of pixels at extreme values.
+    Вычисление доли пикселей с экстремальными значениями яркости.
 
-    For [0,1] images: values ≤ low_thresh or ≥ high_thresh.
-    Salt-and-pepper noise creates spikes at the distribution tails.
+    Шум типа "соль и перец" формирует пики на краях распределения. 
+    Для изображений в диапазоне [0, 1] анализируются значения <= low_thresh 
+    и >= high_thresh.
 
-    Returns
-    -------
-    frac_low : float — fraction of near-zero pixels
-    frac_high : float — fraction of near-max pixels
-    frac_total : float — total fraction of extreme pixels
+    Параметры
+    ---------
+    image : ndarray
+        Массив изображения (в диапазоне [0, 1]).
+    low_thresh : float
+        Верхняя граница для пикселей типа "перец".
+    high_thresh : float
+        Нижняя граница для пикселей типа "соль".
+
+    Возвращает
+    ----------
+    frac_low : float
+        Доля пикселей, близких к нулю.
+    frac_high : float
+        Доля пикселей, близких к максимуму.
+    frac_total : float
+        Суммарная доля экстремальных пикселей.
     """
     total = image.size
     frac_low = np.count_nonzero(image <= low_thresh) / total
@@ -59,19 +66,24 @@ def _histogram_extremes(image, low_thresh=0.01, high_thresh=0.99):
 
 def _local_outlier_mask(image, window_size=5, threshold=0.15):
     """
-    Detect pixels that are local outliers (differ significantly from
-    their neighborhood median).
+    Поиск локальных выбросов (пикселей, значительно отличающихся от 
+    медианы своей окрестности).
 
-    Parameters
+    Параметры
+    ---------
+    image : ndarray
+        Полутоновое изображение размерности (H, W), значения float [0, 1].
+    window_size : int
+        Размер окна для локального медианного фильтра (нечетное число).
+    threshold : float
+        Минимальное отклонение от локальной медианы для классификации 
+        пикселя как выброса (в масштабе [0, 1]).
+
+    Возвращает
     ----------
-    image : ndarray, H×W, float [0, 1]
-    window_size : int — median filter window (odd)
-    threshold : float — minimum difference from local median to flag
-                a pixel as an outlier (in [0, 1] scale)
-
-    Returns
-    -------
-    mask : bool ndarray, H×W — True where impulse noise is suspected
+    mask : ndarray
+        Булева маска размерности (H, W), где True соответствует 
+        подозреваемому импульсному шуму.
     """
     local_med = _scipy_median_filter(image, size=window_size)
     diff = np.abs(image - local_med)
@@ -82,67 +94,67 @@ def detect_impulse_noise(image, low_thresh=0.01, high_thresh=0.99,
                          outlier_window=5, outlier_threshold=0.15,
                          density_threshold=0.0005):
     """
-    Detect whether an image contains impulse (salt-and-pepper) noise.
+    Комплексное обнаружение импульсного шума на изображении.
 
-    Uses two complementary signals:
-        1. Histogram extremes — fraction of pixels near 0 or 1.
-        2. Local outlier detection — pixels far from local median.
+    Алгоритм комбинирует два подхода:
+    1. Поиск экстремумов на границах гистограммы (около 0 и 1).
+    2. Поиск локальных выбросов (отклонений от медианы).
+    Пиксель помечается как зашумленный, если он удовлетворяет обоим критериям.
+    Дополнительно применяется смягченный порог отклонения (0.02) для пикселей 
+    с жесткими экстремальными значениями (<= 0.005 или >= 0.995), чтобы 
+    избежать их пропуска в очень темных или сильно засвеченных областях.
 
-    Parameters
+    Параметры
+    ---------
+    image : ndarray
+        Изображение (H, W) или (H, W, C). Тип float64 [0, 1] или uint8 [0, 255].
+    low_thresh : float
+        Нижний порог для темных экстремумов ("перец").
+    high_thresh : float
+        Верхний порог для светлых экстремумов ("соль").
+    outlier_window : int
+        Размер окна локального медианного фильтра (нечетное число).
+    outlier_threshold : float
+        Порог отклонения от локальной медианы для классификации выброса.
+    density_threshold : float
+        Минимальная предполагаемая плотность (по умолчанию 0.05%), при которой 
+        принимается решение о наличии импульсного шума на изображении.
+
+    Возвращает
     ----------
-    image : ndarray, H×W or H×W×C, float64 [0, 1] or uint8 [0, 255]
-    low_thresh : float — lower bound for "salt" pixels (in [0, 1])
-    high_thresh : float — upper bound for "pepper" pixels (in [0, 1])
-    outlier_window : int — window size for local median (odd)
-    outlier_threshold : float — min diff from local median for outlier
-    density_threshold : float — minimum estimated density to declare
-                        impulse noise present (default 0.5%)
-
-    Returns
-    -------
     result : dict
-        'has_impulse'    — bool: True if impulse noise detected
-        'density'        — float: estimated impulse noise density [0, 1]
-        'frac_low'       — float: fraction of near-zero pixels
-        'frac_high'      — float: fraction of near-max pixels
-        'outlier_frac'   — float: fraction flagged as local outliers
-        'impulse_mask'   — bool ndarray H×W: per-pixel impulse map
+        Словарь с результатами анализа:
+        - 'has_impulse' : bool, True, если обнаружен шум.
+        - 'density' : float, оцененная плотность импульсного шума [0, 1].
+        - 'frac_low' : float, доля темных экстремумов.
+        - 'frac_high' : float, доля светлых экстремумов.
+        - 'outlier_frac' : float, доля локальных выбросов.
+        - 'impulse_mask' : ndarray (bool, HxW), пространственная маска шума.
     """
     img = np.asarray(image, dtype=np.float64)
     if img.max() > 1.0:
         img = img / 255.0
 
-    # Work on grayscale for detection
     if img.ndim == 3:
         gray = 0.2989 * img[:, :, 0] + 0.5870 * img[:, :, 1] + 0.1140 * img[:, :, 2]
     else:
         gray = img
 
-    # Signal 1: histogram extremes
     frac_low, frac_high, frac_total = _histogram_extremes(
         gray, low_thresh, high_thresh)
 
-    # Signal 2: local outlier detection
     outlier_mask = _local_outlier_mask(
         gray, outlier_window, outlier_threshold)
     outlier_frac = np.count_nonzero(outlier_mask) / gray.size
 
-    # Extreme pixels (near 0 or 1)
     extreme_mask = (gray <= low_thresh) | (gray >= high_thresh)
 
-    # Impulse mask: extreme pixels that are local outliers
     impulse_mask = extreme_mask & outlier_mask
 
-    # Hard extremes (≤0.005 or ≥0.995): almost certainly impulse.
-    # In dark/bright regions the standard outlier_threshold misses them
-    # (e.g. pixel=0.0, local_median=0.05, diff=0.05 < 0.15 → missed).
-    # Use a very small threshold: any hard-extreme pixel that differs
-    # from its neighborhood by even 0.02 is flagged.
     hard_extreme = (gray <= 0.005) | (gray >= 0.995)
     hard_outlier = _local_outlier_mask(gray, outlier_window, 0.02)
     impulse_mask = impulse_mask | (hard_extreme & hard_outlier)
 
-    # Density = fraction of impulse pixels
     density = np.count_nonzero(impulse_mask) / gray.size
 
     has_impulse = density >= density_threshold
@@ -159,37 +171,40 @@ def detect_impulse_noise(image, low_thresh=0.01, high_thresh=0.99,
 
 def estimate_impulse_density(image, **kwargs):
     """
-    Convenience wrapper: estimate impulse noise density.
+    Упрощенная функция для получения только оценки плотности импульсного шума.
 
-    Returns
-    -------
-    density : float — estimated density in [0, 1], or 0.0 if not detected
+    Возвращает
+    ----------
+    density : float
+        Оцененная плотность шума в диапазоне [0, 1]. Возвращает 0.0, если 
+        шум не обнаружен (значение ниже порога density_threshold).
     """
     result = detect_impulse_noise(image, **kwargs)
     return result['density'] if result['has_impulse'] else 0.0
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# 2. Removal — Adaptive Median Filter
-# ═════════════════════════════════════════════════════════════════════════════
-
 def adaptive_median_filter(image, impulse_mask, max_window=7):
     """
-    Apply median filter ONLY to pixels flagged as impulse noise.
-    Non-impulse pixels are left completely untouched.
+    Применение медианного фильтра исключительно к пикселям, отмеченным 
+    в маске импульсного шума. Пиксели без шума остаются без изменений.
 
-    Uses progressively larger windows if the median of a smaller
-    window is itself an extreme value (i.e. in a dense impulse region).
+    Алгоритм итеративно увеличивает размер окна (вплоть до max_window), 
+    если вычисленное медианное значение для малого окна само по себе является 
+    экстремальным (что характерно для областей с высокой плотностью шума).
 
-    Parameters
+    Параметры
+    ---------
+    image : ndarray
+        Полутоновое изображение размерности (H, W), значения float64 [0, 1].
+    impulse_mask : ndarray
+        Булева маска (H, W), где True соответствует зашумленному пикселю.
+    max_window : int
+        Максимальный размер окна медианного фильтра (нечетное число).
+
+    Возвращает
     ----------
-    image : ndarray, H×W, float64 [0, 1]
-    impulse_mask : bool ndarray, H×W — True where impulse detected
-    max_window : int — maximum median filter window size (odd)
-
-    Returns
-    -------
-    filtered : ndarray, H×W — image with impulse pixels replaced
+    filtered : ndarray
+        Изображение (H, W) с восстановленными пикселями.
     """
     filtered = image.copy()
     remaining = impulse_mask.copy()
@@ -198,43 +213,47 @@ def adaptive_median_filter(image, impulse_mask, max_window=7):
         if not np.any(remaining):
             break
         med = _scipy_median_filter(filtered, size=wsize)
-        # Replace only pixels that are still flagged
         filtered[remaining] = med[remaining]
-        # Check if the replacement is still extreme — if so, try larger window
         still_extreme = (filtered <= 0.01) | (filtered >= 0.99)
         remaining = remaining & still_extreme
 
     return filtered
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# 3. Combined pipeline
-# ═════════════════════════════════════════════════════════════════════════════
-
 def remove_impulse_noise(image, density_threshold=0.005,
                          max_window=7, outlier_window=5,
                          outlier_threshold=0.15):
     """
-    Detect and remove impulse noise from an image.
+    Обнаружение и адаптивное подавление импульсного шума на изображении.
 
-    If no impulse noise is detected (density < density_threshold),
-    the original image is returned unchanged.
+    Если плотность шума оценивается ниже заданного порога, алгоритм 
+    завершает работу и возвращает исходное изображение без изменений. 
+    Для цветных изображений обнаружение проводится по яркостной компоненте, 
+    однако восстановление и проверка поканальных экстремумов осуществляются 
+    для каждого цветового канала независимо.
 
-    Parameters
+    Параметры
+    ---------
+    image : ndarray
+        Входное изображение (H, W) или (H, W, C), float64 [0, 1] или uint8 [0, 255].
+    density_threshold : float
+        Минимальная плотность шума для инициации процесса подавления.
+    max_window : int
+        Максимальный размер окна адаптивного медианного фильтра (AMF).
+    outlier_window : int
+        Размер окна для поиска локальных выбросов на этапе обнаружения.
+    outlier_threshold : float
+        Порог отклонения от локальной медианы для этапа обнаружения.
+
+    Возвращает
     ----------
-    image : ndarray, H×W or H×W×C, float64 [0, 1] or uint8 [0, 255]
-    density_threshold : float — minimum density to trigger removal
-    max_window : int — max AMF window
-    outlier_window : int — window for outlier detection
-    outlier_threshold : float — threshold for outlier detection
-
-    Returns
-    -------
     result : dict
-        'image'        — ndarray: filtered image (same shape as input)
-        'has_impulse'  — bool: whether impulse noise was detected
-        'density'      — float: estimated density
-        'applied'      — bool: whether filtering was actually applied
+        Словарь с результатами:
+        - 'image' : ndarray, отфильтрованное изображение (формат совпадает со входом).
+        - 'has_impulse' : bool, флаг обнаружения импульсного шума.
+        - 'density' : float, оцененная плотность шума.
+        - 'applied' : bool, флаг фактического применения фильтрации (True, 
+          если плотность превысила порог).
     """
     img = np.asarray(image, dtype=np.float64)
     if img.max() > 1.0:
@@ -242,7 +261,6 @@ def remove_impulse_noise(image, density_threshold=0.005,
 
     is_color = img.ndim == 3
 
-    # Detect on grayscale
     info = detect_impulse_noise(
         img,
         density_threshold=density_threshold,
@@ -261,7 +279,6 @@ def remove_impulse_noise(image, density_threshold=0.005,
     mask = info['impulse_mask']
 
     if is_color:
-        # For color: also detect per-channel extremes
         filtered = img.copy()
         for ch in range(img.shape[2]):
             ch_mask = mask.copy()

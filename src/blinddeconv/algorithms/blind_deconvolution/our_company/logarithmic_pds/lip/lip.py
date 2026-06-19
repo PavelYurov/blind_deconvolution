@@ -1,29 +1,26 @@
 """
 lip.py
 
-Blind Image Deconvolution via Lower-Bounded Logarithmic Image Priors (LIP).
+Слепая деконволюция изображений с использованием логарифмического априорного 
+распределения (Logarithmic Image Prior, LIP) с нижней границей.
 
-Reference:
+Основано на:
     D. Perrone, R. Diethelm, P. Favaro: "Blind Deconvolution via
-    Lower-Bounded Logarithmic Image Priors", International Conference on
-    Energy Minimization Methods in Computer Vision and Pattern Recognition
-    (EMMCVPR), 2015.
+    Lower-Bounded Logarithmic Image Priors", EMMCVPR, 2015.
 
-Implements three methods from the paper:
-    MM  — Majorization-Minimization (Table 2): gradient descent on the
-          EM-majorised weighted-TV subproblem.
-    CV  — Condat-Vũ splitting on the MM-majorised weighted-TV subproblem
-          (data fidelity via spatial convolutions, no FFT).
-    PD  — Paper-faithful Primal-Dual (Table 1): solves the non-convex
-          log-TV energy directly via Chambolle-Pock / Möllenhoff
-          splitting (no MM outer majorisation).
+Реализует три метода оценки функции рассеяния точки (PSF) из оригинальной статьи:
+- 'mm' : метод мажоризации-минимизации (Таблица 2). Использует градиентный 
+  спуск для мажорированной задачи взвешенной полной вариации.
+- 'cv' : метод прямо-двойственного расщепления Конда-Вю для мажорированной 
+  задачи (вычисление верности данных через пространственные свертки без БПФ).
+- 'pd' : метод прямо-двойственного расщепления (Таблица 1). Решает исходную 
+  невыпуклую задачу энергии LIP напрямую (без внешней мажоризации MM).
 """
 
 import numpy as np
 import time
 from typing import Tuple, List, Any, Dict
 
-# ── Framework base class import (DO NOT MODIFY) ─────────────────────────────
 import sys
 from pathlib import Path
 
@@ -47,7 +44,6 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
         sys.path.insert(0, _path)
 
 from blinddeconv.algorithms.base import DeconvolutionAlgorithm
-# ─────────────────────────────────────────────────────────────────────────────
 
 from .solvers import coarse_to_fine
 from .utils import (
@@ -63,35 +59,72 @@ from .utils import (
 
 class LIP_BD(DeconvolutionAlgorithm):
     """
-    Blind deconvolution using the Logarithmic Image Prior (MM algorithm).
+    Класс алгоритма слепой деконволюции LIP (оригинальная базовая версия).
 
-    Pipeline (mirrors MATLAB ``deblur.m`` → ``coarseToFine.m`` → ``blind.m``):
-        1. Normalise input to float64 [0, 1].
-        2. Trim image to odd dimensions.
-        3. (Optional) gamma correction.
-        4. Coarse-to-fine PSF estimation (MM or PD method).
-        5. Non-blind restoration with the estimated kernel (Tikhonov or Wiener).
-        6. Return restored image (int16, [0, 255]) and kernel.
+    Конвейер обработки:
+    1. Нормализация входного изображения к диапазону float64 [0, 1].
+    2. Приведение пространственных размеров к нечетным значениям.
+    3. Применение гамма-коррекции (опционально).
+    4. Иерархическая (от грубого масштаба к точному) оценка ядра размытия.
+    5. Пороговая обработка элементов ядра (удаление шумовых компонент).
+    6. Финальная неслепая деконволюция с использованием оцененного ядра 
+       (фильтр Тихонова или Винера).
+    7. Возврат восстановленного изображения в формате int16 [0, 255] и ядра.
 
-    Parameters
-    ----------
-    kernel_shape : (MK, NK) — spatial support of the unknown PSF.
-    lambda_val   : data-fidelity weight (β in the paper).
-                   Default 30000 (from main_levin.m benchmark).
-    tau          : lower-bound parameter of the log prior (default 1e-3).
-    outer_iters  : EM outer iterations per pyramid level (default 140).
-    inner_iters  : gradient-descent inner iterations per outer (default 5).
-    k_step       : kernel step-size schedule (list/array).
-    u_step       : image step-size schedule (list/array).
-    lambda_mult  : λ multiplier between pyramid levels (default 2.1).
-    scale_mult   : kernel-size divider between pyramid levels (default √2).
-    gamma_correction : whether to apply gamma correction (default False).
-    gamma        : gamma exponent (used when gamma_correction=True).
-    method       : 'mm' (gradient-descent, Table 2) or 'pd' (Condat-Vũ, Table 1).
-    kernel_threshold : fraction of max(k) below which kernel values are zeroed (default 0.05).
-    final_deconv : 'tikhonov' or 'wiener'.
-    final_alpha  : regularisation strength for the non-blind step.
-    verbose      : print progress during coarse-to-fine.
+    Параметры
+    ---------
+    kernel_shape : tuple of ints (MK, NK)
+        Пространственный размер неизвестной функции рассеяния точки (PSF).
+    lambda_val : float, по умолчанию 30000.0
+        Вес члена верности данных (соответствует параметру beta в статье).
+    tau : float, по умолчанию 1e-3
+        Параметр нижней границы логарифмического априорного распределения.
+    outer_iters : int, по умолчанию 140
+        Количество внешних итераций EM на каждом уровне пирамиды.
+    inner_iters : int, по умолчанию 5
+        Количество внутренних итераций градиентного спуска на одну внешнюю.
+    k_step : array-like, опционально
+        Массив размеров шага для обновления ядра.
+    u_step : array-like, опционально
+        Массив размеров шага для обновления изображения.
+    lambda_mult : float, по умолчанию 2.1
+        Множитель для параметра lambda между уровнями пирамиды.
+    scale_mult : float, по умолчанию 1.414 (sqrt(2))
+        Делитель размера ядра между уровнями пирамиды.
+    gamma_correction : bool, по умолчанию False
+        Флаг применения гамма-коррекции.
+    gamma : float, по умолчанию 1.0
+        Экспонента гамма-коррекции.
+    method : {'mm', 'pd', 'cv'}, по умолчанию 'mm'
+        Метод оптимизации оценки ядра.
+    kernel_threshold : float, по умолчанию 0.05
+        Относительный порог (доля от максимума ядра), ниже которого 
+        элементы ядра обнуляются.
+    final_deconv : {'tikhonov', 'wiener'}, по умолчанию 'tikhonov'
+        Метод финальной неслепой деконволюции.
+    final_alpha : float, по умолчанию 0.001
+        Степень регуляризации для неслепого шага.
+    verbose : bool, по умолчанию False
+        Флаг вывода информации о прогрессе.
+
+    Параметры для метода PD (метод 'pd')
+    ------------------------------------
+    pd_outer_iters : int, по умолчанию 30
+        Количество внешних итераций.
+    pd_inner_iters : int, по умолчанию 50
+        Количество внутренних итераций алгоритма Шамболя-Пока.
+    pd_theta : float, по умолчанию 1.0
+        Параметр перерелаксации (theta).
+    pd_tau : float, опционально
+        Шаг для прямой переменной (если None, вычисляется автоматически).
+    pd_sigma : float, опционально
+        Шаг для двойственной переменной (если None, равен pd_tau).
+    h_mode : {'closed', 'lut'}, по умолчанию 'closed'
+        Способ вычисления функции H (аналитический или через таблицу).
+    h_lut_size : int, по умолчанию 4096
+        Размер таблицы для функции H.
+    h_lut_xi_max : float, по умолчанию 4.0
+        Максимальное значение аргумента для интерполяции функции H.
     """
 
     def __init__(
@@ -112,7 +145,6 @@ class LIP_BD(DeconvolutionAlgorithm):
         final_deconv: str = 'tikhonov',
         final_alpha: float = 0.001,
         verbose: bool = False,
-        # ── paper-faithful PD (method='pd') extras ──
         pd_outer_iters: int = 30,
         pd_inner_iters: int = 50,
         pd_theta: float = 1.0,
@@ -130,7 +162,6 @@ class LIP_BD(DeconvolutionAlgorithm):
         self.outer_iters = outer_iters
         self.inner_iters = inner_iters
 
-        # Step-size schedules — defaults from deblur.m
         if k_step is None:
             self.k_step = np.array([1e-2, 5e-3, 1e-3, 5e-4])
         else:
@@ -150,7 +181,6 @@ class LIP_BD(DeconvolutionAlgorithm):
         self.final_alpha = final_alpha
         self.verbose = verbose
 
-        # PD-specific (method='pd', paper-faithful)
         self.pd_outer_iters = int(pd_outer_iters)
         self.pd_inner_iters = int(pd_inner_iters)
         self.pd_theta = float(pd_theta)
@@ -163,29 +193,25 @@ class LIP_BD(DeconvolutionAlgorithm):
         self.history: Dict[str, list] = {'kernel_diff': []}
         self.hyperparams: Dict[str, Any] = {}
 
-    # ── Main entry point ─────────────────────────────────────────────────
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Запуск алгоритма слепой деконволюции.
+        """
         start_time = time.time()
 
         MK, NK = self.kernel_shape
 
-        # ── 1. Normalise to float64 [0, 1] ──────────────────────────────
-        # MATLAB: f = im2double(f)
         f = image.astype(np.float64)
         if f.max() > 1.0:
             f /= 255.0
 
         M_orig, N_orig = f.shape
 
-        # ── 2. Trim to odd dimensions ───────────────────────────────────
-        # MATLAB: if mod(M,2)==0, f=f(1:end-1,:); ...
         f = make_size_odd(f)
 
-        # ── 3. Gamma correction (optional) ──────────────────────────────
         if self.gamma_corr:
             f = gamma_correction(f, self.gamma)
 
-        # ── 4. PSF estimation (blind step) ──────────────────────────────
         if self.method in ('mm', 'cv'):
             blind_params = {
                 'outer_iters': self.outer_iters,
@@ -202,7 +228,6 @@ class LIP_BD(DeconvolutionAlgorithm):
             u, k = coarse_to_fine(f, MK, NK, blind_params, ctf_params,
                                   verbose=self.verbose, method=self.method)
         elif self.method == 'pd':
-            # Paper-faithful PD has its own iteration counts
             blind_params = {
                 'outer_iters': self.pd_outer_iters,
                 'inner_iters': self.pd_inner_iters,
@@ -227,24 +252,11 @@ class LIP_BD(DeconvolutionAlgorithm):
             raise ValueError(
                 f"Unknown method '{self.method}'. Choose 'mm', 'pd', or 'cv'.")
 
-        # ── 4b. Kernel thresholding ─────────────────────────────────────
-        # Remove low-intensity noise from the estimated kernel.
-        # Standard post-processing step (Cho & Lee 2009, Krishnan 2011).
         k[k < self.kernel_threshold * k.max()] = 0.0
         k_sum = k.sum()
         if k_sum > 0:
             k /= k_sum
 
-        # ── 5. Non-blind restoration ────────────────────────────────────
-        # The MATLAB code refers to an external non-blind step
-        # (deconvSps from Levin et al.).  Here we use Tikhonov / Wiener.
-        #
-        # NOTE: The rot90(k,2) in the MATLAB main_levin.m was needed for
-        # the specific convention of deconvSps.  Our Tikhonov / Wiener
-        # filters expect the PSF in the standard convolution form, which
-        # is exactly what coarse_to_fine returns.  No rotation needed.
-
-        # Pad image and taper edges to reduce FFT boundary ringing
         f_pad = pad_image(f, (MK, NK))
         f_pad = edgetaper(f_pad, k)
 
@@ -258,11 +270,9 @@ class LIP_BD(DeconvolutionAlgorithm):
                 "Choose 'tikhonov' or 'wiener'."
             )
 
-        # Crop back to original size
         u_final = crop_image(u_restored, (M_orig, N_orig), (MK, NK))
         u_final = np.clip(u_final, 0.0, 1.0)
 
-        # ── 6. Output ──────────────────────────────────────────────────
         self.hyperparams = {
             'lambda': self.lambda_val,
             'tau': self.tau,
@@ -278,7 +288,6 @@ class LIP_BD(DeconvolutionAlgorithm):
         x_final = np.clip(x_final, 0, 255).astype(np.int16)
         return x_final, k
 
-    # ── Interface methods ────────────────────────────────────────────────
     def get_param(self) -> List[Tuple[str, Any]]:
         return [
             ('kernel_shape', self.kernel_shape),

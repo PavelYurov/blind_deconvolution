@@ -68,7 +68,7 @@ def crop_image(img: np.ndarray, original_shape: tuple, kernel_shape: tuple) -> n
     return img[pad_h : pad_h + h, pad_w : pad_w + w]
 
 def wiener_filter(img: np.ndarray, kernel: np.ndarray, noise_snr: float = 0.01) -> np.ndarray:
-    """Фильтр Винера."""
+
     H, W = img.shape
     otf = psf2otf(kernel, (H, W))
     otf_conj = np.conj(otf)
@@ -79,24 +79,22 @@ def wiener_filter(img: np.ndarray, kernel: np.ndarray, noise_snr: float = 0.01) 
     return np.real(np.fft.ifft2(F_res))
 
 def tikhonov_filter(img: np.ndarray, kernel: np.ndarray, alpha: float = 0.01) -> np.ndarray:
-    """
-    Неслепая деконволюция с регуляризацией Тихонова (1-го порядка).
-    Min ||k*u - f||^2 + alpha * ||grad(u)||^2
-    """
+
+
     H, W = img.shape
     otf = psf2otf(kernel, (H, W))
     otf_conj = np.conj(otf)
-    
-    # Получаем операторы градиента для регуляризации
+
+
     OTF_dx, OTF_dy, _, _ = get_gradient_operators((H, W))
-    
-    # |Dx|^2 + |Dy|^2 - лапласиан в частотной области (штраф за шероховатость)
+
+
     reg_term = np.abs(OTF_dx)**2 + np.abs(OTF_dy)**2
-    
+
     numerator = otf_conj
-    # Знаменатель: отклик ядра + альфа * штраф градиентов
+
     denominator = np.abs(otf)**2 + alpha * reg_term
-    
+
     F_img = np.fft.fft2(img)
     F_res = (numerator / (denominator + 1e-12)) * F_img
     return np.real(np.fft.ifft2(F_res))

@@ -81,10 +81,8 @@ for _p in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
 from blinddeconv.algorithms.base import DeconvolutionAlgorithm
 
 
-# --- DCP PYRAMID HELPERS ---
-
 def _init_kernel(kh, kw):
-    """Строго асимметричная инициализация ядра (как в DCP)."""
+
     k = np.zeros((kh, kw), dtype=np.float64)
     cy = (kh - 1) // 2
     cx = (kw - 1) // 2
@@ -92,7 +90,7 @@ def _init_kernel(kh, kw):
     return k
 
 def _fixsize(f, nk1, nk2):
-    """Точная подгонка размера при переходе между масштабами."""
+
     k1, k2 = f.shape
     while k1 != nk1 or k2 != nk2:
         if k1 > nk1:
@@ -119,7 +117,7 @@ def _fixsize(f, nk1, nk2):
     return f
 
 def _resizeKer(k, ret, k1, k2):
-    """Апскейлинг ядра (bicubic) с точной подгонкой размера."""
+
     k = ndimage.zoom(k, ret, order=3)
     k = np.maximum(k, 0.0)
     k = _fixsize(k, k1, k2)
@@ -128,7 +126,7 @@ def _resizeKer(k, ret, k1, k2):
     return k
 
 def adjust_psf_center(psf: np.ndarray) -> np.ndarray:
-    """Центрирование по центру масс (предотвращает уплывание ядра за края)."""
+
     rows, cols = psf.shape
     X, Y = np.meshgrid(np.arange(1, cols + 1, dtype=np.float64),
                        np.arange(1, rows + 1, dtype=np.float64))
@@ -149,48 +147,9 @@ def adjust_psf_center(psf: np.ndarray) -> np.ndarray:
                                      order=1, mode='constant', cval=0.0)
     return result.reshape(rows, cols)
 
-# --- END HELPERS ---
 
 class BID_HBSP(DeconvolutionAlgorithm):
-    """Bayesian Blind Image Deconvolution with Hyperbolic-Secant Prior.
 
-    Parameters
-    kernel_shape : (kh, kw)
-        Spatial dimensions of the blur kernel to estimate.
-    hs_scale : float
-        Scale parameter *b* of the HS distribution
-        :math:`p(d) \\propto 1/\\cosh(d/b)`.
-        Smaller values yield stronger sparsity (heavier tails);
-        larger values approach Gaussian (L2) behaviour.
-    noise_sigma : float
-        Initial estimate of the noise standard deviation (:math:`\\sigma_n`).
-        Used to seed :math:`\\beta_0 = 1/\\sigma_n^2`.
-    max_iter : int
-        Maximum number of outer EM iterations.
-    cg_iter : int
-        Maximum conjugate-gradient iterations per image solve.
-    cg_tol : float
-        CG convergence tolerance (absolute residual).
-    lambda_h_init : float
-        Initial kernel regularisation (Gaussian prior precision).
-    lambda_h_min : float
-        Minimum kernel regularisation (lower bound during annealing).
-    lambda_h_decay : float
-        Multiplicative decay applied to *lambda_h* each EM iteration
-        (annealing schedule; 1.0 = constant).
-    beta_update : bool
-        Whether to update the noise precision :math:`\\beta` during the
-        M-step.  If False, :math:`\\beta` is held at its initial value.
-    kernel_threshold : bool
-        Whether to zero-out small kernel values (< 5 % of peak) each
-        iteration, promoting kernel sparsity.
-    solver : ``'cg'`` | ``'irw'``
-        Image solver backend:
-        ``'cg'``  — per-pixel HS weights via CG (exact, recommended);
-        ``'irw'`` — iteratively-reweighted Wiener (faster, approximate).
-    verbose : bool
-        Print per-iteration diagnostics.
-    """
 
     def __init__(
         self,
@@ -198,19 +157,19 @@ class BID_HBSP(DeconvolutionAlgorithm):
         hs_scale: float = 0.5,
         noise_sigma: float = 0.01,
         max_iter: int = 40,
-        # Image solver parameters
+
         cg_iter: int = 50,
         cg_tol: float = 1e-6,
         solver: str = "cg",
         irw_iter: int = 5,
-        # Kernel estimation parameters
+
         lambda_h_init: float = 1e3,
         lambda_h_min: float = 1.0,
         lambda_h_decay: float = 0.92,
         kernel_threshold: bool = True,
-        # Noise estimation
+
         beta_update: bool = True,
-        # General
+
         verbose: bool = False,
     ):
         super().__init__(name="BID-HBSP")
@@ -242,7 +201,7 @@ class BID_HBSP(DeconvolutionAlgorithm):
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         start_time = time.time()
 
-        # 1. Data preparation
+
         y_full = image.astype(np.float64)
         if y_full.max() > 1.0:
             y_full /= 255.0
@@ -250,16 +209,16 @@ class BID_HBSP(DeconvolutionAlgorithm):
         kh_full, kw_full = self.kernel_shape
         b = self.hs_scale
 
-        # 2. Инициализация пирамиды строго как в DCP коде
+
         min_k = min(kh_full, kw_full)
         ret = np.sqrt(0.5)
-        # Спускаемся пока размер ядра не станет ~5
+
         maxitr = max(int(np.floor(np.log(5.0 / min_k) / np.log(ret))), 0)
         num_scales = maxitr + 1
 
         retv = ret ** np.arange(0, num_scales)
         k1list = np.ceil(kh_full * retv).astype(int)
-        k1list = k1list + (k1list % 2 == 0) # ensure odd
+        k1list = k1list + (k1list % 2 == 0)
         k2list = np.ceil(kw_full * retv).astype(int)
         k2list = k2list + (k2list % 2 == 0)
 
@@ -269,19 +228,19 @@ class BID_HBSP(DeconvolutionAlgorithm):
         if self.verbose:
             print(f"[{self.name}] Starting Coarse-to-Fine processing with {num_scales} scales.")
 
-        # 3. Идем от маленького (num_scales-1) к большому (0)
+
         for s in range(num_scales - 1, -1, -1):
             kh, kw = k1list[s], k2list[s]
             current_kernel_shape = (kh, kw)
             cret = retv[s]
-            
-            # Инициализация / Апскейл ядра
+
+
             if s == num_scales - 1:
-                h = _init_kernel(kh, kw) # ломаем симметрию!
+                h = _init_kernel(kh, kw)
             else:
                 h = _resizeKer(h, 1.0 / ret, kh, kw)
 
-            # Даунсэмпл картинки
+
             if s == 0:
                 y_level = y_full.copy()
             else:
@@ -311,8 +270,7 @@ class BID_HBSP(DeconvolutionAlgorithm):
                 else:
                     raise NotImplementedError("Only CG solver is strictly supported")
 
-                # Thresholding применяем ТОЛЬКО на оригинальном размере (s == 0)
-                # Иначе мелкое ядро 5x5 мгновенно схлопнется в точку.
+
                 use_threshold = self.kernel_threshold if (s == 0) else False
 
                 h = solve_kernel_fourier(
@@ -345,20 +303,19 @@ class BID_HBSP(DeconvolutionAlgorithm):
                     if self.verbose: print(f"  Converged at iteration {n_iter}.")
                     break
 
-            # Обязательное центрирование ядра в конце каждого уровня, 
-            # чтобы оно не уплыло за границы при следующем апскейле
+
             h = adjust_psf_center(h)
             h[h < 0] = 0.0
             h /= h.sum()
 
-        # 4. Final non-blind deconvolution
+
         lambda_final = beta * 0.0005
-        
+
         if self.verbose:
             print(f"\n[{self.name}] Final non-blind deconvolution (IRLS p=0.8) (λ_reg={lambda_final:.4f}) …")
         x_final = final_deconvolution(y_full, h, beta, lambda_final)
 
-        # 5. Store diagnostics
+
         self.timer = time.time() - start_time
         self.hyperparams = {
             "hs_scale": b,
@@ -369,7 +326,7 @@ class BID_HBSP(DeconvolutionAlgorithm):
             "time_seconds": self.timer,
         }
 
-        # 6. Output conversion
+
         x_out = x_final * 255.0
         x_out = np.clip(np.round(x_out), 0, 255).astype(np.int16)
         return x_out, h
@@ -396,11 +353,9 @@ class BID_HBSP(DeconvolutionAlgorithm):
                     setattr(self, key, value)
 
     def get_history(self) -> dict:
-        """Return per-iteration convergence history."""
+
         return self.history
 
     def get_hyperparams(self) -> dict:
-        """Return estimated / final hyper-parameters."""
+
         return self.hyperparams
-
-

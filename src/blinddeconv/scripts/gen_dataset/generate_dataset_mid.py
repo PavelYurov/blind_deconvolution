@@ -19,7 +19,6 @@ from pathlib import Path
 from collections import Counter
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 
-# ── Путь к фреймворку ───────────────────────────────────────────
 FRAMEWORK_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(FRAMEWORK_ROOT / "src"))
 
@@ -28,9 +27,6 @@ from blinddeconv.filters.noise import (
     GaussianNoise, PoissonNoise, SaltAndPepperNoise, Pink_Noise, Brown_Noise,
 )
 
-# ═══════════════════════════════════════════════════════════════════
-#   Конфигурация датасета
-# ═══════════════════════════════════════════════════════════════════
 
 DATASET_DIR   = FRAMEWORK_ROOT / "images" / "new_dataset_mid_pics"
 ORIGINALS_DIR = DATASET_DIR / "originals"
@@ -38,20 +34,16 @@ DISTORTED_DIR = DATASET_DIR / "distorted"
 FILTERS_DIR   = DATASET_DIR / "ground_truth_filters"
 TMP_DIR       = DATASET_DIR / "tmp"
 
-# Откуда берём PNG ядер (мастер-копия)
 KERNEL_SOURCE_DIR = FRAMEWORK_ROOT / "images" / "new_dataset_small_pics" / "ground_truth_filters"
 
-# Откуда копировать оригиналы (256×256, уже обрезанные)
 ORIGINALS_SOURCE_DIR = FRAMEWORK_ROOT / "images" / "new_dataset_big_pics_test" / "originals"
 
-# 15 оригиналов (те же, что в big)
 ORIGINALS = [
     "airplane", "boat", "boy", "bridge", "cameraman",
     "childs", "drawing", "house", "lenna", "monarch",
     "parrot", "people", "pepper", "scarf", "star",
 ]
 
-# 10 ядер: 5 классов × 2 (drop thick_motion, hook, pacman, defocusmotion, zspiral)
 KERNEL_CLASSES = [
     ["linear", "largemation"],        # Linear
     ["dendric", "heliod"],            # Trajectory
@@ -91,9 +83,6 @@ N_CLEAN = 17   # из 50 -> 34% clean, 66% noisy
 SEED = 42
 
 
-# ═══════════════════════════════════════════════════════════════════
-#   Подготовка ядер
-# ═══════════════════════════════════════════════════════════════════
 
 def prepare_kernels():
     import shutil
@@ -130,9 +119,6 @@ def prepare_kernels():
     return filters
 
 
-# ═══════════════════════════════════════════════════════════════════
-#   Матрица назначений
-# ═══════════════════════════════════════════════════════════════════
 
 def build_design_matrix():
     """
@@ -146,15 +132,12 @@ def build_design_matrix():
     n_classes = len(KERNEL_CLASSES)  # 5
     n_kernels = sum(len(c) for c in KERNEL_CLASSES)  # 10
 
-    # Шаг 1: Полная матрица 15 x 5 классов = 75 пар
     full_pairs = []
     for i, orig in enumerate(ORIGINALS):
         for c, cls_kernels in enumerate(KERNEL_CLASSES):
             k_idx = (i + c) % len(cls_kernels)
             full_pairs.append((orig, cls_kernels[k_idx], c, i))
 
-    # Шаг 2: Отбираем N_TOTAL=50 из 75.
-    # Каждый оригинал получает 3 или 4 класса (50/15 ~ 3.33).
     n_drop = len(full_pairs) - N_TOTAL   # 25
     base_drop = n_drop // n_orig          # 1
     extra_drop = n_drop % n_orig          # 10
@@ -173,7 +156,6 @@ def build_design_matrix():
             if c not in drop_classes:
                 pairs.append((o, k, c))
 
-    # Шаг 3: clean/noisy
     n_noisy = len(pairs) - N_CLEAN
     base_clean = N_CLEAN // n_orig
     extra_clean = N_CLEAN % n_orig
@@ -181,7 +163,6 @@ def build_design_matrix():
                       for i in range(n_orig)]
     np.random.shuffle(clean_per_orig)
 
-    # Пул шумов
     n_per_type = n_noisy // len(NOISE_TYPES)
     n_extra = n_noisy % len(NOISE_TYPES)
     noise_pool = []
@@ -207,9 +188,6 @@ def build_design_matrix():
     return result
 
 
-# ═══════════════════════════════════════════════════════════════════
-#   Применение фильтров + метрики
-# ═══════════════════════════════════════════════════════════════════
 
 def compute_metrics(original, image):
     h = min(original.shape[0], image.shape[0])
@@ -290,9 +268,6 @@ def plot_dataset_distribution(records, save_path):
     print(f"  Plot saved: {save_path}")
 
 
-# ═══════════════════════════════════════════════════════════════════
-#   Main
-# ═══════════════════════════════════════════════════════════════════
 
 def main():
     print("=" * 65)
@@ -303,7 +278,6 @@ def main():
     for d in [ORIGINALS_DIR, DISTORTED_DIR, FILTERS_DIR, TMP_DIR]:
         d.mkdir(parents=True, exist_ok=True)
 
-    # Копируем оригиналы из источника (если ещё не скопированы)
     import shutil as _shutil
     if ORIGINALS_SOURCE_DIR.exists():
         for orig in ORIGINALS:
@@ -313,7 +287,6 @@ def main():
                 _shutil.copy2(str(src), str(dst))
                 print(f"  Скопирован: {orig}.png")
 
-    # Проверяем оригиналы
     missing = [o for o in ORIGINALS if not (ORIGINALS_DIR / f"{o}.png").exists()]
     if missing:
         print(f"\nОШИБКА: Не найдены оригиналы ({len(missing)} шт):")
@@ -322,11 +295,9 @@ def main():
         print(f"\nПоложите {len(ORIGINALS)} изображений в:\n  {ORIGINALS_DIR}")
         return
 
-    # Ядра
     print("\n--- Подготовка ядер ---")
     blur_filters = prepare_kernels()
 
-    # Матрица
     print("\n--- Матрица назначений ---")
     design = build_design_matrix()
 
@@ -336,11 +307,9 @@ def main():
     print(f"  По ядрам: { {k: kernel_counts[k] for k in sorted(kernel_counts)} }")
     print(f"  По шуму:  {dict(noise_counts)}")
 
-    # Очищаем
     for f in DISTORTED_DIR.glob("*.png"):
         f.unlink()
 
-    # Генерация
     print("\n--- Генерация смазанных изображений ---")
     records = []
     for i, (orig, kernel, noise) in enumerate(design):
@@ -371,7 +340,6 @@ def main():
             "delta_ssim": round(metrics["delta_ssim"], 4),
         })
 
-    # JSON
     json_path = DATASET_DIR / "dataset_design.json"
     with open(str(json_path), "w", encoding="utf-8") as f:
         json.dump(records, f, indent=2, ensure_ascii=False)

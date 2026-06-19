@@ -1,24 +1,26 @@
 """
 non_blind.py
 
-Non-blind image deconvolution with space-variant regularization
-and adaptive noise modelling.
+Неслепая деконволюция изображений с пространственно-зависимой регуляризацией 
+и адаптивным моделированием шума.
 
-Reference:
-    "Adaptive Non-Blind Image Deblurring with Space-Variant Gradient
-     and Noise Modelling" — Qingsong Wang et al.
+Основано на методах из следующих работ:
+1. Qingsong Wang et al., "Adaptive Non-Blind Image Deblurring with 
+   Space-Variant Gradient and Noise Modelling".
+   Основные идеи:
+   - Lp-регуляризация градиентов изображения (гиперлапласиан, alpha в (0, 2]).
+   - Lp-метрика для члена верности данных (оценка alpha_n через дивергенцию 
+     Кульбака-Лейблера).
+   - Пространственно-зависимый вес регуляризации lambda(x,y) для каждого пикселя, 
+     вычисляемый на основе локальной статистики градиентов и уровня шума.
+   - Двухэтапный конвейер: первый проход с alpha_n = alpha, второй проход с 
+     оцененным значением alpha_n.
 
-Key ideas ported from the reference implementation:
-    1. Lp regularization on image gradients (hyper-Laplacian, α ∈ (0, 2]).
-    2. Lp fidelity for the noise term (α_n via KL divergence estimation).
-    3. Space-variant λ(x,y) per-pixel regularization weight derived from
-       local gradient statistics vs. estimated noise standard deviation.
-    4. 1D λ-interpolation: build a library of restored images for a
-       geometric grid of λ values, then interpolate per-pixel.
-    5. Two-stage pipeline: first pass with α_n = α (gradient prior),
-       second pass with KL-estimated α_n.
+2. X. Zhou, M. Vega, F. Zhou, R. Molina, A. K. Katsaggelos, "Fast Bayesian 
+   Blind Deconvolution with Huber Super Gaussian Priors", Digital Signal 
+   Processing, 2016. (Метод FIRLS-UBC).
 
-Dependencies: numpy, scipy, pywt (PyWavelets).
+Требуемые библиотеки: numpy, scipy, pywt (PyWavelets).
 """
 
 import numpy as np
@@ -31,22 +33,23 @@ from scipy.fft import dstn, idstn
 __all__ = ['adaptive_lp_deconv', 'ringing_artifacts_removal', 'firls_deconv']
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Proximal operators (LUT-based, Krishnan & Fergus NIPS 2009)
-# ═════════════════════════════════════════════════════════════════════════════
-
 _LUT_RANGE = 10
 _LUT_STEP = 0.0001
 _XX = np.arange(-_LUT_RANGE, _LUT_RANGE + _LUT_STEP, _LUT_STEP)
 
 
 def _compute_w1(v, beta):
-    """Soft-thresholding (α = 1)."""
+    """
+    Оператор мягкого порогового ограничения (soft-thresholding) для alpha = 1.
+    """
     return np.sign(v) * np.maximum(np.abs(v) - 1.0 / beta, 0.0)
 
 
 def _compute_w23(v, beta):
-    """Ferrari's method for α = 2/3 (Alg. 3 in NIPS paper)."""
+    """
+    Аналитическое вычисление проксимального оператора для alpha = 2/3 
+    с использованием метода Феррари.
+    """""
     eps = 1e-6
     m = np.full_like(v, 8.0 / (27.0 * beta ** 3))
     t1 = (-9.0 / 8.0) * v ** 2
@@ -77,7 +80,10 @@ def _compute_w23(v, beta):
 
 
 def _compute_w12(v, beta):
-    """Cardano's method for α = 1/2 (Alg. 2 in NIPS paper)."""
+    """
+    Аналитическое вычисление проксимального оператора для alpha = 1/2 
+    с использованием метода Кардано.
+    """
     eps = 1e-6
     m = -np.sign(v) / (4.0 * beta ** 2)
     t1 = (2.0 / 3.0) * v
@@ -107,7 +113,10 @@ def _compute_w12(v, beta):
 
 
 def _newton_w(v, beta, alpha):
-    """Newton's method fallback for general α."""
+    """
+    Численное вычисление проксимального оператора методом Ньютона 
+    для произвольного значения параметра alpha.
+    """
     w = v.copy().astype(np.float64)
     for _ in range(4):
         df = alpha * np.sign(w) * np.abs(w) ** (alpha - 1) + beta * (w - v)
@@ -120,6 +129,10 @@ def _newton_w(v, beta, alpha):
 
 
 def _compute_w(v, beta, alpha):
+    """
+    Выбор оптимального метода вычисления проксимального оператора 
+    в зависимости от параметра alpha.
+    """
     eps = 1e-9
     if abs(alpha - 1.0) < eps:
         return _compute_w1(v, beta)
@@ -129,13 +142,14 @@ def _compute_w(v, beta, alpha):
         return _compute_w12(v, beta)
     return _newton_w(v, beta, alpha)
 
-
-# Module-level LUT cache
 _lut_cache = {}
 
 
 def _solve_img(v, beta, alpha):
-    """Proximal operator via LUT interpolation."""
+    """
+    Применение проксимального оператора к изображению с использованием 
+    интерполяции по кэшированной таблице (LUT) для ускорения вычислений.
+    """
     key = (beta, alpha)
     if key not in _lut_cache:
         _lut_cache[key] = _compute_w(_XX, beta, alpha)
@@ -147,12 +161,12 @@ def _clear_lut_cache():
     _lut_cache.clear()
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# FFT helpers
-# ═════════════════════════════════════════════════════════════════════════════
-
 def _psf2otf(psf, shape):
-    """PSF to OTF: zero-pad, circshift centre to (0,0), fft2."""
+    """
+    Преобразование функции рассеяния точки (PSF) в оптическую передаточную 
+    функцию (OTF). Функция выполняет дополнение нулями, циклический сдвиг 
+    центра в начало координат и двумерное БПФ.
+    """
     if psf.size == 0 or np.all(psf == 0):
         return np.zeros(shape, dtype=np.complex128)
     ph, pw = psf.shape
@@ -163,40 +177,42 @@ def _psf2otf(psf, shape):
     return fft2(padded)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Core ADMM deconvolution with Lp gradient + Lp noise fidelity
-# ═════════════════════════════════════════════════════════════════════════════
 
 def _fast_deconv_adaptive(yin, kernel, alpha, alpha_n, lam):
     """
-    Non-blind deconvolution with Lp gradient prior AND Lp noise fidelity.
+    Неслепая деконволюция с априорным Lp-распределением градиентов 
+    и Lp-моделью верности данных (шума).
 
-    Solves:
-        min_x  λ · (||∇_x x||^α + ||∇_y x||^α)  +  ||Hx - y||^{α_n}
+    Решается оптимизационная задача вида:
+    min_x lambda * (||grad_x x||^alpha + ||grad_y x||^alpha) + ||Hx - y||^alpha_n
 
-    via half-quadratic splitting (ADMM):
-        - w_n subproblem: proximal operator on noise residual
-        - w_x, w_y subproblems: proximal operator on gradients
-        - x subproblem: closed-form in Fourier domain
+    Решение находится методом попеременных направлений множителей 
+    Лагранжа (ADMM).
 
-    Parameters
+    Параметры
+    ---------
+    yin : ndarray
+        Размытое изображение (размерность 2D).
+    kernel : ndarray
+        Ядро размытия (сумма элементов равна 1).
+    alpha : float
+        Экспонента гиперлапласиана для градиентов изображения.
+    alpha_n : float
+        Экспонента гиперлапласиана для члена верности данных (модель шума).
+    lam : float
+        Глобальный весовой коэффициент регуляризации.
+
+    Возвращает
     ----------
-    yin : 2D array — blurred image [0, 1]
-    kernel : 2D array — PSF (sum = 1)
-    alpha : float — hyper-Laplacian exponent for gradients
-    alpha_n : float — hyper-Laplacian exponent for noise fidelity
-    lam : float — regularization weight (scalar, for this single image)
-
-    Returns
-    -------
-    yout : 2D array — restored image
+    yout : ndarray
+        Восстановленное изображение.
     """
     M, N = yin.shape
 
     K = _psf2otf(kernel, (M, N))
     Y = fft2(yin)
-    Nomin1 = np.conj(K) * Y       # K^T · B
-    Denom1 = np.abs(K) ** 2        # |K|^2
+    Nomin1 = np.conj(K) * Y    
+    Denom1 = np.abs(K) ** 2 
 
     gx = np.array([[1, -1]], dtype=np.float64)
     gy = np.array([[1], [-1]], dtype=np.float64)
@@ -206,24 +222,20 @@ def _fast_deconv_adaptive(yin, kernel, alpha, alpha_n, lam):
 
     yout = yin.copy()
 
-    # Gradients and noise residual
     youtx = np.roll(yout, -1, axis=1) - yout
     youty = np.roll(yout, -1, axis=0) - yout
     youtn = yin - np.real(ifft2(fft2(yout) * K))
 
-    # Continuation schedule
     betas = np.geomspace(1, 2 ** 8, num=9)
-    gamma = 1.0 / 50.0     # = beta_g / beta_n
+    gamma = 1.0 / 50.0
     beta_n = betas * lam / gamma
     beta_g = betas
 
     for i in range(len(betas)):
-        # w-subproblems (proximal operators)
         Wn = _solve_img(youtn, beta_n[i], alpha_n)
         Wx = _solve_img(youtx, beta_g[i], alpha)
         Wy = _solve_img(youty, beta_g[i], alpha)
 
-        # x-subproblem (Fourier domain closed-form)
         Wxx = np.roll(Wx, 1, axis=1) - Wx
         Wyy = np.roll(Wy, 1, axis=0) - Wy
         Wnn = np.real(ifft2(fft2(Wn) * np.conj(K)))
@@ -234,7 +246,6 @@ def _fast_deconv_adaptive(yin, kernel, alpha, alpha_n, lam):
         yout = np.real(ifft2(Fyout))
         yout = np.clip(yout, 0, 1)
 
-        # Update gradients and residual
         youtx = np.roll(yout, -1, axis=1) - yout
         youty = np.roll(yout, -1, axis=0) - yout
         youtn = yin - np.real(ifft2(fft2(yout) * K))
@@ -242,19 +253,16 @@ def _fast_deconv_adaptive(yin, kernel, alpha, alpha_n, lam):
     return yout
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Noise std estimation (DWT-based, from reference implementation)
-# ═════════════════════════════════════════════════════════════════════════════
 
 def _dwt_hh(img):
-    """Extract HH (diagonal detail) subband via 2-level DWT (db2)."""
+    """Извлечение высокочастотной подполосы HH с помощью двумерного DWT."""
     import pywt
     _, (_, _, HH) = pywt.dwt2(img, 'db2')
     return HH
 
 
 def _local_std(grad_map, L=10):
-    """Local standard deviation with (2L+1)×(2L+1) window."""
+    """Вычисление локального стандартного отклонения в окне (2L+1)x(2L+1)."""
     win = 2 * L + 1
     k = np.ones((win, win), dtype=np.float64) / (win ** 2)
     ms_local = convolve2d(grad_map ** 2, k, mode='same', boundary='symm')
@@ -272,7 +280,7 @@ def _y_grad(img):
 
 
 def _find_turning_point(sorted_std, M, N):
-    """Find noise-floor turning point in sorted local-std array."""
+    """Поиск точки перегиба в отсортированном массиве локальных дисперсий."""
     original = sorted_std.copy()
     d = max(1, int(M * N / 2000))
     smooth = np.ones(2 * d + 1, dtype=np.float64)
@@ -290,12 +298,14 @@ def _find_turning_point(sorted_std, M, N):
 
 def _estimate_noise_std(image):
     """
-    Estimate additive noise σ from a single image using DWT-based
-    local gradient statistics.
+    Оценка среднеквадратичного отклонения аддитивного шума (sigma) 
+    по единственному изображению на основе статистики локальных градиентов 
+    в вейвлет-области.
 
-    Returns
-    -------
-    sigma_n : float — estimated noise σ (in image scale)
+    Возвращает
+    ----------
+    sigma_n : float
+        Оцененное СКО шума.
     """
     M, N = image.shape
     HH = _dwt_hh(image)
@@ -310,36 +320,33 @@ def _estimate_noise_std(image):
     return sigma_n
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Space-variant λ map
-# ═════════════════════════════════════════════════════════════════════════════
-
 def _compute_lambda_map(image, sigma_n, alpha):
     """
-    Compute per-pixel regularization weight λ(x,y) from local gradient
-    statistics and estimated noise σ.
+    Вычисление веса регуляризации lambda(x, y) для каждого пикселя на основе 
+    локальной статистики градиентов и оцененного уровня шума.
 
-    Matches the original implementation:
-      1. DWT-HH → local std of x/y gradients → turning points sgx_n, sgy_n
-      2. Image gradients → local std sgx, sgy
-      3. σ_gsx = sqrt(sgx² − sgx_n²),  σ_gsy = sqrt(sgy² − sgy_n²)
-      4. λ(x,y) = (√(2σ_n² / (σ_gsx² + σ_gsy²)))^α
+    Процесс вычисления:
+    1. Оценка базового уровня шума для каждого направления на основе 
+       высокочастотной вейвлет-подполосы.
+    2. Вычисление локальных стандартных отклонений градиентов исходного 
+       изображения.
+    3. Оценка дисперсии полезного сигнала путем вычитания дисперсии шума 
+       из общей дисперсии градиентов.
+    4. Формирование карты коэффициентов по формуле отношения уровня шума 
+       к уровню полезного сигнала.
     """
     eps = 1e-8
     M, N = image.shape
 
-    # Step 1: noise floor per direction (from DWT-HH)
     HH = _dwt_hh(image)
     Bgx_hh, Bgy_hh = _x_grad(HH), _y_grad(HH)
     sgx_hh, sgy_hh = _local_std(Bgx_hh, 10), _local_std(Bgy_hh, 10)
     sgx_n = _find_turning_point(np.sort(sgx_hh.ravel()), M, N)
     sgy_n = _find_turning_point(np.sort(sgy_hh.ravel()), M, N)
 
-    # Step 2: image gradients → local std
     Bgx, Bgy = _x_grad(image), _y_grad(image)
     sgx, sgy = _local_std(Bgx, 10), _local_std(Bgy, 10)
 
-    # Step 3: subtract per-direction noise floor (as in original sigma_gs)
     sigma_gsx_sq = sgx ** 2 - sgx_n ** 2
     sigma_gsx_sq[sigma_gsx_sq < eps] = eps
     sigma_gsx = np.sqrt(sigma_gsx_sq)
@@ -348,20 +355,15 @@ def _compute_lambda_map(image, sigma_n, alpha):
     sigma_gsy_sq[sigma_gsy_sq < eps] = eps
     sigma_gsy = np.sqrt(sigma_gsy_sq)
 
-    # Step 4: λ map
     lam_map = (np.sqrt(2 * sigma_n ** 2 / (
         sigma_gsx ** 2 + sigma_gsy ** 2 + eps))) ** alpha
     return lam_map
 
-
-# ═════════════════════════════════════════════════════════════════════════════
-# α_n estimation via KL divergence
-# ═════════════════════════════════════════════════════════════════════════════
-
 def _estimate_alpha_n(blurred, restored, kernel, sigma_n):
     """
-    Estimate noise exponent α_n by minimizing KL divergence between
-    observed noise residual and simulated hyper-Laplacian noise.
+    Оценка параметра формы шума alpha_n путем минимизации дивергенции 
+    Кульбака-Лейблера (KL) между гистограммой наблюдаемых остатков шума 
+    и смоделированным гиперлапласовским распределением.
     """
     import math
 
@@ -373,7 +375,6 @@ def _estimate_alpha_n(blurred, restored, kernel, sigma_n):
     for i in range(1, 10):
         alpha_n = round(0.1 * i, 2)
 
-        # Generate hyper-Laplacian reference noise
         rng = np.random.default_rng(0)
         beta_hl = sigma_n * np.sqrt(
             math.gamma(1.0 / alpha_n) / math.gamma(3.0 / alpha_n))
@@ -381,7 +382,6 @@ def _estimate_alpha_n(blurred, restored, kernel, sigma_n):
         S = rng.choice([-1.0, 1.0], size=blurred.shape)
         noise_ref = beta_hl * S * (T ** (1.0 / alpha_n))
 
-        # Mask out near-boundary pixels (clipping artifacts)
         mask = (restored >= threshold) & (restored <= 1.0 - threshold)
         noise_sample = noise_observed[mask]
         noise_ref_masked = noise_ref[mask]
@@ -389,7 +389,6 @@ def _estimate_alpha_n(blurred, restored, kernel, sigma_n):
         if noise_sample.size < 100:
             continue
 
-        # Compare histograms via KL divergence
         dx = 0.01
         bins = np.arange(-threshold, threshold + dx, dx)
         hist_s, _ = np.histogram(noise_sample, bins)
@@ -404,29 +403,21 @@ def _estimate_alpha_n(blurred, restored, kernel, sigma_n):
     return best_alpha
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Lambda library + 1D interpolation
-# ═════════════════════════════════════════════════════════════════════════════
 
 def _build_lambda_library(alpha, C, lam_N):
-    """Geometric grid of λ values: C · 2^{(α/3)·i}."""
+    """Формирование геометрической сетки значений коэффициента lambda."""
     i = np.arange(lam_N, dtype=np.float64)
     return C * (2 ** ((alpha / 3.0) * i))
 
 
 def _interpolate_library(blurred, kernel, alpha, alpha_n, lam_map, lam_library):
     """
-    Build per-λ restored images and interpolate per-pixel.
-
-    For each λ in lam_library, run full-image deconvolution (with
-    internal mirror-padding). Then for each pixel, blend the two
-    nearest λ-images based on the per-pixel λ weight.
-
-    All images and lam_map are at ORIGINAL (unpadded) resolution.
+    Формирование библиотеки восстановленных изображений для каждого значения 
+    lambda из сетки и пиксельная интерполяция итогового изображения 
+    в соответствии с рассчитанной картой коэффициентов.
     """
     C = lam_library[0]
 
-    # Build image library (with saturation detection for speed)
     I_library = {}
     sat = False
     prev_I = None
@@ -441,7 +432,6 @@ def _interpolate_library(blurred, kernel, alpha, alpha_n, lam_map, lam_library):
             sat = True
         prev_I = I_library[idx].copy()
 
-    # Per-pixel interpolation (vectorized index computation, per-pixel blend)
     M, N = lam_map.shape
     raw_idx = np.ceil((3.0 / alpha) * np.log2(
         np.maximum(lam_map / C, 1.0))).astype(int)
@@ -471,24 +461,20 @@ def _interpolate_library(blurred, kernel, alpha, alpha_n, lam_map, lam_library):
     return np.clip(I_opt, 0, 1)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Mirror padding (replicate boundary conditions)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def _mirror_pad(image, pad):
-    """Symmetric (mirror) padding to handle boundary conditions."""
+    """Симметричное дополнение изображения для обработки граничных условий."""
     return np.pad(image, pad, mode='reflect')
 
 
 def _mirror_unpad(image, pad, orig_shape):
-    """Remove mirror padding."""
+    """Удаление симметричного дополнения границ."""
     return image[pad:pad + orig_shape[0], pad:pad + orig_shape[1]]
 
 
 def _deconv_with_padding(blurimg, kernel, alpha, alpha_n, lam):
     """
-    Deconvolve with internal mirror-padding (matches original deconv()).
-    Pads the image, runs ADMM on padded domain, then un-pads.
+    Обертка для функции деконволюции, выполняющая внутреннее дополнение 
+    границ для снижения краевых артефактов.
     """
     M, N = blurimg.shape
     k_size = kernel.shape[0]
@@ -497,42 +483,33 @@ def _deconv_with_padding(blurimg, kernel, alpha, alpha_n, lam):
     return result[k_size:k_size + M, k_size:k_size + N]
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Public API
-# ═════════════════════════════════════════════════════════════════════════════
-
 def adaptive_lp_deconv(blurred, kernel, alpha=0.8, sigma_n=None,
                        two_stage=True):
     """
-    Non-blind deconvolution with space-variant Lp regularization
-    and adaptive noise modelling.
+    Неслепая деконволюция с пространственно-зависимой Lp-регуляризацией 
+    и адаптивным моделированием параметров шума.
 
-    Parameters
+    Параметры
+    ---------
+    blurred : ndarray
+        Размытое (возможно, зашумленное) полутоновое изображение, значения 
+        float64 в диапазоне [0, 1].
+    kernel : ndarray
+        Ядро размытия (PSF). Автоматически нормализуется (сумма равна 1).
+    alpha : float, по умолчанию 0.8
+        Экспонента гиперлапласиана для априорного распределения градиентов. 
+        Обычно для естественных изображений лежит в диапазоне [0.5, 0.8].
+    sigma_n : float или None, по умолчанию None
+        Среднеквадратичное отклонение шума (в масштабе изображения [0, 1]). 
+        Если None, оценивается автоматически на основе вейвлет-анализа.
+    two_stage : bool, по умолчанию True
+        Флаг использования второго прохода деконволюции с оцененным 
+        распределением шума (alpha_n). Если False, используется alpha_n = alpha.
+
+    Возвращает
     ----------
-    blurred : ndarray, H×W
-        Blurred (and possibly noisy) grayscale image, float64 [0, 1].
-    kernel : ndarray, h×w
-        Blur kernel (PSF). Will be normalized to sum = 1.
-    alpha : float, optional
-        Hyper-Laplacian exponent for image gradient prior (default 0.8).
-        Literature suggests α ∈ [0.5, 0.8] for natural images.
-    sigma_n : float or None, optional
-        Noise standard deviation (in [0, 1] image scale).
-        If None, estimated automatically via DWT-based method.
-    two_stage : bool, optional
-        If True (default), run a second deconvolution pass with
-        KL-estimated noise exponent α_n. If False, use α_n = α.
-
-    Returns
-    -------
-    restored : ndarray, H×W
-        Restored image, float64 [0, 1].
-
-    Notes
-    -----
-    This method is significantly slower than single-pass FHLP due to
-    building a library of N_λ deconvolved images. Typical N_λ ≈ 10–30,
-    so expect 10–30× the cost of a single FHLP call.
+    restored : ndarray
+        Восстановленное изображение, значения float64 в диапазоне [0, 1].
     """
     kernel = kernel.astype(np.float64)
     kernel = np.maximum(kernel, 1e-10)
@@ -544,40 +521,32 @@ def adaptive_lp_deconv(blurred, kernel, alpha=0.8, sigma_n=None,
 
     M, N = blurred.shape
 
-    # Step 1: Estimate noise σ
     if sigma_n is None:
         sigma_n = _estimate_noise_std(blurred)
     sigma_n = max(sigma_n, 1e-8)
 
-    # Step 2: Compute space-variant λ map on ORIGINAL (unpadded) image
     lam_map = _compute_lambda_map(blurred, sigma_n, alpha)
 
-    # Step 3: Build λ library (geometric grid)
     C = max(lam_map.min(), 1e-12)
     lam_N = int(np.ceil(3.0 / alpha * np.log2(
         max(lam_map.max() / C, 1.0))) + 2)
     lam_N = max(lam_N, 3)
     lam_library = _build_lambda_library(alpha, C, lam_N)
 
-    # Step 4: First pass — α_n = α (gradient prior as noise model)
-    #         Each deconv call handles padding/unpadding internally.
     alpha_n = alpha
     _clear_lut_cache()
     I_opt = _interpolate_library(
         blurred, kernel, alpha, alpha_n, lam_map, lam_library)
 
-    # Step 5: Second pass — estimate α_n via KL divergence
     if two_stage:
         alpha_n = _estimate_alpha_n(blurred, I_opt, kernel, sigma_n)
 
-        # Robustness heuristics (from reference implementation)
         if sigma_n > 0.025 or alpha_n == 0.5:
             alpha_n = max(alpha_n, 0.6)
         center_val = kernel[kernel.shape[0] // 2, kernel.shape[1] // 2]
         if center_val < 1e-4:
             alpha_n = 0.8
 
-        # Re-run with estimated α_n
         _clear_lut_cache()
         I_opt = _interpolate_library(
             blurred, kernel, alpha, alpha_n, lam_map, lam_library)
@@ -585,57 +554,14 @@ def adaptive_lp_deconv(blurred, kernel, alpha=0.8, sigma_n=None,
     return np.clip(I_opt, 0, 1)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# FIRLS-UBC — frils_deb_ubc (undetermined boundary conditions)
-# Reference:
-#   X. Zhou, M. Vega, F. Zhou, R. Molina, A. K. Katsaggelos,
-#   "Fast Bayesian Blind Deconvolution with Huber Super Gaussian Priors",
-#   Digital Signal Processing, 2016.
-#
-# Ported from fbdhsgp/fbdhsgp_denoise/solvers.py  (frils_deb_ubc).
-#
-# Solves:
-#   x* = argmin_x  λ/λ_u * ||H x - y||^2
-#        + λ * (||∇x x||^α + ||∇y x||^α
-#               + w0*(||∇xx x||^α + ||∇yy x||^α + ||∇xy x||^α))
-# via ADMM with an ℓ_p (IRLS) prior on first- AND second-order derivatives
-# and undetermined boundary conditions (replicate-pad + u-subproblem FOV
-# constraint).  Beta is increased by a factor IF after each outer step.
-# ═════════════════════════════════════════════════════════════════════════════
-
 def _frils_deb_ubc_core(y, h, lam, alpha, beta_a, lambda_u,
                         epsilon_min, epsilon_max, out_iter, inner_iter, IF):
     """
-    Core FIRLS-UBC routine.  Ported from ``frils_deb_ubc.m`` / fbdhsgp solvers.
+    Ядро алгоритма FIRLS-UBC.
 
-    Pads the image by the kernel half-size with replicate boundary and
-    uses an undetermined-boundary-condition (UBC) u-subproblem that
-    constrains only the inner (FOV) region to match the observation.
-
-    Parameters
-    ----------
-    y : ndarray (M1, M2)
-        Blurred image (float, [0, 1] scale).
-    h : ndarray
-        Blur kernel (sum = 1, odd-sized preferred).
-    lam : float
-        Regularization weight λ.
-    alpha : float
-        Lp exponent, alpha in (0, 2].
-    beta_a : float
-        ADMM penalty on gradient splitting variable.
-    lambda_u : float
-        Weight of the UBC u-subproblem (data-fidelity coupling).
-    epsilon_min : float
-        Lower bound on gradient magnitude (caps IRLS weights, sets beta_max).
-    epsilon_max : float
-        Upper bound on gradient magnitude (sets initial beta_min).
-    out_iter : int
-        Number of outer (IRLS reweighting) iterations.
-    inner_iter : int
-        Number of inner ADMM iterations per outer step.
-    IF : float
-        Beta increase factor per outer iteration.
+    Решает задачу с использованием дополнения краев дублированием 
+    и наложением ограничения верности данных только на внутреннюю часть 
+    изображения (неопределенные граничные условия).
     """
     M1, M2 = y.shape
     m1, m2 = h.shape
@@ -644,10 +570,8 @@ def _frils_deb_ubc_core(y, h, lam, alpha, beta_a, lambda_u,
     n1 = M1 + m1 - 1
     n2 = M2 + m2 - 1
 
-    # Replicate-pad to UBC domain
     x = np.pad(y, ((hks1, hks1), (hks2, hks2)), mode="edge")
 
-    # First- and second-order derivative filters (3×3, MATLAB layout)
     dxf  = np.array([[0,  0,  0], [0,  1, -1], [0,  0,  0]], dtype=np.float64)
     dyf  = np.array([[0,  0,  0], [0,  1,  0], [0, -1,  0]], dtype=np.float64)
     dyyf = np.array([[0, -1,  0], [0,  2,  0], [0, -1,  0]], dtype=np.float64)
@@ -711,7 +635,6 @@ def _frils_deb_ubc_core(y, h, lam, alpha, beta_a, lambda_u,
     invA = HH + (beta_a / lambda_u) * RR
 
     for _outer in range(out_iter):
-        # IRLS weights with Huber (ℓ_p) cap at ``beta``
         with np.errstate(divide="ignore", invalid="ignore"):
             Wx  = np.minimum(beta, c * adx  ** (alpha - 2.0))
             Wy  = np.minimum(beta, c * ady  ** (alpha - 2.0))
@@ -725,20 +648,17 @@ def _frils_deb_ubc_core(y, h, lam, alpha, beta_a, lambda_u,
         Wxy = np.nan_to_num(Wxy, nan=beta * w0, posinf=beta * w0)
 
         for _inner in range(inner_iter):
-            # u sub-problem (FOV constraint applied only on inner region)
             u = Ax + du
             u_inner = u[hks1:n1 - hks1, hks2:n2 - hks2]
             u[hks1:n1 - hks1, hks2:n2 - hks2] = (
                 y + lambda_u * u_inner) / (1.0 + lambda_u)
 
-            # v sub-problems
             vx  = beta_a * (dx  + dvx)  / (Wx  + beta_a)
             vy  = beta_a * (dy  + dvy)  / (Wy  + beta_a)
             vxx = beta_a * (dxx + dvxx) / (Wxx + beta_a)
             vyy = beta_a * (dyy + dvyy) / (Wyy + beta_a)
             vxy = beta_a * (dxy + dvxy) / (Wxy + beta_a)
 
-            # dual variables
             du   = du   - u   + Ax
             dvx  = dvx  - vx  + dx
             dvy  = dvy  - vy  + dy
@@ -746,7 +666,6 @@ def _frils_deb_ubc_core(y, h, lam, alpha, beta_a, lambda_u,
             dvyy = dvyy - vyy + dyy
             dvxy = dvxy - vxy + dxy
 
-            # x sub-problem
             Y_fft  = fft2(u - du) * Ht
             tempx  = _conv_circ(vx  - dvx,  dxfr)
             tempy  = _conv_circ(vy  - dvy,  dyfr)
@@ -782,47 +701,53 @@ def firls_deconv(blurred, kernel, lam=2e-4, alpha=2.0 / 3.0,
                  IF=None, clip=True,
                  boundary=None, use_edgetaper=None):
     """
-    Non-blind deconvolution via FIRLS-UBC (Zhou et al., DSP 2016).
+    Неслепая деконволюция на основе алгоритма FIRLS-UBC.
 
-    Ported from ``frils_deb_ubc`` in the FBDHSGP algorithm — uses
-    undetermined boundary conditions (replicate-pad + FOV u-constraint),
-    first- and second-order gradient regularization, and an IRLS schedule
-    with exponentially increasing beta.
+    Решает задачу минимизации вида:
+    min_x lambda/lambda_u * ||H x - y||^2
+          + lambda * (||grad_x x||^alpha + ||grad_y x||^alpha
+                      + w0 * (||grad_xx x||^alpha + ||grad_yy x||^alpha 
+                      + ||grad_xy x||^alpha))
 
-    Parameters
-    ----------
-    blurred : ndarray, H×W
-        Blurred image, float64 in [0, 1] (uint8 auto-scaled by /255).
+    Используются неопределенные граничные условия, регуляризация градиентов 
+    первого и второго порядка, а также стратегия изменения весов IRLS 
+    с экспоненциально возрастающим параметром штрафа.
+
+    Параметры
+    ---------
+    blurred : ndarray
+        Размытое изображение (размерность HxW), значения в диапазоне [0, 1].
     kernel : ndarray
-        Blur kernel (PSF). Normalized to sum = 1.
-    lam : float, optional
-        Regularization weight lambda (default 2e-4).
-    alpha : float, optional
-        Lp exponent on gradients in (0, 2] (default 2/3).
-    epsilon_min, epsilon_max : float, optional
-        IRLS bounds (image scale). Defaults: 2.55/255, 20/255.
-    beta_a : float or None, optional
-        ADMM penalty on gradient splitting. If None, computed from
-        ``lam * alpha * epsilon_max**(alpha-2)``.
-    lambda_u : float, optional
-        Weight of the UBC u-subproblem (data-fidelity coupling), default 0.1.
-    out_iter : int, optional
-        Outer IRLS iterations (default 5).
-    inner_iter : int, optional
-        Inner ADMM iterations per outer step (default 4).
-    IF : float or None, optional
-        Beta increase factor per outer iteration (default sqrt(2)).
-    clip : bool, optional
-        Clip output to [0, 1] (default True).
-    boundary : ignored
-        Kept for backward compatibility; the implementation always uses
-        replicate-boundary UBC.
-    use_edgetaper : ignored
-        Kept for backward compatibility.
+        Ядро размытия (сумма элементов равна 1).
+    lam : float, по умолчанию 2e-4
+        Коэффициент регуляризации lambda.
+    alpha : float, по умолчанию 2/3
+        Экспонента Lp-нормы для градиентов, значение в диапазоне (0, 2].
+    epsilon_min, epsilon_max : float, по умолчанию 2.55/255 и 20/255
+        Границы значений алгоритма IRLS (в масштабе изображения).
+    beta_a : float или None, по умолчанию None
+        Штрафной параметр ADMM для переменных расщепления градиентов. 
+        При значении None вычисляется автоматически.
+    lambda_u : float, по умолчанию 0.1
+        Весовой параметр для задачи поиска переменной u.
+    out_iter : int, по умолчанию 5
+        Количество внешних итераций (пересчет весов IRLS).
+    inner_iter : int, по умолчанию 4
+        Количество внутренних итераций ADMM на каждый внешний шаг.
+    IF : float или None, по умолчанию None
+        Множитель увеличения параметра beta на каждой внешней итерации.
+    clip : bool, по умолчанию True
+        Флаг ограничения выходного изображения диапазоном [0, 1].
+    boundary : игнорируется
+        Оставлено для совместимости; реализация всегда использует 
+        модель неопределенных границ (UBC).
+    use_edgetaper : игнорируется
+        Оставлено для совместимости.
 
-    Returns
-    -------
-    restored : ndarray, H×W (float64)
+    Возвращает
+    ----------
+    restored : ndarray
+        Восстановленное изображение (формат float64).
     """
     kernel = kernel.astype(np.float64)
     kernel = np.maximum(kernel, 0.0)
@@ -858,15 +783,11 @@ def firls_deconv(blurred, kernel, lam=2e-4, alpha=2.0 / 3.0,
     return x
 
 
-# ══════════════════════════════════════════════════════════════════════════# Ringing artifacts removal  (from Pan's codebase, self-contained)
-# ═════════════════════════════════════════════════════════════════════════════
-
-# --- opt_fft_size helpers ---
-
 _OPT_FFT_LUT = None
 
 
 def _build_opt_fft_lut(lut_size=4096):
+    """Генерация справочной таблицы оптимальных размеров для БПФ."""
     lut = np.zeros(lut_size + 1, dtype=np.int64)
     e2 = 1
     while e2 <= lut_size:
@@ -896,6 +817,7 @@ def _build_opt_fft_lut(lut_size=4096):
 
 
 def _opt_fft_size(n):
+    """Поиск ближайшего оптимального размера матрицы для быстрого БПФ."""
     global _OPT_FFT_LUT
     if _OPT_FFT_LUT is None:
         _OPT_FFT_LUT = _build_opt_fft_lut()
@@ -915,9 +837,8 @@ def _opt_fft_size(n):
     return m
 
 
-# --- wrap_boundary_liu helpers ---
-
 def _solve_min_laplacian(boundary_image):
+    """Решение краевой задачи с использованием дискретного синус-преобразования."""
     H, W = boundary_image.shape
     boundary_image = boundary_image.copy()
     boundary_image[1:-1, 1:-1] = 0.0
@@ -945,6 +866,7 @@ def _solve_min_laplacian(boundary_image):
 
 
 def _wrap_boundary_liu(img, img_size):
+    """Дополнение изображения с обеспечением гладкого перехода яркости на границах."""
     if img.ndim == 2:
         img = img[:, :, np.newaxis]
     H, W, Ch = img.shape
@@ -1004,9 +926,8 @@ def _wrap_boundary_liu(img, img_size):
     return ret
 
 
-# --- psf2otf (for ringing removal solvers) ---
-
 def _rr_psf2otf(psf, shape):
+    """Вспомогательная функция перевода PSF в OTF для модуля подавления звона."""
     if np.all(psf == 0):
         return np.zeros(shape, dtype=np.complex128)
     in_h, in_w = psf.shape
@@ -1017,9 +938,8 @@ def _rr_psf2otf(psf, shape):
     return fft2(padded)
 
 
-# --- _computeDenominator ---
-
 def _computeDenominator(y, k):
+    """Вычисление знаменателей для решения в частотной области."""
     sizey = y.shape[:2]
     otfk = _rr_psf2otf(k, sizey)
     Nomin1 = np.conj(otfk) * fft2(y)
@@ -1029,9 +949,8 @@ def _computeDenominator(y, k):
     return Nomin1, Denom1, Denom2
 
 
-# --- deblurring_adm_aniso (TV-l2 via ADM / Split Bregman) ---
-
 def _deblurring_adm_aniso(B, k, lambda_tv, alpha):
+    """Анизотропная деконволюция с TV-регуляризацией (Split Bregman)."""
     beta = 1.0 / lambda_tv
     beta_min = 0.001
     m, n = B.shape
@@ -1064,9 +983,8 @@ def _deblurring_adm_aniso(B, k, lambda_tv, alpha):
     return I
 
 
-# --- L0Restoration ---
-
 def _L0Restoration(Im, kernel, lambda_grad, kappa=2.0):
+    """Деконволюция с регуляризацией на основе L0-нормы градиентов."""
     H_orig, W_orig = Im.shape[0], Im.shape[1]
     target_size = _opt_fft_size(
         np.array([H_orig, W_orig]) + np.array(kernel.shape[:2]) - 1)
@@ -1105,9 +1023,8 @@ def _L0Restoration(Im, kernel, lambda_grad, kappa=2.0):
     return S
 
 
-# --- bilateral_filter ---
-
 def _fspecial_gaussian(size, sigma):
+    """Создание двумерного гауссовского фильтра."""
     radius = (size - 1) / 2.0
     y, x = np.mgrid[-radius:radius + 1, -radius:radius + 1]
     g = np.exp(-(x * x + y * y) / (2.0 * sigma * sigma))
@@ -1115,6 +1032,7 @@ def _fspecial_gaussian(size, sigma):
 
 
 def _bilateral_filter(img, sigma_s, sigma):
+    """Реализация билатерального фильтра для подавления шума с сохранением краев."""
     if img.ndim == 2:
         img = img[:, :, np.newaxis]
     was_2d = img.shape[2] == 1
@@ -1146,27 +1064,32 @@ def _bilateral_filter(img, sigma_s, sigma):
     return r_img
 
 
-# --- ringing_artifacts_removal (public) ---
-
 def ringing_artifacts_removal(y, kernel, lambda_tv=4e-3, lambda_l0=2e-3,
                               weight_ring=0.5):
     """
-    Remove ringing artifacts in non-blind deconvolution.
+    Подавление эффекта звона (ringing artifacts) после неслепой деконволюции.
 
-    Combines TV deconvolution and L0 deconvolution, using a bilateral
-    filter on the difference to suppress ringing while preserving edges.
+    Алгоритм комбинирует результаты деконволюции с TV-регуляризацией 
+    и L0-регуляризацией. Для подавления звона при сохранении резкости краев 
+    к разностному изображению применяется билатеральная фильтрация.
 
-    Parameters
+    Параметры
+    ---------
+    y : ndarray
+        Размытое изображение (размерность HxW), значения в диапазоне [0, 1].
+    kernel : ndarray
+        Ядро размытия (сумма элементов равна 1).
+    lambda_tv : float, по умолчанию 4e-3
+        Коэффициент регуляризации для TV-деконволюции.
+    lambda_l0 : float, по умолчанию 2e-3
+        Коэффициент регуляризации для L0-деконволюции.
+    weight_ring : float, по умолчанию 0.5
+        Вес подавления звона (значение 0 соответствует чистой TV-деконволюции).
+
+    Возвращает
     ----------
-    y           : (H, W) blurred image, float64 [0, 1]
-    kernel      : blur kernel (sum = 1)
-    lambda_tv   : weight for TV deconvolution
-    lambda_l0   : weight for L0 deconvolution
-    weight_ring : ringing suppression weight (0 = TV only)
-
-    Returns
-    -------
-    result : (H, W) deblurred image
+    result : ndarray
+        Восстановленное изображение со сниженным уровнем краевых артефактов.
     """
     H, W = y.shape[:2]
     target_size = _opt_fft_size(

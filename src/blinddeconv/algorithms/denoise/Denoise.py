@@ -39,7 +39,6 @@ import numpy as np
 import time
 from typing import Tuple, List, Any, Dict
 
-# ── Framework base class import (DO NOT MODIFY) ─────────────────────────────
 import sys
 from pathlib import Path
 
@@ -63,10 +62,6 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
         sys.path.insert(0, _path)
 
 from blinddeconv.algorithms.base import DeconvolutionAlgorithm
-# ─────────────────────────────────────────────────────────────────────────────
-
-# ── Utility functions (mirrors LIP pipeline) ────────────────────────────────
-
 
 def make_size_odd(image):
     """Trim image to odd spatial dimensions."""
@@ -74,7 +69,6 @@ def make_size_odd(image):
     h = h if h % 2 == 1 else h - 1
     w = w if w % 2 == 1 else w - 1
     return image[:h, :w]
-
 
 class DenoiseWrapper(DeconvolutionAlgorithm):
     """
@@ -116,7 +110,6 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
     ):
         super().__init__(name='DenoiseWrapper')
 
-        # Validate denoiser choice
         valid_methods = {'bm3d', 'guided', 'bilateral', 'nlm', 'tv',
                          'vst+bm3d', 'act', 'median'}
         method_lower = str(method).lower().strip()
@@ -126,7 +119,6 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
                 f"Choose from: {sorted(valid_methods)}")
         self.method = method_lower
 
-        # Validate noise estimation choice
         valid_noise_est = {'chen', 'pca', 'none'}
         noise_est_lower = str(noise_estimation).lower().strip()
         if noise_est_lower not in valid_noise_est:
@@ -143,7 +135,6 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
         self.history: Dict[str, list] = {}
         self.hyperparams: Dict[str, Any] = {}
 
-    # ── Noise estimation ────────────────────────────────────────────────
 
     def _estimate_noise(self, image):
         """Estimate noise level σ from image.
@@ -161,18 +152,8 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
 
         try:
             if self.noise_estimation == 'chen':
-                try:
-                    from blinddeconv.algorithms.blind_deconvolution.\
-                        our_company.logarithmic_pds.lip_denoise.\
-                        chen_noise_estimate import estimate_noise_level
-                except ImportError:
-                    # Fallback: try relative import from lip_denoise siblings
-                    lip_path = Path(__file__).parent.parent.\
-                        parent / 'blind_deconvolution' / 'our_company' / \
-                        'logarithmic_pds' / 'lip_denoise'
-                    if lip_path.exists() and str(lip_path) not in sys.path:
-                        sys.path.insert(0, str(lip_path))
-                    from chen_noise_estimate import estimate_noise_level
+                
+                from blinddeconv.algorithms.mod_denoise.chen_noise_estimate import estimate_noise_level
 
                 sigma_norm = estimate_noise_level(
                     image,
@@ -185,17 +166,8 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
                 }
 
             elif self.noise_estimation == 'pca':
-                try:
-                    from blinddeconv.algorithms.blind_deconvolution.\
-                        our_company.logarithmic_pds.lip_denoise.\
-                        pyatykh_noise_reconstruction import estimate_noise_params
-                except ImportError:
-                    lip_path = Path(__file__).parent.parent.\
-                        parent / 'blind_deconvolution' / 'our_company' / \
-                        'logarithmic_pds' / 'lip_denoise'
-                    if lip_path.exists() and str(lip_path) not in sys.path:
-                        sys.path.insert(0, str(lip_path))
-                    from pyatykh_noise_reconstruction import estimate_noise_params
+                
+                from blinddeconv.algorithms.mod_denoise.pyatykh_noise_reconstruction import estimate_noise_params
 
                 result = estimate_noise_params(image)
                 result['method'] = 'pca'
@@ -210,7 +182,6 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
                 print(f"[{self.name}] Warning: noise estimation failed: {e}")
             return None
 
-    # ── Denoisers ───────────────────────────────────────────────────────
 
     def _apply_tv(self, image, noise_info):
         """Total Variation denoising (Chambolle)."""
@@ -224,7 +195,6 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
             weight = max(0.01, sigma * 2) if sigma else 0.1
 
         kwargs = dict(weight=weight, eps=p.get('eps', 0.002))
-        # skimage >= 0.20 renamed n_iter_max -> max_num_iter
         try:
             return denoise_tv_chambolle(image, **kwargs,
                                         max_num_iter=p.get('max_num_iter', 200))
@@ -304,25 +274,20 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
         p = p.astype(np.float64)
         H, W = I.shape
 
-        # Mean filters (local box averages)
         mean_I = uniform_filter(I, size=2*r+1, mode='reflect')
         mean_p = uniform_filter(p, size=2*r+1, mode='reflect')
         mean_Ip = uniform_filter(I * p, size=2*r+1, mode='reflect')
         mean_II = uniform_filter(I * I, size=2*r+1, mode='reflect')
 
-        # Variance of guidance / covariance guidance-input
         var_I = mean_II - mean_I ** 2
         cov_Ip = mean_Ip - mean_I * mean_p
 
-        # Linear relationship coefficients
         a = cov_Ip / (var_I + eps)
         b = mean_p - a * mean_I
 
-        # Smooth a and b
         mean_a = uniform_filter(a, size=2*r+1, mode='reflect')
         mean_b = uniform_filter(b, size=2*r+1, mode='reflect')
 
-        # Output
         q = mean_a * I + mean_b
         return np.clip(q, 0, 1)
 
@@ -336,7 +301,6 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
         sigma_psd = p.get('sigma', sigma if sigma else 0.05)
 
         stage_arg = p.get('stage_arg', bm3d.BM3DStages.ALL_STAGES)
-        # Accept string shortcuts for convenience
         if isinstance(stage_arg, str):
             _map = {
                 'all': bm3d.BM3DStages.ALL_STAGES,
@@ -350,17 +314,7 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
 
     def _apply_vst_bm3d(self, image, noise_info):
         """VST + BM3D denoising (Poisson-Gaussian noise)."""
-        try:
-            from blinddeconv.algorithms.blind_deconvolution.\
-                our_company.logarithmic_pds.lip_denoise.vst \
-                import vst_bm3d_denoise
-        except ImportError:
-            lip_path = Path(__file__).parent.parent.\
-                parent / 'blind_deconvolution' / 'our_company' / \
-                'logarithmic_pds' / 'lip_denoise'
-            if lip_path.exists() and str(lip_path) not in sys.path:
-                sys.path.insert(0, str(lip_path))
-            from vst import vst_bm3d_denoise
+        from blinddeconv.algorithms.mod_denoise.vst import vst_bm3d_denoise
 
         p = dict(self.denoiser_params)
 
@@ -401,40 +355,25 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
         ksize     = int(p.get('kernel_size', 3))
         threshold = float(p.get('threshold', 0.3))
 
-        # Median image
         med = median_filter(image, size=ksize, mode='reflect')
 
-        # Local range estimate: max deviation from local mean in neighbourhood
         local_mean  = uniform_filter(image, size=ksize, mode='reflect')
         local_sq    = uniform_filter(image ** 2, size=ksize, mode='reflect')
         local_var   = np.clip(local_sq - local_mean ** 2, 0, None)
         local_sigma = np.sqrt(local_var)
 
-        # Scale threshold by local sigma; fall back to global sigma when flat
         global_sigma = float(np.std(image)) or 1e-6
         scale = np.where(local_sigma > 1e-6, local_sigma, global_sigma)
 
-        # Impulse mask: pixel deviates too far from its local median
         mask = np.abs(image - med) > threshold * scale
 
-        # Replace only impulse pixels
         result = image.copy()
         result[mask] = med[mask]
         return result
 
     def _apply_act(self, image, noise_info):
         """Adaptive Curvelet Thresholding."""
-        try:
-            from blinddeconv.algorithms.blind_deconvolution.\
-                our_company.logarithmic_pds.lip_denoise.act_denoise \
-                import act_denoise
-        except ImportError:
-            lip_path = Path(__file__).parent.parent.\
-                parent / 'blind_deconvolution' / 'our_company' / \
-                'logarithmic_pds' / 'lip_denoise'
-            if lip_path.exists() and str(lip_path) not in sys.path:
-                sys.path.insert(0, str(lip_path))
-            from act_denoise import act_denoise
+        from blinddeconv.algorithms.mod_denoise.act_denoise import act_denoise
 
         p = dict(self.denoiser_params)
         sigma = noise_info.get('sigma_norm') if noise_info else None
@@ -449,8 +388,6 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
             threshold_setting=p.get('threshold_setting', 's'),
         )
         return result
-
-    # ── Main entry point ────────────────────────────────────────────────
 
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -471,12 +408,10 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
         """
         start_time = time.time()
 
-        # ── 1. Normalise to float64 [0, 1] ──────────────────────────────
         f = image.astype(np.float64)
         if f.max() > 1.0:
             f /= 255.0
 
-        # Handle color images: convert to grayscale (simple average)
         if f.ndim == 3 and f.shape[2] == 3:
             f = np.mean(f, axis=2)
         elif f.ndim > 2:
@@ -484,11 +419,9 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
 
         M_orig, N_orig = f.shape
 
-        # ── 2. Trim to odd dimensions ───────────────────────────────────
         f = make_size_odd(f)
         M, N = f.shape
 
-        # ── 3. Estimate noise ───────────────────────────────────────────
         noise_info = None
         if self.noise_estimation != 'none':
             noise_info = self._estimate_noise(f)
@@ -497,7 +430,6 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
                     f"[{self.name}] Noise estimation ({noise_info['method']}): "
                     f"σ_norm={noise_info.get('sigma_norm', 0):.5f}")
 
-        # ── 4. Apply denoiser ───────────────────────────────────────────
         if self.verbose:
             print(f"[{self.name}] Applying {self.method} denoiser...")
 
@@ -520,20 +452,14 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
         else:
             raise RuntimeError(f"Unknown denoiser: {self.method}")
 
-        # Ensure output is in [0, 1]
         x_denoised = np.clip(x_denoised, 0, 1)
 
-        # ── 5. Convert to int16 [0, 255] ───────────────────────────────
         x_final = x_denoised * 255.0
         x_final = np.round(x_final).astype(np.int16)
 
-        # ── 6. Point PSF (Dirac delta) ──────────────────────────────────
-        # For a pure denoiser, the "kernel" is a point.
-        # We return a 1×1 PSF with value 1 at center.
         h = np.zeros((1, 1), dtype=np.int16)
         h[0, 0] = 1
 
-        # ── 7. Record hyperparameters ───────────────────────────────────
         self.hyperparams = {
             'time': time.time() - start_time,
             'method': self.method,
@@ -552,7 +478,6 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
 
         return x_final, h
 
-    # ── Interface methods ────────────────────────────────────────────────
 
     def get_param(self) -> List[Tuple[str, Any]]:
         """Get algorithm parameters."""

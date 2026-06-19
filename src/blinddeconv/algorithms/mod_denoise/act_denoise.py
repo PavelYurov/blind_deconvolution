@@ -1,21 +1,19 @@
 """
 act_denoise.py
 
-Adaptive Curvelet Thresholding (ACT) for white and colored Gaussian noise.
+Алгоритм адаптивного порогового шумоподавления в области курвлет-преобразования
+(Adaptive Curvelet Thresholding, ACT) для подавления белого и цветного 
+гауссовского шума.
 
-Based on:
+Основано на:
     N. Eslahi, A. Aghagolzadeh:
     "Compressive Sensing Image Restoration Using Adaptive Curvelet
      Thresholding and Nonlocal Sparse Regularization",
     IEEE Trans. Image Process., vol. 25, no. 7, pp. 3126-3140, Jul. 2016.
     https://doi.org/10.1109/TIP.2016.2562563
 
-Ported from the MATLAB implementation (v1.00, May 2022)
-by Nasser Eslahi (Tampere University).
-
-Requires: curvelets  (pure-Python UDCT implementation, pip install curvelets).
-
-Dependencies: numpy, scipy, curvelets.
+Требования: curvelets (реализация UDCT на чистом Python, pip install curvelets).
+Зависимости: numpy, scipy, curvelets.
 """
 
 import numpy as np
@@ -25,35 +23,37 @@ from numpy.fft import ifft2, fftshift
 __all__ = ['act_denoise']
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# 1. UDCT operator factory
-# ═════════════════════════════════════════════════════════════════════════════
-
 def _choose_num_scales(H, W):
-    """Pick the number of UDCT scales (including lowpass) for an image.
+    """
+    Определение оптимального количества масштабов (включая низкочастотный) 
+    для преобразования UDCT.
 
-    Heuristic: ceil(log2(min(H,W))) - 2, clamped to [2, 4].
+    Используется эмпирическое правило: ceil(log2(min(H, W))) - 2.
+    Значение ограничивается диапазоном от 2 до 4.
     """
     return max(2, min(4, int(np.ceil(np.log2(min(H, W)))) - 2))
 
 
 def _udct_pad_multiple(num_scales):
-    """Smallest factor each spatial dimension must divide for UDCT to
-    reconstruct exactly.
+    """
+    Вычисление множителя, которому должны быть кратны пространственные 
+    размеры изображения для точного восстановления после UDCT.
 
-    ``curvelets.numpy.UDCT`` silently produces large reconstruction error
-    when a dimension is not divisible by ``2**(num_scales-1)``.  Padding
-    each dim to a multiple of this value restores perfect reconstruction
-    and eliminates banding artifacts on non-square / odd-sized images.
+    Чтобы избежать значительных ошибок восстановления и артефактов на 
+    границах изображения (особенно для неквадратных или нечетных размеров), 
+    каждое измерение должно быть кратно 2^(num_scales-1).
     """
     return 1 << max(num_scales - 1, 0)
 
 
 def _make_udct(H, W, num_scales=None):
-    """Create a UDCT operator. (H, W) must already be padded to multiples
-    of ``_udct_pad_multiple(num_scales)`` -- otherwise the underlying UDCT
-    fails silently with bad reconstruction. See :func:`act_denoise`.
     """
+    Создание оператора UDCT. 
+    
+    Размеры (H, W) предварительно должны быть дополнены (padded) до значений, 
+    кратных результату функции _udct_pad_multiple(num_scales).
+    """
+
     from curvelets.numpy import UDCT
 
     if num_scales is None:
@@ -62,35 +62,31 @@ def _make_udct(H, W, num_scales=None):
     return UDCT(shape=(H, W), num_scales=num_scales, transform_kind='real')
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# 2. Noise PSD propagation to curvelet domain
-# ═════════════════════════════════════════════════════════════════════════════
-
 def _compute_curvelet_noise_rootpsd(fft_psd, udct_op):
-    """Compute noise root-PSD (σ) per curvelet subband.
-
-    Mirrors MATLAB ``cmpt_DCuT_rootPSD``.
-
-    The noise coloring kernel in the spatial domain is recovered from
-    √(FFT_PSD) via inverse FFT, then transformed into the curvelet
-    domain.  The RMS of each subband gives the noise std there.
-
-    Parameters
-    ----------
-    fft_psd : ndarray (H, W)
-        Noise FFT-PSD in standard FFT order (DC at [0,0]).
-        Convention: for AWGN with variance σ², FFT_PSD = σ² × H × W.
-    udct_op : curvelets.numpy.UDCT
-
-    Returns
-    -------
-    rootpsd : list[list[list[float]]]
-        rootpsd[J][D][W] = noise std in subband
-        (scale J, direction D, wedge W).
     """
-    # Spatial noise-coloring kernel: ifft2(√PSD), centred.
-    # For a properly formed FFT_PSD (Hermitian symmetric for real kernel),
-    # the result is real-valued.  Take .real for numerical safety.
+    Оценка среднеквадратичного отклонения (СКО) шума для каждой подполосы 
+    курвлет-преобразования.
+
+    Пространственное ядро окрашивания шума восстанавливается из корня 
+    спектральной плотности мощности (FFT_PSD) через обратное БПФ. Затем это 
+    ядро трансформируется в курвлет-область. СКО шума в каждой подполосе 
+    вычисляется как среднеквадратичное значение (RMS) полученных коэффициентов.
+
+    Параметры
+    ---------
+    fft_psd : ndarray (H, W)
+        Спектральная плотность мощности шума (FFT-PSD) в стандартном порядке 
+        FFT (постоянная составляющая в [0,0]). Для белого гауссовского шума 
+        (AWGN) с дисперсией sigma^2: FFT_PSD = sigma^2 * H * W.
+    udct_op : curvelets.numpy.UDCT
+        Инициализированный оператор курвлет-преобразования.
+
+    Возвращает
+    ----------
+    rootpsd : list[list[list[float]]]
+        Вложенный список со значениями СКО шума для каждой подполосы
+        (масштаб, направление, клин).
+    """
     kernel_noise = fftshift(ifft2(np.sqrt(fft_psd.astype(np.complex128)))).real
 
     c_struct = udct_op.forward(kernel_noise)
@@ -108,81 +104,73 @@ def _compute_curvelet_noise_rootpsd(fft_psd, udct_op):
     return rootpsd
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# 3. ML estimator for clean signal std
-# ═════════════════════════════════════════════════════════════════════════════
-
 def _ml_estimator(noisy_coeffs, noise_rootpsd, noise_type):
-    """Estimate clean signal std in one curvelet subband via ML.
+    """
+    Оценка СКО чистого сигнала в отдельной курвлет-подполосе с использованием 
+    метода максимального правдоподобия.
 
-    Mirrors MATLAB ``ML_estimator``.
+    Локальная дисперсия зашумленных коэффициентов оценивается путем усреднения 
+    квадратов их модулей по пространственному окну (исключая центральный пиксель). 
+    Дисперсия чистого сигнала вычисляется как разность между локальной дисперсией 
+    и дисперсией шума. Итоговое СКО = sqrt(max(clean_var, 0)).
 
-    Local variance of noisy coefficients is estimated by averaging
-    |c|² over a neighbourhood (excluding the centre pixel).
-    Clean variance = local noisy variance − noise variance.
-    Clean std = √(max(clean_var, 0)).
-
-    Parameters
-    ----------
+    Параметры
+    ---------
     noisy_coeffs : ndarray (complex)
-        Curvelet coefficients at subband (J, L).
+        Курвлет-коэффициенты текущей подполосы.
     noise_rootpsd : float
-        Noise std (root-PSD) in this subband.
+        СКО шума (sigma_n) в данной подполосе.
     noise_type : str
-        'white' or 'colored'.  Controls averaging window size:
-        7×7 for white, 31×31 for colored (matches MATLAB).
+        Тип шума: 'white' или 'colored'. Определяет размер окна усреднения:
+        7x7 для белого шума, 31x31 для цветного.
 
-    Returns
-    -------
-    clean_std : ndarray (real, same spatial shape as noisy_coeffs)
-        Spatially varying estimate of clean signal std.
+    Возвращает
+    ----------
+    clean_std : ndarray
+        Пространственно-зависимая оценка СКО чистого сигнала (совпадает по 
+        размеру с noisy_coeffs).
     """
     if noise_type == 'white':
-        # 7×7 window, exclude centre → 48 neighbours
         k = np.ones((7, 7), dtype=np.float64) / 48.0
         k[3, 3] = 0.0
     else:
-        # 31×31 window, exclude centre → 960 neighbours
         k = np.ones((31, 31), dtype=np.float64) / 960.0
         k[15, 15] = 0.0
-
-    # Local average of |c|² (circular boundary, same as MATLAB padarray+convn)
     power = (np.abs(noisy_coeffs) ** 2).astype(np.float64)
     local_var = _ndconvolve(power, k, mode='wrap')
 
-    # Clean variance = noisy variance − noise variance
     clean_var = local_var - noise_rootpsd ** 2
     clean_var = np.maximum(clean_var, 0.0)
 
     return np.sqrt(clean_var)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# 4. ACT: Adaptive Curvelet Thresholding
-# ═════════════════════════════════════════════════════════════════════════════
-
 def _apply_act(c_struct, rootpsd, threshold_setting, noise_type):
-    """Apply ACT thresholding across all curvelet subbands.
+    """
+    Применение порогового ограничения ACT ко всем курвлет-подполосам.
 
-    Mirrors MATLAB ``ACT`` subfunction.
-    Coarsest scale (J=0, MATLAB J=1) is always skipped.
+    Самый грубый масштаб (J=0, низкочастотная компонента) всегда пропускается 
+    без изменений. Для остальных масштабов вычисляется адаптивный порог на 
+    основе отношения дисперсии шума к оценке дисперсии чистого сигнала.
 
-    Parameters
-    ----------
+    Параметры
+    ---------
     c_struct : list[list[list[ndarray]]]
-        Curvelet coefficients from UDCT.forward().
-        Structure: c_struct[scale][direction][wedge].
+        Курвлет-коэффициенты, полученные из UDCT.forward().
     rootpsd : list[list[list[float]]]
-        Noise root-PSD per subband from _compute_curvelet_noise_rootpsd.
+        СКО шума для каждой подполосы (из _compute_curvelet_noise_rootpsd).
     threshold_setting : str
-        's' — soft ACT, 'h' — hard ACT, 'ksigma' — k-sigma baseline.
+        Режим ограничения:
+        's' - мягкое ограничение (Soft ACT), порог: sqrt(2) * sigma_n^2 / sigma_clean.
+        'h' - жесткое ограничение (Hard ACT).
+        'ksigma' - классическое ограничение k-sigma (Starck, Candes, Donoho 2002).
     noise_type : str
-        'white' or 'colored'.
+        Тип шума ('white' или 'colored').
 
-    Returns
-    -------
+    Возвращает
+    ----------
     denoised : list[list[list[ndarray]]]
-        Thresholded curvelet coefficients (same structure).
+        Структура курвлет-коэффициентов после пороговой обработки.
     """
     nscales = len(c_struct)
     denoised = []
@@ -193,8 +181,6 @@ def _apply_act(c_struct, rootpsd, threshold_setting, noise_type):
             wedges = []
             for W in range(len(c_struct[J][D])):
                 coeff = c_struct[J][D][W].copy()
-
-                # Skip coarsest scale (J=0 in Python = J=1 in MATLAB)
                 if J == 0:
                     wedges.append(coeff)
                     continue
@@ -203,17 +189,12 @@ def _apply_act(c_struct, rootpsd, threshold_setting, noise_type):
                 mag = np.abs(coeff)
 
                 if threshold_setting in ('s', 'h'):
-                    # ── ACT (Eslahi & Aghagolzadeh, 2016) ───────────────
                     clean_std = _ml_estimator(coeff, sigma_n, noise_type)
                     safe_std = np.maximum(clean_std, 1e-10)
 
                     if threshold_setting == 's':
-                        # Soft adaptive threshold: T = √2 · σ_n² / σ_clean
                         threshold = np.sqrt(2.0) * (sigma_n ** 2) / safe_std
                         threshold = np.where(clean_std > 0, threshold, np.inf)
-
-                        # Complex soft thresholding:
-                        # out = (c / |c|) × max(|c| − T, 0)
                         shrunk = np.maximum(mag - threshold, 0.0)
                         coeff = np.where(
                             mag > 1e-30,
@@ -221,8 +202,7 @@ def _apply_act(c_struct, rootpsd, threshold_setting, noise_type):
                             np.zeros_like(coeff),
                         )
 
-                    else:  # 'h' — hard adaptive threshold
-                        # Additional factor (3+δ)/√2 where δ=1 for finest scale
+                    else:
                         is_finest = float(J == nscales - 1)
                         threshold = ((3.0 + is_finest) * (sigma_n ** 2)
                                      / (np.sqrt(2.0) * safe_std))
@@ -230,7 +210,7 @@ def _apply_act(c_struct, rootpsd, threshold_setting, noise_type):
 
                         coeff = coeff * (mag > threshold)
 
-                else:  # 'ksigma' — Starck, Candes, Donoho (2002)
+                else:
                     is_finest = float(J == nscales - 1)
                     threshold = (3.0 + is_finest) * sigma_n
 
@@ -243,41 +223,42 @@ def _apply_act(c_struct, rootpsd, threshold_setting, noise_type):
     return denoised
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# 5. Public interface
-# ═════════════════════════════════════════════════════════════════════════════
-
 def act_denoise(image, noise_var=None, threshold_setting='s'):
-    """Denoise a grayscale image using Adaptive Curvelet Thresholding.
+    """
+    Подавление шума на полутоновом изображении с использованием алгоритма ACT 
+    (Adaptive Curvelet Thresholding).
 
-    Parameters
+    Функция выполняет дополнение (padding) изображения до оптимальных размеров,
+    прямое курвлет-преобразование, оценку уровня шума (при необходимости), 
+    адаптивную пороговую обработку коэффициентов и обратное преобразование.
+
+    Параметры
+    ---------
+    image : ndarray (H, W), float64 в диапазоне [0, 1]
+        Входное зашумленное полутоновое изображение.
+    noise_var : None, float или ndarray (H, W), по умолчанию None
+        Оценка дисперсии шума:
+        - None : слепая оценка по методу MAD на самом детальном масштабе курвлет-преобразования.
+        - float : известная дисперсия белого гауссовского шума (sigma^2).
+        - ndarray : спектральная плотность мощности (FFT-PSD) шума в стандартном 
+          порядке FFT (постоянная составляющая в [0,0]). Формат масштабирования 
+          для AWGN: FFT_PSD = sigma^2 * H * W.
+    threshold_setting : str, по умолчанию 's'
+        Стратегия порогового ограничения:
+        - 's' : мягкое ограничение (обычно дает лучший PSNR).
+        - 'h' : жесткое ограничение.
+        - 'ksigma' : базовое пороговое ограничение (Starck/Candes/Donoho 2002).
+
+    Возвращает
     ----------
-    image : ndarray (H, W), float64 [0, 1]
-        Noisy grayscale image.
-    noise_var : None, float, or ndarray (H, W)
-        - ``None``  — blind estimation via MAD on finest curvelet subband.
-        - ``float`` — known AWGN variance σ².
-        - ``ndarray (H, W)`` — noise FFT-PSD in standard FFT order
-          (DC at [0,0]).  Convention: for AWGN σ², FFT_PSD = σ² × H × W.
-
-        NOTE: the PSD from ``noise_psd_analysis.estimate_noise_psd()``
-        uses a different convention (centred, patch-based scaling) and
-        is NOT directly compatible.  Use ``None`` (blind MAD) or pass
-        a known σ² from Chen / Pyatykh noise estimators instead.
-    threshold_setting : str
-        ``'s'``      — soft ACT (default, usually best PSNR).
-        ``'h'``      — hard ACT.
-        ``'ksigma'`` — k-sigma baseline (Starck/Candes/Donoho 2002).
-
-    Returns
-    -------
     denoised : ndarray (H, W), float64
-        Denoised image.
+        Изображение после шумоподавления.
     info : dict
-        ``'noise_type'``         — 'white' or 'colored'
-        ``'noise_var'``          — effective variance (float or 'fft_psd')
-        ``'threshold_setting'``  — str
-        ``'blind'``              — bool, True if variance was estimated
+        Словарь с метаданными о процессе шумоподавления:
+        - 'noise_type' : тип шума ('white' или 'colored').
+        - 'noise_var' : эффективная дисперсия шума (float) или строка 'fft_psd'.
+        - 'threshold_setting' : примененная стратегия.
+        - 'blind' : bool, True, если дисперсия оценивалась автоматически.
     """
     if threshold_setting not in ('s', 'h', 'ksigma'):
         raise ValueError(
@@ -288,11 +269,6 @@ def act_denoise(image, noise_var=None, threshold_setting='s'):
     if img.ndim != 2:
         raise ValueError(f"Expected 2D grayscale image, got shape {img.shape}")
     H, W = img.shape
-
-    # Pad to a UDCT-compatible shape.  UDCT silently breaks (huge
-    # reconstruction error -> block / banding artifacts) when a spatial
-    # dimension is not divisible by 2**(num_scales-1).  Pick num_scales
-    # from the original size, then pad each dim to the next multiple.
     num_scales = _choose_num_scales(H, W)
     pad_mult = _udct_pad_multiple(num_scales)
     Hp = H + (-H) % pad_mult
@@ -305,16 +281,10 @@ def act_denoise(image, noise_var=None, threshold_setting='s'):
 
     udct_op = _make_udct(Hp, Wp, num_scales=num_scales)
 
-    # ── Forward curvelet transform ───────────────────────────────────────
     c_struct = udct_op.forward(img)
 
-    # ── Noise variance estimation ────────────────────────────────────────
     blind = noise_var is None
     if blind:
-        # MAD on the finest scale.  Non-square images give wedges of
-        # very different aspect ratios, so a single wedge is biased;
-        # aggregate MAD across all finest-scale wedges and take the
-        # median.
         mads = []
         for direction in c_struct[-1]:
             for wedge in direction:
@@ -325,7 +295,6 @@ def act_denoise(image, noise_var=None, threshold_setting='s'):
         noise_std = float(np.median(mads))
         noise_var = noise_std ** 2
 
-    # ── Build FFT-PSD ────────────────────────────────────────────────────
     scalar_var = (np.isscalar(noise_var)
                   or (isinstance(noise_var, np.ndarray)
                       and noise_var.size == 1))
@@ -342,23 +311,18 @@ def act_denoise(image, noise_var=None, threshold_setting='s'):
         if fft_psd.shape != (Hp, Wp):
             raise ValueError(
                 f"FFT-PSD shape {fft_psd.shape} != image ({Hp}, {Wp})")
-        # Check if essentially flat → white
         psd_range = float(fft_psd.max() - fft_psd.min())
         noise_type = 'white' if psd_range < 0.015 * N else 'colored'
 
-    # ── Noise root-PSD per curvelet subband ──────────────────────────────
     rootpsd = _compute_curvelet_noise_rootpsd(fft_psd, udct_op)
 
-    # ── ACT thresholding ─────────────────────────────────────────────────
     denoised_struct = _apply_act(
         c_struct, rootpsd, threshold_setting, noise_type)
 
-    # ── Inverse curvelet transform ───────────────────────────────────────
     denoised = udct_op.backward(denoised_struct)
     if np.iscomplexobj(denoised):
         denoised = denoised.real
 
-    # ── Crop back to original size ───────────────────────────────────────
     denoised = denoised[:H, :W]
 
     info = {

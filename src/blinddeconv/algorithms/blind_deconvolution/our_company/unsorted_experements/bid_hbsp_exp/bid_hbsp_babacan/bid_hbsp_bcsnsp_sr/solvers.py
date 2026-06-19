@@ -29,10 +29,6 @@ from .utils import (
 )
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-#  Image solver — CG with per-pixel HS weights (from BID-HBSP)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def solve_image_cg(
     y: np.ndarray,
     h: np.ndarray,
@@ -43,7 +39,7 @@ def solve_image_cg(
     max_cg_iter: int = 50,
     cg_tol: float = 1e-6,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """Estimate image mean + approximate pixel-wise variance via CG."""
+
     H, W = y.shape
     N = H * W
 
@@ -68,7 +64,7 @@ def solve_image_cg(
     )
     x_out = x_flat.reshape((H, W))
 
-    # Diagonal variance approximation: Sigma^2 ≈ 1 / diag(A)
+
     h_energy = np.sum(h ** 2)
     reg_strength = (
         gamma_x + np.roll(gamma_x, 1, axis=1)
@@ -79,10 +75,6 @@ def solve_image_cg(
     return np.maximum(x_out, 0.0), sigma_sq
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-#  Kernel solver — Fourier-domain Wiener + gradient space (from BID-HBSP)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def solve_kernel_fourier(
     y: np.ndarray,
     x: np.ndarray,
@@ -92,7 +84,7 @@ def solve_kernel_fourier(
     lambda_h: float,
     do_threshold: bool = True,
 ) -> np.ndarray:
-    """Kernel estimation in gradient space with VB covariance correction."""
+
     H, W = y.shape
 
     dy_x = forward_diff_x(y)
@@ -100,7 +92,7 @@ def solve_kernel_fourier(
     dx_x = forward_diff_x(x)
     dx_y = forward_diff_y(x)
 
-    # Boundary masking
+
     dy_x[:, -1] = 0.0
     dx_x[:, -1] = 0.0
     dy_y[-1, :] = 0.0
@@ -128,10 +120,6 @@ def solve_kernel_fourier(
     return h
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-#  Noise precision update (from BID-HBSP)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def update_noise_precision(
     y: np.ndarray,
     h: np.ndarray,
@@ -139,7 +127,7 @@ def update_noise_precision(
     beta_prev: float,
     damping: float = 0.5,
 ) -> float:
-    """Update β = 1/σ² from the current residual with damping."""
+
     H, W = y.shape
     N = float(H * W)
     F_h = psf2otf(h, (H, W))
@@ -151,27 +139,19 @@ def update_noise_precision(
     return beta
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-#  HS weight update (from BID-HBSP)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def update_hs_weights(
     x: np.ndarray, sigma_sq: np.ndarray, b: float,
 ) -> Tuple:
-    """Update HS weights using variational E[w]."""
+
     dx = forward_diff_x(x)
     dy = forward_diff_y(x)
     return compute_hs_weights(dx, dy, sigma_sq, b)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-#  Final non-blind deconvolution — IRLS (from BID-HBSP)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def final_deconvolution(
     y: np.ndarray, h: np.ndarray, beta: float, lambda_reg: float,
 ) -> np.ndarray:
-    """Non-blind IRLS deconvolution (p=0.8) with edge-padding."""
+
     kh, kw = h.shape
     pad_h = kh
     pad_w = kw
@@ -224,7 +204,7 @@ def _solve_image_irls_step(
     beta: float,
     cg_iter: int = 20,
 ) -> np.ndarray:
-    """One IRLS step via Conjugate Gradient."""
+
     H, W = x_init.shape
     N = H * W
 

@@ -30,12 +30,8 @@ from typing import Tuple
 EPSILON = 1e-12
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-#  FFT-based convolution utilities (from BID-HBSP utils)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def psf2otf(psf: np.ndarray, shape: Tuple[int, int]) -> np.ndarray:
-    """Convert PSF to OTF (zero-pad + circshift + fft2)."""
+
     kh, kw = psf.shape
     padded = np.zeros(shape, dtype=psf.dtype)
     padded[:kh, :kw] = psf
@@ -45,7 +41,7 @@ def psf2otf(psf: np.ndarray, shape: Tuple[int, int]) -> np.ndarray:
 
 
 def otf2psf(otf: np.ndarray, kernel_shape: Tuple[int, int]) -> np.ndarray:
-    """Recover spatial PSF from OTF by inverse DFT and cropping."""
+
     kh, kw = kernel_shape
     psf_full = np.real(ifft2(otf))
     psf_full = np.roll(psf_full, kh // 2, axis=0)
@@ -53,14 +49,10 @@ def otf2psf(otf: np.ndarray, kernel_shape: Tuple[int, int]) -> np.ndarray:
     return psf_full[:kh, :kw]
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-#  Gradient operators (from BID-HBSP utils)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def precompute_gradient_operators(
     shape: Tuple[int, int],
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Precompute DFT of first-order finite-difference operators."""
+
     H, W = shape
     dx = np.zeros(shape)
     dx[0, 0] = -1
@@ -75,28 +67,24 @@ def precompute_gradient_operators(
 
 
 def forward_diff_x(u: np.ndarray) -> np.ndarray:
-    """Horizontal forward difference."""
+
     return np.roll(u, -1, axis=1) - u
 
 
 def forward_diff_y(u: np.ndarray) -> np.ndarray:
-    """Vertical forward difference."""
+
     return np.roll(u, -1, axis=0) - u
 
 
 def adjoint_diff_x(v: np.ndarray) -> np.ndarray:
-    """Adjoint of horizontal forward difference."""
+
     return np.roll(v, 1, axis=1) - v
 
 
 def adjoint_diff_y(v: np.ndarray) -> np.ndarray:
-    """Adjoint of vertical forward difference."""
+
     return np.roll(v, 1, axis=0) - v
 
-
-# ═════════════════════════════════════════════════════════════════════════════
-#  HS prior weights (from BID-HBSP utils)
-# ═════════════════════════════════════════════════════════════════════════════
 
 def compute_hs_weights(
     dx: np.ndarray,
@@ -104,10 +92,8 @@ def compute_hs_weights(
     sigma_x: np.ndarray,
     b: float,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    E[w] for the HS prior via variational approximation.
-    Ref: Castro-Macías et al. (2024), Eq. (26).
-    """
+
+
     sigma_grad = 2.0 * sigma_x
     nu_x = np.sqrt(dx ** 2 + sigma_grad + EPSILON)
     nu_y = np.sqrt(dy ** 2 + sigma_grad + EPSILON)
@@ -117,12 +103,8 @@ def compute_hs_weights(
     return gamma_x, gamma_y
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-#  Kernel helpers (from BID-HBSP utils)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def project_kernel(h: np.ndarray) -> np.ndarray:
-    """Project onto the probability simplex (h >= 0, sum = 1)."""
+
     h = np.maximum(h, 0.0)
     h_sum = h.sum()
     if h_sum > EPSILON:
@@ -133,7 +115,7 @@ def project_kernel(h: np.ndarray) -> np.ndarray:
 
 
 def threshold_kernel(h: np.ndarray, ratio: float = 0.05) -> np.ndarray:
-    """Zero entries below ratio*max, then re-normalise."""
+
     h = np.maximum(h, 0.0)
     h[h < ratio * np.max(h)] = 0.0
     return project_kernel(h)
@@ -142,7 +124,7 @@ def threshold_kernel(h: np.ndarray, ratio: float = 0.05) -> np.ndarray:
 def init_gaussian_kernel(
     shape: Tuple[int, int], sigma: float = None,
 ) -> np.ndarray:
-    """Gaussian kernel normalised to unit sum."""
+
     kh, kw = shape
     if sigma is None:
         sigma = max(kh, kw) / 6.0
@@ -154,7 +136,7 @@ def init_gaussian_kernel(
 
 
 def fft_convolve(x: np.ndarray, h: np.ndarray) -> np.ndarray:
-    """Circular convolution h * x via the FFT."""
+
     F_h = psf2otf(h, x.shape)
     return np.real(ifft2(F_h * fft2(x)))
 
@@ -162,7 +144,7 @@ def fft_convolve(x: np.ndarray, h: np.ndarray) -> np.ndarray:
 def edgetaper(
     img: np.ndarray, kernel: np.ndarray, n_taper: int = None,
 ) -> np.ndarray:
-    """Smooth image edges for FFT-based deconvolution (cf. MATLAB edgetaper)."""
+
     h, w = img.shape
     kh, kw = kernel.shape
     if n_taper is None:
@@ -198,18 +180,6 @@ def edgetaper(
     return img * W + blurred * (1 - W)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-#  NEW: Fast FFT-based initial image estimate (SAR + TV-IRLS)
-#
-#  Uses restore_sar from BCSNSP-SR (pure frequency-domain Wiener filter
-#  with SAR prior and automatic hyperparameter estimation) followed by
-#  a few IRLS iterations with an anisotropic TV prior.
-#
-#  Complexity: O(N log N) per iteration — typically <1-2 s for 256×256.
-#  Contrast with the old approach that called solvex_var_l4_sar which
-#  builds O(N²) sparse matrices and took ~1 hour on the same image.
-# ═════════════════════════════════════════════════════════════════════════════
-
 def sr_initial_estimate(
     y: np.ndarray,
     h_init: np.ndarray,
@@ -217,50 +187,15 @@ def sr_initial_estimate(
     tv_iters: int = 5,
     verbose: bool = False,
 ) -> np.ndarray:
-    """Produce a sharper initial image estimate via FFT-based SAR + TV.
 
-    Two-phase approach inspired by BCSNSP-SR's dual-prior philosophy
-    (Salvador et al., 2013), but implemented entirely in the frequency
-    domain for speed:
 
-    Phase 1 — **SAR deconvolution** (``restore_sar`` from BCSNSP-SR):
-        Frequency-domain Wiener filter with a Simultaneous Auto-Regressive
-        (Laplacian) prior.  Automatically estimates regularisation (α) and
-        noise precision (β) via EM — no manual tuning needed.  Produces a
-        moderately sharpened image with estimated hyperparameters.
-
-    Phase 2 — **TV-IRLS refinement** (anisotropic Lp, p ≈ 0.8):
-        A few iterations of half-quadratic / IRLS with an Lp gradient
-        penalty, all solved via element-wise Fourier operations (CG on
-        the normal equation with FFT matvec).  This adds edge-preserving
-        sparsity that SAR alone cannot provide, mirroring the TV component
-        of the BCSNSP-SR combined prior.
-
-    The ``lambda_prior`` parameter blends the two phases:
-        - 1.0 → full TV refinement after SAR
-        - 0.0 → SAR only (no TV step)
-
-    Parameters
-    ----------
-    y            : (H, W) blurred image, float64, [0, 1].
-    h_init       : (kh, kw) initial kernel estimate (Gaussian seed).
-    lambda_prior : TV strength in [0, 1] — weight of the TV refinement
-                   relative to the SAR result.
-    tv_iters     : number of TV-IRLS iterations (Phase 2).
-    verbose      : print diagnostics.
-
-    Returns
-    -------
-    x0 : (H, W) sharper initial image, float64, [0, 1].
-    """
-    # --- Import FFT-based SAR deconvolver from BCSNSP-SR utils ---
     from blinddeconv.algorithms.super_resolution.our_company.bcsnsp_sr.utils import (
         restore_sar,
     )
 
     H, W = y.shape
 
-    # ── Phase 1: SAR deconvolution (frequency-domain Wiener) ─────────
+
     x_sar, alpha_sar, beta_sar = restore_sar(y, h_init)
     x_sar = np.clip(x_sar, 0.0, 1.0)
 
@@ -272,14 +207,7 @@ def sr_initial_estimate(
     if lambda_prior <= 0.0 or tv_iters <= 0:
         return x_sar
 
-    # ── Phase 2: TV-IRLS refinement (FFT-based, no sparse matrices) ──
-    #
-    # Solve:  min_x  β/2 ||y - h*x||² + λ_tv Σ |∇x|^p
-    # via IRLS (iteratively reweighted least squares) with p = 0.8.
-    # Each iteration solves:
-    #   (β H^T H + D^T W D) x = β H^T y
-    # where W = diag(p |∇x_prev|^{p-2}) are the IRLS weights,
-    # and the matvec uses FFT for the H^T H term.
+
     from scipy.sparse.linalg import LinearOperator, cg as sp_cg
 
     F_h = psf2otf(h_init, (H, W))
@@ -288,8 +216,8 @@ def sr_initial_estimate(
     F_y = fft2(y)
 
     beta = beta_sar
-    # TV regularisation weight — scaled by lambda_prior and alpha_sar
-    # so the TV term is commensurate with the data fidelity
+
+
     lambda_tv = lambda_prior * alpha_sar * 0.5
 
     rhs_base = beta * np.real(ifft2(F_h_conj * F_y))

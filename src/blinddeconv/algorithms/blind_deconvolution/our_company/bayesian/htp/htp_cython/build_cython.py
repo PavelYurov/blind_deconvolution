@@ -1,25 +1,22 @@
 """
-build_cython.py  —  Build all .pyx modules in bid_hbsp_cython.
+build_cython.py
+Собирает все .pyx модули.
 
-Usage (from any directory):
-    python  <path-to>/bid_hbsp_cython/build_cython.py
+Скрипт:
+  1. Компилирует все .pyx - .c 
+  2. Собирает .c - .pyd         
+  3. Копирует .pyd - _build_pyd/
+  4. Копирует .c  - _build_c/     
+  5. Удаляет временные файлы
 
-The script:
-  1. Compiles every .pyx → .c   (Cython.Compiler)
-  2. Builds every .c → .pyd     (setuptools build_ext)
-  3. Copies .pyd → _build_pyd/  (separate output folder)
-  4. Copies .c  → _build_c/     (separate output folder)
-  5. Removes .c from source dir + temp build dirs
+Расположение:
+    {Название папки}_cython/
+        *.pyx                  - исходник
+        build_cython.py        - этот скрипт
+        __init__.py            - (опционально)
+        _build_pyd/            - скомпилированные .pyd файлы
+        _build_c/              - сгенерированные .c файлы
 
-Output layout:
-    bid_hbsp_cython/
-        *.pyx                  ← sources (untouched)
-        build_cython.py        ← this script
-        __init__.py
-        _build_pyd/            ← compiled .pyd files
-        _build_c/              ← generated .c files
-
-Windows MAX_PATH workaround: compilation happens in %TEMP%.
 """
 
 import os
@@ -29,12 +26,10 @@ import tempfile
 import sysconfig
 from pathlib import Path
 
-# ── Locate package directory (same folder as this script) ─────
 PKG_DIR = Path(__file__).resolve().parent
 PYD_DIR = PKG_DIR / "_build_pyd"
 C_DIR   = PKG_DIR / "_build_c"
 
-# ── All .pyx modules to compile ──────────────────────────────
 PYX_MODULES = sorted(
     p.stem for p in PKG_DIR.glob("*.pyx")
 )
@@ -46,7 +41,7 @@ print(f"[build] Modules     : {PYX_MODULES}")
 
 
 def cythonize_all():
-    """Stage 1: .pyx → .c via Cython compiler."""
+    """Стадия 1: .pyx - .c через Cython compiler."""
     from Cython.Compiler.Main import compile as cy_compile, CompilationOptions
 
     opts = CompilationOptions(language_level=3)
@@ -62,16 +57,14 @@ def cythonize_all():
 
 
 def build_extensions(c_files):
-    """Stage 2: .c → .pyd (or .so) via setuptools."""
+    """Стадия 2: .c - .pyd (or .so) через setuptools."""
     import numpy as np
     from setuptools import Extension, Distribution
     from setuptools.command.build_ext import build_ext
 
-    # Use short temp dir to dodge Windows MAX_PATH
     tmp_root = Path(tempfile.gettempdir()) / "cython_bid_hbsp"
     tmp_root.mkdir(exist_ok=True)
 
-    # ── Compiler optimisation flags ──────────────────────────
     if sys.platform.startswith('win'):
         extra_compile_args = ['/O2', '/fp:fast']
         extra_link_args    = []
@@ -104,7 +97,6 @@ def build_extensions(c_files):
         cmd.ensure_finalized()
         cmd.run()
 
-        # Find the built .pyd/.so
         for root, _, files in os.walk(str(tmp_root / "lib")):
             for f in files:
                 if f.startswith(mod) and f.endswith(ext_suffix):
@@ -115,17 +107,15 @@ def build_extensions(c_files):
 
 
 def install_and_cleanup(built, c_files, tmp_root):
-    """Stage 3–5: .pyd → _build_pyd/, .c → _build_c/, clean temps."""
+    """Стадия 3–5: .pyd - _build_pyd/, .c - _build_c/, очистить временные файлы."""
     PYD_DIR.mkdir(exist_ok=True)
     C_DIR.mkdir(exist_ok=True)
 
-    # Copy .pyd into _build_pyd/
     for mod, pyd_path in built.items():
         dest = PYD_DIR / Path(pyd_path).name
         shutil.copy2(pyd_path, dest)
         print(f"  install {dest.relative_to(PKG_DIR)}")
 
-    # Move .c into _build_c/
     for mod, c_path in c_files.items():
         c = Path(c_path)
         if c.exists():
@@ -133,11 +123,9 @@ def install_and_cleanup(built, c_files, tmp_root):
             shutil.move(str(c), str(dest_c))
             print(f"  archive {dest_c.relative_to(PKG_DIR)}")
 
-    # Remove temp build tree
     if tmp_root.exists():
         shutil.rmtree(tmp_root, ignore_errors=True)
 
-    # Remove any stray .pyd left in source dir from previous builds
     for pyd in PKG_DIR.glob("*.pyd"):
         pyd.unlink()
 
@@ -146,10 +134,10 @@ def install_and_cleanup(built, c_files, tmp_root):
 
 
 def main():
-    print("\n══ Stage 1: Cython (.pyx → .c) ══")
+    print("\n══ Stage 1: Cython (.pyx - .c) ══")
     c_files = cythonize_all()
 
-    print("\n══ Stage 2: Compile (.c → .pyd) ══")
+    print("\n══ Stage 2: Compile (.c - .pyd) ══")
     built, tmp_root = build_extensions(c_files)
 
     if len(built) != len(PYX_MODULES):
@@ -161,7 +149,7 @@ def main():
 
     print(f"\n[build] Successfully built {len(built)}/{len(PYX_MODULES)} modules")
     for mod in sorted(built):
-        print(f"  ✓ {mod}")
+        print(f"  V {mod}")
 
 
 if __name__ == "__main__":

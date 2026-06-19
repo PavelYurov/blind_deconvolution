@@ -18,7 +18,6 @@ from pathlib import Path
 from collections import Counter
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 
-# ── Путь к фреймворку ───────────────────────────────────────────
 FRAMEWORK_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(FRAMEWORK_ROOT / "src"))
 
@@ -27,9 +26,6 @@ from blinddeconv.filters.noise import (
     GaussianNoise, PoissonNoise, SaltAndPepperNoise, Pink_Noise, Brown_Noise,
 )
 
-# ═══════════════════════════════════════════════════════════════════
-#   Конфигурация датасета
-# ═══════════════════════════════════════════════════════════════════
 
 DATASET_DIR   = FRAMEWORK_ROOT / "images" / "new_dataset_big_pics"
 ORIGINALS_DIR = DATASET_DIR / "originals"
@@ -37,20 +33,16 @@ DISTORTED_DIR = DATASET_DIR / "distorted"
 FILTERS_DIR   = DATASET_DIR / "ground_truth_filters"
 TMP_DIR       = DATASET_DIR / "tmp"
 
-# Откуда берём PNG ядер (мастер-копия)
 KERNEL_SOURCE_DIR = FRAMEWORK_ROOT / "images" / "new_dataset_small_pics" / "ground_truth_filters"
 
-# Откуда копировать оригиналы (256×256, уже обрезанные)
 ORIGINALS_SOURCE_DIR = FRAMEWORK_ROOT / "images" / "new_dataset_big_pics_test" / "originals"
 
-# 15 оригиналов (должны лежать в ORIGINALS_DIR как {name}.png)
 ORIGINALS = [
     "airplane", "boat", "boy", "bridge", "cameraman",
     "childs", "drawing", "house", "lenna", "monarch",
     "parrot", "people", "pepper", "scarf", "star",
 ]
 
-# 15 ядер: 5 классов × 3
 KERNEL_CLASSES = [
     ["thick_motion", "linear", "largemation"],     # Linear
     ["dendric", "hook", "heliod"],                  # Trajectory
@@ -61,7 +53,6 @@ KERNEL_CLASSES = [
 
 CLASS_NAMES = ["Linear", "Trajectory", "Area", "Mixed", "Complex"]
 
-# Файлы ядер (PNG) — маппинг имя → файл
 KERNEL_FILES = {
     "thick_motion":  "thick_motion_kernel.png",
     "linear":        "linear_kernel.png",
@@ -80,7 +71,6 @@ KERNEL_FILES = {
     "wspiral":       "wspiral_kernel.png",
 }
 
-# Шумы (те же параметры, что в dataset_gen_small_pics.ipynb)
 NOISE_TYPES = ["gaussian", "poisson", "impulse", "pink", "brown"]
 
 def make_noise_filter(noise_type):
@@ -93,13 +83,10 @@ def make_noise_filter(noise_type):
         "brown":    lambda: Brown_Noise(noise_level=0.02),
     }[noise_type]()
 
-N_CLEAN = 25   # из 75 → 33% clean, 67% noisy
+N_CLEAN = 25
 SEED = 42
 
 
-# ═══════════════════════════════════════════════════════════════════
-#   Подготовка ядер: PNG → npy + Kernel_convolution
-# ═══════════════════════════════════════════════════════════════════
 
 def prepare_kernels():
     """Загружает PNG ядер, конвертирует в .npy, возвращает dict фильтров."""
@@ -121,15 +108,12 @@ def prepare_kernels():
         if not png_src.exists():
             raise FileNotFoundError(f"Ядро не найдено: {png_src}")
 
-        # Загрузка и нормализация
         k = cv.imread(str(png_src), cv.IMREAD_GRAYSCALE).astype(np.float64)
         k /= k.sum() + 1e-12
 
-        # Сохраняем .npy для Kernel_convolution
         npy_path = npy_dir / f"{kname}.npy"
         np.save(str(npy_path), k)
 
-        # Копируем PNG в ground_truth_filters датасета
         dst_png = FILTERS_DIR / kfile
         if not dst_png.exists():
             shutil.copy2(str(png_src), str(dst_png))
@@ -140,9 +124,6 @@ def prepare_kernels():
     return filters
 
 
-# ═══════════════════════════════════════════════════════════════════
-#   Матрица назначений (design matrix)
-# ═══════════════════════════════════════════════════════════════════
 
 def build_design_matrix():
     """
@@ -156,13 +137,10 @@ def build_design_matrix():
     n_orig = len(ORIGINALS)
     n_classes = len(KERNEL_CLASSES)
 
-    # Шаг 1: Назначение ядер (balanced pattern)
-    # Для класса c, оригинал i → индекс ядра в классе
     pairs = []  # (orig, kernel_name, class_idx)
     for i, orig in enumerate(ORIGINALS):
         for c, cls_kernels in enumerate(KERNEL_CLASSES):
             n_k = len(cls_kernels)
-            # Разные паттерны для разных классов чтобы избежать повторов
             if c < 3:
                 k_idx = (i + c) % n_k
             elif c == 3:
@@ -171,16 +149,14 @@ def build_design_matrix():
                 k_idx = (i * 2 + 1) % n_k
             pairs.append((orig, cls_kernels[k_idx], c))
 
-    # Шаг 2: Распределяем clean/noisy по оригиналам
     n_total = len(pairs)
     n_noisy = n_total - N_CLEAN
-    base_clean = N_CLEAN // n_orig          # = 1
-    extra_clean = N_CLEAN % n_orig          # = 10
+    base_clean = N_CLEAN // n_orig
+    extra_clean = N_CLEAN % n_orig
     clean_per_orig = [base_clean + (1 if i < extra_clean else 0)
                       for i in range(n_orig)]
     np.random.shuffle(clean_per_orig)
 
-    # Шаг 3: Пул шумов (сбалансированный по типам)
     n_per_type = n_noisy // len(NOISE_TYPES)
     n_extra = n_noisy % len(NOISE_TYPES)
     noise_pool = []
@@ -189,11 +165,9 @@ def build_design_matrix():
     np.random.shuffle(noise_pool)
     noise_iter = iter(noise_pool)
 
-    # Шаг 4: Финальная матрица
     result = []
     for i, orig in enumerate(ORIGINALS):
         orig_pairs = [(o, k, c) for o, k, c in pairs if o == orig]
-        # Случайно выбираем, какие слоты — clean
         class_order = list(range(n_classes))
         np.random.shuffle(class_order)
         clean_set = set(class_order[:clean_per_orig[i]])
@@ -206,10 +180,6 @@ def build_design_matrix():
 
     return result
 
-
-# ═══════════════════════════════════════════════════════════════════
-#   Применение фильтров + метрики
-# ═══════════════════════════════════════════════════════════════════
 
 def compute_metrics(original, image):
     """PSNR и SSIM между original и image (оба uint8)."""
@@ -231,13 +201,10 @@ def process_one(orig_path, blur_filter, noise_type, output_path):
     if original is None:
         raise FileNotFoundError(f"Не удалось загрузить: {orig_path}")
 
-    # Смаз через фреймворк
     blurred = blur_filter.filter(original)
 
-    # Метрики чистого смаза (всегда считаем)
     blur_psnr, blur_ssim = compute_metrics(original, blurred)
 
-    # Шум через фреймворк (если есть)
     if noise_type:
         noise_filter = make_noise_filter(noise_type)
         result = noise_filter.filter(blurred)
@@ -264,7 +231,6 @@ def plot_dataset_distribution(records, save_path):
     noisy  = [r for r in records if r["noise"]]
     clean  = [r for r in records if not r["noise"]]
 
-    # --- SSIM ---
     ax = axes[0]
     if noisy:
         ax.scatter([r["blur_ssim"] for r in noisy],
@@ -280,7 +246,6 @@ def plot_dataset_distribution(records, save_path):
     ax.legend()
     ax.grid(True, alpha=0.3)
 
-    # --- PSNR ---
     ax = axes[1]
     if noisy:
         ax.scatter([r["blur_psnr"] for r in noisy],
@@ -302,21 +267,15 @@ def plot_dataset_distribution(records, save_path):
     print(f"  Plot saved: {save_path}")
 
 
-# ═══════════════════════════════════════════════════════════════════
-#   Main
-# ═══════════════════════════════════════════════════════════════════
-
 def main():
     print("=" * 65)
     print("  Генерация датасета: BIG (75 изображений)")
     print("  15 оригиналов × 5 ядер, 25 clean + 50 noisy")
     print("=" * 65)
 
-    # Создаём папки
     for d in [ORIGINALS_DIR, DISTORTED_DIR, FILTERS_DIR, TMP_DIR]:
         d.mkdir(parents=True, exist_ok=True)
 
-    # Копируем оригиналы из источника (если ещё не скопированы)
     import shutil as _shutil
     if ORIGINALS_SOURCE_DIR.exists():
         for orig in ORIGINALS:
@@ -326,7 +285,6 @@ def main():
                 _shutil.copy2(str(src), str(dst))
                 print(f"  Скопирован: {orig}.png")
 
-    # Проверяем оригиналы
     missing = [o for o in ORIGINALS if not (ORIGINALS_DIR / f"{o}.png").exists()]
     if missing:
         print(f"\nОШИБКА: Не найдены оригиналы ({len(missing)} шт):")
@@ -335,32 +293,26 @@ def main():
         print(f"\nПоложите {len(ORIGINALS)} изображений в:\n  {ORIGINALS_DIR}")
         return
 
-    # Подготовка ядер
     print("\n--- Подготовка ядер ---")
     blur_filters = prepare_kernels()
 
-    # Матрица назначений
     print("\n--- Матрица назначений ---")
     design = build_design_matrix()
 
-    # Статистика
     kernel_counts = Counter(k for _, k, _ in design)
     noise_counts  = Counter(n if n else "CLEAN" for _, _, n in design)
     print(f"  Всего: {len(design)}")
     print(f"  По ядрам: { {k: kernel_counts[k] for k in sorted(kernel_counts)} }")
     print(f"  По шуму:  {dict(noise_counts)}")
 
-    # Очищаем distorted
     for f in DISTORTED_DIR.glob("*.png"):
         f.unlink()
 
-    # Генерация
     print("\n--- Генерация смазанных изображений ---")
     records = []
     for i, (orig, kernel, noise) in enumerate(design):
         orig_path = ORIGINALS_DIR / f"{orig}.png"
 
-        # Имя файла: {orig}_{kernel}_{noise}.png   (_ в конце = clean)
         out_name = f"{orig}_{kernel}_{noise}.png"
         out_path = DISTORTED_DIR / out_name
 
@@ -386,7 +338,6 @@ def main():
             "delta_ssim": round(metrics["delta_ssim"], 4),
         })
 
-    # Сохраняем дизайн в JSON
     json_path = DATASET_DIR / "dataset_design.json"
     with open(str(json_path), "w", encoding="utf-8") as f:
         json.dump(records, f, indent=2, ensure_ascii=False)

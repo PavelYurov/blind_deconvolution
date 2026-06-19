@@ -27,6 +27,28 @@ import pandas as pd
 from pathlib import Path
 from typing import Optional, Callable
 
+import sys
+from pathlib import Path
+
+
+def _find_project_root(start: Path) -> Path:
+    path = start.resolve()
+    while not (path / "pyproject.toml").exists():
+        if path.parent == path:
+            raise RuntimeError("Cannot locate project root")
+        path = path.parent
+    return path
+
+
+_CURRENT_FILE = Path(__file__).resolve()
+_PROJECT_ROOT = _find_project_root(_CURRENT_FILE)
+_SRC_DIR = _PROJECT_ROOT / "src"
+_ALGORITHMS_DIR = _SRC_DIR / "blinddeconv" / "algorithms"
+
+for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
+
 
 class IterationLogger:
     """
@@ -117,7 +139,7 @@ class IterationLogger:
         else:
             local_iter = iteration
 
-        # ── Базовая строка лога ──────────────────────────────────────────
+        # Базовая строка лога
         row = {
             'global_iter': self.global_iter,
             'scale': scale,
@@ -126,7 +148,7 @@ class IterationLogger:
         }
         row.update(metrics)
 
-        # ── Kernel MSE (если есть GT ядро) ───────────────────────────────
+        # Kernel MSE (если есть GT ядро)
         if kernel is not None and self.gt_kernel is not None:
             k_est = kernel.astype(np.float64)
             if k_est.ndim > 2:
@@ -138,22 +160,22 @@ class IterationLogger:
                 k_gt = k_gt[:, :, 0]
             k_gt_norm = k_gt / (k_gt.sum() + 1e-12)
 
-            # Привести к одному размеру (pad меньшее)
+            # Привести к одному размеру
             k_est_p, k_gt_p = self._match_kernel_sizes(k_est_norm, k_gt_norm)
 
             row['kernel_mse'] = float(np.mean((k_est_p - k_gt_p) ** 2))
             row['kernel_rmse'] = float(np.sqrt(row['kernel_mse']))
             row['kernel_mae'] = float(np.mean(np.abs(k_est_p - k_gt_p)))
 
-        # ── Сохранение ядра как PNG ──────────────────────────────────────
+        # Сохранение ядра как PNG 
         if kernel is not None and local_iter % self.save_kernel_every == 0:
-            k_save = np.rot90(kernel.copy(), 2)  # Поворот на 180° (корреляция → свёртка)
+            k_save = np.rot90(kernel.copy(), 2)
             if k_save.max() > 0:
                 k_save = (k_save / k_save.max() * 255).astype(np.uint8)
             fname = f"kernel_s{scale}_iter{local_iter:04d}.png"
             cv.imwrite(str(self.save_dir / "kernels" / fname), k_save)
 
-        # ── Non-blind восстановление: метрики КАЖДУЮ итерацию, PNG — каждые N ─
+        # Non-blind восстановление: метрики каждую итерацию, PNG каждые N
         if (kernel is not None
                 and self.nonblind_func is not None
                 and self.blurred is not None):
@@ -167,7 +189,7 @@ class IterationLogger:
                     fname = f"restored_s{scale}_iter{local_iter:04d}.png"
                     cv.imwrite(str(self.save_dir / "restored" / fname), r_save)
 
-                # PSNR / SSIM — считаем КАЖДУЮ итерацию
+                # PSNR / SSIM — считаем каждую итерацию
                 if self.original is not None:
                     psnr, ssim = self._compute_metrics(self.original, restored)
                     row['psnr'] = round(psnr, 4)
@@ -194,7 +216,7 @@ class IterationLogger:
         self.global_iter = 0
         self._finest_iter = 0
 
-    # ── Вспомогательные методы ────────────────────────────────────────────
+    # Вспомогательные методы
 
     @staticmethod
     def _match_kernel_sizes(k1: np.ndarray, k2: np.ndarray):
@@ -213,7 +235,7 @@ class IterationLogger:
     @staticmethod
     def _compute_metrics(original: np.ndarray, restored: np.ndarray):
         """PSNR и SSIM между двумя float64 [0,1] изображениями."""
-        from skimage.metrics import peak_signal_noise_ratio, structural_similarity
+        from blinddeconv.processing.utils import calculate_metrics
         orig = original.astype(np.float64)
         if orig.max() > 1.0:
             orig /= 255.0
@@ -233,8 +255,6 @@ class IterationLogger:
         orig = orig[:h, :w]
         rest = rest[:h, :w]
 
-        psnr = peak_signal_noise_ratio(orig, rest, data_range=1.0)
-        ssim = structural_similarity(
-            orig, rest, data_range=1.0,
-            channel_axis=2 if orig.ndim == 3 else None)
+        psnr, ssim = calculate_metrics(orig, rest, data_range=1.0)
+
         return psnr, ssim

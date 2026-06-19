@@ -4,10 +4,24 @@
 # cython: cdivision=True
 
 """
-solvers.pyx
+solvers.py
 
-Core solver functions for the LIP (Logarithmic Image Prior) blind deconvolution.
-(Fast Cython version)
+Основные функции решателей для алгоритма слепой деконволюции на основе 
+логарифмического априорного распределения (LIP).
+
+Основано на методах:
+    D. Perrone, R. Diethelm, P. Favaro: "Blind Deconvolution via
+    Lower-Bounded Logarithmic Image Priors", EMMCVPR 2015.
+
+Содержит:
+    - grad_tv_em : вычисление градиента для мажорированной модели TV.
+    - blind : базовый цикл градиентного спуска методом MM (Таблица 2 статьи).
+    - blind_cv : прямо-двойственное расщепление Конда-Вю для мажорированной задачи.
+    - blind_pd : точная реализация прямо-двойственного решателя (Таблица 1 статьи) 
+      для невыпуклого функционала LIP.
+    - build_pyramid : построение многомасштабной пирамиды.
+    - coarse_to_fine : иерархическая оценка ядра (от грубого масштаба к точному).
+    - вспомогательные алгоритмы подавления артефактов (L0, TV, фильтр билатеральный).
 """
 
 import numpy as np
@@ -24,9 +38,6 @@ from .utils import (
 )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# gradTVEM.m  →  grad_tv_em (FAST CYTHON VERSION)
-# ─────────────────────────────────────────────────────────────────────────────
 
 cdef inline double get_diff(double[:, ::1] arr, int i, int j, int dy, int dx, int M, int N) noexcept:
     """Эквивалент shft() без выделения памяти."""
@@ -37,6 +48,34 @@ cdef inline double get_diff(double[:, ::1] arr, int i, int j, int dy, int dx, in
 def grad_tv_em(cnp.ndarray[cnp.float64_t, ndim=2] u_np, 
                cnp.ndarray[cnp.float64_t, ndim=2] ut_np, 
                double epsilon=1e-3, double tau=1e-1):
+    """
+    Вычисление градиента для мажорированной оценки полной вариации (TV).
+
+    Используется симметричная формулировка с четырьмя структурами окрестностей 
+    (диагональные и прямые направления) и тремя вариантами сдвига, что в сумме 
+    дает 12 членов, усредненных с коэффициентом 1/4.
+
+    Оцениваемый регуляризатор: log(|grad u| + tau).
+    Его EM-мажоранта на предыдущей итерации ut имеет вид:
+        |grad u| / (|grad ut| + tau) + const
+
+    Параметры
+    ---------
+    u : ndarray
+        Текущая оценка четкого изображения размерности (M, N).
+    ut : ndarray
+        Оценка изображения на предыдущей итерации (используется в знаменателе 
+        мажоранты).
+    epsilon : float, по умолчанию 1e-3
+        Константа сглаживания для предотвращения деления на ноль.
+    tau : float, по умолчанию 1e-1
+        Параметр нижней границы логарифмического распределения.
+
+    Возвращает
+    ----------
+    grad : ndarray
+        Градиент мажорированного регуляризатора TV по переменной u.
+    """
     
     u_np = np.ascontiguousarray(u_np, dtype=np.float64)
     ut_np = np.ascontiguousarray(ut_np, dtype=np.float64)
@@ -66,7 +105,6 @@ def grad_tv_em(cnp.ndarray[cnp.float64_t, ndim=2] u_np,
                 dx = deltas[d][0]
                 dy = deltas[d][1]
 
-                # case 1
                 ux1 = get_diff(u, i, j, 0, dx, M, N)
                 uy1 = get_diff(u, i, j, dy, 0, M, N)
                 TV1 = sqrt(epsilon + ux1*ux1 + uy1*uy1)
@@ -76,7 +114,6 @@ def grad_tv_em(cnp.ndarray[cnp.float64_t, ndim=2] u_np,
                 uty1 = get_diff(ut, i, j, dy, 0, M, N)
                 TVt1 = sqrt(epsilon + utx1*utx1 + uty1*uty1)
 
-                # case 2
                 ux2 = -get_diff(u, i, j, 0, -dx, M, N)
                 uy2 = get_diff(u, i, j, dy, -dx, M, N) - get_diff(u, i, j, 0, -dx, M, N)
                 TV2 = sqrt(epsilon + ux2*ux2 + uy2*uy2)
@@ -86,7 +123,6 @@ def grad_tv_em(cnp.ndarray[cnp.float64_t, ndim=2] u_np,
                 uty2 = get_diff(ut, i, j, dy, -dx, M, N) - get_diff(ut, i, j, 0, -dx, M, N)
                 TVt2 = sqrt(epsilon + utx2*utx2 + uty2*uty2)
 
-                # case 3
                 ux3 = get_diff(u, i, j, -dy, dx, M, N) - get_diff(u, i, j, -dy, 0, M, N)
                 uy3 = -get_diff(u, i, j, -dy, 0, M, N)
                 TV3 = sqrt(epsilon + ux3*ux3 + uy3*uy3)
@@ -105,13 +141,52 @@ def grad_tv_em(cnp.ndarray[cnp.float64_t, ndim=2] u_np,
     return grad_out
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# blind.m  →  blind (FAST CYTHON VERSION)
-# ─────────────────────────────────────────────────────────────────────────────
-
 def blind(f, MK, NK, beta, u, k, outer_iters=140, inner_iters=5, 
           tau=1e-3, k_step=1e-3, u_step=1e-3, blind_denoise_fn=None,
           progress_callback=None):
+    """
+    Основной цикл слепой деконволюции на основе мажоризации-минимизации (MM).
+
+    Минимизирует функцию стоимости:
+        min_{u,k} (1 / 2*beta) * ||k * u - f||^2 + sum |grad u_{i,j}| / (|grad ut_{i,j}| + tau)
+
+    Алгоритм поочередно обновляет:
+    1. Оценку четкого изображения u (градиентный спуск).
+    2. Оценку ядра размытия k (градиентный спуск с проекцией на 
+       симплекс: k >= 0, sum(k) = 1).
+
+    Параметры
+    ---------
+    f : ndarray
+        Размытое изображение размерности (M, N).
+    MK, NK : int
+        Пространственные размеры ядра.
+    beta : float
+        Вес члена верности данных (эквивалентен параметру lambda).
+    u : ndarray
+        Начальная оценка четкого изображения (M+MK-1, N+NK-1).
+    k : ndarray
+        Начальная оценка ядра (MK, NK).
+    outer_iters : int
+        Количество внешних итераций (обновлений мажоранты).
+    inner_iters : int
+        Количество внутренних итераций градиентного спуска.
+    tau : float
+        Параметр нижней границы логарифмического распределения.
+    k_step : float
+        Коэффициент масштабирования шага для ядра.
+    u_step : float
+        Коэффициент масштабирования шага для изображения.
+    blind_denoise_fn : callable или None
+        Функция предварительного шумоподавления для u перед обновлением ядра.
+
+    Возвращает
+    ----------
+    u : ndarray
+        Оцененное четкое изображение (с дополненными границами).
+    k : ndarray
+        Оцененное ядро размытия.
+    """
     
     cdef double epsilon = 1e-3
     u = np.ascontiguousarray(u, dtype=np.float64)
@@ -154,12 +229,6 @@ def blind(f, MK, NK, beta, u, k, outer_iters=140, inner_iters=5,
 
     return u, k
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Condat-Vũ variant on MM-majorant  →  blind_cv  (FAST CYTHON VERSION)
-# (own construction — NOT the PD algorithm from the paper; see ``blind_pd``
-#  below for the paper-faithful Table 1 variant.)
-# ─────────────────────────────────────────────────────────────────────────────
 
 cdef void compute_w(double[:, ::1] u, double[:, ::1] w, double epsilon) noexcept:
     cdef int M = u.shape[0], N = u.shape[1], i, j, next_i, next_j
@@ -216,24 +285,23 @@ def blind_cv(f, MK, NK, beta, u, k, outer_iters=140, inner_iters=5,
              tau_param=1e-3, k_step=1e-3, blind_denoise_fn=None,
              progress_callback=None):
     """
-    Condat-Vũ primal-dual splitting on the MM-majorised weighted-TV
-    subproblem (Cython-accelerated, own construction — NOT from the paper).
+    Прямо-двойственное расщепление Конда-Вю для решения мажорированной 
+    подзадачи взвешенной полной вариации.
 
-    Mirrors ``blind_cv`` in ``lip_denoise/solvers.py`` bit-for-bit:
-        * outer loop:   MM weights ``w = √(ε + |∇u|²)`` recomputed from u,
-                        radius ``1 / (w + τ_param)`` frozen for inner loop.
-        * inner loop:   dual step (ball projection) + primal step
-                        ``u ← [u − τ·∇f(u) + τ·div(p)]_+``, over-relaxed.
-        * kernel step:  OUTSIDE inner loop, projected gradient descent,
-                        centre-of-mass re-centring (k, u, p compensated).
+    Ключевые отличия от классического метода Шамболя-Пока:
+    - Градиент верности данных вычисляется через пространственные свертки 
+      (исключаются круговые артефакты, присущие методам на базе БПФ).
+    - Обновление ядра выполняется вне внутреннего цикла PD, что сохраняет 
+      гарантии сходимости алгоритма расщепления операторов.
+    - Размер шага удовлетворяет строгому условию сходимости Конда: 
+      1/tau - sigma * ||grad||^2 > L_f / 2.
 
-    Convergence condition (Condat 2013, Thm. 3.1):
-        ``1/τ − σ·‖∇‖² > L_f / 2`` with L_f = β, ‖∇‖² = 8.
-        → σ = 0.99·β/16,  τ = 0.99/β.
-
-    Boundary condition: **periodic** (to match the Python reference's
-    ``np.roll`` formulation).  The data-fidelity gradient uses spatial
-    valid/full convolutions, so those terms are boundary-correct.
+    Возвращает
+    ----------
+    u : ndarray
+        Оцененное четкое изображение.
+    k : ndarray
+        Оцененное ядро размытия.
     """
     cdef double epsilon = 1e-3
     u = np.ascontiguousarray(u, dtype=np.float64)
@@ -307,16 +375,8 @@ def blind_cv(f, MK, NK, beta, u, k, outer_iters=140, inner_iters=5,
     return u, k
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Table 1 of Perrone & Favaro (2016)  →  blind_pd
-# Paper-faithful primal-dual solver for the non-convex log-TV prior.
-# Implementation is pure NumPy (kept identical to the ``lip_denoise`` version
-# — ``точь-в-точь как Python``).  The CV solver above carries the Cython
-# speedups.
-# ─────────────────────────────────────────────────────────────────────────────
-
 def _grad_neumann(u):
-    """Forward differences with Neumann (zero at last row/col) boundary."""
+    """Вычисление прямых разностей с условиями Неймана (нули на краях)."""
     gx = np.zeros_like(u)
     gy = np.zeros_like(u)
     gx[:, :-1] = u[:, 1:] - u[:, :-1]
@@ -326,8 +386,7 @@ def _grad_neumann(u):
 
 def _div_neumann(px, py):
     """
-    Divergence operator — adjoint of ``_grad_neumann`` under
-    ``<∇u, p> = -<u, div p>``.  Standard Chambolle-2004 construction.
+    Оператор дивергенции, сопряженный к _grad_neumann.
     """
     dx = np.zeros_like(px)
     dx[:, 1:-1] = px[:, 1:-1] - px[:, :-2]
@@ -343,12 +402,13 @@ def _div_neumann(px, py):
 
 def _h_function(xi, mu, eps, sigma):
     """
-    Solve eq. (25) of Perrone & Favaro (2016) per pixel:
-
-        H(ξ, μ, ε, σ) = argmin_ρ  (μ/2σ)·(ρ−1)²·ξ²  +  log(ρ²·ξ² + ε²)
-
-    Cardano closed-form in ρ (depressed cubic).  Identical numerics to the
-    ``lip_denoise`` reference implementation.
+    Решение одномерной подзадачи минимизации для проксимального оператора.
+    
+    Решается кубическое уравнение относительно rho:
+        rho^3 - rho^2 + c*rho + d = 0,
+        где c = eps^2/xi^2 + 2*sigma/(mu*xi^2), d = -eps^2/xi^2.
+        
+    Решение осуществляется с использованием формулы Кардано (векторизованно).
     """
     xi = np.asarray(xi, dtype=np.float64)
     eps2 = eps * eps
@@ -414,14 +474,14 @@ def _h_function(xi, mu, eps, sigma):
 
 
 def _build_h_lut(mu, eps, sigma, xi_max=4.0, n_grid=4096):
-    """Pre-compute H(ξ) on a uniform grid for fast interpolation."""
+    """Предварительное вычисление функции H на равномерной сетке."""
     xi_grid = np.linspace(0.0, xi_max, n_grid, dtype=np.float64)
     h_grid = _h_function(xi_grid, mu=mu, eps=eps, sigma=sigma)
     return xi_grid, h_grid
 
 
 def _h_lut_apply(xi, xi_grid, h_grid):
-    """Vectorised 1-D linear interpolation of a pre-computed H-LUT."""
+    """Векторизованная линейная интерполяция по таблице H-LUT."""
     return np.interp(xi, xi_grid, h_grid,
                      left=h_grid[0], right=h_grid[-1])
 
@@ -434,15 +494,24 @@ def blind_pd(f, MK, NK, beta, u, k,
              blind_denoise_fn=None,
              progress_callback=None):
     """
-    Primal-dual blind deconvolution — Table 1 of Perrone & Favaro (2016).
+    Прямо-двойственная слепая деконволюция на основе алгоритма Шамболя-Пока.
 
-    Mirrors ``blind_pd`` in ``lip_denoise/solvers.py`` bit-for-bit.  Uses
-    Neumann boundary conditions via ``_grad_neumann`` / ``_div_neumann``
-    and the H-function from eq. (25).
+    Решает задачу с невыпуклым регуляризатором LIP напрямую (без использования 
+    внешней мажоризации MM). Для каждой внешней итерации ядро фиксируется, 
+    а во внутреннем цикле выполняется прямо-двойственное обновление:
+    
+        z1^{n+1} = (z1^n + sigma*(k * u_bar^n - f)) / (1 + sigma)
+        zeta = z2^n + sigma * grad(u_bar^n)
+        xi = ||zeta|| / sigma
+        z2^{n+1} = (1 - H(xi, mu, eps, sigma)) * zeta
+        u^{n+1} = u^n - tau * (k^T * z1^{n+1} - div(z2^{n+1}))
 
-    Step sizes (balanced, paper-faithful):
-        ``pd_tau = pd_sigma = 0.99 / √‖K‖² ≈ 0.33``
-        with ``‖K‖² ≤ ‖k*‖² + ‖∇‖² ≤ 1 + 8 = 9``.
+    Значения шагов по умолчанию (сбалансированные): 
+        tau = sigma = 0.99 / sqrt(||K||^2) ~ 0.33.
+        
+    Примечание к параметру mu: 
+        Параметр beta играет роль 2*lambda из оригинальной статьи. Для 
+        сохранения сопоставимого соотношения регуляризации устанавливается mu = beta.
     """
     epsilon = float(tau_param)
     mu = float(beta)
@@ -482,11 +551,9 @@ def blind_pd(f, MK, NK, beta, u, k,
 
     for it in range(outer_iters):
         for itt in range(inner_iters):
-            # z₁ ← (z₁ + σ(k*ū − f)) / (1 + σ)
             Kub = convn_valid(u_bar, k)
             z1 = (z1 + sigma_pd * (Kub - f)) / (1.0 + sigma_pd)
 
-            # z₂ ← (1 − H(‖ζ‖/σ, μ, ε, σ)) · ζ   where ζ = z₂ + σ·∇ū
             gx, gy = _grad_neumann(u_bar)
             zx = z2x + sigma_pd * gx
             zy = z2y + sigma_pd * gy
@@ -496,7 +563,6 @@ def blind_pd(f, MK, NK, beta, u, k,
             z2x = scale * zx
             z2y = scale * zy
 
-            # ũ ← ũ − τ (k₋ * z₁ + ∇* z₂),   ∇* = −div
             Kstar_z1 = convn_full(z1, np.rot90(k, 2))
             div_z2 = _div_neumann(z2x, z2y)
             u_new = u_tilde - tau_pd * (Kstar_z1 - div_z2)
@@ -506,7 +572,6 @@ def blind_pd(f, MK, NK, beta, u, k,
 
         u = u_tilde
 
-        # Kernel step (Chan-Wong / blind.m style)
         u_dk = blind_denoise_fn(u) if blind_denoise_fn is not None else u
         synth = convn_valid(u_dk, k)
         err = synth - f
@@ -519,7 +584,6 @@ def blind_pd(f, MK, NK, beta, u, k,
         if k_sum > 0:
             k /= k_sum
 
-        # Kernel centre-of-mass re-centring
         k_sum_c = k.sum()
         if k_sum_c > 0:
             cy = (ys * k).sum() / k_sum_c
@@ -548,18 +612,31 @@ def blind_pd(f, MK, NK, beta, u, k,
     return u, k
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# buildPyramid.m  →  build_pyramid
-# ─────────────────────────────────────────────────────────────────────────────
-
 def _make_odd(val: int) -> int:
-    """Force integer to odd by subtracting 1 if even."""
+    """Округление целого числа до ближайшего нечетного (с вычитанием 1 для четных)."""
     return val - 1 if val % 2 == 0 else val
 
 
 def build_pyramid(f: np.ndarray, MK: int, NK: int,
                   lam: float, lambda_mult: float,
                   scale_mult: float = 1.4142135623730951):
+    """
+    Построение пирамиды изображений, размеров ядер и значений параметра 
+    lambda для иерархической обработки.
+
+    Параметры
+    ---------
+    f : ndarray
+        Изображение в исходном (максимальном) разрешении.
+    MK, NK : int
+        Размеры ядра в исходном разрешении.
+    lam : float
+        Параметр lambda для финального (самого точного) масштаба.
+    lambda_mult : float
+        Множитель lambda между уровнями.
+    scale_mult : float
+        Делитель размера ядра между уровнями.
+    """
     M, N = f.shape[:2]
     smallest_scale = 3
 
@@ -611,16 +688,15 @@ def build_pyramid(f: np.ndarray, MK: int, NK: int,
     return fp, Mp, Np, MKp, NKp, lambdas, num_scales
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# coarseToFine.m  →  coarse_to_fine
-# ─────────────────────────────────────────────────────────────────────────────
-
 def coarse_to_fine(f: np.ndarray, MK: int, NK: int,
                    blind_params: dict, ctf_params: dict,
                    verbose: bool = False, method: str = 'mm',
                    blind_denoise_fn=None,
                    progress_callback=None):
-    
+    """
+    Многомасштабная слепая деконволюция (иерархический подход от грубого 
+    разрешения к точному).
+    """
     final_lambda = ctf_params.get('final_lambda')
     lambda_mult = ctf_params.get('lambda_mult', 2.1)
     scale_mult = ctf_params.get('scale_mult', np.sqrt(2))
@@ -720,17 +796,13 @@ def coarse_to_fine(f: np.ndarray, MK: int, NK: int,
     return u, k
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# FFT-related helpers for non-blind deconvolution
-# ═════════════════════════════════════════════════════════════════════════════
-
 from numpy.fft import fft2, ifft2
 from scipy.fft import dstn, idstn
 
 _OPT_FFT_LUT = None
 
 def _build_opt_fft_lut(max_n=4096):
-    """Build LUT mapping n -> next efficient FFT size (products of 2,3,5,7)."""
+    """Таблица оптимальных размеров БПФ (кратных 2, 3, 5, 7)."""
     efficient = set()
     p2 = 1
     while p2 <= max_n:
@@ -755,7 +827,7 @@ def _build_opt_fft_lut(max_n=4096):
     return lut
 
 def opt_fft_size(n) -> np.ndarray:
-    """Optimal FFT data length(s) — smallest efficient size >= n."""
+    """Вычисление оптимального размера массива для БПФ."""
     global _OPT_FFT_LUT
     if _OPT_FFT_LUT is None:
         _OPT_FFT_LUT = _build_opt_fft_lut()
@@ -775,12 +847,8 @@ def opt_fft_size(n) -> np.ndarray:
     return m
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# wrap_boundary_liu (Liu & Jia ICIP 2008, Cho implementation)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def _solve_min_laplacian(boundary_image: np.ndarray) -> np.ndarray:
-    """Solve Laplace eq. with Dirichlet BC via DST-I."""
+    """Решение уравнения Лапласа для сглаживания границ через DST-I."""
     H, W = boundary_image.shape
     bi = boundary_image.copy()
     bi[1:-1, 1:-1] = 0.0
@@ -810,7 +878,10 @@ def _solve_min_laplacian(boundary_image: np.ndarray) -> np.ndarray:
 
 
 def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
-    """Pad image so boundaries are circularly smooth for FFT-based deconv."""
+    """
+    Дополнение границ изображения для обеспечения их гладкого циклического перехода.
+    Минимизирует артефакты при деконволюции на базе БПФ (метод Liu & Jia 2008).
+    """
     if img.ndim == 2:
         img = img[:, :, np.newaxis]
     H, W, Ch = img.shape
@@ -876,12 +947,8 @@ def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
     return ret
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# TV deblurring (ADM anisotropic — Split Bregman)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def _computeDenominator(B, k):
-    """Pre-compute frequency-domain terms for ADM TV deblurring."""
+    """Предварительное вычисление частотных компонентов для ADM."""
     m, n = B.shape
     otf_k = psf2otf(k, (m, n))
     Nomin1 = np.conj(otf_k) * fft2(B)
@@ -895,7 +962,10 @@ def _computeDenominator(B, k):
 
 
 def deblurring_adm_aniso(B, k, lambda_tv, alpha):
-    """TV-l2 deblurring via ADM/Split Bregman with anisotropic TV."""
+    """
+    Анизотропная деконволюция с TV-регуляризацией методом попеременных 
+    направлений (Split Bregman / ADM).
+    """
     beta = 1.0 / lambda_tv
     beta_min = 0.001
     m, n = B.shape
@@ -931,12 +1001,10 @@ def deblurring_adm_aniso(B, k, lambda_tv, alpha):
     return I
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# L0 gradient restoration
-# ═════════════════════════════════════════════════════════════════════════════
-
 def L0Restoration(Im, kernel, lambda_grad, kappa=2.0):
-    """Image restoration with L0 gradient prior."""
+    """
+    Восстановление изображения с использованием L0-нормы градиентов.
+    """
     H_orig, W_orig = Im.shape[0], Im.shape[1]
     target_size = opt_fft_size(
         np.array([H_orig, W_orig]) + np.array(kernel.shape[:2]) - 1)
@@ -993,12 +1061,8 @@ def L0Restoration(Im, kernel, lambda_grad, kappa=2.0):
     return S
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Bilateral filter
-# ═════════════════════════════════════════════════════════════════════════════
-
 def _fspecial_gaussian(size, sigma):
-    """2-D Gaussian kernel."""
+    """Формирование двумерного гауссовского ядра."""
     x = np.arange(size) - size // 2
     g = np.exp(-x ** 2 / (2 * sigma ** 2))
     h = np.outer(g, g)
@@ -1006,7 +1070,10 @@ def _fspecial_gaussian(size, sigma):
 
 
 def bilateral_filter(img, sigma_s, sigma):
-    """Bilateral filter for grayscale images."""
+    """
+    Билатеральный фильтр для полутоновых изображений. 
+    Подавляет шум с сохранением границ.
+    """
     was_2d = img.ndim == 2
     if was_2d:
         img = img[:, :, np.newaxis]
@@ -1042,29 +1109,31 @@ def bilateral_filter(img, sigma_s, sigma):
     return r_img
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Ringing artifacts removal (Pan et al. CVPR 2014)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def ringing_artifacts_removal(y, kernel, lambda_tv=1e-3,
                               lambda_l0=2e-3, weight_ring=1.0):
     """
-    Non-blind deconvolution with ringing suppression.
+    Подавление эффекта звона (ringing artifacts) после неслепой деконволюции.
 
-    Uses TV deconv + L0 deconv + bilateral filter on their difference
-    to identify and subtract ringing artifacts.
+    Использует комбинацию TV-деконволюции, L0-деконволюции и билатерального 
+    фильтра для выявления и вычитания высокочастотных артефактов.
 
-    Parameters
+    Параметры
+    ---------
+    y : ndarray
+        Размытое изображение размерности (H, W).
+    kernel : ndarray
+        Ядро размытия.
+    lambda_tv : float
+        Вес TV-регуляризации.
+    lambda_l0 : float
+        Вес L0-регуляризации.
+    weight_ring : float
+        Коэффициент подавления звона (0 соответствует чистой TV-деконволюции).
+
+    Возвращает
     ----------
-    y           : (H, W) blurred image (single channel, float [0,1])
-    kernel      : blur kernel
-    lambda_tv   : TV regularisation weight
-    lambda_l0   : L0 gradient prior weight
-    weight_ring : ringing suppression strength (0 = TV only)
-
-    Returns
-    -------
-    result : (H, W) deblurred image
+    result : ndarray
+        Восстановленное изображение без эффекта звона.
     """
     H, W = y.shape[:2]
     target_size = opt_fft_size(

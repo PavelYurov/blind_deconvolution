@@ -1,25 +1,27 @@
 """
 screenot.py
 
-Image denoising via ScreeNOT (optimal adaptive SVD thresholding).
+Подавление шума на изображениях с использованием алгоритма ScreeNOT 
+(оптимальное адаптивное пороговое ограничение сингулярных чисел).
 
-Based on:
+Основано на методе:
     Donoho, Gavish, Romanov:
     "ScreeNOT: Exact MSE-optimal singular value thresholding in correlated noise."
     Annals of Statistics (2023).
 
-ScreeNOT finds the MSE-optimal hard threshold for singular values of a matrix
-Y = X + Z, where X is low-rank signal and Z is additive noise with arbitrary
-(unknown) correlation structure.  The threshold is computed adaptively from
-the observed singular values — no knowledge of noise statistics is needed.
+Алгоритм ScreeNOT находит оптимальный (в смысле минимума среднеквадратичной 
+ошибки) жесткий порог для сингулярных чисел матрицы наблюдаемых данных 
+Y = X + Z, где X — низкоранговый полезный сигнал, а Z — аддитивный шум 
+с произвольной (неизвестной) корреляционной структурой. Порог вычисляется 
+адаптивно на основе распределения наблюдаемых сингулярных чисел без 
+необходимости предварительного знания статистики шума.
 
-Two modes:
-    'full'  — treat the entire image as a matrix Y (H×W) and apply
-              ScreeNOT directly.  Simple, fast, no artifacts.
-    'patch' — extract overlapping patches into a matrix, apply ScreeNOT,
-              aggregate back.  Better for high-texture images but slower.
-
-Dependencies: numpy (only).
+Режимы работы:
+- 'full' : обработка всего изображения как единой матрицы размерности (H, W). 
+  Быстрый метод, не создающий блочных артефактов.
+- 'patch' : извлечение перекрывающихся блоков (патчей) в единую матрицу, 
+  применение ScreeNOT и обратная сборка с усреднением. Более ресурсоемкий 
+  метод, но эффективнее для изображений с высокой текстурной сложностью.
 """
 
 import numpy as np
@@ -30,29 +32,24 @@ __all__ = [
     'screenot_denoise',
 ]
 
-
-# ═════════════════════════════════════════════════════════════════════════════
-# 1. Core ScreeNOT algorithm (from Donoho, Gavish, Romanov 2023)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def _Phi(y, fZ):
-    """Functional Phi(y; fZ)."""
+    """Вычисление функционала Phi(y; fZ)."""
     return np.mean(y / (y ** 2 - fZ ** 2))
 
 
 def _Phid(y, fZ):
-    """Derivative of Phi w.r.t. y."""
+    """Вычисление производной функционала Phi по переменной y."""
     return np.mean(-(y ** 2 + fZ ** 2) / (y ** 2 - fZ ** 2) ** 2)
 
 
 def _D(y, fZ, gamma):
-    """Functional D_gamma(y; fZ)."""
+    """Вычисление функционала D_gamma(y; fZ)."""
     phi = _Phi(y, fZ)
     return phi * (gamma * phi + (1 - gamma) / y)
 
 
 def _Dd(y, fZ, gamma):
-    """Derivative of D_gamma w.r.t. y."""
+    """Вычисление производной функционала D_gamma по переменной y."""
     phi = _Phi(y, fZ)
     phid = _Phid(y, fZ)
     return (phid * (gamma * phi + (1 - gamma) / y)
@@ -60,20 +57,36 @@ def _Dd(y, fZ, gamma):
 
 
 def _F(y, fZ, gamma):
-    """Functional Psi_gamma(y; fZ).  Optimal threshold satisfies F = -4."""
+    """
+    Вычисление функционала Psi_gamma(y; fZ). 
+    Оптимальный порог удовлетворяет условию F = -4.
+    """
     d = _D(y, fZ, gamma)
     dd = _Dd(y, fZ, gamma)
     return y * dd / d
 
 
 def _create_pseudo_noise(fY, k, strategy='i'):
-    """Estimate noise singular-value distribution from observed SVs.
+    """
+    Оценка распределения сингулярных чисел шума на основе наблюдаемых 
+    сингулярных чисел.
 
-    Parameters
+    Параметры
+    ---------
+    fY : ndarray
+        Одномерный массив наблюдаемых сингулярных чисел.
+    k : int
+        Верхняя граница ранга полезного сигнала.
+    strategy : str
+        Стратегия оценки распределения шума:
+        - 'i' : импутация (заполнение на основе аппроксимации).
+        - 'w' : винзоризация (замещение крайних значений).
+        - '0' : обнуление.
+
+    Возвращает
     ----------
-    fY : 1-d array — observed singular values (any order).
-    k : int — upper bound on signal rank.
-    strategy : str — 'i' (imputation), 'w' (winsorization), '0' (zero).
+    fZ : ndarray
+        Оцененное распределение сингулярных чисел шума.
     """
     fZ = np.sort(fY)
     p = fZ.size
@@ -100,7 +113,9 @@ def _create_pseudo_noise(fY, k, strategy='i'):
 
 
 def _compute_opt_threshold(fZ, gamma):
-    """Binary search for optimal threshold t* where F(t*; fZ) = -4."""
+    """
+    Двоичный поиск оптимального порога t*, удовлетворяющего условию F(t*; fZ) = -4.
+    """
     low = np.max(fZ)
     high = low + 2.0
     while _F(high, fZ, gamma) < -4:
@@ -118,20 +133,28 @@ def _compute_opt_threshold(fZ, gamma):
 
 
 def adaptive_hard_thresholding(Y, k, strategy='i'):
-    """ScreeNOT: optimal adaptive hard thresholding of a matrix.
+    """
+    Оптимальное адаптивное жесткое пороговое ограничение сингулярных чисел 
+    матрицы (алгоритм ScreeNOT).
 
-    Parameters
+    Параметры
+    ---------
+    Y : ndarray
+        Наблюдаемая матрица размерности (n, p), представляющая собой 
+        сумму полезного сигнала и шума.
+    k : int
+        Верхняя граница ранга сигнала (допускается нестрогая оценка).
+    strategy : str
+        Стратегия оценки распределения шума ('i', 'w' или '0').
+
+    Возвращает
     ----------
-    Y : ndarray, shape (n, p) — observed matrix (signal + noise).
-    k : int — upper bound on signal rank (can be loose).
-    strategy : str — noise bulk estimation: 'i' (imputation, default),
-               'w' (winsorization), '0' (transport to zero).
-
-    Returns
-    -------
-    Xest : ndarray, same shape as Y — denoised (low-rank) estimate.
-    Topt : float — the hard threshold used.
-    r : int — estimated signal rank (number of kept components).
+    Xest : ndarray
+        Восстановленная матрица низкого ранга (формат совпадает с Y).
+    Topt : float
+        Примененный оптимальный жесткий порог.
+    r : int
+        Оцененный ранг сигнала (количество сохраненных компонент).
     """
     U, fY, Vt = svd(Y, full_matrices=False)
     gamma = min(Y.shape[0] / Y.shape[1], Y.shape[1] / Y.shape[0])
@@ -146,44 +169,40 @@ def adaptive_hard_thresholding(Y, k, strategy='i'):
     return Xest, Topt, r
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# 2. Image denoising via ScreeNOT
-# ═════════════════════════════════════════════════════════════════════════════
-
 def screenot_denoise(image, k=10, strategy='i', mode='full',
                      patch_size=8, stride=3):
-    """Denoise a 2D image using ScreeNOT SVD thresholding.
+    """
+    Подавление шума на двумерном полутоновом изображении.
 
-    Parameters
-    ----------
-    image : ndarray, H×W, float64 [0, 1]
-        Grayscale image to denoise.
+    Параметры
+    ---------
+    image : ndarray
+        Входное полутоновое изображение (размерность HxW), значения 
+        float64 в диапазоне [0, 1].
     k : int
-        Upper bound on the signal rank.
-        For mode='full': rank of the image matrix (typ. 10–50).
-        For mode='patch': rank of the patch matrix (typ. 5–20).
+        Верхняя граница ранга сигнала.
+        Для режима 'full': ожидаемый ранг матрицы изображения (обычно 10-50).
+        Для режима 'patch': ожидаемый ранг матрицы блоков (обычно 5-20).
     strategy : str
-        ScreeNOT noise bulk estimation: 'i' (default), 'w', or '0'.
+        Стратегия оценки шума в ScreeNOT ('i', 'w' или '0'). По умолчанию 'i'.
     mode : str
-        'full'  — apply ScreeNOT to the image matrix directly (default).
-                  No patch artifacts. Fast.
-        'patch' — patch-based: extract overlapping patches, apply
-                  ScreeNOT to patch matrix, aggregate with averaging.
+        Режим обработки:
+        - 'full' : применение алгоритма ко всему изображению как к единой матрице.
+        - 'patch' : извлечение перекрывающихся блоков, их обработка и агрегация.
+    patch_size : int, по умолчанию 8
+        Длина стороны квадратного блока (используется только в режиме 'patch').
+    stride : int, по умолчанию 3
+        Шаг смещения блоков (используется только в режиме 'patch').
 
-    Patch-mode only parameters
-    --------------------------
-    patch_size : int
-        Side length of square patches (default 8).
-    stride : int
-        Step between patches (default 3).
-
-    Returns
-    -------
-    denoised : ndarray, same shape as image, float64 [0, 1]
+    Возвращает
+    ----------
+    denoised : ndarray
+        Восстановленное изображение (формат совпадает со входом).
     info : dict
-        'Topt'  — optimal threshold used
-        'rank'  — estimated signal rank
-        'mode'  — 'full' or 'patch'
+        Словарь метаданных:
+        - 'Topt' : вычисленный оптимальный порог.
+        - 'rank' : оцененный ранг полезного сигнала.
+        - 'mode' : примененный режим обработки.
     """
     if image.ndim != 2:
         raise ValueError(f'Expected 2D image, got shape {image.shape}')
@@ -197,11 +216,14 @@ def screenot_denoise(image, k=10, strategy='i', mode='full',
 
 
 def _denoise_full(image, k, strategy):
-    """Apply ScreeNOT directly to the image matrix H×W."""
+    """
+    Применение алгоритма ScreeNOT напрямую к матрице изображения.
+    Значение k автоматически ограничивается допустимым диапазоном для 
+    выбранной стратегии импутации.
+    """
     H, W = image.shape
     min_dim = min(H, W)
 
-    # Clamp k to valid range for imputation
     max_k = min_dim // 2 - 1
     if k > max_k:
         k = max(1, max_k)
@@ -225,7 +247,9 @@ def _denoise_full(image, k, strategy):
 
 
 def _extract_patches(image, patch_size, stride):
-    """Extract overlapping patches as rows of a matrix."""
+    """
+    Извлечение перекрывающихся блоков изображения в виде строк единой матрицы.
+    """
     H, W = image.shape
     positions = []
     rows = []
@@ -238,7 +262,9 @@ def _extract_patches(image, patch_size, stride):
 
 
 def _aggregate_patches(patches, positions, patch_size, image_shape):
-    """Reconstruct image from patches with overlap averaging."""
+    """
+    Обратная сборка изображения из набора блоков с усреднением значений 
+    в об
     H, W = image_shape
     accum = np.zeros((H, W), dtype=np.float64)
     count = np.zeros((H, W), dtype=np.float64)
@@ -251,7 +277,11 @@ def _aggregate_patches(patches, positions, patch_size, image_shape):
 
 
 def _denoise_patch(image, k, strategy, patch_size, stride):
-    """Apply ScreeNOT to the matrix of overlapping patches."""
+    """
+    Подавление шума с использованием блочного (patch-based) подхода.
+    Сформированная матрица блоков подвергается обработке ScreeNOT, после 
+    чего изображение восстанавливается с помощью усреднения.
+    """
     H, W = image.shape
     if H < patch_size or W < patch_size:
         return image.copy(), {

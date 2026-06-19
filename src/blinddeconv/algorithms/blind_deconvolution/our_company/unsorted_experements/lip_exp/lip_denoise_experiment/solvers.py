@@ -30,63 +30,17 @@ from .utils import (
 )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# gradTVEM.m  →  grad_tv_em
-# ─────────────────────────────────────────────────────────────────────────────
-
 def grad_tv_em(u: np.ndarray, ut: np.ndarray,
                epsilon: float = 1e-3, tau: float = 1e-1) -> np.ndarray:
-    """
-    Gradient of the EM-majorised Total Variation regulariser.
 
-    Equivalent to MATLAB ``gradTVEM.m`` by P. Favaro (2014).
 
-    Uses a symmetric formulation with 4 neighbourhood structures
-    (WS, ES, WN, EN) × 3 shifted cases = 12 terms, averaged by 1/4.
-
-    The regulariser being majorised is  log(|∇u| + τ), and the
-    EM majorant at the previous iterate uᵗ is:
-
-        |∇u| / (|∇uᵗ| + τ)   (+ const)
-
-    Parameters
-    ----------
-    u       : (M, N) current sharp-image estimate
-    ut      : (M, N) previous iterate (for the majorant denominator)
-    epsilon : smoothing constant to avoid division by zero in √(…)
-    tau     : lower-bound parameter of the log prior
-
-    Returns
-    -------
-    grad : (M, N) gradient of the majorised TV w.r.t. u
-
-    MATLAB correspondence
-    ---------------------
-    deltas{1} = [ 1  1];   % WS        →  (dx= 1, dy= 1)
-    deltas{2} = [-1  1];   % ES        →  (dx=-1, dy= 1)
-    deltas{3} = [ 1 -1];   % WN        →  (dx= 1, dy=-1)
-    deltas{4} = [-1 -1];   % EN        →  (dx=-1, dy=-1)
-
-    For each (dx, dy) three cases are computed:
-        case 1 (no shift)  : du = -(ux + uy)
-        case 2 (x shift)   : du =  ux
-        case 3 (y shift)   : du =  uy
-    where ux, uy are appropriate finite-difference terms via ``shft``.
-
-    Each contribution:  du / TV / (τ + TVt)
-    where TV  = √(ε + ux² + uy²)   from u
-          TVt = √(ε + utx² + uty²) from uᵗ
-
-    Final result is averaged over the 4 neighbourhoods (/ 4).
-    """
-    # MATLAB: deltas{1}=[1 1]; deltas{2}=[-1 1]; ...
     deltas = [(1, 1), (-1, 1), (1, -1), (-1, -1)]
 
     grad = np.zeros_like(u)
 
     for dx, dy in deltas:
-        # ── case 1: no shift ──
-        # MATLAB: ux{1,ns} = shft(u,dx,0) - shft(u,0,0);
+
+
         ux1 = shft(u, dx, 0) - shft(u, 0, 0)
         uy1 = shft(u, 0, dy) - shft(u, 0, 0)
         TV1 = np.sqrt(epsilon + ux1 ** 2 + uy1 ** 2)
@@ -96,8 +50,7 @@ def grad_tv_em(u: np.ndarray, ut: np.ndarray,
         uty1 = shft(ut, 0, dy) - shft(ut, 0, 0)
         TVt1 = np.sqrt(epsilon + utx1 ** 2 + uty1 ** 2)
 
-        # ── case 2: x shift ──
-        # MATLAB: ux{2,ns} = shft(u,0,0) - shft(u,-dx,0);
+
         ux2 = shft(u, 0, 0) - shft(u, -dx, 0)
         uy2 = shft(u, -dx, dy) - shft(u, -dx, 0)
         TV2 = np.sqrt(epsilon + ux2 ** 2 + uy2 ** 2)
@@ -107,8 +60,7 @@ def grad_tv_em(u: np.ndarray, ut: np.ndarray,
         uty2 = shft(ut, -dx, dy) - shft(ut, -dx, 0)
         TVt2 = np.sqrt(epsilon + utx2 ** 2 + uty2 ** 2)
 
-        # ── case 3: y shift ──
-        # MATLAB: ux{3,ns} = shft(u,dx,-dy) - shft(u,0,-dy);
+
         ux3 = shft(u, dx, -dy) - shft(u, 0, -dy)
         uy3 = shft(u, 0, 0) - shft(u, 0, -dy)
         TV3 = np.sqrt(epsilon + ux3 ** 2 + uy3 ** 2)
@@ -118,19 +70,15 @@ def grad_tv_em(u: np.ndarray, ut: np.ndarray,
         uty3 = shft(ut, 0, 0) - shft(ut, 0, -dy)
         TVt3 = np.sqrt(epsilon + utx3 ** 2 + uty3 ** 2)
 
-        # ── accumulate:  du / TV / (tau + TVt) ──
+
         grad += du1 / TV1 / (tau + TVt1)
         grad += du2 / TV2 / (tau + TVt2)
         grad += du3 / TV3 / (tau + TVt3)
 
-    # Average over 4 neighbourhood structures
+
     grad /= 4.0
     return grad
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# blind.m  →  blind
-# ─────────────────────────────────────────────────────────────────────────────
 
 def blind(f: np.ndarray, MK: int, NK: int, beta: float,
           u: np.ndarray, k: np.ndarray,
@@ -140,81 +88,33 @@ def blind(f: np.ndarray, MK: int, NK: int, beta: float,
           k_step: float = 1e-3,
           u_step: float = 1e-3,
           blind_denoise_fn=None) -> tuple:
-    """
-    Core MM blind-deconvolution loop (Table 2 of the paper).
 
-    Equivalent to MATLAB ``blind.m``.
 
-    Minimises:
-        min_{u,k}  (1 / 2β) · ||k ⊛ u − f||²  +  Σ_{i,j} |∇u_{i,j}| / (|∇uᵗ_{i,j}| + τ)
-
-    The algorithm alternates:
-        1. Gradient descent on u (sharp image)
-        2. Gradient descent on k (kernel) with projection onto
-           the set { k ≥ 0, Σk = 1 }
-
-    Parameters
-    ----------
-    f           : (M, N) blurry image
-    MK, NK      : kernel spatial support (rows, cols)
-    beta        : data-fidelity weight  (called ``lambda`` at higher level)
-    u           : (M+MK-1, N+NK-1) initial sharp-image estimate
-    k           : (MK, NK) initial kernel estimate
-    outer_iters : number of outer (majorisation-update) iterations
-    inner_iters : number of inner gradient-descent iterations per outer iter
-    tau         : lower-bound parameter τ of the log prior
-    k_step      : kernel step-size scaling factor
-    u_step      : image step-size scaling factor
-    blind_denoise_fn : callable or None
-        If not None, called as ``blind_denoise_fn(u)`` before each kernel
-        update step; returns denoised u used for kernel gradient only.
-
-    Returns
-    -------
-    u : (M+MK-1, N+NK-1) estimated sharp image  (padded)
-    k : (MK, NK) estimated kernel
-
-    MATLAB → Python notes
-    ---------------------
-    * ``convn(u,k,'valid')`` →  ``convn_valid(u, k)``   — both true convolutions.
-    * ``convn(err, rot90(k,2), 'full')`` →  ``convn_full(err, np.rot90(k,2))``
-      MATLAB rot90(k,2) rotates by 180° → same as np.rot90(k,2).
-      convn(err, rot90(k,2), 'full') computes the "transpose-convolution"
-      needed for the gradient w.r.t. u.
-    * ``convn(rot90(u,2), err, 'valid')`` → ``convn_valid(np.rot90(u,2), err)``
-      This yields the gradient w.r.t. k.
-    * Adaptive step sizes:
-        MATLAB:  dt = u_step * (max(u(:)) + 1/numel(u)) / max(abs(gradu(:)) + 1e-30)
-        Python:  dt = u_step * (u.max()   + 1/u.size)   / (np.abs(gradu).max() + 1e-30)
-      ``max(u(:))`` in MATLAB is global max → ``u.max()`` in NumPy (scalar).
-      ``numel(u)`` → ``u.size``.
-    * Kernel projection: max(k,0) → np.maximum(k, 0); k/sum(k(:)) → k/k.sum()
-    """
-    epsilon = 1e-3  # TV smoothing constant (hardcoded in MATLAB)
+    epsilon = 1e-3
 
     for it in range(outer_iters):
-        ut = u.copy()  # freeze majorant reference
+        ut = u.copy()
         for itt in range(inner_iters):
-            # ── sharp-image step ──
-            synth = convn_valid(u, k)          # k ⊛ u  (valid)
-            err = synth - f                     # residual
-            # gradient w.r.t. u (data + TV prior)
-            #   MATLAB: beta*convn(err, rot90(k,2), 'full') + gradTVEM(…)
+
+            synth = convn_valid(u, k)
+            err = synth - f
+
+
             gradu = (beta * convn_full(err, np.rot90(k, 2))
                      + grad_tv_em(u, ut, epsilon, tau))
-            # adaptive step
+
             dt = u_step * (u.max() + 1.0 / u.size) / (np.abs(gradu).max() + 1e-30)
             u = u - dt * gradu
 
-            # ── kernel step ──
+
             synth = convn_valid(u, k)
             err = synth - f
-            #   MATLAB: gradk = convn(rot90(u,2), err, 'valid')
+
             u_dk = blind_denoise_fn(u) if blind_denoise_fn is not None else u
             gradk = convn_valid(np.rot90(u_dk, 2), err)
             alpha = k_step * (k.max() + 1.0 / k.size) / (np.abs(gradk).max() + 1e-30)
             k = k - alpha * gradk
-            # projection: non-negative, sum-to-one
+
             k = np.maximum(k, 0.0)
             k_sum = k.sum()
             if k_sum > 0:
@@ -223,11 +123,6 @@ def blind(f: np.ndarray, MK: int, NK: int, beta: float,
     return u, k
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Condat-Vũ variant on MM-majorant  →  blind_cv
-# (own construction — NOT the PD algorithm from the paper)
-# ─────────────────────────────────────────────────────────────────────────────
-
 def blind_cv(f: np.ndarray, MK: int, NK: int, beta: float,
              u: np.ndarray, k: np.ndarray,
              outer_iters: int = 140,
@@ -235,126 +130,75 @@ def blind_cv(f: np.ndarray, MK: int, NK: int, beta: float,
              tau_param: float = 1e-3,
              k_step: float = 1e-3,
              blind_denoise_fn=None) -> tuple:
-    """
-    Condat-Vũ primal-dual splitting on the MM-majorised weighted-TV subproblem.
 
-    This is **not** the PD algorithm from Perrone & Favaro (Table 1) — see
-    ``blind_pd`` for the paper-faithful variant.  Here the log prior is first
-    majorised (as in ``blind``) and the resulting weighted-TV subproblem is
-    solved with Condat-Vũ splitting (data fidelity handled via its gradient,
-    TV handled via a single dual variable).
 
-    Key improvements over a pure Chambolle-Pock implementation:
-        * Data-fidelity gradient uses **spatial convolutions** (no FFT),
-          avoiding circular-boundary artefacts.
-          [Chen & Huang, Inverse Problems 2013; Chen, SIOPT 2014]
-        * Kernel update is performed **outside** the inner PD loop,
-          preserving operator-splitting convergence guarantees.
-        * Positivity constraint u ≥ 0 is enforced at each primal step.
-        * Step sizes satisfy the **strict** Condat convergence condition:
-          1/τ − σ·‖∇‖² > L_f / 2.
-
-    Weighted-TV subproblem at outer iteration t:
-
-        min_u  (β/2)·‖k*u − f‖²  +  Σ_{i,j}  |∇u_{i,j}| / (|∇uᵗ_{i,j}| + τ)
-
-    The primal step uses ∇f(u) = β·kᵀ*(k*u − f) computed via spatial
-    (valid/full) convolutions, so boundary conditions are linear (not
-    circular).  The dual constraint is a per-pixel ball projection with
-    radius 1 / (|∇uᵗ| + τ).
-
-    Parameters
-    ----------
-    f           : (M, N)  blurry image
-    MK, NK      : kernel spatial support
-    beta        : data-fidelity weight
-    u           : (M+MK-1, N+NK-1)  initial sharp-image estimate
-    k           : (MK, NK)  initial kernel estimate
-    outer_iters : number of MM (majorant-update) iterations
-    inner_iters : number of Condat-Vũ iterations per outer step
-    tau_param   : lower-bound τ of the log prior
-    k_step      : kernel gradient-descent step-size scaling
-    blind_denoise_fn : callable or None
-        If not None, called as ``blind_denoise_fn(u)`` before the kernel
-        update step; returns denoised u used for kernel gradient only.
-
-    Returns
-    -------
-    u : (M+MK-1, N+NK-1)  estimated sharp image (padded)
-    k : (MK, NK)  estimated kernel
-    """
     epsilon = 1e-3
     Mu, Nu = u.shape
 
-    # Dual variable: (p_x, p_y) per pixel
+
     p = np.zeros((2, Mu, Nu))
 
-    # Grid for center-of-mass computation (allocated once)
+
     ys, xs = np.mgrid[0:MK, 0:NK]
     cy_target = (MK - 1) / 2.0
     cx_target = (NK - 1) / 2.0
 
     for it in range(outer_iters):
-        # ── MM step: compute weights from current u ──
+
         grad_x_ut = np.roll(u, -1, axis=1) - u
         grad_y_ut = np.roll(u, -1, axis=0) - u
         w = np.sqrt(epsilon + grad_x_ut ** 2 + grad_y_ut ** 2)
-        # Dual constraint radius: 1 / (w + τ)
+
         radius = 1.0 / (w + tau_param)
 
         u_bar = u.copy()
 
-        # ── Step sizes (Condat-Vũ convergence condition) ──────────────
-        # L_f = β · ‖k‖²_op.  For normalised non-negative k:
-        # ‖k‖_op = max|FFT(k)| = sum(k) = 1,  so  L_f = β.
+
         L_f = beta
-        # ‖∇‖² = 8.  Condition: 1/τ − 8σ > L_f / 2  (strict).
-        # Balanced: 8σ = L_f/2  →  σ = L_f/16,  τ = 1/L_f.
-        # 0.99 safety factor for strict inequality.
+
+
         sigma_pd = 0.99 * L_f / 16.0
         tau_pd = 0.99 / L_f
         theta = 1.0
 
         for itt in range(inner_iters):
-            # ── Dual step: p ← proj( p + σ·∇ū ) ──
+
             grad_x = np.roll(u_bar, -1, axis=1) - u_bar
             grad_y = np.roll(u_bar, -1, axis=0) - u_bar
 
             ptx = p[0] + sigma_pd * grad_x
             pty = p[1] + sigma_pd * grad_y
 
-            # Project onto ball of radius 1/(w + τ) at each pixel
+
             norm_pt = np.sqrt(ptx ** 2 + pty ** 2 + 1e-30)
             proj_scale = np.minimum(1.0, radius / norm_pt)
             p[0] = ptx * proj_scale
             p[1] = pty * proj_scale
 
-            # ── Primal step (Condat-Vũ: gradient + divergence) ──
+
             u_old = u.copy()
-            # Gradient of data fidelity via spatial convolutions
-            # ∇f(u) = β · kᵀ * (k * u − f)
+
+
             synth = convn_valid(u, k)
             err = synth - f
             grad_data = beta * convn_full(err, np.rot90(k, 2))
-            # Divergence of dual variable
-            div_p = (p[0] - np.roll(p[0], 1, axis=1)) + \
+
+            div_p = (p[0] - np.roll(p[0], 1, axis=1)) +\
                     (p[1] - np.roll(p[1], 1, axis=0))
-            # Condat-Vũ update: u ← u − τ·∇f(u) + τ·div(p)
+
             u = u - tau_pd * grad_data + tau_pd * div_p
-            # Positivity constraint (proximal of ι_{u≥0})
+
             u = np.maximum(u, 0.0)
 
-            # Overrelaxation
+
             u_bar = u + theta * (u - u_old)
 
-        # ── Kernel step (OUTSIDE inner loop for convergence) ──
-        # [Chen, SIOPT 2014]: operator splitting requires fixed operators
-        # within each block; updating k inside violates this.
+
         u_dk = blind_denoise_fn(u) if blind_denoise_fn is not None else u
         synth = convn_valid(u_dk, k)
         err = synth - f
         gradk = convn_valid(np.rot90(u_dk, 2), err)
-        alpha_k = k_step * (k.max() + 1.0 / k.size) / \
+        alpha_k = k_step * (k.max() + 1.0 / k.size) /\
                   (np.abs(gradk).max() + 1e-30)
         k = k - alpha_k * gradk
         k = np.maximum(k, 0.0)
@@ -362,8 +206,7 @@ def blind_cv(f: np.ndarray, MK: int, NK: int, beta: float,
         if k_sum > 0:
             k /= k_sum
 
-        # ── Center-of-mass kernel centering ──
-        # Keeps kernel centred for proper coarse-to-fine resizing.
+
         k_sum_c = k.sum()
         if k_sum_c > 0:
             cy = (ys * k).sum() / k_sum_c
@@ -373,7 +216,7 @@ def blind_cv(f: np.ndarray, MK: int, NK: int, beta: float,
             if dy != 0 or dx != 0:
                 k = np.roll(k, dy, axis=0)
                 k = np.roll(k, dx, axis=1)
-                # Compensate u/p to keep spatial alignment.
+
                 u = np.roll(u, -dy, axis=0)
                 u = np.roll(u, -dx, axis=1)
                 p[0] = np.roll(p[0], -dy, axis=0)
@@ -384,13 +227,8 @@ def blind_cv(f: np.ndarray, MK: int, NK: int, beta: float,
     return u, k
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Table 1 of Perrone & Favaro (2016)  →  blind_pd
-# Paper-faithful primal-dual solver for the non-convex log-TV prior.
-# ─────────────────────────────────────────────────────────────────────────────
-
 def _grad_neumann(u: np.ndarray):
-    """Forward differences with Neumann (zero at last row/col) boundary."""
+
     gx = np.zeros_like(u)
     gy = np.zeros_like(u)
     gx[:, :-1] = u[:, 1:] - u[:, :-1]
@@ -399,13 +237,8 @@ def _grad_neumann(u: np.ndarray):
 
 
 def _div_neumann(px: np.ndarray, py: np.ndarray) -> np.ndarray:
-    """
-    Divergence operator — adjoint of ``_grad_neumann`` under ``<∇u, p> = -<u, div p>``.
 
-    Standard Chambolle-2004 construction:
-        div p[i, j] = (p_x[i, j]   − p_x[i, j-1])    (boundary-corrected)
-                    + (p_y[i, j]   − p_y[i-1, j])
-    """
+
     dx = np.zeros_like(px)
     dx[:, 1:-1] = px[:, 1:-1] - px[:, :-2]
     dx[:, 0]    = px[:, 0]
@@ -420,39 +253,14 @@ def _div_neumann(px: np.ndarray, py: np.ndarray) -> np.ndarray:
 
 def _h_function(xi: np.ndarray, mu: float, eps: float,
                 sigma: float) -> np.ndarray:
-    """
-    Solve the 1-D sub-problem of eq. (25) in Perrone & Favaro (2016):
 
-        H(ξ, μ, ε, σ) = argmin_ρ  (μ / 2σ)·(ρ − 1)²·ξ²  +  log(ρ²·ξ² + ε²)
 
-    The first-order optimality condition is a depressed cubic in ρ:
-
-        ρ³ − ρ² + c·ρ + d = 0,
-        where  c = ε²/ξ² + 2σ/(μ·ξ²),   d = −ε²/ξ².
-
-    Solved per-pixel (vectorised) via Cardano's formula; when the
-    discriminant is positive we have three real roots and pick the one
-    that minimises the objective (the paper suggests a LUT; the closed
-    form here is fast enough for our problem sizes).
-
-    Parameters
-    ----------
-    xi    : (…) array — non-negative magnitudes  ‖z₂ + σ·∇ū‖ / σ
-    mu    : scalar μ  (= 2·λ/p  in the paper; we use μ = 2·β below)
-    eps   : scalar ε of the log prior
-    sigma : scalar PD dual step-size
-
-    Returns
-    -------
-    rho : (…) array with values in [0, 1].
-    """
     xi = np.asarray(xi, dtype=np.float64)
     eps2 = eps * eps
 
     rho = np.zeros_like(xi)
 
-    # ξ ≈ 0 → prox factor (1 − H) acts on z ≈ 0, value of ρ is irrelevant;
-    # we keep ρ = 0 (equivalently any value) so output stays ≈ 0.
+
     safe = xi > 1e-12
     if not np.any(safe):
         return rho
@@ -463,11 +271,11 @@ def _h_function(xi: np.ndarray, mu: float, eps: float,
     c = eps2 / xi2 + 2.0 * sigma / (mu * xi2)
     d = -eps2 / xi2
 
-    # Depress cubic: substitute ρ = t + 1/3   ⇒   t³ + p·t + q = 0
+
     p = c - 1.0 / 3.0
     q = -2.0 / 27.0 + c / 3.0 + d
 
-    # Cardano discriminant (three real roots ⇔ Δ > 0 ⇔ q²/4 + p³/27 < 0).
+
     disc = q * q / 4.0 + (p ** 3) / 27.0
 
     rho_s = np.empty_like(xi_s)
@@ -478,8 +286,8 @@ def _h_function(xi: np.ndarray, mu: float, eps: float,
         p_t = p[three_real]
         q_t = q[three_real]
         xi2_t = xi2[three_real]
-        # Trigonometric form (requires p < 0, guaranteed when disc < 0):
-        #   t_k = 2·√(−p/3)·cos((1/3)·arccos((3q/2p)·√(−3/p)) − 2πk/3)
+
+
         r = 2.0 * np.sqrt(-p_t / 3.0)
         arg = (3.0 * q_t) / (2.0 * p_t) * np.sqrt(-3.0 / p_t)
         arg = np.clip(arg, -1.0, 1.0)
@@ -491,9 +299,9 @@ def _h_function(xi: np.ndarray, mu: float, eps: float,
         r1 = t1 + 1.0 / 3.0
         r2 = t2 + 1.0 / 3.0
 
-        # Minimiser selection
+
         def _obj(rr):
-            return (mu / (2.0 * sigma)) * (rr - 1.0) ** 2 * xi2_t \
+            return (mu / (2.0 * sigma)) * (rr - 1.0) ** 2 * xi2_t\
                    + np.log(rr * rr * xi2_t + eps2)
 
         o0 = _obj(r0)
@@ -515,8 +323,7 @@ def _h_function(xi: np.ndarray, mu: float, eps: float,
         t = np.cbrt(u3) + np.cbrt(v3)
         rho_s[one_real] = t + 1.0 / 3.0
 
-    # Clip to [0, 1]: out of this range the prox (1 − ρ) loses meaning,
-    # and a tiny numerical overshoot is possible near the endpoints.
+
     rho_s = np.clip(rho_s, 0.0, 1.0)
     rho[safe] = rho_s
     return rho
@@ -524,19 +331,8 @@ def _h_function(xi: np.ndarray, mu: float, eps: float,
 
 def _build_h_lut(mu: float, eps: float, sigma: float,
                  xi_max: float = 2.0, n_grid: int = 4096) -> tuple:
-    """
-    Pre-compute H(ξ) on a uniform grid for fast interpolation.
 
-    The paper recommends a look-up table (LUT) because, inside the inner
-    loop, ``μ, ε, σ`` are fixed and only ``ξ`` changes per pixel.  We
-    sample ξ on ``[0, xi_max]`` (values of ξ above that threshold give
-    H ≈ 1 to numerical precision).
 
-    Returns
-    -------
-    xi_grid : (n_grid,) ndarray — sample points
-    h_grid  : (n_grid,) ndarray — H(xi_grid)
-    """
     xi_grid = np.linspace(0.0, xi_max, n_grid, dtype=np.float64)
     h_grid = _h_function(xi_grid, mu=mu, eps=eps, sigma=sigma)
     return xi_grid, h_grid
@@ -544,7 +340,7 @@ def _build_h_lut(mu: float, eps: float, sigma: float,
 
 def _h_lut_apply(xi: np.ndarray, xi_grid: np.ndarray,
                  h_grid: np.ndarray) -> np.ndarray:
-    """Vectorised 1-D linear interpolation of a pre-computed H-LUT."""
+
     return np.interp(xi, xi_grid, h_grid,
                      left=h_grid[0], right=h_grid[-1])
 
@@ -562,122 +358,19 @@ def blind_pd(f: np.ndarray, MK: int, NK: int, beta: float,
              h_lut_size: int = 4096,
              h_lut_xi_max: float = 4.0,
              blind_denoise_fn=None) -> tuple:
-    """
-    Primal-dual blind deconvolution  —  Table 1 of Perrone & Favaro (2016),
-    "A Logarithmic Image Prior for Blind Deconvolution", IJCV 117.
 
-    Solves the non-convex log-TV energy (eq. 12) directly via the
-    Chambolle-Pock / Möllenhoff primal-dual splitting (no MM outer
-    majorisation).  For each outer iteration, a fixed kernel k is used
-    and the inner loop performs N₀ primal-dual steps (Table 1):
 
-        z₁^{n+1} = (z₁^n + σ·(k * ū^n − f)) / (1 + σ)
+    epsilon = float(tau_param)
 
-        ζ        = z₂^n + σ·∇ū^n
-        ξ        = ‖ζ‖ / σ                                   (per-pixel)
-        z₂^{n+1} = (1 − H(ξ, μ, ε, σ)) · ζ
-
-        ũ^{n+1}  = ũ^n − τ·( k₋ * z₁^{n+1}  +  ∇* z₂^{n+1} )
-        ū^{n+1}  = ũ^{n+1} + θ·(ũ^{n+1} − ũ^n)
-
-    where ``∇* = −div``.  After the inner loop the kernel step follows
-    ``blind.m`` — projected gradient descent onto the simplex.
-
-    Parameters
-    ----------
-    f           : (M, N) blurry image
-    MK, NK      : kernel spatial support
-    beta        : data-fidelity weight λ (eq. 12).  Drives μ = β
-                  (see "Note on μ" below).
-    u           : (M+MK-1, N+NK-1) initial (padded) sharp-image estimate
-    k           : (MK, NK) initial kernel
-    outer_iters : T — outer iterations (kernel updates).  Paper leaves T
-                  symbolic; default 30 is empirically sufficient at full
-                  resolution (more is needed for coarse-to-fine pyramids
-                  via ``coarse_to_fine``).
-    inner_iters : N₀ — inner PD iterations per outer step.  Paper leaves
-                  N₀ symbolic; for PD splitting the inner saddle-point
-                  must actually be approached, so the default is large
-                  (50) — much larger than for the MM solver, where the
-                  inner gradient-descent loop only needs a few steps.
-    tau_param   : ε of the log prior (eq. 11).  Following the MATLAB
-                  reference we expose this as ``tau`` for parity with
-                  the MM solver.
-    k_step      : kernel gradient-descent step-size scaling
-    theta       : PD over-relaxation parameter, θ ∈ (0, 1] (paper: 1)
-    pd_tau      : primal step.  ``None`` → balanced default 0.99/√‖K‖²
-                  ≈ 0.33 (see step-size note below).
-    pd_sigma    : dual step.  ``None`` → equal to ``pd_tau``.
-    blind_denoise_fn : optional callable applied to u before the kernel
-                  gradient (same contract as in ``blind``/``blind_cv``).
-
-    Returns
-    -------
-    u : (M+MK-1, N+NK-1) estimated sharp image (still padded)
-    k : (MK, NK) estimated kernel
-
-    Notes on step sizes
-    -------------------
-    The PD scheme has K = (k*, ∇), so
-        ‖K‖² ≤ ‖k‖_op² + ‖∇‖² ≤ 1 + 8 = 9
-    for a normalised non-negative k and Neumann forward-difference ∇.
-    The Chambolle-Pock convergence condition (Perrone & Favaro eq. 19,
-    Chambolle-Pock 2010 Thm. 1) is
-
-        τ · σ · ‖K‖² < 1
-
-    The paper does NOT give numerical defaults for τ, σ — it only states
-    the constraint above.  We pick the **balanced** choice
-
-        τ = σ = 0.99 / √‖K‖² = 0.99 / 3 ≈ 0.33
-
-    which gives τσ‖K‖² ≈ 0.98 — strictly below 1, but as close as
-    practical (Chambolle-Pock 2010 §6.2 recommends operating near the
-    boundary for fastest convergence on negative-curvature problems).
-
-    Important: β does NOT enter the primal step nor F₁* (see "Note on
-    μ" below); it only enters the dual update via H(·, μ=β, ε, σ).
-    Therefore the step sizes do NOT need to scale with β — the small
-    ``τ = 0.005`` used in earlier code revisions was a (slow) safety
-    fallback, not a paper recommendation.
-
-    Note on μ
-    ---------
-    In problem (12) of the paper,  λ  multiplies the data term.  After
-    rescaling to problem (16) — the form actually solved by the PD
-    saddle-point — the data-fidelity coefficient becomes ½ and the log
-    prior is weighted by ``1/μ`` with ``μ = 2λ/p``.  For the standard
-    ``p = 1`` this gives ``μ = 2λ``.
-
-    Throughout this codebase (following ``blind.m``) the parameter
-    ``beta`` plays the role of ``2·λ`` of problem (12).  Indeed the MM
-    gradient ``β · k₋ · (k*u−f)`` is the gradient of
-    ``(β/2)·‖k*u−f‖² + prior``, so the effective  λ_problem-12  is
-    ``β/2``.  To keep the **same** regularisation-to-data ratio between
-    MM and PD solvers (so that the same ``lambda_val`` parameter gives
-    comparable behaviour), we set
-
-            μ = β   (=  2 · (β/2)  =  2 · λ_effective ).
-    """
-    epsilon = float(tau_param)   # ε of the log prior (eq. 11)
-    # ``beta`` here plays the role of 2·λ in problem (12) — see docstring.
     mu = float(beta)
 
-    # ── Step sizes ──────────────────────────────────────────────────────
-    # Paper-faithful balanced default:  τ = σ = 0.99 / √‖K‖² ≈ 0.33,
-    # giving τσ‖K‖² ≈ 0.98 < 1  (eq. 19, paper).  See step-size note in
-    # the docstring for why β does NOT enter the choice of τ, σ.
-    K_norm2 = 9.0  # ‖k*‖² + ‖∇‖² ≤ 1 + 8 = 9
+
+    K_norm2 = 9.0
     default_step = 0.99 / np.sqrt(K_norm2)
     tau_pd = float(pd_tau) if pd_tau is not None else default_step
     sigma_pd = float(pd_sigma) if pd_sigma is not None else tau_pd
 
-    # ── H-evaluator (closed-form vs LUT) ────────────────────────────────
-    # Paper (sec. 5) recommends a look-up table for speed: μ, ε, σ are
-    # fixed inside the inner loop, so H(ξ) can be precomputed once.
-    # Mathematically LUT ≡ closed-form; the only difference is speed
-    # (LUT ≈ O(1) per pixel via np.interp) and a controllable
-    # interpolation error.
+
     h_mode_l = str(h_mode).lower()
     if h_mode_l == 'lut':
         _xi_grid, _h_grid = _build_h_lut(
@@ -691,59 +384,54 @@ def blind_pd(f: np.ndarray, MK: int, NK: int, beta: float,
     else:
         raise ValueError(f"h_mode must be 'closed' or 'lut', got {h_mode!r}")
 
-    # ── Dual / primal state ─────────────────────────────────────────────
+
     Mu, Nu = u.shape
     z1 = np.zeros_like(f)
     z2x = np.zeros((Mu, Nu))
     z2y = np.zeros((Mu, Nu))
     u_tilde = u.copy()
-    u_bar = u.copy()    
+    u_bar = u.copy()
 
-    # ── Kernel-centering grids (as in blind_cv) ─────────────────────────
+
     ys, xs = np.mgrid[0:MK, 0:NK]
     cy_target = (MK - 1) / 2.0
     cx_target = (NK - 1) / 2.0
 
     for it in range(outer_iters):
         for itt in range(inner_iters):
-            # ── Dual update z₁ (data),  Table 1, line 1:
-            #   z₁ ← (z₁ + σ(Kū − f)) / (1 + σ)
-            # The paper normalises the data term to F₁(v)=½‖v−f‖², so
-            # F₁*(z)=½‖z‖²+⟨z,f⟩  and  prox_{σF₁*}(w) = (w−σf)/(1+σ).
-            # All of the regularisation strength (λ/β) is carried by μ in the
-            # H-function below, not here.
-            Kub = convn_valid(u_bar, k)                    # k * ū, valid
+
+
+            Kub = convn_valid(u_bar, k)
             z1 = (z1 + sigma_pd * (Kub - f)) / (1.0 + sigma_pd)
 
-            # ── Dual update z₂ (gradient / log prior)
+
             gx, gy = _grad_neumann(u_bar)
             zx = z2x + sigma_pd * gx
             zy = z2y + sigma_pd * gy
-            # ξ = ‖ζ‖ / σ   per pixel
+
             xi = np.sqrt(zx * zx + zy * zy) / sigma_pd
             H = _H(xi)
             scale = 1.0 - H
             z2x = scale * zx
             z2y = scale * zy
 
-            # ── Primal update
-            #   ũ ← ũ − τ·( k₋ * z₁  +  ∇* z₂ ),   ∇* = −div
+
             Kstar_z1 = convn_full(z1, np.rot90(k, 2))
             div_z2 = _div_neumann(z2x, z2y)
             u_new = u_tilde - tau_pd * (Kstar_z1 - div_z2)
 
-            # Over-relaxation
+
             u_bar = u_new + theta * (u_new - u_tilde)
             u_tilde = u_new
 
         u = u_tilde
 
-        # ── Kernel step (Chan-Wong / blind.m style) ────────────────────
+
         u_dk = blind_denoise_fn(u) if blind_denoise_fn is not None else u
         synth = convn_valid(u_dk, k)
         err = synth - f
         gradk = convn_valid(np.rot90(u_dk, 2), err)
-        alpha_k = k_step * (k.max() + 1.0 / k.size) / \
+        alpha_k = k_step * (k.max() + 1.0 / k.size) /\
                   (np.abs(gradk).max() + 1e-30)
         k = k - alpha_k * gradk
         k = np.maximum(k, 0.0)
@@ -751,7 +439,7 @@ def blind_pd(f: np.ndarray, MK: int, NK: int, beta: float,
         if k_sum > 0:
             k /= k_sum
 
-        # ── Kernel centre-of-mass re-centring (same trick as blind_cv) ─
+
         k_sum_c = k.sum()
         if k_sum_c > 0:
             cy = (ys * k).sum() / k_sum_c
@@ -769,46 +457,16 @@ def blind_pd(f: np.ndarray, MK: int, NK: int, beta: float,
     return u, k
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# buildPyramid.m  →  build_pyramid
-# ─────────────────────────────────────────────────────────────────────────────
-
 def _make_odd(val: int) -> int:
-    """Force integer to odd by subtracting 1 if even."""
+
     return val - 1 if val % 2 == 0 else val
 
 
 def build_pyramid(f: np.ndarray, MK: int, NK: int,
                   lam: float, lambda_mult: float,
                   scale_mult: float = 1.4142135623730951):
-    """
-    Build a coarse-to-fine pyramid of images, kernel sizes, and λ values.
 
-    Equivalent to MATLAB ``buildPyramid.m``.
 
-    Parameters
-    ----------
-    f           : (M, N) blurry image at full resolution
-    MK, NK      : full-resolution kernel size
-    lam         : λ at the finest (scale-1) level
-    lambda_mult : λ multiplier between levels  (lambdaMultiplier = 2.1)
-    scale_mult  : kernel-size divider between levels (kernelSizeMultiplier = √2)
-
-    Returns
-    -------
-    fp      : list of downscaled images  [scale-0 … scale-S]
-    Mp, Np  : list of image sizes per scale
-    MKp, NKp: list of kernel sizes per scale
-    lambdas : list of λ values per scale
-    scales  : total number of pyramid levels (int)
-
-    Notes
-    -----
-    MATLAB uses ``round()`` which rounds to nearest, ties to even.
-    Python's built-in ``round()`` is banker's rounding (identical behaviour).
-
-    MATLAB ``imresize(f,[M N],'bicubic')`` → ``imresize_matlab(f,(M,N))``.
-    """
     M, N = f.shape[:2]
     smallest_scale = 3
 
@@ -819,47 +477,47 @@ def build_pyramid(f: np.ndarray, MK: int, NK: int,
     NKp = [NK]
     lambdas = [lam]
 
-    num_scales = 1  # current count of levels
+    num_scales = 1
 
     while MKp[num_scales - 1] > smallest_scale and NKp[num_scales - 1] > smallest_scale:
-        prev = num_scales - 1  # index of previous level
+        prev = num_scales - 1
 
-        # λ decreases toward coarser scales
+
         lambdas.append(lambdas[prev] / lambda_mult)
 
-        # Kernel dimensions: divide and force odd
+
         new_mk = round(MKp[prev] / scale_mult)
         new_nk = round(NKp[prev] / scale_mult)
         new_mk = _make_odd(new_mk)
         new_nk = _make_odd(new_nk)
 
-        # Avoid stalling: if a dimension didn't decrease, subtract 2
+
         if new_nk == NKp[prev]:
             new_nk -= 2
         if new_mk == MKp[prev]:
             new_mk -= 2
 
-        # Floor at smallest_scale
+
         new_mk = max(new_mk, smallest_scale)
         new_nk = max(new_nk, smallest_scale)
 
         MKp.append(new_mk)
         NKp.append(new_nk)
 
-        # Image dimensions scale proportionally to kernel change
+
         factor_m = MKp[prev] / new_mk
         factor_n = NKp[prev] / new_nk
 
         new_m = round(Mp[prev] / factor_m)
         new_n = round(Np[prev] / factor_n)
-        # Force odd
+
         new_m = _make_odd(new_m)
         new_n = _make_odd(new_n)
 
         Mp.append(new_m)
         Np.append(new_n)
 
-        # Down-scale image from the *original* f (not recursively)
+
         fp.append(imresize_matlab(f, (new_m, new_n)))
 
         num_scales += 1
@@ -867,64 +525,25 @@ def build_pyramid(f: np.ndarray, MK: int, NK: int,
     return fp, Mp, Np, MKp, NKp, lambdas, num_scales
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# coarseToFine.m  →  coarse_to_fine
-# ─────────────────────────────────────────────────────────────────────────────
-
 def coarse_to_fine(f: np.ndarray, MK: int, NK: int,
                    blind_params: dict, ctf_params: dict,
                    verbose: bool = False, method: str = 'mm',
                    blind_denoise_fn=None):
-    """
-    Multi-scale coarse-to-fine blind deconvolution.
 
-    Equivalent to MATLAB ``coarseToFine.m``.
 
-    Parameters
-    ----------
-    f : (M, N) blurry image  (already preprocessed: double, odd dims, etc.)
-    MK, NK : kernel support at finest level
-    blind_params : dict with keys used by ``blind()``:
-        outer_iters, inner_iters, tau, k_step, u_step
-        (k_step and u_step are **arrays** with one entry per step-phase)
-    ctf_params : dict with keys:
-        final_lambda    — λ at finest scale
-        lambda_mult     — λ multiplier between scales   (default 2.1)
-        scale_mult      — kernel-size divider            (default √2)
-    verbose : if True, print progress
-
-    Returns
-    -------
-    u : (M+MK-1, N+NK-1) estimated sharp image (padded)
-    k : (MK, NK) estimated kernel
-
-    MATLAB → Python notes
-    ---------------------
-    * ``padarray(f,[floor(MK/2) floor(NK/2)],'replicate')``
-      →  ``pad_replicate(f, MK//2, NK//2)``
-    * ``ones(MK,NK)/MK/NK`` = uniform kernel
-      → ``np.ones((MK,NK)) / (MK * NK)``
-
-    Multi-step-size handling:
-        In ``deblur.m``, ``params.k_step`` and ``params.u_step`` are vectors
-        (e.g. [1e-2, 5e-3, 1e-3, 5e-4]).  In ``blind.m`` the outer loop
-        ``for i = 1:length(params.k_step)`` runs the *full set of outer_iters*
-        once per step-size entry.  Here we replicate that by calling ``blind()``
-        once per step-size element at each pyramid level.
-    """
     final_lambda = ctf_params.get('final_lambda')
     lambda_mult = ctf_params.get('lambda_mult', 2.1)
     scale_mult = ctf_params.get('scale_mult', np.sqrt(2))
 
-    # Build pyramid
+
     fp, Mp, Np, MKp, NKp, lambdas, num_scales = build_pyramid(
         f, MK, NK, final_lambda, lambda_mult, scale_mult)
 
-    # Initial estimates
+
     u = pad_replicate(f, MK // 2, NK // 2)
     k = np.ones((MK, NK), dtype=np.float64) / (MK * NK)
 
-    # Extract step-size arrays
+
     k_steps = blind_params.get('k_step', np.array([1e-3]))
     u_steps = blind_params.get('u_step', np.array([1e-3]))
     if np.isscalar(k_steps):
@@ -936,19 +555,17 @@ def coarse_to_fine(f: np.ndarray, MK: int, NK: int,
     inner_iters = blind_params.get('inner_iters', 5)
     tau = blind_params.get('tau', 1e-3)
 
-    # ── Process from coarsest to finest ──
-    # MATLAB:  for scale = scales:-1:1   (scales is the coarsest, 1 the finest)
+
     for scale_idx in range(num_scales - 1, -1, -1):
         Ms = Mp[scale_idx]
         Ns = Np[scale_idx]
         MKs = MKp[scale_idx]
         NKs = NKp[scale_idx]
 
-        # Resize current estimates to match this scale's dimensions
-        # u has spatial size (Ms + MKs - 1,  Ns + NKs - 1)
+
         u = imresize_matlab(u, (Ms + MKs - 1, Ns + NKs - 1))
         k = imresize_matlab(k, (MKs, NKs))
-        # Project kernel: non-negative, normalised
+
         k = k * (k > 0)
         k_sum = k.sum()
         if k_sum > 0:
@@ -961,8 +578,7 @@ def coarse_to_fine(f: np.ndarray, MK: int, NK: int,
             print(f"scale: {scale_idx}  lambda: {lam:.4f}  "
                   f"MKs: {MKs}  NKs: {NKs}  outer_iters: {outer_iters}")
 
-        # Run solver for each step-size phase
-        # MATLAB outer loop:  for i=1:length(params.k_step)
+
         for phase in range(len(k_steps)):
             if method == 'mm':
                 u, k = blind(
@@ -1007,10 +623,6 @@ def coarse_to_fine(f: np.ndarray, MK: int, NK: int,
     return u, k
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# FFT-related helpers for non-blind deconvolution
-# ═════════════════════════════════════════════════════════════════════════════
-
 from numpy.fft import fft2, ifft2
 from scipy.fft import dstn, idstn
 
@@ -1018,7 +630,7 @@ _OPT_FFT_LUT = None
 
 
 def _build_opt_fft_lut(max_n=4096):
-    """Build LUT mapping n -> next efficient FFT size (products of 2,3,5,7)."""
+
     efficient = set()
     p2 = 1
     while p2 <= max_n:
@@ -1044,7 +656,7 @@ def _build_opt_fft_lut(max_n=4096):
 
 
 def opt_fft_size(n) -> np.ndarray:
-    """Optimal FFT data length(s) — smallest efficient size >= n."""
+
     global _OPT_FFT_LUT
     if _OPT_FFT_LUT is None:
         _OPT_FFT_LUT = _build_opt_fft_lut()
@@ -1064,12 +676,8 @@ def opt_fft_size(n) -> np.ndarray:
     return m
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# wrap_boundary_liu (Liu & Jia ICIP 2008, Cho implementation)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def _solve_min_laplacian(boundary_image: np.ndarray) -> np.ndarray:
-    """Solve Laplace eq. with Dirichlet BC via DST-I."""
+
     H, W = boundary_image.shape
     bi = boundary_image.copy()
     bi[1:-1, 1:-1] = 0.0
@@ -1087,7 +695,7 @@ def _solve_min_laplacian(boundary_image: np.ndarray) -> np.ndarray:
     x = np.arange(1, W - 1)
     y = np.arange(1, H - 1)
     xx, yy = np.meshgrid(x, y)
-    denom = (2.0 * np.cos(np.pi * xx / (W - 1)) - 2.0) + \
+    denom = (2.0 * np.cos(np.pi * xx / (W - 1)) - 2.0) +\
             (2.0 * np.cos(np.pi * yy / (H - 1)) - 2.0)
 
     f3 = f2sin / denom
@@ -1099,7 +707,7 @@ def _solve_min_laplacian(boundary_image: np.ndarray) -> np.ndarray:
 
 
 def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
-    """Pad image so boundaries are circularly smooth for FFT-based deconv."""
+
     if img.ndim == 2:
         img = img[:, :, np.newaxis]
     H, W, Ch = img.shape
@@ -1165,12 +773,8 @@ def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
     return ret
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# TV deblurring (ADM anisotropic — Split Bregman)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def _computeDenominator(B, k):
-    """Pre-compute frequency-domain terms for ADM TV deblurring."""
+
     m, n = B.shape
     otf_k = psf2otf(k, (m, n))
     Nomin1 = np.conj(otf_k) * fft2(B)
@@ -1184,7 +788,7 @@ def _computeDenominator(B, k):
 
 
 def deblurring_adm_aniso(B, k, lambda_tv, alpha):
-    """TV-l2 deblurring via ADM/Split Bregman with anisotropic TV."""
+
     beta = 1.0 / lambda_tv
     beta_min = 0.001
     m, n = B.shape
@@ -1220,12 +824,8 @@ def deblurring_adm_aniso(B, k, lambda_tv, alpha):
     return I
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# L0 gradient restoration
-# ═════════════════════════════════════════════════════════════════════════════
-
 def L0Restoration(Im, kernel, lambda_grad, kappa=2.0):
-    """Image restoration with L0 gradient prior."""
+
     H_orig, W_orig = Im.shape[0], Im.shape[1]
     target_size = opt_fft_size(
         np.array([H_orig, W_orig]) + np.array(kernel.shape[:2]) - 1)
@@ -1282,12 +882,8 @@ def L0Restoration(Im, kernel, lambda_grad, kappa=2.0):
     return S
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Bilateral filter
-# ═════════════════════════════════════════════════════════════════════════════
-
 def _fspecial_gaussian(size, sigma):
-    """2-D Gaussian kernel."""
+
     x = np.arange(size) - size // 2
     g = np.exp(-x ** 2 / (2 * sigma ** 2))
     h = np.outer(g, g)
@@ -1295,7 +891,7 @@ def _fspecial_gaussian(size, sigma):
 
 
 def bilateral_filter(img, sigma_s, sigma):
-    """Bilateral filter for grayscale images."""
+
     was_2d = img.ndim == 2
     if was_2d:
         img = img[:, :, np.newaxis]
@@ -1331,30 +927,10 @@ def bilateral_filter(img, sigma_s, sigma):
     return r_img
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Ringing artifacts removal (Pan et al. CVPR 2014)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def ringing_artifacts_removal(y, kernel, lambda_tv=1e-3,
                               lambda_l0=2e-3, weight_ring=1.0):
-    """
-    Non-blind deconvolution with ringing suppression.
 
-    Uses TV deconv + L0 deconv + bilateral filter on their difference
-    to identify and subtract ringing artifacts.
 
-    Parameters
-    ----------
-    y           : (H, W) blurred image (single channel, float [0,1])
-    kernel      : blur kernel
-    lambda_tv   : TV regularisation weight
-    lambda_l0   : L0 gradient prior weight
-    weight_ring : ringing suppression strength (0 = TV only)
-
-    Returns
-    -------
-    result : (H, W) deblurred image
-    """
     H, W = y.shape[:2]
     target_size = opt_fft_size(
         np.array([H, W]) + np.array(kernel.shape[:2]) - 1)
