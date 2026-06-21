@@ -1,26 +1,23 @@
 """
 gbbid.py
 
-Blind Image Deblurring using Graph-Based RGTV Prior (GBBID).
+Слепая деконволюция изображений с использованием графового априорного 
+распределения (Graph-Based RGTV Prior, GBBID).
 
-Reference:
+Основано на методе:
     Y. Bai, G. Cheung, X. Liu, W. Gao:
     "Graph-Based Blind Image Deblurring From a Single Photograph",
     IEEE Transactions on Image Processing, vol. 28, no. 3, pp. 1404-1418, 2019.
 
-Pipeline (mirrors MATLAB graph_blind_main.m):
-    1. Normalise input to float64 [0, 1].
-    2. Convert to grayscale, crop borders.
-    3. Blind kernel estimation via bid_rgtv_c2f_cg (coarse-to-fine RGTV).
-    4. Non-blind restoration via Deconvolution_FHLP (Krishnan & Fergus NIPS 2009).
-    5. Return restored image (int16, [0, 255]) and kernel.
+Модифицированная версия включает расширенный конвейер предобработки и 
+подавления шума (импульсного, периодического, пуассоновского и гауссовского) 
+с автоматическим оркестратором параметров.
 """
 
 import numpy as np
 import time
 from typing import Tuple, List, Any, Dict
 
-# ── Framework base class import (DO NOT MODIFY) ─────────────────────────────
 import sys
 from pathlib import Path
 
@@ -44,7 +41,6 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
         sys.path.insert(0, _path)
 
 from blinddeconv.algorithms.base import DeconvolutionAlgorithm
-# ─────────────────────────────────────────────────────────────────────────────
 
 from .solvers import (
     bid_rgtv_c2f_cg,
@@ -61,90 +57,73 @@ from .utils import opt_fft_size, wrap_boundary_liu
 
 class GBBID(DeconvolutionAlgorithm):
     """
-    Blind deconvolution using Graph-Based RGTV prior.
+    Алгоритм слепой деконволюции на основе графовой регуляризации RGTV 
+    с интегрированным конвейером обработки шума.
 
-    Parameters
-    ----------
-    k_estimate_size : int — estimated blur kernel size (odd). Default 69.
-    border          : int — boundary pixels to crop. Default 20.
-    preprocess      : str — denoiser before pyramid building:
-                      'tv'|'nlm'|'bilateral'|'guided'|'bm3d'|'none'.
-                      Default 'tv' (original behaviour).
-    preprocess_params : dict or None — kwargs for preprocess denoiser.
-                      TV defaults: {'mu': 0.01, 'gamma': 0.1, 'max_it': 10}.
-    pre_kernel      : str — denoiser before kernel estimation step.
-                      Same options. Default 'none'.
-    pre_kernel_params : dict or None — kwargs for pre_kernel denoiser.
-    nonblind_method : str — non-blind deconvolution method:
-                      'fhlp'     — Fast Hyper-Laplacian Prior (default, Krishnan & Fergus NIPS 2009)
-                      'tv_adm'   — TV-l2 via ADM/Split Bregman with wrap_boundary_liu
-                      'l0'       — L0 gradient prior with wrap_boundary_liu
-                      'ringing_removal' — TV + L0 + bilateral blend (Pan et al.)
-                      'adaptive_lp' — Space-variant Lp with adaptive noise model (Wang et al.)
-    nonblind_params : dict or None — method-specific kwargs.
-                      fhlp defaults:     {'lambda_val': 2e3,  'alpha': 0.5,  'edgetaper_iters': 4}
-                      tv_adm defaults:   {'lambda_tv': 2e-3,  'alpha': 1}
-                      l0 defaults:       {'lambda_grad': 2e-3, 'kappa': 2.0}
-                      ringing_removal:   {'lambda_tv': 2e-3,  'lambda_l0': 2e-3, 'weight_ring': 0.5}
-                      adaptive_lp:       {'alpha': 0.8, 'sigma_n': None, 'two_stage': True}
-    lambda_fhlp     : float — (legacy) FHLP data-fidelity weight. Default 2e3.
-    alpha_fhlp      : float — (legacy) hyper-Laplacian exponent. Default 0.5.
-    edgetaper_iters : int — (legacy) number of edgetaper passes in FHLP.
-                      Default 4.
-    noise_estimation : str — noise estimation method before processing:
-                      'chen'    — PCA eigenvalue method (Chen et al. ICCV 2015)
-                      'pyatykh' — PCA + VST + kurtosis (Pyatykh et al. TIP 2013)
-                      'none'    — disabled (default)
-    auto_params     : bool — if True and noise_estimation != 'none',
-                      automatically adapt preprocess / pre_kernel / nonblind
-                      parameters based on estimated σ. Only fills parameters
-                      that were not explicitly set (None). Default False.
-    noise_preprocess : str — PSD-based spectral noise preprocessing:
-                      'auto'    — analyze PSD, apply notch + prewhiten as needed
-                      'prewhiten' — force prewhitening only
-                      'notch'   — force notch filter only
-                      'bandstop' — band-stop filter (requires bandstop_params)
-                      'none'    — disabled (default)
-    noise_preprocess_params : dict or None — kwargs for noise_preprocess.
-                      auto defaults: {'pch_size': 32, 'n_smooth': 100,
-                                      'peak_threshold': 5.0,
-                                      'prewhiten_reg': 1e-3, 'notch_radius': 3}
-                      bandstop requires: {'freq_low': ..., 'freq_high': ..., 'order': 2}
-    impulse_preprocess : str — impulse noise detection and removal:
-                      'auto'  — detect and remove if density > threshold (default)
-                      'none'  — disabled
-    impulse_params : dict or None — kwargs for impulse preprocessing.
-                      Defaults: {'density_threshold': 0.005, 'max_window': 7,
-                                 'outlier_window': 5, 'outlier_threshold': 0.15}
-    screenot_preprocess : str — ScreeNOT SVD thresholding denoising:
-                      'auto'  — apply patch-based ScreeNOT (default)
-                      'none'  — disabled
-    screenot_params : dict or None — kwargs for ScreeNOT.
-                      Defaults: {'k': 10, 'strategy': 'i', 'mode': 'full'}
-                      mode='full': treat image as matrix (no artifacts).
-                      mode='patch': patch-based (needs patch_size, stride).
-    act_preprocess : str — ACT curvelet denoising (Eslahi & Aghagolzadeh TIP 2016):
-                      'auto'  — apply ACT (requires curvelops)
-                      'none'  — disabled (default)
-                      Cannot be used together with screenot_preprocess='auto'.
-    act_params : dict or None — kwargs for ACT.
-                      Defaults: {'noise_var': None, 'threshold_setting': 's'}
-                      noise_var=None: blind MAD estimation.
-                      noise_var=float: known AWGN variance σ².
-                      noise_var=ndarray: FFT-PSD (DC at [0,0], scale σ²×N).
-                      threshold_setting: 's' (soft), 'h' (hard), 'ksigma'.
-                      If noise_var is None AND noise_estimation is enabled,
-                      σ² from Chen/Pyatykh is automatically used instead
-                      of blind MAD (much more accurate for correlated noise).
-    pre_nonblind : str — denoiser applied to y BEFORE non-blind step:
-                      'bm3d'|'nlm'|'bilateral'|'guided'|'tv'|'act'|'none'.
-                      Default 'none'.  For correlated noise, 'bm3d' is
-                      recommended — non-blind methods assume white noise
-                      and produce color artifacts otherwise.
-    pre_nonblind_params : dict or None — kwargs for pre_nonblind denoiser.
-                      bm3d: {'sigma_psd': auto from noise_estimation}
-                      act:  {'noise_var': auto, 'threshold_setting': 's'}
-                      Other: same as preprocess params.
+    Параметры
+    ---------
+    k_estimate_size : int, по умолчанию 69
+        Ожидаемый пространственный размер оцениваемого ядра размытия.
+    border : int, по умолчанию 20
+        Количество краевых пикселей, обрезаемых перед началом оценки ядра.
+    preprocess : str
+        Алгоритм предварительного шумоподавления перед построением пирамиды:
+        'tv', 'nlm', 'bilateral', 'guided', 'bm3d', 'none'. По умолчанию 'tv'.
+    preprocess_params : dict или None
+        Параметры для метода предварительного шумоподавления.
+    pre_kernel : str
+        Алгоритм шумоподавления перед шагом оценки ядра. По умолчанию 'none'.
+    pre_kernel_params : dict или None
+        Параметры для метода шумоподавления перед оценкой ядра.
+    nonblind_method : str
+        Метод финальной неслепой деконволюции:
+        - 'fhlp' : быстрое гиперлапласовское априорное распределение (по умолчанию).
+        - 'tv_adm' : TV-регуляризация через метод ADM/Split Bregman.
+        - 'l0' : использование L0-нормы градиентов.
+        - 'ringing_removal' : комбинация TV, L0 и билатерального фильтра.
+        - 'adaptive_lp' : пространственно-зависимая Lp-регуляризация.
+    nonblind_params : dict или None
+        Специфичные параметры для выбранного метода неслепой деконволюции.
+    lambda_fhlp : float, по умолчанию 2e3
+        Вес члена верности данных для метода FHLP.
+    alpha_fhlp : float, по умолчанию 0.5
+        Экспонента гиперлапласиана для метода FHLP.
+    edgetaper_iters : int, по умолчанию 4
+        Количество проходов сглаживания краев (edgetaper) для метода FHLP.
+    noise_estimation : str
+        Метод оценки дисперсии шума: 'chen', 'pyatykh' или 'none'.
+    auto_params : bool
+        Если True и оценка шума включена, алгоритм автоматически адаптирует 
+        незаданные параметры методов шумоподавления на основе уровня шума.
+    noise_preprocess : str
+        Спектральный фильтр для периодического шума: 'auto', 'prewhiten', 
+        'notch', 'bandstop', 'none'.
+    noise_preprocess_params : dict или None
+        Параметры спектральной фильтрации шума.
+    impulse_preprocess : str
+        Метод обработки импульсного шума ('auto', 'none').
+    impulse_params : dict или None
+        Параметры для обнаружения и фильтрации импульсного шума.
+    screenot_preprocess : str
+        Предварительное шумоподавление методом ScreeNOT ('auto', 'none').
+    screenot_params : dict или None
+        Параметры алгоритма ScreeNOT.
+    act_preprocess : str
+        Предварительное шумоподавление методом Adaptive Curvelet Thresholding. 
+        Несовместимо с screenot_preprocess='auto'.
+    act_params : dict или None
+        Параметры для метода ACT.
+    pre_nonblind : str
+        Метод шумоподавления, применяемый перед финальным неслепым шагом. 
+        Рекомендуется 'bm3d' или 'act' для коррелированного шума.
+    pre_nonblind_params : dict или None
+        Параметры шумоподавления перед неслепым шагом.
+    auto_mode : str
+        Глобальный оркестратор шумоподавления ('robust' или 'off'). В режиме 
+        'robust' выполняется автоматическая настройка всего конвейера с 
+        плавным переходом параметров в зависимости от уровня шума sigma.
+    auto_mode_params : dict или None
+        Настройки порогов и ограничений для глобального оркестратора.
     """
 
     def __init__(
@@ -203,10 +182,6 @@ class GBBID(DeconvolutionAlgorithm):
         self.auto_mode = (auto_mode or 'off').lower()
         self.auto_mode_params = auto_mode_params
 
-        # Snapshot of user-supplied defaults — used by the robust
-        # orchestrator so that soft-blending always starts from the
-        # values the user passed at construction, not from values that
-        # were overwritten on a previous process() call.
         self._defaults_snapshot = {
             'lambda_fhlp': float(lambda_fhlp),
             'alpha_fhlp': float(alpha_fhlp),
@@ -223,16 +198,23 @@ class GBBID(DeconvolutionAlgorithm):
         self.history: Dict[str, list] = {'kernel_diff': []}
         self.hyperparams: Dict[str, Any] = {}
 
-    # ── Main entry point ─────────────────────────────────────────────────
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Запуск алгоритма слепой деконволюции.
+
+        Возвращает
+        ----------
+        x_final : ndarray
+            Восстановленное изображение в формате int16 [0, 255].
+        kernel : ndarray
+            Оцененное ядро размытия.
+        """
         start_time = time.time()
 
-        # ── 1. Normalise to float64 [0, 1] ──────────────────────────────
         y = image.astype(np.float64)
         if y.max() > 1.0:
             y /= 255.0
 
-        # ── 2. Grayscale for kernel estimation ──────────────────────────
         if y.ndim == 3 and y.shape[2] == 3:
             yg = 0.2989 * y[:, :, 0] + 0.5870 * y[:, :, 1] + 0.1140 * y[:, :, 2]
         elif y.ndim == 3 and y.shape[2] == 1:
@@ -240,7 +222,6 @@ class GBBID(DeconvolutionAlgorithm):
         else:
             yg = y.copy() if y.ndim == 2 else y[:, :, 0]
 
-        # ── 2½. Impulse noise detection & removal ────────────────
         impulse_info = None
         if self.impulse_preprocess == 'auto':
             ip = self.impulse_params or {}
@@ -254,7 +235,6 @@ class GBBID(DeconvolutionAlgorithm):
                 yg = adaptive_median_filter(
                     yg, impulse_info['impulse_mask'],
                     max_window=ip.get('max_window', 7))
-                # Also filter the full image for non-blind step
                 if y.ndim == 3:
                     for ch in range(y.shape[2]):
                         ch_info = detect_impulse_noise(
@@ -270,7 +250,6 @@ class GBBID(DeconvolutionAlgorithm):
                 else:
                     y = yg.copy()
 
-        # ── 2¾. ScreeNOT SVD thresholding denoising ─────────────────
         screenot_info = None
         if self.screenot_preprocess == 'auto':
             from blinddeconv.algorithms.mod_cython._build_pyd.screenot import screenot_denoise
@@ -283,7 +262,6 @@ class GBBID(DeconvolutionAlgorithm):
                 patch_size=sp.get('patch_size', 8),
                 stride=sp.get('stride', 3),
             )
-            # Also denoise the full image for non-blind step
             if y.ndim == 3:
                 for ch in range(y.shape[2]):
                     y[:, :, ch], _ = screenot_denoise(
@@ -297,22 +275,17 @@ class GBBID(DeconvolutionAlgorithm):
             else:
                 y = yg.copy()
 
-        # ── 2¾a. Noise estimation (moved BEFORE ACT) ────────────────
-        #    So that σ² is available for ACT and pre_nonblind.
         noise_info = None
         if self.noise_estimation != 'none':
             noise_info = self._estimate_noise(yg)
         elif self.auto_mode == 'robust':
-            # Orchestrator requires σ — force PCA estimator if user left it off.
             self.noise_estimation = 'pyatykh'
             noise_info = self._estimate_noise(yg)
 
-        # ── 2¾a½. Robust orchestrator (soft-weighted auto config) ───
         orchestrator_info = None
         if self.auto_mode == 'robust':
             orchestrator_info = self._orchestrate_robust(noise_info, image=yg)
 
-        # ── 2¾b. ACT curvelet denoising ──────────────────────────────
         act_info = None
         if self.act_preprocess == 'auto':
             if self.screenot_preprocess == 'auto':
@@ -321,10 +294,6 @@ class GBBID(DeconvolutionAlgorithm):
                     "be 'auto'. Choose one denoiser.")
             from blinddeconv.algorithms.mod_cython._build_pyd.act_denoise import act_denoise
             ap = self.act_params or {}
-            # If user did not specify noise_var AND we have a noise
-            # estimate, use σ² from Chen/Pyatykh instead of blind MAD.
-            # This is critical for correlated noise where MAD on the
-            # finest curvelet scale severely underestimates total σ.
             act_noise_var = ap.get('noise_var', None)
             if act_noise_var is None and noise_info is not None:
                 act_noise_var = noise_info.get('sigma_norm', 0.0) ** 2
@@ -333,7 +302,6 @@ class GBBID(DeconvolutionAlgorithm):
                 noise_var=act_noise_var,
                 threshold_setting=ap.get('threshold_setting', 's'),
             )
-            # Also denoise the full image for non-blind step
             if y.ndim == 3:
                 for ch in range(y.shape[2]):
                     y[:, :, ch], _ = act_denoise(
@@ -343,16 +311,12 @@ class GBBID(DeconvolutionAlgorithm):
                     )
             else:
                 y = yg.copy()
-
-        # ── 3. Crop borders ─────────────────────────────────────────────
-        # MATLAB: Y_b(border+1:end-border, border+1:end-border)
         b = self.border
         if b > 0:
             yg_cropped = yg[b:-b, b:-b]
         else:
             yg_cropped = yg
 
-        # ── 3¼. PSD-based noise preprocessing ───────────────────
         psd_info = None
         if self.noise_preprocess != 'none':
             yg, psd_info = self._apply_noise_preprocess(yg)
@@ -361,7 +325,6 @@ class GBBID(DeconvolutionAlgorithm):
             else:
                 yg_cropped = yg
 
-        # ── Effective parameters (auto-adapted or user-specified) ────
         eff_pp = self.preprocess_params
         eff_pkp = self.pre_kernel_params
         eff_nbp = self.nonblind_params
@@ -370,7 +333,6 @@ class GBBID(DeconvolutionAlgorithm):
             eff_pp, eff_pkp, eff_nbp = self._compute_adaptive_params(
                 sigma, eff_pp, eff_pkp, eff_nbp)
 
-        # ── 4. Blind kernel estimation ──────────────────────────────────
         kernel, _skeleton = bid_rgtv_c2f_cg(
             yg_cropped, self.k_estimate_size,
             show_intermediate=False,
@@ -381,14 +343,9 @@ class GBBID(DeconvolutionAlgorithm):
             iteration_callback=self._callback,
         )
 
-        # ── 4½. Pre-nonblind denoising ───────────────────────────────
-        #    Non-blind methods (FHLP, TV, L0) assume white noise.
-        #    Correlated noise (1/f, 1/f²) causes color artifacts.
-        #    Applying a denoiser to y before non-blind suppresses this.
         if self.pre_nonblind not in (None, 'none'):
             y = self._apply_pre_nonblind(y, noise_info)
 
-        # ── 5. Non-blind restoration ──────────────────────────────────
         nb = self.nonblind_method
         nb_p = eff_nbp or {}
 
@@ -402,7 +359,6 @@ class GBBID(DeconvolutionAlgorithm):
 
         Latent = np.clip(Latent, 0.0, 1.0)
 
-        # ── 6. Output ──────────────────────────────────────────────────
         self.hyperparams = {
             'k_estimate_size': self.k_estimate_size,
             'border': self.border,
@@ -445,9 +401,8 @@ class GBBID(DeconvolutionAlgorithm):
         x_final = np.clip(x_final, 0, 255).astype(np.int16)
         return x_final, kernel
 
-    # ── Non-blind dispatch ───────────────────────────────────────────────
     def _nonblind_single(self, y_ch, kernel, method, params):
-        """Run non-blind deconvolution on a single channel."""
+        """Выполнение неслепой деконволюции для одного цветового канала."""
         if method == 'fhlp':
             return Deconvolution_FHLP(
                 y_ch, kernel,
@@ -488,26 +443,24 @@ class GBBID(DeconvolutionAlgorithm):
                 f"Choose from: 'fhlp', 'tv_adm', 'l0', 'ringing_removal', "
                 f"'adaptive_lp'")
 
-    # ── Robust orchestrator ──────────────────────────────────────────
     def _orchestrate_robust(self, noise_info, image=None):
-        """Soft-weighted auto configuration of the GBBID noise pipeline.
+        """
+        Автоматическая конфигурация параметров конвейера на основе оценки шума.
 
-        Conservative mirror of LIP's orchestrator.  Designed to keep
-        ``kernel_solver_L2`` happy: avoids aggressive smoothing inside the
-        coarse-to-fine kernel-estimation loop, where over-denoised images
-        wipe out the fine gradients that ``informative_edge_mask_adaptive_mine``
-        relies on.
-
-        Policy:
-            • Clean regime  (σ ≤ σ_clean) — defaults are kept verbatim.
-              Only resolves ``nonblind_method='auto'`` to ``'fhlp'``.
-            • Heavy regime  (σ  > σ_clean) — soft blend toward σ-aware
-              configuration.
+        Стратегия работы:
+        - Режим чистого сигнала (sigma <= sigma_clean): параметры по умолчанию 
+          остаются без изменений. Метод неслепой деконволюции переводится 
+          в режим 'fhlp', если был задан как 'auto'.
+        - Режим сильного шума (sigma > sigma_clean): выполняется плавное 
+          смешивание параметров. Применяется маршрутизация в зависимости от 
+          типа шума: пуассоновский шум направляется на фильтры ACT или VST+BM3D, 
+          гауссовский — на билатеральную фильтрацию или BM3D. Для предотвращения 
+          потери информативных краев агрессивное сглаживание внутри цикла 
+          оценки ядра ограничивается.
         """
         snap = self._defaults_snapshot
         amp = dict(self.auto_mode_params or {})
 
-        # ── 1) Reset from snapshot — avoid sticky state between calls.
         self.lambda_fhlp = snap['lambda_fhlp']
         self.alpha_fhlp = snap['alpha_fhlp']
         self.preprocess = snap['preprocess']
@@ -519,7 +472,6 @@ class GBBID(DeconvolutionAlgorithm):
         self.nonblind_method = snap['nonblind_method']
         self.nonblind_params = snap['nonblind_params']
 
-        # ── 2) Read σ.
         sigma = 0.0
         if noise_info is not None:
             sigma = float(noise_info.get('sigma_norm', 0.0) or 0.0)
@@ -528,15 +480,10 @@ class GBBID(DeconvolutionAlgorithm):
         sigma_heavy = float(amp.get('sigma_heavy', 0.05))
         force_heavy_sigma = float(amp.get('force_heavy_sigma', 0.01))
 
-        # Force heavy branch for signal-dependent noise even when σ is
-        # small — pca's sigma_norm is taken at mean brightness and may
-        # understate the Poisson component.
         nt = (noise_info or {}).get('noise_type', None)
         force_heavy = (nt in ('poisson', 'poisson_gaussian')
                        and sigma >= force_heavy_sigma)
 
-        # ── 3) Clean branch — DO NOT alter denoisers or parameters.
-        #      Only resolve ``nonblind_method='auto'``.
         if sigma <= sigma_clean and not force_heavy:
             if snap['nonblind_method'] == 'auto':
                 self.nonblind_method = 'fhlp'
@@ -550,7 +497,6 @@ class GBBID(DeconvolutionAlgorithm):
                 'alpha_fhlp': float(self.alpha_fhlp),
             }
 
-        # ── 4) Heavy branch — smooth weight between σ_clean and σ_heavy.
         w = 1.0 if sigma >= sigma_heavy else (
             (sigma - sigma_clean) / (sigma_heavy - sigma_clean))
         regime = 'heavy' if w > 0.95 else 'medium'
@@ -559,35 +505,15 @@ class GBBID(DeconvolutionAlgorithm):
         poisson_like = noise_type in ('poisson', 'poisson_gaussian',
                                       'unknown')
 
-        # ── 4a) λ_FHLP / α_FHLP: soft blend.
-        # FHLP λ controls data-fidelity weight in non-blind step.
-        # Higher σ → smaller λ (let prior win).  k_lambda_fhlp/σ gives
-        # ≈ 50/0.025 = 2000 at σ=0.025 — matches the snap default.
         k_lambda_fhlp = float(amp.get('k_lambda_fhlp', 50.0))
         k_alpha_fhlp = float(amp.get('k_alpha_fhlp', 0.6))
         lam_noisy = float(np.clip(k_lambda_fhlp / max(sigma, 1e-6),
                                   100.0, 1e5))
-        # α stays in [0.5, snap].  Heavier σ → α → 0.5 (more sparsity).
         alpha_noisy = max(0.5, k_alpha_fhlp)
 
         self.lambda_fhlp = (1.0 - w) * snap['lambda_fhlp'] + w * lam_noisy
         self.alpha_fhlp = (1.0 - w) * snap['alpha_fhlp'] + w * alpha_noisy
 
-        # ── 4b) preprocess (single-pass, level-0 of pyramid).
-        #   Poisson-like → bilateral (default) OR vst_bm3d (optional).
-        #     Bilateral with sigma_color tuned to peak Poisson σ is the
-        #     conservative default: it preserves edges needed by
-        #     ``kernel_solver_L2`` / ``informative_edge_mask_adaptive_mine``.
-        #     vst_bm3d applies GAT → BM3D → inverse, which is more
-        #     accurate for moderate-to-heavy Poisson at the cost of
-        #     some edge softening.  Safe to use when the kernel size is
-        #     large enough that a slightly softer input still resolves
-        #     the PSF support.
-        #     ACT is NOT offered for preprocess in GBBID: curvelet
-        #     thresholding can wipe out mid-tone edges when σ² is
-        #     misestimated — see comments in LIP orchestrator.
-        #   Gaussian, w<0.6 → bilateral.
-        #   Gaussian, w≥0.6 → bm3d.
         poisson_denoiser = str(amp.get('poisson_denoiser', 'act')).lower()
         if poisson_denoiser not in ('act', 'vst_bm3d'):
             poisson_denoiser = 'act'
@@ -601,20 +527,12 @@ class GBBID(DeconvolutionAlgorithm):
                 self.preprocess = 'vst_bm3d'
                 self.preprocess_params = {'noise_info': noise_info}
             else:
-                # Default: bilateral — gentle, preserves edges for kernel solver.
-                # Effective σ in bright regions of a Poisson image is larger
-                # than the global σ_norm (which is averaged).  Boost
-                # sigma_color to handle the worst case without losing edges.
                 self.preprocess = 'bilateral'
                 self.preprocess_params = {
                     'sigma_color': float(max(2.0 * sigma, 0.02)),
                     'sigma_spatial': 3.0,
                 }
         elif gauss_act_preprocess:
-            # ACT for Gaussian/correlated noise: use Pyatykh scalar σ²
-            # (white noise assumption — avoids blind-MAD underestimation
-            # for 1/f noise where finest curvelet scale has less energy).
-            # NOTE: opt-in only — ACT can erase fine edges in GBBID.
             self.preprocess = 'act'
             self.preprocess_params = {
                 'noise_var': float(sigma ** 2),
@@ -630,38 +548,12 @@ class GBBID(DeconvolutionAlgorithm):
             self.preprocess = 'bm3d'
             self.preprocess_params = {'sigma_psd': float(sigma)}
 
-        # ── 4c) pre_kernel (in-loop denoiser of skeleton before kernel
-        # solver).  This is the DANGEROUS knob: smoothing inside the
-        # kernel loop can erase the informative edges that
-        # `kernel_solver_L2` and `informative_edge_mask_adaptive_mine`
-        # rely on.
-        #   Poisson-like → ALWAYS 'none'.  Per-iteration smoothing of a
-        #     signal-dependent-noise image with a single-σ filter erodes
-        #     dark-region detail and leaves bright-region noise alone
-        #     — worst of both worlds for kernel estimation.
-        #   Gaussian, w<0.5 → 'none' (defaults).
-        #   Gaussian, w≥0.5 → mild bilateral (sigma_color = 0.5·σ).
         if (not poisson_like) and w >= 0.5:
             self.pre_kernel = 'bilateral'
             self.pre_kernel_params = {
                 'sigma_color': float(max(0.5 * sigma, 0.005)),
                 'sigma_spatial': 2.0,
             }
-        # else: pre_kernel stays as snap['pre_kernel'] (default 'none')
-
-        # ── 4d) pre_nonblind (denoise of y before non-blind solve).
-        # Outside kernel loop — can be aggressive.
-        #   Poisson-like → ACT (default) or vst_bm3d (if poisson_denoiser
-        #     set in auto_mode_params).  Both are safe here: the kernel is
-        #     already estimated and ringing_removal handles residuals.
-        #     ACT: explicit noise_var=σ² avoids blind-MAD underestimation.
-        #     vst_bm3d: GAT→BM3D→inverse; more accurate for heavier Poisson.
-        #   Gaussian, w<0.6 → BM3D with sigma_psd=σ (or ACT via flag).
-        #   Gaussian, w≥0.6 → BM3D (or ACT via flag).
-        #   ACT (act_pre_nonblind_gaussian=True): per-subband curvelet
-        #     threshold handles correlated (pink/brown) noise well because
-        #     each curvelet subband has its own energy-based threshold.
-        #     noise_var=σ² from Pyatykh prevents blind-MAD underestimation.
         if poisson_like:
             if poisson_denoiser == 'vst_bm3d':
                 self.pre_nonblind = 'vst_bm3d'
@@ -673,9 +565,6 @@ class GBBID(DeconvolutionAlgorithm):
                     'threshold_setting': 's',
                 }
         elif gauss_act_pre_nonblind:
-            # ACT for Gaussian/correlated noise in pre_nonblind.
-            # Safe here (kernel already estimated).  Use Pyatykh scalar σ²
-            # — more accurate than blind-MAD for 1/f noise.
             self.pre_nonblind = 'act'
             self.pre_nonblind_params = {
                 'noise_var': float(sigma ** 2),
@@ -688,7 +577,6 @@ class GBBID(DeconvolutionAlgorithm):
             self.pre_nonblind = 'bm3d'
             self.pre_nonblind_params = {'sigma_psd': float(sigma)}
 
-        # ── 4e) nonblind_method: heavy noise → ringing_removal when 'auto'.
         nb_auto_heavy = amp.get('nonblind_auto_heavy', 'ringing_removal')
         if snap['nonblind_method'] == 'auto':
             self.nonblind_method = nb_auto_heavy
@@ -710,18 +598,10 @@ class GBBID(DeconvolutionAlgorithm):
         }
         return info
 
-    # ── PSD-based noise preprocessing ────────────────────────────────────
     def _apply_noise_preprocess(self, yg):
-        """Analyze noise PSD and apply spectral filtering.
-
-        In 'auto' mode, only notch filter is applied (for periodic noise).
-        Prewhitening is NOT applied automatically — it requires a pure
-        noise PSD which cannot be obtained from a single image.
-
-        Returns
-        -------
-        yg_filtered : ndarray — preprocessed grayscale image [0, 1]
-        psd_info : dict — PSD analysis results
+        """
+        Анализ спектральной плотности мощности шума и применение 
+        соответствующей спектральной фильтрации.
         """
         from blinddeconv.algorithms.mod_cython._build_pyd.noise_psd_analysis import (
             analyze_noise_psd, noise_preprocess,
@@ -740,7 +620,6 @@ class GBBID(DeconvolutionAlgorithm):
             )
             return result['image'], result['psd_info']
 
-        # For explicit modes, always run analysis first
         psd_info = analyze_noise_psd(
             yg,
             pch_size=p.get('pch_size', 32),
@@ -777,31 +656,15 @@ class GBBID(DeconvolutionAlgorithm):
 
         return yg_out, psd_info
 
-    # ── Pre-nonblind denoising ────────────────────────────────────────
     def _apply_pre_nonblind(self, y, noise_info):
-        """Denoise y before non-blind deconvolution.
-
-        Non-blind methods (FHLP / TV-ADM / L0 / ringing_removal) all
-        assume white Gaussian noise.  Correlated noise (1/f, 1/f²)
-        violates this assumption and causes structured artifacts
-        ('wrong colors', ringing amplification).
-
-        Applying a denoiser to y here suppresses the correlated noise
-        component, letting the non-blind step work correctly.
-
-        Parameters
-        ----------
-        y : ndarray, H×W or H×W×C, float64 [0,1]
-        noise_info : dict or None — from _estimate_noise()
-
-        Returns
-        -------
-        y_denoised : ndarray, same shape as y
+        """
+        Шумоподавление перед неслепой деконволюцией для устранения 
+        коррелированных шумовых компонент. Неслепые методы предполагают белый шум, 
+        наличие цветного шума приводит к структурным артефактам.
         """
         method = self.pre_nonblind
         params = dict(self.pre_nonblind_params or {})
 
-        # Auto-fill sigma from noise estimation if available
         sigma = None
         if noise_info is not None:
             sigma = noise_info.get('sigma_norm', None)
@@ -838,8 +701,6 @@ class GBBID(DeconvolutionAlgorithm):
                                         a=a, b=b, sigma=sig)
             return y
 
-        # For standard denoisers (bm3d, nlm, bilateral, guided, tv),
-        # auto-fill sigma_psd / h / sigma_color from noise estimation.
         if method == 'bm3d' and 'sigma_psd' not in params and sigma is not None:
             params['sigma_psd'] = sigma
         elif method == 'nlm' and 'h' not in params and sigma is not None:
@@ -857,9 +718,8 @@ class GBBID(DeconvolutionAlgorithm):
             y = apply_denoiser(y, method, **params)
         return y
 
-    # ── Noise estimation helpers ─────────────────────────────────────────
     def _estimate_noise(self, yg):
-        """Estimate noise level from grayscale image (float64 [0, 1])."""
+        """Оценка уровня шума по полутоновому изображению."""
         if self.noise_estimation == 'chen':
             from blinddeconv.algorithms.mod_cython._build_pyd.chen_noise_estimate import estimate_noise_level
             sigma = estimate_noise_level(yg)
@@ -873,10 +733,9 @@ class GBBID(DeconvolutionAlgorithm):
         return None
 
     def _compute_adaptive_params(self, sigma, pp, pkp, nbp):
-        """Adapt processing parameters based on estimated noise σ (in [0,1] scale).
-
-        Only fills parameters that are None (not explicitly set by user).
-        Formulas are initial heuristics — tune per dataset.
+        """
+        Адаптация параметров обработки на основе оцененного уровня шума.
+        Заполняются только те параметры, которые не были заданы пользователем.
         """
         if sigma < 1e-6:
             return pp, pkp, nbp
@@ -915,7 +774,6 @@ class GBBID(DeconvolutionAlgorithm):
 
         return pp, pkp, nbp
 
-    # ── Interface methods ────────────────────────────────────────────────
     def get_param(self) -> List[Tuple[str, Any]]:
         return [
             ('k_estimate_size', self.k_estimate_size),
@@ -949,10 +807,6 @@ class GBBID(DeconvolutionAlgorithm):
         for key, value in params.items():
             if hasattr(self, key):
                 setattr(self, key, value)
-                # Keep the orchestrator's default-snapshot in sync with
-                # parameters the user updates after construction —
-                # otherwise robust mode would keep blending toward stale
-                # values from the original __init__.
                 if key in self._defaults_snapshot:
                     self._defaults_snapshot[key] = (
                         float(value) if key in ('lambda_fhlp', 'alpha_fhlp')

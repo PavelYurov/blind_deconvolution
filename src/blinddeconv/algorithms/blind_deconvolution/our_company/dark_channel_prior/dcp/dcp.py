@@ -1,26 +1,27 @@
 """
 dcp.py
 
-Blind Image Deblurring Using Dark Channel Prior (DCP).
+Слепая деконволюция изображений с использованием априорного распределения 
+темного канала (Dark Channel Prior, DCP).
 
-Reference:
+Основано на методе:
     J. Pan, D. Sun, H. Pfister, M.-H. Yang: "Blind Image Deblurring
-    Using Dark Channel Prior", CVPR 2016.
+    Using Dark Channel Prior", CVPR, 2016.
 
-Pipeline (mirrors MATLAB demo_deblurring.m):
-    1. Normalise input to float64 [0, 1].
-    2. Convert to grayscale for kernel estimation.
-    3. Multi-scale blind deconvolution (blind_deconv).
-    4. Non-blind restoration on the full (colour) image
-       via ringing_artifacts_removal.
-    5. Return restored image (int16, [0, 255]) and kernel.
+Конвейер обработки:
+1. Нормализация входного изображения к диапазону float64 [0, 1].
+2. Преобразование в полутоновый формат для оценки ядра размытия.
+3. Многомасштабная слепая деконволюция.
+4. Неслепое восстановление полноцветного изображения с подавлением 
+   артефактов звона.
+5. Возврат восстановленного изображения (в формате int16 [0, 255]) и 
+   оцененного ядра.
 """
 
 import numpy as np
 import time
 from typing import Tuple, List, Any, Dict
 
-# ── Framework base class import (DO NOT MODIFY) ─────────────────────────────
 import sys
 from pathlib import Path
 
@@ -44,35 +45,36 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
         sys.path.insert(0, _path)
 
 from blinddeconv.algorithms.base import DeconvolutionAlgorithm
-# ─────────────────────────────────────────────────────────────────────────────
 
 from .solvers import blind_deconv, ringing_artifacts_removal
 
 
 class DCP_BD(DeconvolutionAlgorithm):
     """
-    Blind deconvolution using the Dark Channel Prior.
+    Алгоритм слепой деконволюции на основе априорного распределения темного канала.
 
-    Parameters
-    ----------
-    kernel_size  : int — spatial support of the unknown PSF (square, odd).
-    lambda_dark  : float — weight for L0 intensity (dark-channel) prior.
-                   Default 4e-3 (from demo_deblurring.m).
-    lambda_grad  : float — weight for L0 gradient prior.
-                   Default 4e-3.
-    xk_iter      : int — number of blind iterations per pyramid level.
-                   Default 5.
-    gamma_correct : float — gamma correction exponent applied before
-                    kernel estimation.  1.0 = no correction.  Default 1.0.
-    k_thresh     : float — final kernel threshold.
-                   kernel values < max(k)/k_thresh are zeroed.
-                   Default 20.
-    lambda_tv    : float — weight for TV non-blind deconvolution.
-                   Default 0.003.
-    lambda_l0    : float — weight for L0 non-blind deconvolution.
-                   Default 5e-4.
-    weight_ring  : float — ringing suppression weight (0 = no suppression).
-                   Default 1.0.
+    Параметры
+    ---------
+    kernel_size : int, по умолчанию 25
+        Пространственный размер неизвестной функции рассеяния точки (нечетное число).
+    lambda_dark : float, по умолчанию 4e-3
+        Весовой коэффициент для L0-регуляризации интенсивности темного канала.
+    lambda_grad : float, по умолчанию 4e-3
+        Весовой коэффициент для L0-регуляризации градиентов.
+    xk_iter : int, по умолчанию 5
+        Количество итераций слепой оценки на каждом уровне пирамиды.
+    gamma_correct : float, по умолчанию 1.0
+        Экспонента гамма-коррекции, применяемая перед оценкой ядра.
+    k_thresh : float, по умолчанию 20.0
+        Относительный порог для финального ядра. Значения ядра, меньшие чем 
+        max(k) / k_thresh, обнуляются.
+    lambda_tv : float, по умолчанию 0.003
+        Вес TV-регуляризации для этапа неслепой деконволюции.
+    lambda_l0 : float, по умолчанию 5e-4
+        Вес L0-регуляризации для этапа неслепой деконволюции.
+    weight_ring : float, по умолчанию 1.0
+        Коэффициент подавления артефактов звона (0 соответствует отключению 
+        дополнительного подавления).
     """
 
     def __init__(
@@ -102,23 +104,28 @@ class DCP_BD(DeconvolutionAlgorithm):
         self.history: Dict[str, list] = {'kernel_diff': []}
         self.hyperparams: Dict[str, Any] = {}
 
-    # ── Main entry point ─────────────────────────────────────────────────
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Запуск алгоритма слепой деконволюции.
+
+        Возвращает
+        ----------
+        x_final : ndarray
+            Восстановленное изображение в формате int16 [0, 255].
+        kernel : ndarray
+            Оцененное ядро размытия.
+        """
         start_time = time.time()
 
-        # ── 1. Normalise to float64 [0, 1] ──────────────────────────────
         y = image.astype(np.float64)
         if y.max() > 1.0:
             y /= 255.0
 
-        # ── 2. Grayscale for kernel estimation ──────────────────────────
-        # MATLAB: yg = im2double(rgb2gray(y))
         if y.ndim == 3 and y.shape[2] == 3:
             yg = 0.2989 * y[:, :, 0] + 0.5870 * y[:, :, 1] + 0.1140 * y[:, :, 2]
         else:
             yg = y.copy() if y.ndim == 2 else y[:, :, 0]
 
-        # ── 3. Blind kernel estimation ──────────────────────────────────
         opts = {
             'kernel_size': self.kernel_size,
             'gamma_correct': self.gamma_correct,
@@ -130,14 +137,11 @@ class DCP_BD(DeconvolutionAlgorithm):
             yg, self.lambda_dark, self.lambda_grad, opts
         )
 
-        # ── 4. Non-blind restoration ────────────────────────────────────
-        # MATLAB: Latent = ringing_artifacts_removal(y, kernel, ...)
         Latent = ringing_artifacts_removal(
             y, kernel, self.lambda_tv, self.lambda_l0, self.weight_ring
         )
         Latent = np.clip(Latent, 0.0, 1.0)
 
-        # ── 5. Output ──────────────────────────────────────────────────
         self.hyperparams = {
             'kernel_size': self.kernel_size,
             'lambda_dark': self.lambda_dark,
@@ -152,7 +156,6 @@ class DCP_BD(DeconvolutionAlgorithm):
         x_final = np.clip(x_final, 0, 255).astype(np.int16)
         return x_final, kernel
 
-    # ── Interface methods ────────────────────────────────────────────────
     def get_param(self) -> List[Tuple[str, Any]]:
         return [
             ('kernel_size', self.kernel_size),

@@ -1,58 +1,15 @@
 """
 utils.py
 
-Utility functions for GBBID (Graph-Based Blind Image Deblurring).
+Вспомогательные вычислительные функции для алгоритма графовой слепой 
+деконволюции изображений (GBBID).
 
-Ported from MATLAB code by Yuanchao Bai et al.
-Reference:
-    Y. Bai, G. Cheung, X. Liu, W. Gao:
-    "Graph-Based Blind Image Deblurring From a Single Photograph",
-    IEEE Transactions on Image Processing, vol. 28, no. 3, pp. 1404-1418, 2019.
-
-Also includes utilities from:
-    - D. Krishnan, R. Fergus: "Fast Image Deconvolution using
-      Hyper-Laplacian Priors", NIPS 2009.
-    - Jian-Feng Cai: 2D Tight Wavelet Frame Transform library.
-
-MATLAB -> Python conversion notes (CRITICAL differences):
-    ─────────────────────────────────────────────────────────────────────
-    imfilter(x, h, 'conv', 'replicate'):
-        MATLAB imfilter with 'conv' flag performs TRUE convolution
-        (kernel is flipped internally), with replicate boundary padding.
-        -> scipy.ndimage.convolve(x, h, mode='nearest')
-           scipy.ndimage.convolve also performs true convolution and
-           mode='nearest' matches MATLAB's 'replicate'.
-
-    imfilter(x, h, 'circular'):
-        MATLAB imfilter DEFAULT = correlation (no flip), circular padding.
-        -> scipy.ndimage.correlate(x, h, mode='wrap')
-
-    conv2(A, B, 'valid'/'same'/'full'):
-        MATLAB conv2 is TRUE CONVOLUTION (kernel is flipped internally).
-        -> scipy.signal.fftconvolve(A, B, mode=...) also true convolution.
-        Output sizes:
-            'valid': (M-k+1, N-l+1)
-            'same' : (M, N) for first argument
-            'full' : (M+k-1, N+l-1)
-
-    rot90(k, 2):
-        Rotate 180 degrees = flip both dims -> k[::-1, ::-1]
-
-    psf2otf(psf, shape):
-        Zero-pad, circshift centre to (0,0), then fft2.
-
-    otf2psf(otf, psf_size):
-        ifft2 -> real, circshift by +floor(psf_size/2), crop.
-
-    edgetaper(I, PSF):
-        MATLAB built-in; reimplemented below.
-
-    padarray(A, padsize, 'symmetric', 'both'):
-        -> np.pad(A, ..., mode='symmetric')
-        Both MATLAB and numpy 'symmetric' repeat the edge element.
-
-    Indexing:
-        MATLAB is 1-based, Python is 0-based.
+Основано на методах:
+    - Y. Bai, G. Cheung, X. Liu, W. Gao: "Graph-Based Blind Image Deblurring 
+      From a Single Photograph", IEEE TIP 2019.
+    - D. Krishnan, R. Fergus: "Fast Image Deconvolution using Hyper-Laplacian 
+      Priors", NIPS 2009.
+    - Библиотека двумерного дискретного вейвлет-преобразования (Jian-Feng Cai).
 """
 
 import numpy as np
@@ -63,18 +20,17 @@ from scipy.ndimage import correlate as ndimage_correlate
 from scipy.interpolate import interp1d
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# PSF <-> OTF conversions
-# ═════════════════════════════════════════════════════════════════════════════
-
 def psf2otf(psf, shape):
     """
-    Convert PSF to OTF.  Equivalent to MATLAB psf2otf(psf, shape).
+    Преобразование функции рассеяния точки (PSF) в оптическую передаточную 
+    функцию (OTF).
 
-    1. Zero-pad *psf* into an array of *shape*.
-    2. Circularly shift so that the centre of the PSF lands at index (0,0).
-    3. Return fft2.
+    Алгоритм:
+    1. Дополнение матрицы PSF нулями до размеров shape.
+    2. Циклический сдвиг матрицы так, чтобы центр PSF оказался в координате (0, 0).
+    3. Вычисление двумерного быстрого преобразования Фурье.
     """
+
     if psf.size == 0 or np.all(psf == 0):
         return np.zeros(shape, dtype=np.complex128)
 
@@ -89,11 +45,8 @@ def psf2otf(psf, shape):
 
 def otf2psf(otf, psf_size):
     """
-    Convert OTF back to PSF.  Equivalent to MATLAB otf2psf(otf, psf_size).
-
-    1. ifft2 -> real part.
-    2. Circular shift by +floor(psf_size/2) for each dim.
-    3. Crop to psf_size.
+    Преобразование оптической передаточной функции (OTF) обратно в 
+    функцию рассеяния точки (PSF).
     """
     full = np.real(ifft2(otf))
     ph, pw = psf_size
@@ -102,16 +55,12 @@ def otf2psf(otf, psf_size):
     return full[:ph, :pw]
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Padding utilities
-# ═════════════════════════════════════════════════════════════════════════════
-
 def G_padding(x, k, factor):
     """
-    Padding the input image for graph construction.
-    MATLAB: G_padding.m
+    Дополнение границ входного изображения для построения графа.
+    Использует дублирование крайних пикселей (режим 'edge').
 
-    Returns (x_padding, padsize) where padsize = (row_pad, col_pad).
+    Возвращает дополненное изображение и размер добавленных полей (padsize).
     """
     padsize = (k.shape[0] * factor, k.shape[1] * factor)
     x_padding = np.pad(x,
@@ -122,10 +71,9 @@ def G_padding(x, k, factor):
 
 def Copy_Enlarge_h(I, H_size):
     """
-    Symmetric padding image by replicating edge rows/columns.
-    MATLAB: Copy_Enlarge_h.m
+    Симметричное увеличение изображения путем дублирования крайних строк и столбцов.
 
-    Returns (I2, border).
+    Возвращает увеличенное изображение и размер добавленных полей (border).
     """
     s_h, s_w = int(H_size[0]), int(H_size[1])
     if s_h % 2 == 0:
@@ -135,12 +83,10 @@ def Copy_Enlarge_h(I, H_size):
     border = (s_h - 1, s_w - 1)
     h, w = I.shape
 
-    # Pad columns: replicate first and last column
     left = np.tile(I[:, 0:1], (1, border[1]))
     right = np.tile(I[:, -1:], (1, border[1]))
     I2 = np.concatenate([left, I, right], axis=1)
 
-    # Pad rows: replicate first and last row
     top = np.tile(I2[0:1, :], (border[0], 1))
     bottom = np.tile(I2[-1:, :], (border[0], 1))
     I2 = np.concatenate([top, I2, bottom], axis=0)
@@ -148,20 +94,19 @@ def Copy_Enlarge_h(I, H_size):
     return I2, border
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# FFT-based convolution (for large kernels)
-# ═════════════════════════════════════════════════════════════════════════════
 
 def fftconv(I, filt, method):
     """
-    Convolution with a large kernel accelerated by FFT.
-    MATLAB: fftconv.m
+    Ускоренная двумерная свертка с использованием быстрого преобразования Фурье.
 
-    Parameters
-    ----------
-    I : 2D array
-    filt : 2D array -- convolution kernel
-    method : str -- 'same' or 'valid'
+    Параметры
+    ---------
+    I : ndarray
+        Двумерный массив изображения.
+    filt : ndarray
+        Ядро свертки.
+    method : str
+        Режим формирования выходного массива ('same' или 'valid').
     """
     k1, k2 = filt.shape
 
@@ -185,30 +130,24 @@ def fftconv(I, filt, method):
     hk2u = k2 - hk2d - 1
 
     if method == 'same':
-        # MATLAB: cI(hk1d+1:end-hk1u, hk2d+1:end-hk2u)
         end0 = -hk1u if hk1u > 0 else None
         end1 = -hk2u if hk2u > 0 else None
         cI = cI[hk1d:end0, hk2d:end1]
-        # MATLAB: cI(p_size+1:end-p_size, p_size+1:end-p_size)
         cI = cI[p_size[0]:-p_size[0] if p_size[0] > 0 else None,
                 p_size[1]:-p_size[1] if p_size[1] > 0 else None]
     elif method == 'valid':
-        # MATLAB: cI(hk1d+hk1u+1:end, hk2d+hk2u+1:end)
         cI = cI[hk1d + hk1u:, hk2d + hk2u:]
 
     return cI
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# edgetaper -- replicate MATLAB built-in edgetaper
-# ═════════════════════════════════════════════════════════════════════════════
-
 def edgetaper(img, psf):
     """
-    Replicate MATLAB's edgetaper(I, PSF).
+    Сглаживание краев изображения путем смешивания исходного изображения 
+    с его размытой копией. 
 
-    Blends the edges of image I with a blurred version using weights
-    derived from the autocorrelation of the PSF projections.
+    Веса для смешивания вычисляются на основе одномерной автокорреляции 
+    горизонтальных и вертикальных проекций функции рассеяния точки (PSF).
     """
     sn, sm = psf.shape
     n, m = img.shape
@@ -245,17 +184,8 @@ def edgetaper(img, psf):
     return beta * img + (1.0 - beta) * blurred
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Graph weight computation
-# ═════════════════════════════════════════════════════════════════════════════
-
 def weight_function_l1(d):
-    """
-    Compute weights for l1-Graph Laplacian.
-    MATLAB: weight_function_l1.m
-
-    w = 1 / max(|d|, epsilon),  epsilon = 0.01.
-    """
+    """Вычисление весов для L1-графового лапласиана: w = 1 / max(|d|, epsilon)."""
     epsilon = 0.01
     d_abs = np.abs(d)
     d_abs = np.maximum(d_abs, epsilon)
@@ -264,32 +194,25 @@ def weight_function_l1(d):
 
 def weights_computation(x, sigma, nei_num, wtype):
     """
-    Weight computation for graph-based deblurring.
-    MATLAB: weights_computation.m
+    Вычисление весов графа для пространственной регуляризации.
 
-    Parameters
+    Параметры
+    ---------
+    x : ndarray
+        Текущая оценка изображения.
+    sigma : float или None
+        Параметр Гауссианы (используется при wtype=1).
+    nei_num : int
+        Количество соседей (поддерживается только 4).
+    wtype : int
+        Тип взвешивания:
+        1 - Гауссово: w = exp(-d^2 / sigma^2)
+        2 - Норма L1 (IRLS): w = 1 / |d|
+
+    Возвращает
     ----------
-    x : 2D array -- current image estimate
-    sigma : float or None -- Gaussian sigma (used for type=1)
-    nei_num : int -- number of neighbours (must be 4)
-    wtype : int -- weight type:
-        1 = Gaussian: w = exp(-d^2/sigma^2)
-        2 = IRLS/L1:  w = 1/|d|
-
-    Returns
-    -------
-    W : (h*w, 4) array of weights
-
-    Notes
-    -----
-    MATLAB uses imfilter(x, d, 'conv', 'replicate') which is true convolution
-    with replicate boundary. This matches scipy.ndimage.convolve(x, d, mode='nearest').
-
-    The 4 directions are:
-        d1 = [1, -1, 0]   (horizontal left)
-        d2 = d1'           (vertical up)
-        d3 = [0, -1, 1]   (horizontal right)
-        d4 = d3'           (vertical down)
+    W : ndarray
+        Массив весов графа размерности (h*w, 4).
     """
     h, w = x.shape
 
@@ -335,15 +258,10 @@ def weights_computation(x, sigma, nei_num, wtype):
     return W
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Informative edge mask
-# ═════════════════════════════════════════════════════════════════════════════
-
 def _adaptive_threshold(M, ratio, max_iter):
     """
-    Find a threshold such that approximately `ratio` fraction of pixels
-    exceed it. Uses binary search.
-    MATLAB: adaptive_threshold (nested in informative_edge_mask_adaptive_mine.m)
+    Бинарный поиск порогового значения, при котором заданная доля 
+    пикселей (ratio) превышает этот порог.
     """
     n = M.size
     lower_bound = 0.0
@@ -370,33 +288,33 @@ def _adaptive_threshold(M, ratio, max_iter):
 
 def informative_edge_mask_adaptive_mine(Y_s, t_s, t_r, h):
     """
-    Find informative edge and generate mask.
-    MATLAB: informative_edge_mask_adaptive_mine.m
+    Выделение информативных краев и формирование соответствующей бинарной маски.
 
-    Parameters
+    Параметры
+    ---------
+    Y_s : ndarray
+        Промежуточное структурное (skeleton) изображение.
+    t_s : float
+        Относительный порог для интенсивности градиентов (например, 0.1).
+    t_r : float
+        Относительный порог для оценки когерентности краев (например, 0.3).
+    h : int
+        Размер локального окна для оценки.
+
+    Возвращает
     ----------
-    Y_s : 2D array -- skeleton image
-    t_s : float -- strength threshold ratio (e.g. 0.1)
-    t_r : float -- ratio threshold (e.g. 0.3)
-    h : int -- local window size (e.g. 5)
-
-    Returns
-    -------
-    M : binary mask (same size as Y_s)
+    M : ndarray
+        Бинарная пространственная маска размерности Y_s.
     """
-    # MATLAB: Dx = rot90([0,-1,1], 2) = [1,-1,0]
     Dx = np.array([[1, -1, 0]], dtype=np.float64)
     Dy = Dx.T
 
-    # imfilter(Y_s, Dx, 'conv', 'replicate')  =  true convolution, replicate boundary
     Mx = ndimage_convolve(Y_s, Dx, mode='nearest')
     My = ndimage_convolve(Y_s, Dy, mode='nearest')
     M_mag = np.sqrt(Mx ** 2 + My ** 2)
 
-    # Strength threshold: keep top t_s fraction
     M3, _ = _adaptive_threshold(M_mag, t_s, 100)
 
-    # Coherence ratio
     k_tmp = np.ones((h, h), dtype=np.float64)
     Mx2 = ndimage_convolve(Mx, k_tmp, mode='nearest')
     My2 = ndimage_convolve(My, k_tmp, mode='nearest')
@@ -410,19 +328,11 @@ def informative_edge_mask_adaptive_mine(Y_s, t_s, t_r, h):
     return M3 * M4_bin
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Kernel utilities
-# ═════════════════════════════════════════════════════════════════════════════
-
 def _shift_kernel(k, hw):
-    """
-    Shift kernel by (dh, dw) pixels.
-    MATLAB: shift_kernel (nested in kernel_centralize.m)
-    """
+    """Сдвиг ядра на величину (dh, dw) пикселей."""
     h, w = k.shape
     dh, dw = int(hw[0]), int(hw[1])
 
-    # Vertical shift
     k_tmp = np.zeros_like(k)
     if dh >= 0:
         if dh < h:
@@ -431,7 +341,6 @@ def _shift_kernel(k, hw):
         if -dh < h:
             k_tmp[:h + dh, :] = k[-dh:, :]
 
-    # Horizontal shift
     k_s = np.zeros_like(k)
     if dw >= 0:
         if dw < w:
@@ -445,17 +354,15 @@ def _shift_kernel(k, hw):
 
 def kernel_centralize(k, threshold):
     """
-    Centralize restored kernel.
-    MATLAB: kernel_centralize.m
+    Центрирование восстановленного ядра размытия.
 
-    Finds the bounding box of significant kernel elements,
-    computes its centre, and shifts the kernel so that this centre
-    aligns with the geometric centre of the array.
+    Определяет ограничивающую рамку (bounding box) значимых элементов ядра, 
+    вычисляет ее геометрический центр и сдвигает массив так, чтобы этот 
+    центр совпал с геометрическим центром массива.
     """
     h, w = k.shape
     thresh_val = k.max() * threshold
 
-    # Find bounding box
     h_begin = 0
     for i in range(h):
         if k[i, :].sum() > thresh_val:
@@ -480,12 +387,9 @@ def kernel_centralize(k, threshold):
             w_end = i
             break
 
-    # Centre of bounding box (0-indexed, same shift as MATLAB 1-indexed)
     h_center = int(np.floor(h_begin + (h_end - h_begin) / 2.0))
     w_center = int(np.floor(w_begin + (w_end - w_begin) / 2.0))
 
-    # Geometric centre of array
-    # MATLAB: ceil(h/2) (1-indexed) → (h-1)//2 (0-indexed)
     kh_center = (h - 1) // 2
     kw_center = (w - 1) // 2
 
@@ -500,10 +404,7 @@ def kernel_centralize(k, threshold):
 
 
 def k_rescale(k):
-    """
-    Rescale kernel for display (min-max normalization to [0, 1]).
-    MATLAB: k_rescale.m
-    """
+    """Масштабирование ядра по правилу min-max для визуализации в диапазоне [0, 1]."""
     k_max = k.max()
     k_min = k.min()
     if k_max == k_min:
@@ -511,16 +412,10 @@ def k_rescale(k):
     return (k - k_min) / (k_max - k_min)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Conjugate gradient solver
-# ═════════════════════════════════════════════════════════════════════════════
-
 def conjgrad(x, b, max_it, tol, Ax_func, func_param):
     """
-    Conjugate gradient optimization.
-    MATLAB: conjgrad (from kernel_solver_L2.m)
-
-    Solves A*x = b where A is defined implicitly by Ax_func.
+    Решение системы линейных уравнений A*x = b методом сопряженных градиентов.
+    Матрица A задается неявно через функцию умножения матрицы на вектор (Ax_func).
     """
     r = b - Ax_func(x, func_param)
     p = r.copy()
@@ -543,27 +438,24 @@ def conjgrad(x, b, max_it, tol, Ax_func, func_param):
     return x
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# 2D Tight Wavelet Frame Transform
-# (Ported from 2DTWFT library by Jian-Feng Cai)
-# ═════════════════════════════════════════════════════════════════════════════
 
 def GenerateFrameletFilter(frame):
     """
-    Generate framelet decomposition (D) and reconstruction (R) filter banks.
-    MATLAB: GenerateFrameletFilter.m
+    Генерация наборов фильтров для декомпозиции (D) и восстановления (R) 
+    с использованием вейвлет-фреймов.
 
-    Parameters
-    ----------
+    Параметры
+    ---------
     frame : int
-        0 = Haar Wavelet
-        1 = Piecewise Linear Framelet
-        3 = Piecewise Cubic Framelet
+        Тип базиса: 
+        0 = Вейвлет Хаара
+        1 = Кусочно-линейный фрейм
+        3 = Кусочно-кубический фрейм
 
-    Returns
-    -------
-    D : list — decomposition filters, last element is boundary-condition string
-    R : list — reconstruction filters, last element is boundary-condition string
+    Возвращает
+    ----------
+    D, R : list
+        Списки фильтров, где последний элемент — строка с граничными условиями.
     """
     if frame == 0:
         D = [
@@ -614,53 +506,29 @@ def GenerateFrameletFilter(frame):
 
 def ConvSymAsym2D(A, M, b, L):
     """
-    1D convolution/correlation with boundary conditions, applied along rows.
-    MATLAB: ConvSymAsym2D.m
-
-    Parameters
-    ----------
-    A : 2D array
-    M : 1D filter array
-    b : char — boundary condition: 'c' (circular), 's' (symmetric), 'a' (antisymmetric)
-    L : int — decomposition level (determines upsampling step = 2^(L-1))
-
-    Notes
-    -----
-    For 'c' (circular): MATLAB uses imfilter(A, ker, 'circular') which is
-    CORRELATION (default, no 'conv' flag) with circular boundary.
-    -> scipy.ndimage.correlate(A, ker, mode='wrap')
-
-    For 's'/'a': MATLAB uses conv2(Ae, ker, 'valid') which is true CONVOLUTION.
-    -> scipy.signal.convolve2d(Ae, ker, 'valid')
+    Одномерная свертка (корреляция) с учетом граничных условий, применяемая по строкам.
     """
     m, n = A.shape
     nM = len(M)
     step = 2 ** (L - 1)
 
-    # Build upsampled kernel (column vector)
     ker_len = step * (nM - 1) + 1
     ker = np.zeros(ker_len, dtype=np.float64)
     ker[::step] = M
     lker = ker_len // 2
 
-    # Reshape to column filter (ker_len, 1)
     ker_2d = ker.reshape(-1, 1)
 
     if b == 'c':
-        # Circular boundary: MATLAB imfilter default = correlation
         C = ndimage_correlate(A, ker_2d, mode='wrap')
     else:
-        # Symmetric or antisymmetric boundary
-        # MATLAB: padarray(A, lker, 'symmetric', 'both') — pads ALL dimensions
         Ae = np.pad(A,
                     ((lker, lker), (lker, lker)),
                     mode='symmetric')
         if b == 'a':
-            # Negate the padded regions
             Ae[:lker, :] = -Ae[:lker, :]
             Ae[m + lker:m + 2 * lker, :] = -Ae[m + lker:m + 2 * lker, :]
 
-        # MATLAB: conv2(Ae, ker, 'valid') — true convolution
         from scipy.signal import convolve2d
         C = convolve2d(Ae, ker_2d, mode='valid')
 
@@ -668,13 +536,7 @@ def ConvSymAsym2D(A, M, b, L):
 
 
 def FraDec2D(A, D, L):
-    """
-    Single-level 2D framelet decomposition (separable).
-    MATLAB: FraDec2D.m
-
-    Returns a list-of-lists Dec where Dec[i][j] is the coefficient
-    for filter pair (i, j).
-    """
+    """Одноуровневая сепарабельная двумерная декомпозиция на базе вейвлет-фреймов."""
     nD = len(D)
     SorAS = D[-1]  # boundary condition string
     n_filt = nD - 1
@@ -691,27 +553,18 @@ def FraDec2D(A, D, L):
 
 
 def FraDecMultiLevel2D(A, D, L):
-    """
-    Multi-level 2D framelet decomposition.
-    MATLAB: FraDecMultiLevel2D.m
-
-    Returns a list Dec of length L, where Dec[k] is the single-level
-    decomposition at level k+1 (0-indexed).
-    """
+    """Многоуровневая декомпозиция на базе вейвлет-фреймов."""
     Dec = []
     kDec = A.copy()
     for k in range(1, L + 1):
         dec_k = FraDec2D(kDec, D, k)
         Dec.append(dec_k)
-        kDec = dec_k[0][0].copy()  # low-frequency component
+        kDec = dec_k[0][0].copy()
     return Dec
 
 
 def FraRec2D(C, R, L):
-    """
-    Single-level 2D framelet reconstruction (separable).
-    MATLAB: FraRec2D.m
-    """
+    """Одноуровневое сепарабельное восстановление из коэффициентов вейвлет-фреймов."""
     nR = len(R)
     SorAS = R[-1]
     n_filt = nR - 1
@@ -730,29 +583,16 @@ def FraRec2D(C, R, L):
     return Rec
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Wavelet-domain kernel filtering
-# ═════════════════════════════════════════════════════════════════════════════
-
 def sort_filter(Cf, level, f_n, ratio):
     """
-    Threshold wavelet coefficients at a given decomposition level.
-    MATLAB: sort_filter.m
+    Пороговое ограничение вейвлет-коэффициентов на заданном уровне декомпозиции.
 
-    Collects all coefficients, sorts by magnitude, zeros out the
-    bottom (1-ratio) fraction.
-
-    Parameters
-    ----------
-    Cf : list of list-of-lists — multi-level framelet coefficients
-    level : int — 0-indexed level to filter
-    f_n : int — number of filter pairs (len(R) - 1)
-    ratio : float — fraction of coefficients to keep
+    Собирает все коэффициенты, сортирует по абсолютной величине и обнуляет 
+    заданную долю (1 - ratio) наименьших значений.
     """
     h, w = Cf[level][0][0].shape
     num = h * w
 
-    # Collect all coefficients into a flat vector
     v_cf = np.zeros(num * f_n * f_n, dtype=np.float64)
     n = 0
     for k in range(f_n):
@@ -760,12 +600,10 @@ def sort_filter(Cf, level, f_n, ratio):
             v_cf[n:n + num] = Cf[level][k][t].ravel()
             n += num
 
-    # Sort by absolute value and zero out the smallest
     indices = np.argsort(np.abs(v_cf))
     n_zero = int(np.floor(num * f_n * f_n * (1 - ratio)))
     v_cf[indices[:n_zero]] = 0.0
 
-    # Put back
     n = 0
     for k in range(f_n):
         for t in range(f_n):
@@ -777,55 +615,45 @@ def sort_filter(Cf, level, f_n, ratio):
 
 def kernel_filter(C, R, L, ratio):
     """
-    Filter noise on the restored kernel using wavelet thresholding.
-    MATLAB: kernel_filter.m
+    Удаление шума из восстановленного ядра с использованием вейвлет-фильтрации.
 
-    Parameters
-    ----------
-    C : list — multi-level framelet coefficients (from FraDecMultiLevel2D)
-    R : list — reconstruction filter bank
-    L : int — number of decomposition levels
-    ratio : float — fraction of coefficients to keep
-
-    Returns
-    -------
-    Rec : 2D array — filtered kernel
+    Параметры
+    ---------
+    C : list
+        Коэффициенты многоуровневой декомпозиции.
+    R : list
+        Набор фильтров для восстановления.
+    L : int
+        Количество уровней декомпозиции.
+    ratio : float
+        Доля сохраняемых наибольших коэффициентов.
     """
-    f_n = len(R) - 1  # number of filter pairs
+    f_n = len(R) - 1
 
     for k in range(L, 1, -1):
-        # MATLAB: k goes from L down to 2 (1-indexed)
-        C = sort_filter(C, k - 1, f_n, ratio)           # 0-indexed
-        C[k - 2][0][0] = FraRec2D(C[k - 1], R, k)      # reconstruct level k
+        C = sort_filter(C, k - 1, f_n, ratio)
+        C[k - 2][0][0] = FraRec2D(C[k - 1], R, k)
 
     C = sort_filter(C, 0, f_n, ratio)
     Rec = FraRec2D(C[0], R, 1)
     return Rec
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# solve_image — LUT-based solver for w-subproblem in fast_deconv
-# (from solve_image.m, Krishnan & Fergus NIPS 2009)
-# ═════════════════════════════════════════════════════════════════════════════
-
-_SOLVE_IMAGE_LUT = {}  # cache: (beta, alpha) -> interp1d function
+_SOLVE_IMAGE_LUT = {}
 
 
 def clear_solve_image_cache():
-    """Clear the persistent LUT cache (equivalent to MATLAB `clear persistent`)."""
+    """Очистка постоянного кэша таблицы LUT."""
     _SOLVE_IMAGE_LUT.clear()
 
 
 def _compute_w1(v, beta):
-    """alpha = 1: soft thresholding."""
+    """Оценка проксимального оператора для alpha = 1 (мягкое пороговое ограничение)."""
     return np.maximum(np.abs(v) - 1.0 / beta, 0.0) * np.sign(v)
 
 
 def _compute_w23(v, beta):
-    """
-    alpha = 2/3: quartic equation via Ferrari's method.
-    MATLAB: compute_w23 in solve_image.m
-    """
+    """Аналитическая оценка проксимального оператора для alpha = 2/3 (метод Феррари)."""
     epsilon = 1e-6
 
     k_val = 8.0 / (27.0 * beta ** 3)
@@ -844,7 +672,6 @@ def _compute_w23(v, beta):
     disc = -m3 / 27.0 + (m2 * v4) / 256.0
     r1 = -q / 2.0 + np.sqrt(disc.astype(np.complex128))
 
-    # Cube root via exp(log/3)
     u = np.exp(np.log(r1) / 3.0)
     y = 2.0 * (-5.0 / 18.0 * alpha_q + u + (m.astype(np.complex128) / (3.0 * u)))
 
@@ -853,7 +680,6 @@ def _compute_w23(v, beta):
     alpha_c = alpha_q.astype(np.complex128)
     beta2_c = beta2.astype(np.complex128)
 
-    # 4 roots
     root = np.zeros((v.size, 4), dtype=np.complex128)
     v_flat = v.ravel()
 
@@ -865,7 +691,6 @@ def _compute_w23(v, beta):
     root[:, 2] = 0.75 * v_flat + 0.5 * (-W_val + sqrt_minus)
     root[:, 3] = 0.75 * v_flat + 0.5 * (-W_val - sqrt_minus)
 
-    # Pick the correct root
     v_rep = np.repeat(v_flat[:, np.newaxis], 4, axis=1)
     sv2 = np.sign(v_rep)
     rsv2 = np.real(root) * sv2
@@ -874,19 +699,15 @@ def _compute_w23(v, beta):
             (rsv2 > np.abs(v_rep) / 2.0) &
             (rsv2 < np.abs(v_rep)))
 
-    # MATLAB: sort(mask .* rsv2, 3, 'descend') .* sv2;  w = result(:,:,1)
     filtered = mask * rsv2
-    sorted_vals = np.sort(filtered, axis=1)[:, ::-1]  # descending
+    sorted_vals = np.sort(filtered, axis=1)[:, ::-1]
     w = sorted_vals[:, 0] * np.sign(v_flat)
 
     return np.real(w).reshape(v.shape)
 
 
 def _compute_w12(v, beta):
-    """
-    alpha = 1/2: cubic equation.
-    MATLAB: compute_w12 in solve_image.m
-    """
+    """Аналитическая оценка проксимального оператора для alpha = 1/2 (метод Кардано)."""
     epsilon = 1e-6
 
     k_val = -0.25 / beta ** 2
@@ -918,11 +739,9 @@ def _compute_w12(v, beta):
                   - ((1.0 - 1j * sqrt3) / (3.0 * 2.0 ** (2.0 / 3.0))) * t3
                   - ((1.0 + 1j * sqrt3) / (6.0 * cbrt2)) * t2)
 
-    # Handle NaN/Inf
     bad = np.isnan(root) | np.isinf(root)
     root[bad] = 0.0
 
-    # Pick the correct root
     v_rep = np.repeat(v_flat[:, np.newaxis], 3, axis=1)
     sv2 = np.sign(v_rep)
     rsv2 = np.real(root) * sv2
@@ -932,7 +751,7 @@ def _compute_w12(v, beta):
             (rsv2 < np.abs(v_rep)))
 
     filtered = mask * rsv2
-    sorted_vals = np.sort(filtered, axis=1)[:, ::-1]  # descending
+    sorted_vals = np.sort(filtered, axis=1)[:, ::-1]
     w = sorted_vals[:, 0] * np.sign(v_flat)
 
     return np.real(w).reshape(v.shape)
@@ -940,8 +759,8 @@ def _compute_w12(v, beta):
 
 def _newton_w(v, beta, alpha):
     """
-    General alpha: Newton-Raphson solver.
-    MATLAB: newton_w in solve_image.m
+    Вычисление проксимального оператора методом Ньютона-Рафсона 
+    для произвольных значений alpha.
     """
     iterations = 4
     x = v.copy()
@@ -953,8 +772,6 @@ def _newton_w(v, beta, alpha):
         x = x - fd / fdd
 
     x[np.isnan(x)] = 0.0
-
-    # Check whether the zero solution is better
     z = beta / 2.0 * v ** 2
     f = np.abs(x) ** alpha + beta / 2.0 * (x - v) ** 2
     w = np.where(f < z, x, 0.0)
@@ -962,7 +779,7 @@ def _newton_w(v, beta, alpha):
 
 
 def _compute_w(v, beta, alpha):
-    """Dispatch to the appropriate solver for a given alpha."""
+    """Выбор оптимального метода вычисления проксимального оператора на основе alpha."""
     if abs(alpha - 1.0) < 1e-9:
         return _compute_w1(v, beta)
     elif abs(alpha - 2.0 / 3.0) < 1e-9:
@@ -975,11 +792,10 @@ def _compute_w(v, beta, alpha):
 
 def solve_image(v, beta, alpha):
     """
-    Solve component-wise:  min_w |w|^alpha + (beta/2)*(w - v)^2
-    using a Look-Up Table (LUT) with linear interpolation.
-    MATLAB: solve_image.m (Krishnan & Fergus, NIPS 2009)
-
-    The LUT is built once per (beta, alpha) pair and cached.
+    Покомпонентное решение задачи минимизации: 
+        min_w |w|^alpha + (beta/2)*(w - v)^2 
+    с использованием интерполяции по предварительно вычисленной таблице 
+    значений (LUT).
     """
     key = (beta, alpha)
 

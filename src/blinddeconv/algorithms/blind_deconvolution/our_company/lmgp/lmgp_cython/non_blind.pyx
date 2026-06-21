@@ -163,9 +163,6 @@ def _estimate_alpha_n(blurred, restored, kernel, sigma_n):
 
 def _build_lambda_library(alpha, C, lam_N): return C * (2 ** ((alpha / 3.0) * np.arange(lam_N, dtype=np.float64)))
 
-# ─────────────────────────────────────────────────────────────────────────────
-# C-ОПТИМИЗИРОВАННАЯ ИНТЕРПОЛЯЦИЯ ДЛЯ NON-BLIND
-# ─────────────────────────────────────────────────────────────────────────────
 
 cdef void _do_interpolate(double[:, ::1] lam_map, double[::1] lam_lib, int[:, ::1] raw_idx,
                           double[:, :, ::1] I_lib, double[:, ::1] I_opt) noexcept:

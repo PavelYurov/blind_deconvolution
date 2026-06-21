@@ -1,25 +1,32 @@
 """
 pmp.py
 
-Blind Image Deblurring Using Patch-wise Minimal Pixels (PMP) Prior.
+Модуль слепой деконволюции изображений на основе априорной информации 
+о локальных минимальных значениях интенсивности (Patch-wise Minimal Pixels, PMP).
 
-Reference:
-    F. Wen, R. Ying, Y. Liu, P. Liu, T.-K. Truong:
-    "A Simple Local Minimal Intensity Prior and An Improved Algorithm
-    for Blind Image Deblurring", IEEE TCSVT, 2021.
+Основано на методе:
+    F. Wen, R. Ying, Y. Liu, P. Liu, T.-K. Truong: "A Simple Local 
+    Minimal Intensity Prior and An Improved Algorithm for Blind Image 
+    Deblurring", IEEE TCSVT, 2021.
 
-Pipeline (mirrors MATLAB demo_samples.m):
-    1. Normalise input to float64 [0, 1].
-    2. Multi-scale blind deconvolution (blind_deconv) on grayscale input.
-    3. Non-blind restoration via ringing_artifacts_removal.
-    4. Return restored image (int16, [0, 255]) and kernel.
+Математическая модель опирается на наблюдение, что в небольших неперекрывающихся 
+паттернах четкого естественного изображения минимальные значения интенсивности 
+близки к нулю. Процесс пространственного размытия сглаживает эти минимумы, 
+повышая их значения. Использование L0-нормы карты минимальных пикселей 
+позволяет эффективно разделять размытые и четкие изображения в процессе оптимизации.
+
+Общий конвейер восстановления:
+1. Нормализация динамического диапазона входного сигнала к отрезку [0.0, 1.0].
+2. Формирование полутоновой матрицы яркости по стандарту ITU-R BT.601 для оценки ядра.
+3. Многомасштабная слепая деконволюция с использованием априорного знания PMP.
+4. Финальная неслепая деконволюция исходного сигнала с подавлением пространственных 
+   артефактов (эффекта Гиббса).
 """
 
 import numpy as np
 import time
 from typing import Tuple, List, Any, Dict
 
-# ── Framework base class import (DO NOT MODIFY) ─────────────────────────────
 import sys
 from pathlib import Path
 
@@ -43,38 +50,43 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
         sys.path.insert(0, _path)
 
 from blinddeconv.algorithms.base import DeconvolutionAlgorithm
-# ─────────────────────────────────────────────────────────────────────────────
 
 from .solvers import blind_deconv, ringing_artifacts_removal
 
 
 class PMP_BD(DeconvolutionAlgorithm):
     """
-    Blind deconvolution using the Patch-wise Minimal Pixels (PMP) prior.
+    Алгоритм слепой деконволюции на основе априорного знания локальных 
+    минимальных значений интенсивности.
 
-    Parameters
-    ----------
-    kernel_size   : int — spatial support of the unknown PSF (square, odd).
-    lambda_pmp    : float — weight for L0 intensity (PMP) prior.
-                    Default 0.1 (from demo_samples.m).
-    lambda_grad   : float — weight for L0 gradient prior.
-                    Default 4e-3.
-    xk_iter       : int — number of blind iterations per pyramid level.
-                    Default 5.
-    gamma_correct : float — gamma correction exponent applied before
-                    kernel estimation.  1.0 = no correction.  Default 1.0.
-    k_thresh      : float — final kernel threshold.
-                    kernel values < max(k)/k_thresh are zeroed.
-                    Default 20.
-    patch_r       : int or None — patch size for PMP prior.
-                    None = auto (floor(0.025 * mean(image_size))).
-                    Default None.
-    lambda_tv     : float — weight for TV non-blind deconvolution.
-                    Default 0.001.
-    lambda_l0     : float — weight for L0 non-blind deconvolution.
-                    Default 5e-4.
-    weight_ring   : float — ringing suppression weight (0 = no suppression).
-                    Default 1.0.
+    Целевой минимизируемый функционал (согласно уравнению 9 в первоисточнике):
+    E(I, K) = ||I * K - B||_2^2 + lambda_pmp * ||P(I)||_0 + lambda_grad * ||nabla I||_0 + gamma * ||K||_2^2
+    где P(I) — оператор извлечения минимальных пикселей паттерна.
+
+    Параметры
+    ---------
+    kernel_size : int, по умолчанию 25
+        Линейный размер квадратного пространственного носителя функции рассеяния
+        точки. Значение должно быть нечетным числом.
+    lambda_pmp : float, по умолчанию 0.1
+        Коэффициент регуляризации априорного члена минимальных значений (параметр alpha).
+    lambda_grad : float, по умолчанию 4e-3
+        Коэффициент L0-регуляризации разреженности градиентов (параметр mu).
+    xk_iter : int, по умолчанию 5
+        Количество итераций попеременной минимизации на каждом уровне масштабной пирамиды.
+    gamma_correct : float, по умолчанию 1.0
+        Коэффициент предварительного степенного преобразования сигнала перед оценкой ядра.
+    k_thresh : float, по умолчанию 20.0
+        Жесткий порог отсечения шума в оцененном ядре размытия.
+    patch_r : int или None, по умолчанию None
+        Размер локального паттерна для поиска минимальных пикселей. При значении None
+        вычисляется автоматически как floor(0.025 * mean(H, W)).
+    lambda_tv : float, по умолчанию 0.001
+        Вес полной вариации (Total Variation) на этапе финальной неслепой деконволюции.
+    lambda_l0 : float, по умолчанию 5e-4
+        Вес L0-нормы градиента на этапе финальной неслепой деконволюции.
+    weight_ring : float, по умолчанию 1.0
+        Коэффициент силы подавления краевых эффектов звона.
     """
 
     def __init__(
@@ -106,19 +118,26 @@ class PMP_BD(DeconvolutionAlgorithm):
         self.history: Dict[str, list] = {'kernel_diff': []}
         self.hyperparams: Dict[str, Any] = {}
 
-    # ── Main entry point ─────────────────────────────────────────────────
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Запуск полного цикла слепой деконволюции для переданного кадра.
+
+        Параметры
+        ---------
+        image : np.ndarray
+            Входное искаженное изображение (одноканальное или многоканальное).
+
+        Возвращаемое значение
+        ---------------------
+        Tuple[np.ndarray, np.ndarray]
+            Кортеж, содержащий восстановленное изображение в целочисленном формате
+            (int16, диапазон 0-255) и оцененную матрицу ядра искажения.
+        """
         start_time = time.time()
 
-        # ── 1. Normalise to float64 [0, 1] ──────────────────────────────
         y = image.astype(np.float64)
         if y.max() > 1.0:
             y /= 255.0
-
-        # ── 2. Grayscale for kernel estimation ──────────────────────────
-        # MATLAB: yg = im2double(rgb2gray(y))
-        # The user specifies: process() takes 1 grayscale image.
-        # Handle both 2D and 3D (single-channel) inputs gracefully.
         if y.ndim == 3 and y.shape[2] == 3:
             yg = 0.2989 * y[:, :, 0] + 0.5870 * y[:, :, 1] + 0.1140 * y[:, :, 2]
         elif y.ndim == 3 and y.shape[2] == 1:
@@ -126,9 +145,6 @@ class PMP_BD(DeconvolutionAlgorithm):
         else:
             yg = y.copy() if y.ndim == 2 else y[:, :, 0]
 
-        # ── 3. Blind kernel estimation ──────────────────────────────────
-        # MATLAB: [kernel, interim_latent] = blind_deconv(yg, lambda, lambda_grad, opts)
-        # or:     [kernel, interim_latent] = blind_deconv(yg, lambda, lambda_grad, opts, patch_r)
         opts = {
             'kernel_size': self.kernel_size,
             'gamma_correct': self.gamma_correct,
@@ -141,14 +157,11 @@ class PMP_BD(DeconvolutionAlgorithm):
             patch_r=self.patch_r,
         )
 
-        # ── 4. Non-blind restoration ────────────────────────────────────
-        # MATLAB: Latent = ringing_artifacts_removal(y, kernel, lambda_tv, lambda_l0, weight_ring)
         Latent = ringing_artifacts_removal(
             y, kernel, self.lambda_tv, self.lambda_l0, self.weight_ring
         )
         Latent = np.clip(Latent, 0.0, 1.0)
 
-        # ── 5. Output ──────────────────────────────────────────────────
         self.hyperparams = {
             'kernel_size': self.kernel_size,
             'lambda_pmp': self.lambda_pmp,
@@ -163,7 +176,6 @@ class PMP_BD(DeconvolutionAlgorithm):
         x_final = np.clip(x_final, 0, 255).astype(np.int16)
         return x_final, kernel
 
-    # ── Interface methods ────────────────────────────────────────────────
     def get_param(self) -> List[Tuple[str, Any]]:
         return [
             ('kernel_size', self.kernel_size),

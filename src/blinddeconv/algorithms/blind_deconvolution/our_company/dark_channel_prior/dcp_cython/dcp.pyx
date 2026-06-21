@@ -1,41 +1,20 @@
 """
 dcp.py
 
-Blind Image Deblurring Using Dark Channel Prior (DCP) with optional
-noise-aware preprocessing and non-blind restoration pipeline.
+Слепая деконволюция изображений с использованием априорного распределения 
+темного канала (Dark Channel Prior, DCP).
+Модифицированная версия с опциональным конвейером шумоподавления и 
+интеграцией методов неслепого восстановления.
 
-Reference:
+Основано на методе:
     J. Pan, D. Sun, H. Pfister, M.-H. Yang: "Blind Image Deblurring
-    Using Dark Channel Prior", CVPR 2016.
-
-Pipeline:
-    1.  Normalise input to float64 [0, 1].
-    2.  Convert to grayscale for kernel estimation.
-    3a. Impulse noise detection & removal (optional).
-    3b. Noise σ estimation (optional).
-    3c. Auto-params from σ (optional).
-    3d. ScreeNOT SVD denoising (optional, mutually exclusive with ACT).
-    3e. ACT curvelet denoising (optional, mutually exclusive with ScreeNOT).
-    3f. Spatial pre-blind denoising (optional).
-    3g. PSD-based noise filtering (optional).
-    3h. Histogram equalization (optional).
-    4.  Multi-scale blind deconvolution (blind_deconv) with optional
-        intra-loop hooks (latent denoising, kernel smoothing,
-        gradient equalization).
-    5.  Pre-nonblind denoising (optional).
-    6.  Non-blind restoration (ringing_removal / adaptive_lp / wiener /
-        tikhonov).
-    7.  Return restored image (int16, [0, 255]) and kernel.
-
-All noise pipeline steps are DISABLED by default — the algorithm
-behaves identically to the original Pan et al. CVPR 2016 code.
+    Using Dark Channel Prior", CVPR, 2016.
 """
 
 import numpy as np
 import time
 from typing import Tuple, List, Any, Dict
 
-# ── Framework base class import (DO NOT MODIFY) ─────────────────────────────
 import sys
 from pathlib import Path
 
@@ -59,199 +38,98 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
         sys.path.insert(0, _path)
 
 from blinddeconv.algorithms.base import DeconvolutionAlgorithm 
-# ─────────────────────────────────────────────────────────────────────────────
 
 from .solvers import blind_deconv, ringing_artifacts_removal
 
 
 class DCP_BD(DeconvolutionAlgorithm):
     """
-    Blind deconvolution using the Dark Channel Prior.
+    Алгоритм слепой деконволюции на основе априорного распределения темного канала 
+    с расширенным конвейером подавления шума.
 
-    The core algorithm (blind_deconv, ringing_artifacts_removal) is the
-    UNMODIFIED Pan et al. CVPR 2016 code.  All noise handling is done
-    OUTSIDE the blind loop via optional pre/post-processing stages.
+    Базовые параметры DCP
+    ---------------------
+    kernel_size : int, по умолчанию 25
+        Пространственный размер неизвестной функции рассеяния точки (квадратное, нечетное).
+    lambda_dark : float, по умолчанию 4e-3
+        Вес для L0-регуляризации интенсивности темного канала.
+    lambda_grad : float, по умолчанию 4e-3
+        Вес для L0-регуляризации градиентов изображения.
+    xk_iter : int, по умолчанию 5
+        Количество итераций слепой оценки на каждом уровне пирамиды.
+    gamma_correct : float, по умолчанию 1.0
+        Экспонента гамма-коррекции, применяемая перед оценкой ядра.
+    k_thresh : float, по умолчанию 20.0
+        Относительный порог обнуления элементов ядра (max(k) / k_thresh).
+    lambda_tv : float, по умолчанию 0.003
+        Вес TV-регуляризации для этапа неслепой деконволюции.
+    lambda_l0 : float, по умолчанию 5e-4
+        Вес L0-регуляризации для этапа неслепой деконволюции.
+    weight_ring : float, по умолчанию 1.0
+        Коэффициент подавления артефактов звона.
 
-    Original DCP Parameters
-    -----------------------
-    kernel_size   : int — spatial support of the unknown PSF (square, odd).
-                    Default 25.
-    lambda_dark   : float — weight for L0 intensity (dark-channel) prior.
-                    Default 4e-3 (from demo_deblurring.m).
-    lambda_grad   : float — weight for L0 gradient prior.
-                    Default 4e-3.
-    xk_iter       : int — number of blind iterations per pyramid level.
-                    Default 5.
-    gamma_correct : float — gamma correction exponent applied before
-                    kernel estimation.  1.0 = no correction.  Default 1.0.
-    k_thresh      : float — final kernel threshold.
-                    kernel values < max(k)/k_thresh are zeroed.
-                    Default 20.
-    lambda_tv     : float — weight for TV non-blind deconvolution.
-                    Default 0.003.
-    lambda_l0     : float — weight for L0 non-blind deconvolution.
-                    Default 5e-4.
-    weight_ring   : float — ringing suppression weight (0 = no suppression).
-                    Default 1.0.
+    Параметры конвейера шумоподавления
+    ----------------------------------
+    impulse_preprocess : str, по умолчанию 'none'
+        Метод обработки импульсного шума ('auto' для автоматического обнаружения).
+    impulse_params : dict или None
+        Параметры обнаружения импульсного шума (density_threshold, outlier_threshold, и т.д.).
+    noise_estimation : str, по умолчанию 'none'
+        Метод оценки дисперсии шума: 'chen' (на базе PCA), 'pca' (с VST) или 'none'.
+    auto_params : dict или None
+        Правила автоматической настройки lambda_dark, lambda_grad и параметров 
+        неслепого восстановления на основе оцененного уровня шума sigma.
+    screenot_preprocess : str, по умолчанию 'none'
+        Предварительное шумоподавление на основе метода ScreeNOT ('auto', 'none').
+    screenot_params : dict или None
+        Параметры метода ScreeNOT.
+    act_preprocess : str, по умолчанию 'none'
+        Предварительное шумоподавление методом Adaptive Curvelet Thresholding.
+    act_params : dict или None
+        Параметры метода ACT.
+    preprocess : str, по умолчанию 'none'
+        Пространственный алгоритм шумоподавления, применяемый до начала 
+        слепого цикла оценки ядра ('tv', 'nlm', 'bilateral', 'bm3d' и др.).
+    preprocess_params : dict или None
+        Специфичные параметры для предварительного пространственного фильтра.
+    noise_preprocess : str, по умолчанию 'none'
+        Спектральный фильтр для периодического шума ('auto', 'notch', 'bandstop').
+    noise_preprocess_params : dict или None
+        Параметры спектральной фильтрации.
+    histogram_eq : str, по умолчанию 'none'
+        Выравнивание гистограммы всего изображения перед началом работы 
+        ('clahe', 'global', 'none'). Внимание: может нарушить свойства темного канала.
+    histogram_eq_params : dict или None
+        Параметры эквализации гистограммы.
+    pre_nonblind : str, по умолчанию 'none'
+        Алгоритм шумоподавления, применяемый перед финальным неслепым шагом.
+    pre_nonblind_params : dict или None
+        Параметры для данного алгоритма.
 
-    Noise Pipeline Parameters (all disabled by default)
-    ---------------------------------------------------
+    Параметры внутренних обработчиков (blind_hooks)
+    -----------------------------------------------
+    blind_hooks : dict или None
+        Определяет методы обработки внутри цикла слепой оценки ядра. Возможные ключи:
+        - 'latent_denoise': фильтрация скрытого изображения S перед вычислением градиентов.
+        - 'latent_denoise_decay': фактор затухания силы фильтрации с каждой итерацией.
+        - 'grad_eq': безопасная эквализация гистограммы только для скрытого 
+          изображения перед вычислением градиентов.
+        - 'kernel_smooth': сглаживание ядра размытия после каждой итерации.
 
-    impulse_preprocess : str
-        'auto' — detect & remove impulse (salt-and-pepper) noise before
-        blind deconvolution.  'none' — skip.  Default 'none'.
-
-    impulse_params : dict or None
-        Parameters for impulse detection & removal.
-        Keys:
-            'density_threshold' : float — minimum density to declare
-                impulse noise present (default 0.0005).
-            'outlier_threshold' : float — min diff from local median
-                for a pixel to be flagged as outlier (default 0.08).
-            'outlier_window'    : int — window for local median (default 5).
-            'max_window'        : int — max window for adaptive median
-                filter (default 7).
-
-    noise_estimation : str
-        Method for noise σ estimation:
-        'chen' — Chen et al. (ICCV 2015) PCA eigenvalue analysis.
-        'pca'  — Pyatykh et al. (TIP 2013) PCA + VST + kurtosis.
-        'none' — skip.  Default 'none'.
-
-    auto_params : dict or None
-        If not None (and noise_estimation succeeds), auto-tune
-        lambda_dark, lambda_grad, and non-blind params from estimated σ.
-        Keys:
-            'k_lambda_dark' : float — lambda_dark = max(floor, k * σ).
-                Default 2.0.
-            'k_lambda_grad' : float — lambda_grad = max(floor, k * σ).
-                Default 0.2.
-            'k_lambda_tv'   : float — lambda_tv = max(1e-4, k * σ).
-                Default 0.05.
-            'k_lambda_l0'   : float — lambda_l0 = max(1e-5, k * σ).
-                Default 0.025.
-
-    screenot_preprocess : str
-        'auto' — apply ScreeNOT SVD denoising before blind step.
-        'none' — skip.  Default 'none'.
-        MUTUALLY EXCLUSIVE with act_preprocess.
-
-    screenot_params : dict or None
-        Parameters for ScreeNOT denoising.
-        Keys:
-            'k'          : int — upper bound on signal rank (default 10).
-            'strategy'   : str — 'i' / 'w' / '0' (default 'i').
-            'mode'       : str — 'full' or 'patch' (default 'full').
-            'patch_size' : int — patch size for 'patch' mode (default 8).
-            'stride'     : int — stride for 'patch' mode (default 3).
-
-    act_preprocess : str
-        'auto' — apply Adaptive Curvelet Thresholding before blind step.
-        'none' — skip.  Default 'none'.
-        MUTUALLY EXCLUSIVE with screenot_preprocess.
-
-    act_params : dict or None
-        Parameters for ACT denoising.
-        Keys:
-            'noise_var'          : float or None — noise variance.
-                If None and noise_estimation is active, uses σ².
-            'threshold_setting'  : str — 's' (soft) or 'h' (hard).
-                Default 's'.
-
-    preprocess : str
-        Spatial denoiser applied BEFORE the blind step.
-        Options: 'tv', 'nlm', 'bilateral', 'guided', 'bm3d',
-                 'act', 'none'.  Default 'none'.
-
-    preprocess_params : dict or None
-        Parameters for the pre-blind spatial denoiser (see _apply_denoise).
-
-    noise_preprocess : str
-        PSD-based noise filter: 'auto', 'notch', 'bandstop', or 'none'.
-        Default 'none'.
-
-    noise_preprocess_params : dict or None
-        Parameters for PSD noise preprocessing.
-
-    histogram_eq : str
-        Histogram equalization applied to the FULL blurred image before
-        the blind loop: 'clahe', 'global', 'none'.  Default 'none'.
-        WARNING: CLAHE/global equalization BREAKS the dark channel prior
-        (dark_channel takes min over patches — equalization destroys dark
-        pixels and shifts graythresh).  Prefer using
-        blind_hooks['grad_eq'] instead, which applies equalization ONLY
-        to the latent image before gradient computation, leaving
-        L0Deblur_dark_channel on original intensities.
-
-    histogram_eq_params : dict or None
-        Parameters for histogram equalization.
-
-    pre_nonblind : str
-        Denoiser applied to the blurry image BEFORE the non-blind step.
-        Same options as preprocess.  Default 'none'.
-
-    pre_nonblind_params : dict or None
-        Parameters for the pre-nonblind denoiser.
-
-    Intra-Loop Hooks (blind_hooks)
-    ------------------------------
-    blind_hooks : dict or None
-        If not None, enables denoising / processing INSIDE the blind
-        deconvolution loop.  All sub-keys default to 'none' (disabled).
-
-        Keys:
-            'latent_denoise' : str — denoiser applied to the latent image
-                S AFTER L0Deblur estimation and BEFORE gradient computation
-                (threshold_pxpy_v1).  This is the single most impactful
-                injection point: cleaner S → cleaner gradients → better
-                kernel.  Does NOT affect L0Deblur input.
-                Options: 'bilateral', 'guided', 'tv', 'nlm', 'bm3d',
-                         'act', 'none'.  Default 'none'.
-                Recommended: 'guided' or 'bilateral' (fast, edge-preserving).
-
-            'latent_denoise_params' : dict — parameters for the latent
-                denoiser (same keys as preprocess_params).
-
-            'latent_denoise_decay' : float — multiplicative factor applied
-                to denoising strength per iteration.  < 1.0 = weaken
-                denoising as kernel improves.  Default 1.0 (no decay).
-
-            'grad_eq' : str — histogram equalization applied ONLY to the
-                latent S for gradient computation, NOT for L0Deblur.
-                This is the SAFE way to use equalization with dark channel
-                prior.  Options: 'clahe', 'global', 'none'.
-                Default 'none'.
-
-            'grad_eq_params' : dict — parameters for gradient equalization.
-                Keys: 'clip_limit' (default 0.01), 'nbins' (default 256).
-
-            'kernel_smooth' : str — kernel post-processing after each
-                iteration.  Options: 'gaussian', 'none'.
-                Default 'none'.
-
-            'kernel_smooth_params' : dict — parameters for kernel smoothing.
-                Keys: 'sigma' (default 0.5).
-
-    Non-Blind Restoration Parameters
-    ---------------------------------
-
-    final_deconv : str
-        Non-blind deconvolution method:
-        'ringing_removal' — default DCP method: TV + L0 + bilateral
-            ringing suppression.
-        'adaptive_lp' — space-variant Lp regularisation (Wang et al.).
-        'wiener' — Wiener filter (FFT-based).
-        'tikhonov' — Tikhonov filter (FFT-based).
-        Default 'ringing_removal'.
-
-    nb_params : dict or None
-        Parameters for non-ringing_removal non-blind methods.
-        adaptive_lp: {'alpha': float (default 0.8),
-                      'two_stage': bool (default True)}.
-        wiener:      {'noise_snr': float (default 0.01)}.
-        tikhonov:    {'alpha': float (default 0.01)}.
-
-    verbose : bool — print progress.  Default False.
+    Параметры финального восстановления
+    -----------------------------------
+    final_deconv : str, по умолчанию 'ringing_removal'
+        Метод финальной неслепой деконволюции ('ringing_removal', 'adaptive_lp', 
+        'wiener', 'tikhonov').
+    nb_params : dict или None
+        Специфические параметры для выбранного метода финального восстановления.
+    auto_mode : str, по умолчанию 'off'
+        Глобальный оркестратор шумоподавления ('robust' или 'off'). Автоматически 
+        переопределяет параметры конвейера на основе оценки шума.
+    auto_mode_params : dict или None
+        Параметры для настройки порогов срабатывания оркестратора.
+    verbose : bool, по умолчанию False
+        Флаг вывода диагностической информации в консоль.
     """
 
     def __init__(
@@ -265,7 +143,6 @@ class DCP_BD(DeconvolutionAlgorithm):
         lambda_tv: float = 0.003,
         lambda_l0: float = 5e-4,
         weight_ring: float = 1.0,
-        # ── Noise pipeline (all disabled by default) ────────────────────
         impulse_preprocess: str = 'none',
         impulse_params: dict = None,
         noise_estimation: str = 'none',
@@ -282,12 +159,9 @@ class DCP_BD(DeconvolutionAlgorithm):
         histogram_eq_params: dict = None,
         pre_nonblind: str = 'none',
         pre_nonblind_params: dict = None,
-        # ── Intra-loop hooks ────────────────────────────────────────────
         blind_hooks: dict = None,
-        # ── Non-blind restoration ───────────────────────────────────────
         final_deconv: str = 'ringing_removal',
         nb_params: dict = None,
-        # ── LIP-style robust orchestrator ───────────────────────────────
         auto_mode: str = 'off',
         auto_mode_params: dict = None,
         verbose: bool = False,
@@ -305,7 +179,6 @@ class DCP_BD(DeconvolutionAlgorithm):
         self.lambda_l0 = lambda_l0
         self.weight_ring = weight_ring
 
-        # Noise pipeline
         self.impulse_preprocess = impulse_preprocess
         self.impulse_params = impulse_params
         self.noise_estimation = noise_estimation
@@ -323,20 +196,16 @@ class DCP_BD(DeconvolutionAlgorithm):
         self.pre_nonblind = pre_nonblind
         self.pre_nonblind_params = pre_nonblind_params
 
-        # Intra-loop hooks
         self.blind_hooks = blind_hooks
 
-        # Non-blind
         self.final_deconv = final_deconv.lower()
         self.nb_params = nb_params
 
-        # LIP-style robust orchestrator
         self.auto_mode = (auto_mode or 'off').lower()
         self.auto_mode_params = auto_mode_params
 
         self.verbose = verbose
 
-        # Snapshot of user-provided values for orchestrator-managed groups.
         self._defaults_snapshot = {
             'preprocess':          preprocess,
             'preprocess_params':   preprocess_params,
@@ -357,16 +226,33 @@ class DCP_BD(DeconvolutionAlgorithm):
         self.history: Dict[str, list] = {'kernel_diff': []}
         self.hyperparams: Dict[str, Any] = {}
 
-    # ── Main entry point ─────────────────────────────────────────────────
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Запуск алгоритма слепой деконволюции с полным конвейером обработки.
+
+        Процесс включает следующие этапы:
+        1. Нормализация входного изображения.
+        2. Конвертация в полутоновый формат для оценки ядра.
+        3. Последовательное выполнение этапов шумоподавления (импульсный шум, 
+           оценка параметров, ScreeNOT/ACT, спектральная фильтрация).
+        4. Многомасштабная слепая деконволюция с опциональными внутренними 
+           обработчиками (хуками).
+        5. Неслепое восстановление исходного изображения с применением 
+           оцененного ядра.
+
+        Возвращает
+        ----------
+        x_final : ndarray
+            Восстановленное изображение в формате int16 [0, 255].
+        kernel : ndarray
+            Оцененное ядро размытия.
+        """
         start_time = time.time()
 
-        # ── 1. Normalise to float64 [0, 1] ──────────────────────────────
         y = image.astype(np.float64)
         if y.max() > 1.0:
             y /= 255.0
 
-        # ── 2. Grayscale for kernel estimation ──────────────────────────
         if y.ndim == 3 and y.shape[2] == 3:
             yg = 0.2989 * y[:, :, 0] + 0.5870 * y[:, :, 1] + 0.1140 * y[:, :, 2]
         elif y.ndim == 3 and y.shape[2] == 1:
@@ -374,7 +260,6 @@ class DCP_BD(DeconvolutionAlgorithm):
         else:
             yg = y.copy() if y.ndim == 2 else y[:, :, 0]
 
-        # ── 3a. Impulse noise detection & removal ───────────────────────
         impulse_info = None
         if self.impulse_preprocess == 'auto':
             from blinddeconv.algorithms.mod_cython._build_pyd.impulse_noise_estimation import (
@@ -396,8 +281,6 @@ class DCP_BD(DeconvolutionAlgorithm):
                     yg, impulse_info['impulse_mask'],
                     max_window=ip.get('max_window', 7))
 
-        # ── 3b. Noise estimation ────────────────────────────────────────
-        # Auto-promote to PCA when robust orchestrator is enabled.
         if self.auto_mode == 'robust' and self.noise_estimation == 'none':
             self.noise_estimation = 'pca'
             if self.verbose:
@@ -411,7 +294,6 @@ class DCP_BD(DeconvolutionAlgorithm):
                 print(f"[DCP-BD] Noise estimation ({self.noise_estimation}): "
                       f"σ={sigma:.5f} (σ_255={sigma * 255:.2f})")
 
-        # ── 3c. Auto-params from σ ──────────────────────────────────────
         if self.auto_params is not None and noise_info is not None:
             sigma_n = noise_info.get('sigma_norm', None)
             if sigma_n is not None and sigma_n > 0:
@@ -431,10 +313,8 @@ class DCP_BD(DeconvolutionAlgorithm):
                           f"λ_tv={self.lambda_tv:.5f}, "
                           f"λ_l0={self.lambda_l0:.6f}")
 
-        # ── 3c'. LIP-style robust orchestrator ──────────────────────────
         orchestrator_info = self._orchestrate_robust(noise_info)
 
-        # ── 3d. ScreeNOT SVD denoising ──────────────────────────────────
         screenot_info = None
         if self.screenot_preprocess == 'auto':
             if self.act_preprocess == 'auto':
@@ -455,7 +335,6 @@ class DCP_BD(DeconvolutionAlgorithm):
                 print(f"[DCP-BD] ScreeNOT applied "
                       f"(rank={screenot_info.get('rank', '?')})")
 
-        # ── 3e. ACT curvelet denoising ──────────────────────────────────
         act_info = None
         if self.act_preprocess == 'auto':
             from blinddeconv.algorithms.mod_cython._build_pyd.act_denoise import act_denoise
@@ -471,30 +350,24 @@ class DCP_BD(DeconvolutionAlgorithm):
             if self.verbose:
                 print("[DCP-BD] ACT curvelet denoising applied")
 
-        # ── 3f. Pre-blind spatial denoising ─────────────────────────────
         if self.preprocess not in (None, 'none'):
             yg = self._apply_denoise(
                 yg, self.preprocess, self.preprocess_params, noise_info)
             if self.verbose:
                 print(f"[DCP-BD] Pre-blind denoise: {self.preprocess}")
 
-        # ── 3g. PSD-based noise preprocessing ───────────────────────────
         psd_info = None
         if self.noise_preprocess != 'none':
             yg, psd_info = self._apply_noise_preprocess(yg)
             if self.verbose:
                 print(f"[DCP-BD] PSD noise preprocess: {self.noise_preprocess}")
 
-        # ── 3h. Histogram equalization ──────────────────────────────────
-        # WARNING: full-image equalization breaks the dark channel prior.
-        # Prefer blind_hooks['grad_eq'] for safe per-iteration equalization.
         yg_for_restore = yg
         if self.histogram_eq not in (None, 'none'):
             yg = self._apply_histogram_eq(yg)
             if self.verbose:
                 print(f"[DCP-BD] Histogram equalization: {self.histogram_eq}")
 
-        # ── 4. Blind kernel estimation ──────────────────────────────────
         opts = {
             'kernel_size': self.kernel_size,
             'gamma_correct': self.gamma_correct,
@@ -510,8 +383,6 @@ class DCP_BD(DeconvolutionAlgorithm):
             iteration_callback=self._callback,
         )
 
-        # ── 5. Pre-nonblind denoising ──────────────────────────────────
-        # Use pre-equalization image for non-blind restoration
         y_nb = yg_for_restore
         if self.pre_nonblind not in (None, 'none'):
             y_nb = self._apply_denoise(
@@ -519,7 +390,6 @@ class DCP_BD(DeconvolutionAlgorithm):
             if self.verbose:
                 print(f"[DCP-BD] Pre-nonblind denoise: {self.pre_nonblind}")
 
-        # ── 6. Non-blind restoration ────────────────────────────────────
         if self.final_deconv == 'ringing_removal':
             Latent = ringing_artifacts_removal(
                 y_nb, kernel,
@@ -549,7 +419,6 @@ class DCP_BD(DeconvolutionAlgorithm):
 
         Latent = np.clip(Latent, 0.0, 1.0)
 
-        # ── 7. Output ──────────────────────────────────────────────────
         self.hyperparams = {
             'kernel_size': self.kernel_size,
             'lambda_dark': self.lambda_dark,
@@ -586,11 +455,7 @@ class DCP_BD(DeconvolutionAlgorithm):
         x_final = np.clip(x_final, 0, 255).astype(np.int16)
         return x_final, kernel
 
-    # ═════════════════════════════════════════════════════════════════════
-    # Private helpers
-    # ═════════════════════════════════════════════════════════════════════
 
-    # ── Guided filter (box-filter variant, He et al. 2013) ─────────────
     @staticmethod
     def _guided_filter(I, p, r, eps):
         from scipy.ndimage import uniform_filter
@@ -606,9 +471,11 @@ class DCP_BD(DeconvolutionAlgorithm):
         b = mean_p - a * mean_I
         return box(a) * I + box(b)
 
-    # ── Universal denoiser dispatch ───────────────────────────────────
     def _apply_denoise(self, img, method, params, noise_info):
-        """Apply a spatial denoiser to a single-channel image [0, 1]."""
+        """
+        Применение пространственного фильтра к одноканальному изображению.
+        Поддерживаемые алгоритмы: 'tv', 'nlm', 'bilateral', 'guided', 'bm3d', 'act'.
+        """
         if method is None or method == 'none':
             return img
         p = dict(params or {})
@@ -668,8 +535,8 @@ class DCP_BD(DeconvolutionAlgorithm):
                 f"'tv', 'nlm', 'bilateral', 'guided', 'bm3d', "
                 f"'act', 'none'")
 
-    # ── Noise estimation ─────────────────────────────────────────────
     def _estimate_noise(self, yg):
+        """Оценка параметров шума методами Chen или PCA."""
         if self.noise_estimation == 'chen':
             from blinddeconv.algorithms.mod_cython._build_pyd.chen_noise_estimate import estimate_noise_level
             sigma = estimate_noise_level(yg)
@@ -682,8 +549,8 @@ class DCP_BD(DeconvolutionAlgorithm):
             return result
         return None
 
-    # ── PSD-based noise preprocessing ────────────────────────────────
     def _apply_noise_preprocess(self, yg):
+        """Анализ и фильтрация периодического шума в спектральной области."""
         from blinddeconv.algorithms.mod_cython._build_pyd.noise_psd_analysis import (
             analyze_noise_psd, noise_preprocess,
             notch_filter, bandstop_filter,
@@ -728,11 +595,17 @@ class DCP_BD(DeconvolutionAlgorithm):
                 f"Choose from: 'auto', 'notch', 'bandstop', 'none'")
 
         return yg_out, psd_info
-    # ── LIP-style robust orchestrator (schema A) ──────────────────
+    
     def _orchestrate_robust(self, noise_info):
-        """Adjust orchestrator-managed groups based on estimated noise.
+        """
+        Автоматическая настройка параметров конвейера на основе оценки шума.
 
-        See dcp.py for full docstring.
+        Алгоритм работы:
+        - Режим малого шума (sigma <= sigma_clean): используются оригинальные параметры 
+          без изменений.
+        - Режим сильного шума (sigma > sigma_clean): плавное перераспределение 
+          весов, активация направляющих фильтров, двусторонней фильтрации 
+          или алгоритма BM3D/ACT в зависимости от типа (пуассоновский или гауссовский).
         """
         info = {'triggered': False, 'mode': self.auto_mode}
 
@@ -892,12 +765,12 @@ class DCP_BD(DeconvolutionAlgorithm):
                   f"nb_blend={info['nb_blend_applied']}")
 
         return info
-    # ── Build intra-loop hooks ────────────────────────────────────────
+    
     def _build_blind_hooks(self, noise_info):
-        """Create hook callbacks for the blind deconvolution loop.
-
-        Returns (latent_hook, kernel_hook) — both None if blind_hooks
-        is None or all sub-keys are 'none'.
+        """
+        Формирование функций обратного вызова для внедрения фильтрации внутрь 
+        цикла оценки ядра (подавление шума в скрытом изображении или ядре 
+        на каждой итерации).
         """
         bh = self.blind_hooks
         if bh is None:
@@ -905,7 +778,6 @@ class DCP_BD(DeconvolutionAlgorithm):
 
         sigma = noise_info.get('sigma_norm', None) if noise_info else None
 
-        # ── Latent hook ──────────────────────────────────────────────
         latent_method = bh.get('latent_denoise', 'none')
         latent_params = bh.get('latent_denoise_params', None)
         latent_decay = bh.get('latent_denoise_decay', 1.0)
@@ -916,10 +788,8 @@ class DCP_BD(DeconvolutionAlgorithm):
         if latent_method != 'none' or grad_eq != 'none':
             def _latent_hook(S, k, iter_idx, scale_idx):
                 result = S
-                # 1) Denoise latent
                 if latent_method != 'none':
                     p = dict(latent_params or {})
-                    # Decay denoising strength across iterations
                     if latent_decay < 1.0 and iter_idx > 0:
                         factor = latent_decay ** iter_idx
                         for key in ('weight', 'h', 'sigma_color',
@@ -928,7 +798,6 @@ class DCP_BD(DeconvolutionAlgorithm):
                                 p[key] = p[key] * factor
                     result = self._apply_denoise(
                         result, latent_method, p, noise_info)
-                # 2) Equalize for gradient computation only
                 if grad_eq == 'clahe':
                     from skimage.exposure import equalize_adapthist
                     gp = grad_eq_params or {}
@@ -943,7 +812,6 @@ class DCP_BD(DeconvolutionAlgorithm):
                 return result
             latent_hook = _latent_hook
 
-        # ── Kernel hook ──────────────────────────────────────────────
         kernel_method = bh.get('kernel_smooth', 'none')
         kernel_params = bh.get('kernel_smooth_params', {})
 
@@ -969,8 +837,8 @@ class DCP_BD(DeconvolutionAlgorithm):
 
         return latent_hook, kernel_hook
 
-    # ── Histogram equalization ────────────────────────────────────────
     def _apply_histogram_eq(self, img):
+        """Глобальное или адаптивное выравнивание гистограммы."""
         from skimage.exposure import equalize_adapthist, equalize_hist
         method = self.histogram_eq
         p = self.histogram_eq_params or {}
@@ -989,7 +857,6 @@ class DCP_BD(DeconvolutionAlgorithm):
                 f"Unknown histogram_eq='{method}'. "
                 f"Choose from: 'clahe', 'global', 'none'")
 
-    # ── FFT-based non-blind methods ──────────────────────────────────
     @staticmethod
     def _psf2otf(psf, shape):
         padded = np.zeros(shape, dtype=np.float64)
@@ -1000,6 +867,7 @@ class DCP_BD(DeconvolutionAlgorithm):
         return np.fft.fft2(padded)
 
     def _wiener_filter(self, img, kernel):
+        """Неслепая деконволюция на основе фильтра Винера."""
         nbp = self.nb_params or {}
         noise_snr = nbp.get('noise_snr', 0.01)
         H_otf = self._psf2otf(kernel, img.shape[:2])
@@ -1010,6 +878,7 @@ class DCP_BD(DeconvolutionAlgorithm):
         return result
 
     def _tikhonov_filter(self, img, kernel):
+        """Неслепая деконволюция с регуляризацией Тихонова."""
         nbp = self.nb_params or {}
         alpha = nbp.get('alpha', 0.01)
         H_otf = self._psf2otf(kernel, img.shape[:2])
@@ -1024,7 +893,6 @@ class DCP_BD(DeconvolutionAlgorithm):
         result = np.real(np.fft.ifft2(H_conj * G / denom))
         return result
 
-    # ── Interface methods ────────────────────────────────────────────────
     def get_param(self) -> List[Tuple[str, Any]]:
         return [
             ('kernel_size', self.kernel_size),

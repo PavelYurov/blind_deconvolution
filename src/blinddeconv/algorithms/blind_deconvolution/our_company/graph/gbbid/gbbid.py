@@ -1,26 +1,29 @@
 """
 gbbid.py
 
-Blind Image Deblurring using Graph-Based RGTV Prior (GBBID).
+Слепая деконволюция изображений с использованием графового априорного 
+распределения (Graph-Based RGTV Prior, GBBID).
 
-Reference:
+Основано на методе:
     Y. Bai, G. Cheung, X. Liu, W. Gao:
     "Graph-Based Blind Image Deblurring From a Single Photograph",
     IEEE Transactions on Image Processing, vol. 28, no. 3, pp. 1404-1418, 2019.
 
-Pipeline (mirrors MATLAB graph_blind_main.m):
-    1. Normalise input to float64 [0, 1].
-    2. Convert to grayscale, crop borders.
-    3. Blind kernel estimation via bid_rgtv_c2f_cg (coarse-to-fine RGTV).
-    4. Non-blind restoration via Deconvolution_FHLP (Krishnan & Fergus NIPS 2009).
-    5. Return restored image (int16, [0, 255]) and kernel.
+Конвейер обработки:
+1. Нормализация входного изображения к диапазону float64 [0, 1].
+2. Преобразование в полутоновый формат и обрезка краевых пикселей.
+3. Слепая оценка ядра размытия иерархическим методом (от грубого масштаба 
+   к точному) с использованием регуляризации RGTV.
+4. Неслепое восстановление с использованием гиперлапласовского априорного 
+   распределения (метод FHLP).
+5. Возврат восстановленного изображения (в формате int16 [0, 255]) и 
+   оцененного ядра.
 """
 
 import numpy as np
 import time
 from typing import Tuple, List, Any, Dict
 
-# ── Framework base class import (DO NOT MODIFY) ─────────────────────────────
 import sys
 from pathlib import Path
 
@@ -44,25 +47,25 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
         sys.path.insert(0, _path)
 
 from blinddeconv.algorithms.base import DeconvolutionAlgorithm
-# ─────────────────────────────────────────────────────────────────────────────
 
 from .solvers import bid_rgtv_c2f_cg, Deconvolution_FHLP
 
 
 class GBBID(DeconvolutionAlgorithm):
     """
-    Blind deconvolution using Graph-Based RGTV prior.
+    Алгоритм слепой деконволюции на основе графовой регуляризации RGTV.
 
-    Parameters
-    ----------
-    k_estimate_size : int — estimated blur kernel size (odd).
-                      Default 69 (from graph_blind_main.m).
-    border          : int — number of boundary pixels to crop before
-                      kernel estimation. Default 20.
-    lambda_fhlp     : float — data-fidelity weight for FHLP non-blind
-                      deconvolution. Default 2e3.
-    alpha_fhlp      : float — hyper-Laplacian exponent for FHLP.
-                      Default 0.5.
+    Параметры
+    ---------
+    k_estimate_size : int, по умолчанию 69
+        Ожидаемый пространственный размер оцениваемого ядра размытия (нечетное число).
+    border : int, по умолчанию 20
+        Количество краевых пикселей, обрезаемых перед началом оценки ядра 
+        для снижения влияния граничных артефактов.
+    lambda_fhlp : float, по умолчанию 2e3
+        Вес члена верности данных для этапа неслепой деконволюции FHLP.
+    alpha_fhlp : float, по умолчанию 0.5
+        Экспонента гиперлапласиана для этапа неслепой деконволюции.
     """
 
     def __init__(
@@ -82,16 +85,11 @@ class GBBID(DeconvolutionAlgorithm):
         self.history: Dict[str, list] = {'kernel_diff': []}
         self.hyperparams: Dict[str, Any] = {}
 
-    # ── Main entry point ─────────────────────────────────────────────────
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         start_time = time.time()
-
-        # ── 1. Normalise to float64 [0, 1] ──────────────────────────────
         y = image.astype(np.float64)
         if y.max() > 1.0:
             y /= 255.0
-
-        # ── 2. Grayscale for kernel estimation ──────────────────────────
         if y.ndim == 3 and y.shape[2] == 3:
             yg = 0.2989 * y[:, :, 0] + 0.5870 * y[:, :, 1] + 0.1140 * y[:, :, 2]
         elif y.ndim == 3 and y.shape[2] == 1:
@@ -99,20 +97,15 @@ class GBBID(DeconvolutionAlgorithm):
         else:
             yg = y.copy() if y.ndim == 2 else y[:, :, 0]
 
-        # ── 3. Crop borders ─────────────────────────────────────────────
-        # MATLAB: Y_b(border+1:end-border, border+1:end-border)
         b = self.border
         if b > 0:
             yg_cropped = yg[b:-b, b:-b]
         else:
             yg_cropped = yg
 
-        # ── 4. Blind kernel estimation ──────────────────────────────────
         kernel, _skeleton = bid_rgtv_c2f_cg(
             yg_cropped, self.k_estimate_size, show_intermediate=False)
 
-        # ── 5. Non-blind restoration (FHLP) ────────────────────────────
-        # MATLAB applies FHLP per channel on the FULL (unpadded) image
         if y.ndim == 3:
             Latent = np.zeros_like(y)
             for ch in range(y.shape[2]):
@@ -128,7 +121,6 @@ class GBBID(DeconvolutionAlgorithm):
 
         Latent = np.clip(Latent, 0.0, 1.0)
 
-        # ── 6. Output ──────────────────────────────────────────────────
         self.hyperparams = {
             'k_estimate_size': self.k_estimate_size,
             'border': self.border,
@@ -141,7 +133,6 @@ class GBBID(DeconvolutionAlgorithm):
         x_final = np.clip(x_final, 0, 255).astype(np.int16)
         return x_final, kernel
 
-    # ── Interface methods ────────────────────────────────────────────────
     def get_param(self) -> List[Tuple[str, Any]]:
         return [
             ('k_estimate_size', self.k_estimate_size),

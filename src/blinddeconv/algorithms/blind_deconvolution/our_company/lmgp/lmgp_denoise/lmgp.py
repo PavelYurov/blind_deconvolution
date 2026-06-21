@@ -1,25 +1,31 @@
 """
 lmgp.py
 
-Blind Image Deblurring With Local Maximum Gradient Prior.
+Модуль слепой деконволюции изображений на основе априорной информации
+о локальном максимальном градиенте с интегрированным конвейером 
+робастного шумоподавления и адаптивной оценки параметров.
 
-Reference:
-    L. Chen, F. Fang, T. Wang, G. Zhang:
-    "Blind Image Deblurring With Local Maximum Gradient Prior",
-    CVPR, 2019.
+Основано на методе:
+    L. Chen, F. Fang, T. Wang, G. Zhang: "Blind Image Deblurring
+    With Local Maximum Gradient Prior", CVPR, 2019.
 
-Pipeline (mirrors MATLAB demo_deblurring.m):
-    1. Normalise input to float64 [0, 1].
-    2. Multi-scale blind deconvolution (blind_deconv) on grayscale input.
-    3. Non-blind restoration via ringing_artifacts_removal.
-    4. Return restored image (int16, [0, 255]) and kernel.
+Общий конвейер обработки включает последовательное выполнение следующих этапов:
+1. Предварительное обнаружение и фильтрация импульсного шума.
+2. Слепая оценка дисперсии аддитивного гауссова шума.
+3. Опциональная низкоранговая или кривлет-фильтрация (SVD/ACT) и 
+   пространственное сглаживание до построения пирамиды масштабов.
+4. Спектральная обработка для подавления периодических помех (PSD-фильтрация).
+5. Итеративная многомасштабная слепая деконволюция с промежуточной 
+   регуляризацией градиентов скрытого изображения.
+6. Финальная неслепая деконволюция с использованием алгоритмов минимизации 
+   полной вариации, L0-нормы градиента или адаптивной фильтрации 
+   для подавления краевых артефактов.
 """
 
 import numpy as np
 import time
 from typing import Tuple, List, Any, Dict
 
-# ── Framework base class import (DO NOT MODIFY) ─────────────────────────────
 import sys
 from pathlib import Path
 
@@ -43,7 +49,6 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
         sys.path.insert(0, _path)
 
 from blinddeconv.algorithms.base import DeconvolutionAlgorithm
-# ─────────────────────────────────────────────────────────────────────────────
 
 from .solvers import (
     blind_deconv,
@@ -58,203 +63,100 @@ from .utils import opt_fft_size, wrap_boundary_liu
 
 class LMGP_BD(DeconvolutionAlgorithm):
     """
-    Blind deconvolution using the Local Maximum Gradient Prior (LMGP).
+    Алгоритм слепой деконволюции на основе априорного знания локального
+    максимального градиента с расширенным конвейером робастной оценки.
 
-    Pipeline::
+    Параметры базовой модели
+    ------------------------
+    kernel_size : int, по умолчанию 27
+        Линейный размер квадратного пространственного носителя функции рассеяния точки.
+    lambda_lmg : float, по умолчанию 4e-3
+        Коэффициент регуляризации априорного члена локального максимального градиента.
+    lambda_grad : float, по умолчанию 4e-3
+        Коэффициент регуляризации разреженности градиента скрытого изображения.
+    xk_iter : int, по умолчанию 5
+        Количество итераций попеременной минимизации на каждом масштабном уровне.
+    gamma_correct : float, по умолчанию 1.0
+        Коэффициент степенного преобразования перед оценкой ядра.
+    k_thresh : float, по умолчанию 20.0
+        Порог отсечения малых амплитуд в оцененном ядре размытия.
+    lambda_tv : float, по умолчанию 0.001
+        Вес полной вариации на этапе финального подавления артефактов.
+    lambda_l0 : float, по умолчанию 5e-4
+        Вес L0-нормы градиента на этапе финального подавления артефактов.
+    weight_ring : float, по умолчанию 1.0
+        Коэффициент силы компенсации артефактов звона.
 
-        image ──► impulse removal ──► noise estimation ──► auto_params
-              ──► pre-pyramid denoising (preprocess) ──► PSD filter
-              ──► gamma correction
-              ──► multi-scale blind loop {
-                    L0_LMG_deblur  (lmg_denoise_* denoiser before LMG operator)
-                    threshold_pxpy_v1  (denoise_* denoiser before gradients)
-                    estimate_psf
-                  }
-              ──► non-blind restoration ──► output
+    Параметры фильтрации при оценке градиентов
+    ------------------------------------------
+    denoise_eps : float, опционально
+        Параметр регуляризации для направленного фильтра (guided filter).
+    denoise_radius : int, по умолчанию 2
+        Радиус окна направленного фильтра.
+    ensemble_denoise : bool, по умолчанию False
+        Использование ансамбля направленных фильтров разных радиусов.
+    denoise_type : str, по умолчанию 'guided'
+        Тип пространственного фильтра (guided, bilateral, bm3d, nlm).
+    denoise_bilateral_sigma_s : float, по умолчанию 2.0
+        Пространственное среднеквадратичное отклонение двустороннего фильтра.
+    denoise_bilateral_sigma_r : float, по умолчанию 0.1
+        Амплитудное среднеквадратичное отклонение двустороннего фильтра.
+    denoise_bm3d_sigma : float, по умолчанию 0.01
+        Ожидаемое среднеквадратичное отклонение шума для фильтра BM3D.
+    denoise_nlm_h : float, по умолчанию 0.01
+        Сила сглаживания для фильтра нелокальных средних.
 
-    Parameters
-    ----------
-    kernel_size   : int — spatial support of the unknown PSF (square, odd).
-                    Default 27 (from demo_deblurring.m).
-    lambda_lmg    : float — weight for LMG prior.  Default 4e-3.
-    lambda_grad   : float — weight for L0 gradient prior.  Default 4e-3.
-    xk_iter       : int — blind iterations per pyramid level.  Default 5.
-    gamma_correct : float — gamma correction exponent.  1.0 = off.  Default 1.0.
-    k_thresh      : float — kernel threshold: k[k < max(k)/k_thresh] = 0.
-                    Default 20.
-    lambda_tv     : float — TV weight for ringing_removal non-blind.
-                    Default 0.001.
-    lambda_l0     : float — L0 weight for ringing_removal non-blind.
-                    Default 5e-4.
-    weight_ring   : float — ringing suppression weight (0 = off).  Default 1.0.
+    Параметры фильтрации для оператора локального максимального градиента
+    ---------------------------------------------------------------------
+    lmg_denoise_eps : float, опционально
+        Регуляризация направленного фильтра перед вычислением оператора.
+    lmg_denoise_radius : int, по умолчанию 2
+        Радиус окна направленного фильтра перед вычислением оператора.
+    lmg_denoise_type : str, по умолчанию 'guided'
+        Тип фильтра (guided, bilateral, bm3d, nlm).
+    lmg_bilateral_sigma_s : float, по умолчанию 2.0
+        Пространственное отклонение двустороннего фильтра.
+    lmg_bilateral_sigma_r : float, по умолчанию 0.1
+        Амплитудное отклонение двустороннего фильтра.
+    lmg_bm3d_sigma : float, по умолчанию 0.01
+        Уровень шума для BM3D фильтрации.
+    lmg_nlm_h : float, по умолчанию 0.01
+        Сила сглаживания NLM фильтрации.
 
-    Gradient-thresholding denoiser (threshold_pxpy_v1):
-    denoise_eps   : float or None — guided-filter eps / enable flag.
-                    None = disabled.  Default None.
-    denoise_radius: int — guided-filter radius. Default 2.
-    ensemble_denoise : bool — ensemble of 3 guided filters.  Default False.
-    denoise_type  : str — 'guided' | 'bilateral' | 'bm3d' | 'nlm'.
-                    Default 'guided'.
-    denoise_bilateral_sigma_s : float — bilateral spatial σ.  Default 2.0.
-    denoise_bilateral_sigma_r : float — bilateral range σ.  Default 0.1.
-    denoise_bm3d_sigma : float — BM3D noise σ.  Default 0.01.
-    denoise_nlm_h : float — NLM filter strength.  Default 0.01.
+    Расширенные параметры робастности
+    ---------------------------------
+    grad_smooth_sigma : float, опционально
+        Отклонение гауссова фильтра для сглаживания градиентов.
+    use_soft_threshold : bool, по умолчанию False
+        Использование мягкого отсечения на основе L1-нормы.
+    softmax_tau : float, опционально
+        Температурный параметр для перевода операции локального максимума 
+        в непрерывную функцию (мягкий максимум).
+    kernel_reg_weight : float, по умолчанию 0.0
+        Коэффициент регуляризации Тихонова для матрицы функции рассеяния точки.
 
-    LMG-operator denoiser (L0_LMG_deblur):
-    lmg_denoise_eps   : float or None — guided-filter eps / enable flag.
-                        None = disabled.  Default None.
-    lmg_denoise_radius: int — guided-filter radius.  Default 2.
-    lmg_denoise_type  : str — 'guided' | 'bilateral' | 'bm3d' | 'nlm'.
-                        Default 'guided'.
-    lmg_bilateral_sigma_s : float — bilateral spatial σ.  Default 2.0.
-    lmg_bilateral_sigma_r : float — bilateral range σ.  Default 0.1.
-    lmg_bm3d_sigma : float — BM3D noise σ.  Default 0.01.
-    lmg_nlm_h      : float — NLM filter strength.  Default 0.01.
+    Параметры финального восстановления
+    -----------------------------------
+    nonblind_method : str, по умолчанию 'ringing_removal'
+        Метод финального неслепого восстановления (ringing_removal, tv_adm, 
+        l0, adaptive_lp).
+    nonblind_params : dict, опционально
+        Дополнительные параметры для выбранного метода восстановления.
 
-    Other blind-step noise robustness:
-    grad_smooth_sigma : float or None — Gaussian σ on Bx/By.  Default None.
-    use_soft_threshold : bool — L1 soft thresholding.  Default False.
-    softmax_tau   : float or None — soft-max temperature in Max_matrix.
-                    Default None.
-    kernel_reg_weight : float — Tikhonov regularisation on PSF.  Default 0.0.
-
-    Non-blind (ringing_removal, flat params — default method):
-    use_pmp_nonblind : bool — PMP deblur_tv_pmpr.  Default False.
-    pmp_lambda    : float — PMP prior weight.  Default 0.1.
-    pmp_patch_r   : int — PMP patch size.  Default 3.
-    pmp_quantile  : float — PMP quantile.  Default 0.0.
-
-    Non-blind (alternative methods, via nonblind_method + nonblind_params):
-    nonblind_method : str — 'ringing_removal' (default) | 'tv_adm' | 'l0'
-                      | 'adaptive_lp'.
-    nonblind_params : dict or None — kwargs for non-default methods.
-                      When nonblind_method='ringing_removal', the flat params
-                      above are used and this is ignored.
-                      Examples:
-                        tv_adm:      {'lambda_tv': 2e-3, 'alpha': 1}
-                        l0:          {'lambda_grad': 2e-3, 'kappa': 2.0}
-                        adaptive_lp: {'alpha': 0.8, 'sigma_n': None,
-                                      'two_stage': True}
-
-    Pre-pyramid denoising (applied ONCE to the input image BEFORE the
-    coarse-to-fine blind loop — analogous to GBBID's ``preprocess``):
-    preprocess : str — 'tv' | 'nlm' | 'bilateral' | 'guided' | 'bm3d'
-                 | 'none'.  Default 'none'.
-    preprocess_params : dict or None — denoiser-specific kwargs.
-                        When auto_params=True and noise_estimation != 'none',
-                        missing keys are auto-filled from estimated σ.
-                        Examples:
-                          tv:        {'weight': 0.1}
-                          nlm:       {'h': 0.01, 'patch_size': 5}
-                          bilateral: {'sigma_color': 0.1, 'sigma_space': 5.0}
-                          guided:    {'radius': 4, 'eps': 0.01}
-                          bm3d:      {'sigma': 0.05}
-
-    Noise estimation pipeline:
-    noise_estimation : str — 'pca' | 'chen' | 'none'.  Default 'none'.
-    auto_params   : bool — auto-fill denoiser params from estimated σ.
-                    Only overrides params that are at their default values.
-                    Auto-adapted (when at default):
-                      denoise_eps        : None → σ² × 4
-                      denoise_bm3d_sigma : 0.01 → σ
-                      denoise_nlm_h      : 0.01 → σ
-                      denoise_bilateral_sigma_r : 0.1 → σ × 2
-                      lmg_denoise_eps    : None → σ² × 4
-                      lmg_bm3d_sigma     : 0.01 → σ
-                      lmg_nlm_h          : 0.01 → σ
-                      lmg_bilateral_sigma_r : 0.1 → σ × 2
-                      lambda_tv/lambda_l0/weight_ring (when at default)
-                    NOT auto-adapted (always manual):
-                      kernel_size, lambda_lmg, lambda_grad, xk_iter,
-                      gamma_correct, k_thresh, denoise_radius, denoise_type,
-                      ensemble_denoise, lmg_denoise_radius, lmg_denoise_type,
-                      denoise_bilateral_sigma_s, lmg_bilateral_sigma_s,
-                      grad_smooth_sigma, use_soft_threshold, softmax_tau,
-                      kernel_reg_weight.
-    noise_preprocess : str — 'auto' | 'prewhiten' | 'notch' | 'bandstop'
-                       | 'none'.  Default 'none'.
-    noise_preprocess_params : dict or None.
-    impulse_preprocess : str — 'auto' | 'none'.  Default 'none'.
-    impulse_density_threshold : float — minimum impulse pixel fraction
-                                to trigger removal.  Default 0.0005 (0.05%).
-    impulse_outlier_threshold : float — min diff from local median to
-                                flag a pixel as outlier.  Default 0.08.
-                                Lower → more aggressive detection.
-    impulse_max_window : int — max window size for adaptive median
-                         filter.  Default 7.
-
-    ScreeNOT SVD denoising (applied after noise estimation, before
-    pre-pyramid denoising):
-    screenot_preprocess : str — 'auto' | 'none'.  Default 'none'.
-                          Cannot be 'auto' simultaneously with act_preprocess.
-    screenot_params : dict or None — kwargs for screenot_denoise().
-                      Keys: k (int, default 10), strategy ('i'|'0'),
-                      mode ('full'|'economy'), patch_size (int, 8),
-                      stride (int, 3).
-
-    ACT curvelet denoising (applied after noise estimation, before
-    pre-pyramid denoising; mutually exclusive with screenot_preprocess):
-    act_preprocess : str — 'auto' | 'none'.  Default 'none'.
-    act_params : dict or None — kwargs for act_denoise().
-                 Keys: noise_var (float or None), threshold_setting
-                 ('s'|'h'|'ksigma', default 's').
-                 If noise_var is None AND noise_estimation is enabled,
-                 σ² from Chen/Pyatykh is automatically used instead
-                 of blind MAD (much more accurate for correlated noise).
-
-    Pre-nonblind denoising (applied to y AFTER blind kernel estimation
-    and BEFORE the non-blind step):
-    pre_nonblind : str — 'bm3d'|'nlm'|'bilateral'|'guided'|'tv'|'act'
-                   |'none'.  Default 'none'.  For correlated noise,
-                   'bm3d' is recommended — non-blind methods assume
-                   white noise and produce color artifacts otherwise.
-    pre_nonblind_params : dict or None — kwargs for the denoiser.
-                          bm3d: {'sigma_psd': auto from noise_estimation}
-                          act:  {'noise_var': auto, 'threshold_setting': 's'}
-                          Other: same as preprocess params.
-
-    Histogram equalization (applied ONLY to the grayscale image ``yg``
-    used for blind kernel estimation, right before the coarse-to-fine
-    loop.  The non-blind step operates on the original colour ``y``, so
-    the final intensity distribution is NOT affected by equalization):
-    histogram_eq : str — 'clahe' | 'global' | 'none'.  Default 'none'.
-                   'clahe'  : Contrast-Limited Adaptive Histogram
-                              Equalization (local, recommended).
-                   'global' : standard global histogram equalization.
-    histogram_eq_params : dict or None.
-                   CLAHE:  {'clip_limit': float (default 0.01),
-                            'nbins': int (default 256),
-                            'kernel_size': int or None (default None)}.
-                   Global: no parameters.
-
-    Surgical histogram equalization for KERNEL ESTIMATION only.
-    This is the recommended way to use equalization — it applies the
-    same transformation symmetrically to both the blur-image gradient
-    source (blur_B_tmp) and the latent-image gradient source (S) ONLY
-    inside the kernel-estimation step (estimate_psf).  The latent
-    update (L0_LMG_deblur) and the non-blind restoration operate on
-    the UN-equalized image, so the final intensity distribution is
-    preserved and the linear model B = I*k + n is not broken during
-    deconvolution, only during gradient matching for ``k``.
-    kernel_eq : str — 'clahe' | 'global' | 'none'.  Default 'none'.
-                When enabled with ``auto_params=True`` and a noise σ
-                is estimated, ``lambda_grad`` is typically fine.  If
-                kernel collapses to a point on rich textures, try:
-                   - lambda_grad ↑  (e.g. 8e-3 instead of 4e-3)
-                   - lambda_lmg  ↑  (e.g. 8e-3 instead of 4e-3)
-                   - k_thresh    ↑  (e.g. 40 instead of 20)
-                   - ensemble_denoise=True, denoise_eps=1e-2
-                If kernel is too noisy / not sharp:
-                   - lambda_grad ↓
-                   - grad_smooth_sigma=0.3..0.5
-    kernel_eq_params : dict or None.
-                   CLAHE:  {'clip_limit': float (default 0.003),
-                            'nbins': int (default 256),
-                            'kernel_size': int or None (default None)}.
-                   NOTE: lower ``clip_limit`` (0.001..0.005) is
-                   recommended here to avoid over-amplifying noise
-                   inside the blind loop.
-                   Global: no parameters.
+    Оценка и подавление шума
+    ------------------------
+    noise_estimation : str, по умолчанию 'none'
+        Метод автоматической оценки дисперсии шума (pca, chen, none).
+    auto_params : bool, по умолчанию False
+        Автоматическое переопределение порогов и параметров фильтрации 
+        на основе оцененной дисперсии шума.
+    noise_preprocess : str, по умолчанию 'none'
+        Метод спектрального подавления шума.
+    impulse_preprocess : str, по умолчанию 'none'
+        Метод подавления импульсного шума.
+    auto_mode : str, по умолчанию 'off'
+        Режим работы робастного оркестратора. При значении robust позволяет 
+        алгоритму динамически перестраивать конвейер в зависимости от уровня шума.
     """
 
     def __init__(
@@ -291,13 +193,10 @@ class LMGP_BD(DeconvolutionAlgorithm):
         pmp_lambda: float = 0.1,
         pmp_patch_r: int = 3,
         pmp_quantile: float = 0.0,
-        # ── Non-blind alternative methods ────────────────────
         nonblind_method: str = 'ringing_removal',
         nonblind_params: dict = None,
-        # ── Pre-pyramid denoising ────────────────────────────
         preprocess: str = 'none',
         preprocess_params: dict = None,
-        # ── Noise estimation pipeline ────────────────────────
         noise_estimation: str = 'none',
         auto_params: bool = False,
         noise_preprocess: str = 'none',
@@ -306,33 +205,16 @@ class LMGP_BD(DeconvolutionAlgorithm):
         impulse_density_threshold: float = 0.0005,
         impulse_outlier_threshold: float = 0.08,
         impulse_max_window: int = 7,
-        # ── ScreeNOT / ACT / pre-nonblind ────────────────────
         screenot_preprocess: str = 'none',
         screenot_params: dict = None,
         act_preprocess: str = 'none',
         act_params: dict = None,
         pre_nonblind: str = 'none',
         pre_nonblind_params: dict = None,
-        # ── Histogram equalization (applied to yg before blind) ──
         histogram_eq: str = 'none',
         histogram_eq_params: dict = None,
-        # ── Surgical eq for kernel estimation only (inside blind loop) ─
         kernel_eq: str = 'none',
         kernel_eq_params: dict = None,
-        # ── LIP-style robust orchestrator (schema A) ─────────────
-        # When auto_mode='off' (default) the algorithm behaves
-        # exactly as before — no field is touched.
-        # When auto_mode='robust', after noise estimation the
-        # orchestrator may override (only for the current process()
-        # call) the following 5 groups of fields:
-        #   preprocess / preprocess_params
-        #   pre_nonblind / pre_nonblind_params
-        #   act_preprocess / act_params
-        #   nonblind_method / nonblind_params
-        #   ringing_removal NB weights: lambda_tv, lambda_l0, weight_ring
-        # Paper-tuned core (kernel_size, lambda_lmg, lambda_grad,
-        # xk_iter, gamma_correct, k_thresh, *_denoise_*, etc.) is
-        # never touched.  See _orchestrate_robust() for details.
         auto_mode: str = 'off',
         auto_mode_params: dict = None,
     ):
@@ -393,12 +275,8 @@ class LMGP_BD(DeconvolutionAlgorithm):
         self.kernel_eq = kernel_eq
         self.kernel_eq_params = kernel_eq_params
 
-        # ── Robust orchestrator state ────────────────────────────
         self.auto_mode = auto_mode
         self.auto_mode_params = auto_mode_params
-        # Snapshot user-supplied values for the 5 orchestrator-managed
-        # groups; orchestrator restores from snapshot at every call,
-        # so it stays idempotent across multiple process() runs.
         self._defaults_snapshot = {
             'preprocess':          preprocess,
             'preprocess_params':   preprocess_params,
@@ -418,16 +296,31 @@ class LMGP_BD(DeconvolutionAlgorithm):
         self.history: Dict[str, list] = {'kernel_diff': []}
         self.hyperparams: Dict[str, Any] = {}
 
-    # ── Main entry point ─────────────────────────────────────────────────
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Запуск расширенного конвейера слепой деконволюции.
+
+        Выполняет нормирование, опциональную предварительную фильтрацию,
+        слепую оценку функции рассеяния точки и финальное восстановление
+        резкости изображения.
+
+        Параметры
+        ---------
+        image : np.ndarray
+            Входное искаженное изображение.
+
+        Возвращаемое значение
+        ---------------------
+        Tuple[np.ndarray, np.ndarray]
+            Кортеж, содержащий восстановленное изображение в целочисленном формате
+            и вещественную матрицу оцененного ядра искажения.
+        """
         start_time = time.time()
 
-        # ── 1. Normalise to float64 [0, 1] ──────────────────────────────
         y = image.astype(np.float64)
         if y.max() > 1.0:
             y /= 255.0
 
-        # ── 2. Grayscale for kernel estimation ──────────────────────────
         if y.ndim == 3 and y.shape[2] == 3:
             yg = 0.2989 * y[:, :, 0] + 0.5870 * y[:, :, 1] + 0.1140 * y[:, :, 2]
         elif y.ndim == 3 and y.shape[2] == 1:
@@ -435,7 +328,6 @@ class LMGP_BD(DeconvolutionAlgorithm):
         else:
             yg = y.copy() if y.ndim == 2 else y[:, :, 0]
 
-        # ── 2a. Impulse noise detection & removal ────────────────────────
         impulse_info = None
         if self.impulse_preprocess == 'auto':
             impulse_info = detect_impulse_noise(
@@ -461,21 +353,16 @@ class LMGP_BD(DeconvolutionAlgorithm):
                 else:
                     y = yg.copy()
 
-        # ── 2b. Noise estimation ─────────────────────────────────────────
-        # Robust mode auto-promotes noise_estimation to 'pca' if the
-        # user left it at 'none' (we need σ to make decisions).
         if self.auto_mode == 'robust' and self.noise_estimation == 'none':
             self.noise_estimation = 'pca'
         noise_info = None
         if self.noise_estimation != 'none':
             noise_info = self._estimate_noise(yg)
 
-        # ── 2b½. Robust orchestrator (schema A: clean / heavy) ──────────
         orchestrator_info = None
         if self.auto_mode == 'robust':
             orchestrator_info = self._orchestrate_robust(noise_info)
 
-        # ── 2c. Effective params (auto-adapted or user-specified) ────────
         overrides = {}
         pp_eff = self.preprocess_params
         if self.auto_params and noise_info is not None:
@@ -487,7 +374,6 @@ class LMGP_BD(DeconvolutionAlgorithm):
         def eff(name):
             return overrides[name] if name in overrides else getattr(self, name)
 
-        # ── 2d. ScreeNOT SVD denoising ────────────────────────────────────
         screenot_info = None
         if self.screenot_preprocess == 'auto':
             from blinddeconv.algorithms.mod_denoise.screenot import screenot_denoise
@@ -513,7 +399,6 @@ class LMGP_BD(DeconvolutionAlgorithm):
             else:
                 y = yg.copy()
 
-        # ── 2d¼. ACT curvelet denoising ──────────────────────────────────
         act_info = None
         if self.act_preprocess == 'auto':
             if self.screenot_preprocess == 'auto':
@@ -540,7 +425,6 @@ class LMGP_BD(DeconvolutionAlgorithm):
             else:
                 y = yg.copy()
 
-        # ── 2d½. Pre-pyramid denoising ───────────────────────────────────
         if self.preprocess not in (None, 'none'):
             yg = self._apply_preprocess(yg, pp_eff)
             if y.ndim == 3:
@@ -549,19 +433,13 @@ class LMGP_BD(DeconvolutionAlgorithm):
             else:
                 y = yg.copy()
 
-        # ── 2e. PSD-based noise preprocessing ────────────────────────────
         psd_info = None
         if self.noise_preprocess != 'none':
             yg, psd_info = self._apply_noise_preprocess(yg)
 
-        # ── 2f. Histogram equalization (yg only — improves kernel est.) ─
-        # Applied only to the grayscale image used for blind kernel
-        # estimation.  The non-blind step operates on the original y,
-        # so we do not need to preserve a pre-eq copy.
         if self.histogram_eq not in (None, 'none'):
             yg = self._apply_histogram_eq(yg)
 
-        # ── 3. Blind kernel estimation ──────────────────────────────────
         opts = {
             'kernel_size': self.kernel_size,
             'gamma_correct': self.gamma_correct,
@@ -586,7 +464,6 @@ class LMGP_BD(DeconvolutionAlgorithm):
             'use_soft_threshold': self.use_soft_threshold,
             'softmax_tau': self.softmax_tau,
             'kernel_reg_weight': self.kernel_reg_weight,
-            # Surgical histogram eq for kernel estimation only.
             'kernel_eq': self.kernel_eq,
             'kernel_eq_params': self.kernel_eq_params,
         }
@@ -596,11 +473,9 @@ class LMGP_BD(DeconvolutionAlgorithm):
             iteration_callback=self._callback,
         )
 
-        # ── 3½. Pre-nonblind denoising ────────────────────────────────
         if self.pre_nonblind not in (None, 'none'):
             y = self._apply_pre_nonblind(y, noise_info)
 
-        # ── 4. Non-blind restoration ────────────────────────────────────
         if self.nonblind_method == 'ringing_removal':
             if y.ndim == 3:
                 Latent = np.zeros_like(y)
@@ -633,7 +508,6 @@ class LMGP_BD(DeconvolutionAlgorithm):
 
         Latent = np.clip(Latent, 0.0, 1.0)
 
-        # ── 5. Output ──────────────────────────────────────────────────
         self.hyperparams = {
             'kernel_size': self.kernel_size,
             'lambda_lmg': self.lambda_lmg,
@@ -681,9 +555,10 @@ class LMGP_BD(DeconvolutionAlgorithm):
         x_final = np.clip(x_final, 0, 255).astype(np.int16)
         return x_final, kernel
 
-    # ── Non-blind dispatch (alternative methods) ─────────────────────────
     def _nonblind_single(self, y_ch, kernel, method, params):
-        """Run non-blind deconvolution for non-default methods."""
+        """
+        Выполнение финальной деконволюции для выбранного альтернативного метода.
+        """
         if method == 'tv_adm':
             H, W = y_ch.shape
             target_size = opt_fft_size(
@@ -711,15 +586,10 @@ class LMGP_BD(DeconvolutionAlgorithm):
                 f"Choose from: 'ringing_removal', 'tv_adm', 'l0', "
                 f"'adaptive_lp'")
 
-    # ── Pre-nonblind denoising ────────────────────────────────────────────
     def _apply_pre_nonblind(self, y, noise_info):
-        """Denoise y before non-blind deconvolution.
-
-        Non-blind methods (ringing_removal / TV-ADM / L0) assume white
-        Gaussian noise.  Correlated noise (1/f, 1/f²) violates this and
-        causes structured artifacts ('wrong colors', ringing amplification).
-
-        Applying a denoiser to y here suppresses the correlated component.
+        """
+        Применение пространственной фильтрации перед этапом неслепой деконволюции.
+        Подавляет коррелированный шум для предотвращения структурированных артефактов.
         """
         method = self.pre_nonblind
         params = dict(self.pre_nonblind_params or {})
@@ -744,7 +614,6 @@ class LMGP_BD(DeconvolutionAlgorithm):
                                    threshold_setting=ts)
             return y
 
-        # For standard denoisers, build kwargs for _apply_preprocess.
         if method == 'bm3d':
             if 'sigma' not in params and sigma is not None:
                 params['sigma'] = sigma
@@ -758,7 +627,6 @@ class LMGP_BD(DeconvolutionAlgorithm):
             if 'eps' not in params and sigma is not None:
                 params['eps'] = sigma ** 2 * 4
 
-        # Temporarily switch self.preprocess to route through _apply_preprocess
         saved = self.preprocess
         self.preprocess = method
         try:
@@ -771,24 +639,10 @@ class LMGP_BD(DeconvolutionAlgorithm):
             self.preprocess = saved
         return y
 
-    # ── Histogram equalization ────────────────────────────────────────
     def _apply_histogram_eq(self, img):
-        """Apply histogram equalization to a [0, 1] grayscale image.
-
-        Used BEFORE the blind step to enhance contrast and make salient
-        edges more prominent for kernel estimation.  Only the grayscale
-        image ``yg`` is equalized; the colour ``y`` fed to the non-blind
-        step is untouched, so the final intensity distribution is
-        preserved.
-
-        Options
-        -------
-        'clahe'  : Contrast-Limited Adaptive Histogram Equalization
-                   (recommended — local, avoids over-amplification).
-                   Params: {'clip_limit': float (default 0.01),
-                            'nbins': int (default 256),
-                            'kernel_size': int or None (default None)}.
-        'global' : standard global histogram equalization (no params).
+        """
+        Применение эквализации гистограммы к полутоновому изображению
+        для усиления контраста структурных элементов.
         """
         from skimage.exposure import equalize_adapthist, equalize_hist
         method = self.histogram_eq
@@ -808,9 +662,10 @@ class LMGP_BD(DeconvolutionAlgorithm):
                 f"Unknown histogram_eq='{method}'. "
                 f"Choose from: 'clahe', 'global', 'none'")
 
-    # ── PSD-based noise preprocessing ────────────────────────────────────
     def _apply_noise_preprocess(self, yg):
-        """Analyze noise PSD and apply spectral filtering."""
+        """
+        Оценка спектральной плотности мощности шума и фильтрация периодических помех.
+        """
         from blinddeconv.algorithms.mod_denoise.noise_psd_analysis import (
             analyze_noise_psd, noise_preprocess,
             prewhiten, notch_filter, bandstop_filter,
@@ -864,27 +719,18 @@ class LMGP_BD(DeconvolutionAlgorithm):
 
         return yg_out, psd_info
 
-    # ── Robust orchestrator (LIP-style schema A) ─────────────────────────
     def _orchestrate_robust(self, noise_info):
-        """σ-driven decision for the 5 orchestrator-managed groups.
+        """
+        Динамическое управление параметрами конвейера на основе оценки уровня шума.
 
-        Strategy
-        --------
-        Always restore from snapshot first (idempotent across calls).
-        Two branches:
-          * clean  (σ ≤ σ_clean and not poisson-like-forced) →
-                   keep user defaults untouched, only return info.
-          * heavy  (σ > σ_clean, OR poisson-like with σ > force_heavy_sigma):
-                   override preprocess / pre_nonblind / act_preprocess and
-                   blend ringing_removal NB weights between snapshot
-                   (clean target) and σ-scaled "noisy" target.
-
-        Returns dict with the decisions made (for hyperparams logging).
-        Never raises; if noise_info is None, behaves as clean.
+        Стратегия: восстанавливает параметры из исходного состояния для идемпотентности.
+        При превышении заданного порога шума активируются жесткие методы
+        предварительной фильтрации (например, кривлет-преобразование или BM3D),
+        а веса регуляризаторов финальной деконволюции масштабируются пропорционально
+        оцененной дисперсии для предотвращения роста артефактов.
         """
         snap = self._defaults_snapshot
 
-        # Always restore snapshot first → idempotent.
         self.preprocess          = snap['preprocess']
         self.preprocess_params   = snap['preprocess_params']
         self.pre_nonblind        = snap['pre_nonblind']
@@ -911,7 +757,6 @@ class LMGP_BD(DeconvolutionAlgorithm):
         force_sigma = float(p.get('force_heavy_sigma', 0.01))
         prefer_act_gauss = bool(p.get('prefer_act_for_gaussian', False))
 
-        # Decide branch.
         heavy = (sigma > sigma_clean) or (poisson_like and sigma > force_sigma)
         if not heavy:
             return {
@@ -920,8 +765,6 @@ class LMGP_BD(DeconvolutionAlgorithm):
                 'sigma_clean': sigma_clean,
             }
 
-        # Heavy branch ----------------------------------------------------
-        # Blend weight w in [0, 1] for NB-weight interpolation.
         denom = max(sigma_heavy - sigma_clean, 1e-9)
         w = max(0.0, min(1.0, (sigma - sigma_clean) / denom))
 
@@ -936,8 +779,6 @@ class LMGP_BD(DeconvolutionAlgorithm):
         use_act_branch = poisson_like or prefer_act_gauss
 
         if use_act_branch:
-            # ACT handles correlated / signal-dependent noise robustly.
-            # Disable spatial preprocess to avoid double-denoising.
             self.preprocess          = 'none'
             self.preprocess_params   = None
             self.act_preprocess      = 'auto'
@@ -952,7 +793,6 @@ class LMGP_BD(DeconvolutionAlgorithm):
             }
             decisions['route'] = 'act'
         else:
-            # Pure Gaussian heavy branch.
             self.act_preprocess = 'none'
             self.act_params     = None
             if w < 0.6:
@@ -971,9 +811,6 @@ class LMGP_BD(DeconvolutionAlgorithm):
                 self.pre_nonblind_params = {'sigma': sigma * 1.5}
                 decisions['route'] = 'gauss_strong'
 
-        # Blend ringing_removal NB weights between snapshot (clean
-        # target) and a σ-scaled "noisy" target.  Only meaningful for
-        # the default ringing_removal non-blind method.
         if self.nonblind_method == 'ringing_removal':
             base = snap['nb_params']
             noisy = {
@@ -999,9 +836,10 @@ class LMGP_BD(DeconvolutionAlgorithm):
 
         return decisions
 
-    # ── Noise estimation ─────────────────────────────────────────────────
     def _estimate_noise(self, yg):
-        """Estimate noise level from grayscale image (float64 [0, 1])."""
+        """
+        Оценка уровня дисперсии шума из полутонового изображения.
+        """
         if self.noise_estimation == 'chen':
             from blinddeconv.algorithms.mod_denoise.chen_noise_estimate import estimate_noise_level
             sigma = estimate_noise_level(yg)
@@ -1014,20 +852,15 @@ class LMGP_BD(DeconvolutionAlgorithm):
             return result
         return None
 
-    # ── Auto-adaptive parameters ─────────────────────────────────────────
     def _compute_adaptive_params(self, sigma):
-        """Return dict of param overrides based on estimated noise σ
-        (in [0,1] scale).  Only overrides params left at their default
-        values — user-specified values are never touched.
-
-        Does NOT mutate self.* — returns a dict of overrides applied
-        via eff() in process().
+        """
+        Вычисление словаря переопределяемых параметров на основе оценки шума.
+        Изменяются только те параметры, которые оставлены в значениях по умолчанию.
         """
         overrides = {}
         if sigma < 1e-6:
             return overrides
 
-        # ── Grad denoiser ────────────────────────────────────────────────
         if self.denoise_eps is None:
             overrides['denoise_eps'] = sigma ** 2 * 4
         if self.denoise_bm3d_sigma == 0.01:
@@ -1037,7 +870,6 @@ class LMGP_BD(DeconvolutionAlgorithm):
         if self.denoise_bilateral_sigma_r == 0.1:
             overrides['denoise_bilateral_sigma_r'] = sigma * 2
 
-        # ── LMG denoiser ─────────────────────────────────────────────────
         if self.lmg_denoise_eps is None:
             overrides['lmg_denoise_eps'] = sigma ** 2 * 4
         if self.lmg_bm3d_sigma == 0.01:
@@ -1047,7 +879,6 @@ class LMGP_BD(DeconvolutionAlgorithm):
         if self.lmg_bilateral_sigma_r == 0.1:
             overrides['lmg_bilateral_sigma_r'] = sigma * 2
 
-        # ── Non-blind (ringing_removal flat params) ──────────────────────
         if self.nonblind_method == 'ringing_removal':
             if self.lambda_tv == 0.001:
                 overrides['lambda_tv'] = sigma * 0.5
@@ -1058,18 +889,10 @@ class LMGP_BD(DeconvolutionAlgorithm):
 
         return overrides
 
-    # ── Pre-pyramid denoising ────────────────────────────────────────────
     def _apply_preprocess(self, img, params=None):
-        """Apply spatial denoiser to image before blind deconvolution.
-
-        Parameters
-        ----------
-        img : ndarray, H×W, float64 [0, 1]
-        params : dict or None — denoiser-specific parameters.
-
-        Returns
-        -------
-        denoised : ndarray, H×W, float64 [0, 1]
+        """
+        Применение пространственного фильтра к изображению перед началом
+        итеративной слепой деконволюции.
         """
         method = self.preprocess
         if method is None or method == 'none':
@@ -1121,10 +944,9 @@ class LMGP_BD(DeconvolutionAlgorithm):
                 f"'bm3d', 'none'")
 
     def _adapt_preprocess_params(self, sigma):
-        """Auto-fill preprocess_params based on estimated noise σ ([0,1]).
-
-        Only fills keys not already specified by the user.
-        Returns a new dict (does not mutate self.preprocess_params).
+        """
+        Автоматическое заполнение словаря параметров предварительной фильтрации
+        на основе оцененной дисперсии шума.
         """
         pp = dict(self.preprocess_params) if self.preprocess_params else {}
         m = self.preprocess
@@ -1147,7 +969,6 @@ class LMGP_BD(DeconvolutionAlgorithm):
 
         return pp
 
-    # ── Interface methods ────────────────────────────────────────────────
     def get_param(self) -> List[Tuple[str, Any]]:
         return [
             ('kernel_size', self.kernel_size),

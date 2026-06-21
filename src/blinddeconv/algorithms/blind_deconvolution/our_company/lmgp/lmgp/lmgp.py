@@ -1,25 +1,31 @@
 """
 lmgp.py
 
-Blind Image Deblurring With Local Maximum Gradient Prior.
+Модуль слепой деконволюции изображений на основе априорной информации
+о локальном максимальном градиенте (Local Maximum Gradient Prior, LMGP).
 
-Reference:
-    L. Chen, F. Fang, T. Wang, G. Zhang:
-    "Blind Image Deblurring With Local Maximum Gradient Prior",
-    CVPR, 2019.
+Математическая модель опирается на свойство процесса свертки, при котором
+максимальное значение градиента внутри любого локального паттерна
+искаженного изображения строго меньше аналогичного значения для исходного.
 
-Pipeline (mirrors MATLAB demo_deblurring.m):
-    1. Normalise input to float64 [0, 1].
-    2. Multi-scale blind deconvolution (blind_deconv) on grayscale input.
-    3. Non-blind restoration via ringing_artifacts_removal.
-    4. Return restored image (int16, [0, 255]) and kernel.
+Теоретическое обоснование и вывод оптимизационного функционала описаны в:
+L. Chen, F. Fang, T. Wang, G. Zhang: Blind Image Deblurring With Local
+Maximum Gradient Prior, CVPR, 2019.
+
+Общий конвейер восстановления включает:
+1. Нормализацию динамического диапазона входного сигнала к отрезку [0.0, 1.0].
+2. Формирование одноканальной матрицы яркости по стандарту ITU-R BT.601
+   для устойчивой оценки ядра искажения.
+3. Итеративную оценку матрицы ядра размытия в пространстве масштабной пирамиды.
+4. Финальную неслепую деконволюцию исходного изображения с подавлением
+   пространственных артефактов (эффекта звона).
+5. Масштабирование восстановленного сигнала обратно в целочисленный формат.
 """
 
 import numpy as np
 import time
 from typing import Tuple, List, Any, Dict
 
-# ── Framework base class import (DO NOT MODIFY) ─────────────────────────────
 import sys
 from pathlib import Path
 
@@ -43,36 +49,46 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
         sys.path.insert(0, _path)
 
 from blinddeconv.algorithms.base import DeconvolutionAlgorithm
-# ─────────────────────────────────────────────────────────────────────────────
 
 from .solvers import blind_deconv, ringing_artifacts_removal
 
 
 class LMGP_BD(DeconvolutionAlgorithm):
     """
-    Blind deconvolution using the Local Maximum Gradient Prior (LMGP).
+    Алгоритм слепой деконволюции на основе априорного знания локального
+    максимального градиента.
 
-    Parameters
-    ----------
-    kernel_size   : int — spatial support of the unknown PSF (square, odd).
-                    Default 27 (from demo_deblurring.m).
-    lambda_lmg    : float — weight for LMG prior.
-                    Default 4e-3.
-    lambda_grad   : float — weight for L0 gradient prior.
-                    Default 4e-3.
-    xk_iter       : int — number of blind iterations per pyramid level.
-                    Default 5.
-    gamma_correct : float — gamma correction exponent applied before
-                    kernel estimation.  1.0 = no correction.  Default 1.0.
-    k_thresh      : float — final kernel threshold.
-                    kernel values < max(k)/k_thresh are zeroed.
-                    Default 20.
-    lambda_tv     : float — weight for TV non-blind deconvolution.
-                    Default 0.001.
-    lambda_l0     : float — weight for L0 non-blind deconvolution.
-                    Default 5e-4.
-    weight_ring   : float — ringing suppression weight (0 = no suppression).
-                    Default 1.0.
+    Целевой минимизируемый функционал:
+    E(I, K) = ||I * K - B||_2^2 + beta * ||2 - LMG(I)||_1 + gamma * ||nabla I||_0 + tau * ||K||_2^2
+
+    Параметры
+    ---------
+    kernel_size : int, по умолчанию 27
+        Линейный размер квадратного пространственного носителя функции рассеяния
+        точки. Значение должно быть нечетным числом.
+    lambda_lmg : float, по умолчанию 4e-3
+        Коэффициент регуляризации априорного члена LMG. Соответствует параметру
+        beta в математической модели.
+    lambda_grad : float, по умолчанию 4e-3
+        Коэффициент L0-регуляризации разреженности градиента скрытого
+        изображения. Соответствует параметру gamma в математической модели.
+    xk_iter : int, по умолчанию 5
+        Количество итераций попеременной минимизации на каждом уровне
+        масштабной пирамиды.
+    gamma_correct : float, по умолчанию 1.0
+        Коэффициент предварительного степенного преобразования сигнала
+        перед оценкой ядра. Значение 1.0 эквивалентно линейному тракту.
+    k_thresh : float, по умолчанию 20.0
+        Жесткий порог отсечения шума в оцененном ядре. Элементы матрицы ядра,
+        значения которых меньше максимального элемента, деленного на данный порог,
+        принудительно обнуляются.
+    lambda_tv : float, по умолчанию 0.001
+        Вес полной вариации на этапе финальной неслепой деконволюции.
+    lambda_l0 : float, по умолчанию 5e-4
+        Вес L0-нормы градиента на этапе финальной неслепой деконволюции.
+    weight_ring : float, по умолчанию 1.0
+        Коэффициент силы подавления краевых эффектов звона. Значение 0.0
+        соответствует полному отключению алгоритма подавления.
     """
 
     def __init__(
@@ -102,17 +118,23 @@ class LMGP_BD(DeconvolutionAlgorithm):
         self.history: Dict[str, list] = {'kernel_diff': []}
         self.hyperparams: Dict[str, Any] = {}
 
-    # ── Main entry point ─────────────────────────────────────────────────
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Запуск алгоритма слепой деконволюции.
+
+        Возвращает
+        ----------
+        x_final : ndarray
+            Восстановленное изображение в формате int16 [0, 255].
+        kernel : ndarray
+            Оцененное ядро размытия.
+        """
         start_time = time.time()
 
-        # ── 1. Normalise to float64 [0, 1] ──────────────────────────────
         y = image.astype(np.float64)
         if y.max() > 1.0:
             y /= 255.0
 
-        # ── 2. Grayscale for kernel estimation ──────────────────────────
-        # MATLAB: yg = im2double(rgb2gray(y))
         if y.ndim == 3 and y.shape[2] == 3:
             yg = 0.2989 * y[:, :, 0] + 0.5870 * y[:, :, 1] + 0.1140 * y[:, :, 2]
         elif y.ndim == 3 and y.shape[2] == 1:
@@ -120,8 +142,6 @@ class LMGP_BD(DeconvolutionAlgorithm):
         else:
             yg = y.copy() if y.ndim == 2 else y[:, :, 0]
 
-        # ── 3. Blind kernel estimation ──────────────────────────────────
-        # MATLAB: [kernel, interim_latent] = blind_deconv(yg, lambda_lmg, lambda_grad, opts)
         opts = {
             'kernel_size': self.kernel_size,
             'gamma_correct': self.gamma_correct,
@@ -133,14 +153,11 @@ class LMGP_BD(DeconvolutionAlgorithm):
             yg, self.lambda_lmg, self.lambda_grad, opts,
         )
 
-        # ── 4. Non-blind restoration ────────────────────────────────────
-        # MATLAB: Latent = ringing_artifacts_removal(y, kernel, lambda_tv, lambda_l0, weight_ring)
         Latent = ringing_artifacts_removal(
             y, kernel, self.lambda_tv, self.lambda_l0, self.weight_ring
         )
         Latent = np.clip(Latent, 0.0, 1.0)
 
-        # ── 5. Output ──────────────────────────────────────────────────
         self.hyperparams = {
             'kernel_size': self.kernel_size,
             'lambda_lmg': self.lambda_lmg,
@@ -155,7 +172,6 @@ class LMGP_BD(DeconvolutionAlgorithm):
         x_final = np.clip(x_final, 0, 255).astype(np.int16)
         return x_final, kernel
 
-    # ── Interface methods ────────────────────────────────────────────────
     def get_param(self) -> List[Tuple[str, Any]]:
         return [
             ('kernel_size', self.kernel_size),

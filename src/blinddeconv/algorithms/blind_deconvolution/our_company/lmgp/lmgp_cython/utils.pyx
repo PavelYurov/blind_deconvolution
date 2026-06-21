@@ -2,6 +2,21 @@
 # cython: boundscheck=False
 # cython: wraparound=False
 # cython: cdivision=True
+"""
+utils.py
+
+Вспомогательные функции и операторы для алгоритмов слепой деконволюции 
+с расширенными методами пространственной фильтрации.
+
+Основано на методе:
+    L. Chen, F. Fang, T. Wang, G. Zhang: "Blind Image Deblurring
+    With Local Maximum Gradient Prior", CVPR, 2019.
+
+Модуль включает поддержку направленной (guided), двусторонней (bilateral), 
+нелокальной (NLM) и блочной (BM3D) фильтрации. Оператор поиска локального 
+максимума расширен опциональной поддержкой гладкого вероятностного взвешивания 
+через функцию softmax.
+"""
 
 import numpy as np
 cimport numpy as cnp
@@ -19,6 +34,9 @@ except ImportError:
     _HAS_BM3D = False
 
 def psf2otf(psf, shape):
+    """
+    Преобразование функции рассеяния точки в оптическую передаточную функцию.
+    """
     if np.all(psf == 0):
         return np.zeros(shape, dtype=np.complex128)
     in_h, in_w = psf.shape
@@ -29,6 +47,9 @@ def psf2otf(psf, shape):
     return np.fft.fft2(padded)
 
 def otf2psf(otf, psf_size):
+    """
+    Преобразование оптической передаточной функции в функцию рассеяния точки.
+    """
     full = np.real(np.fft.ifft2(otf))
     ph, pw = psf_size
     full = np.roll(full, ph // 2, axis=0)
@@ -38,6 +59,10 @@ def otf2psf(otf, psf_size):
 _OPT_FFT_LUT = None
 
 def _build_opt_fft_lut(lut_size: int = 4096):
+    """
+    Построение таблицы оптимальных размеров для быстрого преобразования Фурье.
+    Оптимальными считаются размеры, факторизуемые малыми простыми числами.
+    """
     lut = np.zeros(lut_size + 1, dtype=np.int64)
     e2 = 1
     while e2 <= lut_size:
@@ -61,6 +86,9 @@ def _build_opt_fft_lut(lut_size: int = 4096):
     return lut
 
 def opt_fft_size(n):
+    """
+    Вычисление оптимального размера массива для быстрого преобразования Фурье.
+    """
     global _OPT_FFT_LUT
     if _OPT_FFT_LUT is None: _OPT_FFT_LUT = _build_opt_fft_lut()
     n = np.asarray(n, dtype=np.int64)
@@ -74,6 +102,10 @@ def opt_fft_size(n):
     return int(m.flat[0]) if scalar_input else m
 
 def _solve_min_laplacian(boundary_image):
+    """
+    Решение уравнения Лапласа с граничными условиями Дирихле на основе
+    дискретного синусного преобразования первого типа.
+    """
     H, W = boundary_image.shape
     boundary_image = boundary_image.copy()
     boundary_image[1:-1, 1:-1] = 0.0
@@ -91,6 +123,9 @@ def _solve_min_laplacian(boundary_image):
     return img_direct
 
 def wrap_boundary_liu(img, img_size):
+    """
+    Круговое сглаживание границ изображения для Фурье-деконволюции.
+    """
     if img.ndim == 2: img = img[:, :, np.newaxis]
     H, W, Ch = img.shape
     H_out, W_out = int(img_size[0]), int(img_size[1])
@@ -119,6 +154,9 @@ def wrap_boundary_liu(img, img_size):
     return ret[:, :, 0] if ret.shape[2] == 1 else ret
 
 def conjgrad(x, b, max_it, tol, ax_func, func_param):
+    """
+    Метод сопряженных градиентов для решения систем линейных уравнений.
+    """
     x = x.copy()
     r = b - ax_func(x, func_param)
     p = r.copy()
@@ -137,13 +175,12 @@ def conjgrad(x, b, max_it, tol, ax_func, func_param):
     return x
 
 def _matlab_round(x):
-    # MATLAB ``round`` is round-half-away-from-zero; Python's built-in
-    # ``round`` is banker's rounding (round-half-to-even).  For shifts
-    # of exactly 0.5 these differ by 1 pixel which propagates through
-    # the whole pyramid and destroys PSNR/SSIM.
     return int(np.floor(np.abs(x) + 0.5) * np.sign(x)) if x != 0 else 0
 
 def adjust_psf_center(psf):
+    """
+    Центрирование функции рассеяния точки.
+    """
     rows, cols = psf.shape
     X, Y = np.meshgrid(np.arange(1, cols + 1, dtype=np.float64), np.arange(1, rows + 1, dtype=np.float64))
     if np.sum(psf) == 0: return psf
@@ -153,6 +190,9 @@ def adjust_psf_center(psf):
     return map_coordinates(psf, [out_rows - yshift, out_cols - xshift], order=1, mode='constant', cval=0.0).reshape(rows, cols)
 
 def _histc(data, edges):
+    """
+    Построение гистограммы распределения значений по заданным границам корзин.
+    """
     indices = np.searchsorted(edges, data, side='right') - 1
     indices[data == edges[-1]] = len(edges) - 1
     indices[indices < 0] = len(edges)
@@ -160,6 +200,29 @@ def _histc(data, edges):
     return np.bincount(indices, minlength=len(edges) + 1)[:len(edges)]
 
 def guided_filter(I, p, radius, eps):
+    """
+    Направленный (guided) фильтр с сохранением границ.
+
+    Выполняет сглаживание изображения p, используя опорное изображение I.
+    Для подавления шума в самом изображении используется режим самонаправленности
+    (I совпадает с p).
+
+    Параметры
+    ---------
+    I : ndarray
+        Опорное изображение.
+    p : ndarray
+        Фильтруемое изображение.
+    radius : int
+        Радиус локального окна фильтра.
+    eps : float
+        Коэффициент регуляризации.
+
+    Возвращаемое значение
+    ---------------------
+    q : ndarray
+        Отфильтрованное изображение.
+    """
     ksize = 2 * radius + 1
     mean_I = uniform_filter(I.astype(np.float64), size=ksize, mode='reflect')
     mean_p = uniform_filter(p.astype(np.float64), size=ksize, mode='reflect')
@@ -171,6 +234,13 @@ def guided_filter(I, p, radius, eps):
     return mean_a * I + mean_b
 
 def threshold_pxpy_v1(latent, psf_size, threshold=None, denoise_eps=None, denoise_radius=2, ensemble_denoise=False, denoise_type='guided', bilateral_sigma_s=2.0, bilateral_sigma_r=0.1, bm3d_sigma=0.01, nlm_h=0.01):
+    """
+    Адаптивное пороговое отсечение шумовых градиентов изображения с 
+    предварительной пространственной фильтрацией.
+
+    Перед вычислением производных к изображению применяется выбранный метод
+    шумоподавления для стабилизации оценки в зашумленных областях.
+    """
     b_estimate_threshold = threshold is None
     if b_estimate_threshold: threshold = 0.0
 
@@ -210,20 +280,32 @@ def threshold_pxpy_v1(latent, psf_size, threshold=None, denoise_eps=None, denois
     return px, py, threshold
 
 def nlm_filter(img, h=0.01, patch_size=5, patch_distance=6):
+    """
+    Подавление шума с использованием алгоритма нелокальных средних (NLM).
+    """
     sigma_est = max(estimate_sigma(img), 1e-8)
     return denoise_nl_means(img, h=h * sigma_est / 0.01, sigma=sigma_est, patch_size=patch_size, patch_distance=patch_distance, fast_mode=True)
 
 def bm3d_filter(img, sigma_psd=0.01):
+    """
+    Блочная фильтрация с трехмерным преобразованием (BM3D).
+    """
     if not _HAS_BM3D: raise ImportError("bm3d package is not installed.")
     return _bm3d_mod.bm3d(img, sigma_psd=sigma_psd)
 
 def _fspecial_gaussian(size, sigma):
+    """
+    Генерация двумерного гауссова фильтра.
+    """
     radius = (size - 1) / 2.0
     y, x = np.mgrid[-radius:radius + 1, -radius:radius + 1]
     g = np.exp(-(x * x + y * y) / (2.0 * sigma * sigma))
     return g / g.sum()
 
 def bilateral_filter(img, sigma_s, sigma):
+    """
+    Двусторонняя фильтрация изображения с сохранением границ.
+    """
     if img.ndim == 2: img = img[:, :, np.newaxis]
     was_2d = img.shape[2] == 1
     h, w, d = img.shape
@@ -242,6 +324,31 @@ def bilateral_filter(img, sigma_s, sigma):
     return r_img[:, :, 0] if was_2d else r_img
 
 def find_min_pixels(I, patch_size, quantile=0.0):
+    """
+    Поиск минимальных пикселей в неперекрывающихся паттернах.
+
+    При значении параметра quantile больше нуля осуществляется выбор
+    значения, соответствующего заданному квантилю, что обеспечивает
+    устойчивость алгоритма к экстремальным импульсным выбросам.
+
+    Параметры
+    ---------
+    I : ndarray
+        Полутоновое изображение.
+    patch_size : int
+        Размер стороны квадратного паттерна.
+    quantile : float
+        Уровень квантиля в диапазоне [0, 1). Значение 0 эквивалентно
+        выбору абсолютного минимума.
+
+    Возвращаемое значение
+    ---------------------
+    J : ndarray
+        Разреженное изображение, содержащее найденные значения в 
+        соответствующих координатах.
+    Mask : ndarray
+        Бинарная маска позиций минимальных значений.
+    """
     M, N = I.shape
     Mp, Np = int(np.ceil(M / patch_size)), int(np.ceil(N / patch_size))
     J, Mask = np.zeros((M, N), dtype=np.float64), np.zeros((M, N), dtype=np.float64)
@@ -260,6 +367,9 @@ def find_min_pixels(I, patch_size, quantile=0.0):
     return J, Mask
 
 def gen_partialmat(im_row, im_col):
+    """
+    Генерация разреженных матриц операторов частных производных.
+    """
     M, N = im_row, im_col
     n = M * N
     all_inds = np.arange(n, dtype=np.int64)
@@ -281,16 +391,39 @@ def gen_partialmat(im_row, im_col):
     return px_mat, py_mat
 
 def Abs_matrix(I):
+    """
+    Построение разреженной диагональной матрицы знаков элементов.
+    """
     with np.errstate(divide='ignore', invalid='ignore'): abs_I = np.abs(I) / I
     abs_I = np.where(np.isfinite(abs_I), abs_I, 1.0)
     diag_vals = abs_I.flatten(order='F')
     return sparse.diags(diag_vals, 0, shape=(diag_vals.size, diag_vals.size), format='csr')
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 1. C-ОПТИМИЗИРОВАННАЯ ФУНКЦИЯ MAX_MATRIX
-# ─────────────────────────────────────────────────────────────────────────────
 
 def Max_matrix(cnp.ndarray[cnp.float64_t, ndim=2] I, int patch_size, softmax_tau=None):
+    """
+    Построение разреженной матрицы выбора локального максимума.
+
+    При значении параметра softmax_tau > 0 осуществляется вероятностное
+    (мягкое) взвешивание соседей вместо жесткого выбора единичного максимума.
+    Это преобразует оператор в непрерывную функцию от входного сигнала
+    и устраняет хаотичную нестабильность при переключении индексов.
+
+    Параметры
+    ---------
+    I : ndarray
+        Карта полной вариации размерности (M, N).
+    patch_size : int
+        Размер окрестности локального поиска (нечетное число).
+    softmax_tau : float, опционально
+        Температурный параметр для функции softmax. Если не задан,
+        применяется стандартное жесткое отсечение.
+
+    Возвращаемое значение
+    ---------------------
+    max_mat : sparse.csr_matrix
+        Разреженная матрица весов размерности (M*N, M*N).
+    """
     cdef int M = I.shape[0]
     cdef int N = I.shape[1]
     cdef int padsize = patch_size // 2
@@ -300,13 +433,11 @@ def Max_matrix(cnp.ndarray[cnp.float64_t, ndim=2] I, int patch_size, softmax_tau
     cdef int best_r, best_c
     cdef double[:, ::1] I_view = I
 
-    # --- ПЕРЕНЕСЛИ ВСЕ ОБЪЯВЛЕНИЯ В НАЧАЛО ---
     cdef int nnz
     cdef int[::1] r_view
     cdef int[::1] c_view
     cdef int[::1] sc_view
     cdef double[::1] v_view
-    # -----------------------------------------
 
     if softmax_tau is not None and softmax_tau > 0:
         stau = softmax_tau
@@ -315,7 +446,6 @@ def Max_matrix(cnp.ndarray[cnp.float64_t, ndim=2] I, int patch_size, softmax_tau
         col_arr = np.zeros(max_nnz, dtype=np.int32)
         val_arr = np.zeros(max_nnz, dtype=np.float64)
         
-        # Присваиваем типизированным view наши numpy-массивы
         r_view = row_arr
         c_view = col_arr
         v_view = val_arr
@@ -384,6 +514,28 @@ def Max_matrix(cnp.ndarray[cnp.float64_t, ndim=2] I, int patch_size, softmax_tau
         return sparse.csr_matrix((sparse_val, (sparse_row, sparse_col)), shape=(n_px, n_px))
 
 def LMG(img, patch_size, softmax_tau=None):
+    """
+    Вычисление локального максимального градиента и сборка оператора матрицы.
+
+    Модифицированная реализация с опциональной поддержкой гладкого вероятностного
+    взвешивания локальных экстремумов.
+
+    Параметры
+    ---------
+    img : ndarray
+        Полутоновое изображение размерности (M, N).
+    patch_size : int
+        Размер квадратной окрестности поиска максимума.
+    softmax_tau : float, опционально
+        Температурный параметр сглаживания операции выбора максимума.
+
+    Возвращаемое значение
+    ---------------------
+    output_img : ndarray
+        Карта локального максимального градиента.
+    A : sparse.csr_matrix
+        Разреженный линейный оператор G_S.
+    """
     M, N = img.shape
     px_mat, py_mat = gen_partialmat(M, N)
     img_vec = img.flatten(order='F')

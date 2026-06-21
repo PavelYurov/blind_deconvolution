@@ -1,38 +1,42 @@
 """
-Denoise Wrapper — Image Denoising Algorithm.
+Denoise.py
 
-Pipeline:
-    1. Normalise input to float64 [0, 1].
-    2. Trim image to odd dimensions.
-    3. Noise estimation via Chen-Pyatykh PCA or Chen ICCV2015 method.
-    4. Apply selected denoiser with adaptive parameters from noise estimate.
-    5. Return denoised image (int16, [0, 255]) and point-like kernel.
+Универсальный класс-обертка для интеграции алгоритмов шумоподавления 
+в инфраструктуру слепой деконволюции.
 
-Supported denoisers:
-    - bm3d       : Block Matching 3D.
-    - guided     : Guided Filter.
-    - bilateral  : Bilateral Filter.
-    - nlm        : Non-Local Means.
-    - tv         : Total Variation (Chambolle).
-    - vst+bm3d   : Variance-Stabilized Transform + BM3D (Poisson-Gaussian).
-    - act        : Adaptive Curvelet Thresholding.
+Конвейер обработки:
+1. Нормализация входного изображения к диапазону float64 [0, 1].
+2. Усечение пространственных размеров изображения до нечетных значений.
+3. Оценка уровня шума с использованием методов на основе PCA или вейвлет-анализа.
+4. Применение выбранного алгоритма шумоподавления с параметрами, адаптированными 
+   на основе предварительной оценки шума.
+5. Возврат отфильтрованного изображения (в формате int16 [0, 255]) и 
+   точечного ядра (эквивалента дельта-функции Дирака).
 
-Noise estimation methods:
-    - chen       : Wavelet-based eigenvalue method (ICCV 2015).
-    - pca        : PCA + VST + Kurtosis (TIP 2013).
-    - none       : No noise estimation; use default parameters.
+Поддерживаемые алгоритмы шумоподавления:
+- bm3d : блочное сопоставление и трехмерная фильтрация (Block Matching 3D).
+- guided : фильтр с направляющим изображением (Guided Filter).
+- bilateral : билатеральная фильтрация.
+- nlm : нелокальное усреднение (Non-Local Means).
+- tv : метод полной вариации (модель Шамболя).
+- vst+bm3d : преобразование, стабилизирующее дисперсию, совместно с BM3D 
+  для подавления пуассоновско-гауссовского шума.
+- act : адаптивное пороговое ограничение в кривлет-области.
+- median : медианная фильтрация с переключением (для импульсного шума).
 
-References:
-    Chen G., Zhu F., Heng P.A.:
-        "An Efficient Statistical Method for Image Noise Level Estimation",
-        ICCV 2015.
-    Pyatykh S., Hesser J., Zheng L.:
-        "Image Noise Level Estimation by Principal Component Analysis",
-        IEEE Trans. Image Process., vol. 22, no. 12, pp. 4874–4883, 2013.
-    Dabov K., Foi A., Katkovnik V., Egiazarian K.:
-        "Image Denoising by Sparse 3D Transform-Domain Collaborative
-         Filtering", IEEE Trans. Image Process., vol. 16, no. 8,
-         pp. 2080–2095, Aug. 2007.
+Методы оценки шума:
+- chen : метод на основе собственных значений в вейвлет-области (ICCV 2015).
+- pca : метод главных компонент с применением стабилизации дисперсии (TIP 2013).
+- none : оценка отключена, используются параметры по умолчанию.
+
+Литература:
+    1. Chen G., Zhu F., Heng P.A., "An Efficient Statistical Method for 
+       Image Noise Level Estimation", ICCV 2015.
+    2. Pyatykh S., Hesser J., Zheng L., "Image Noise Level Estimation 
+       by Principal Component Analysis", IEEE Trans. Image Process., 2013.
+    3. Dabov K., Foi A., Katkovnik V., Egiazarian K., "Image Denoising 
+       by Sparse 3D Transform-Domain Collaborative Filtering", IEEE Trans. 
+       Image Process., 2007.
 """
 
 import numpy as np
@@ -64,7 +68,9 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
 from blinddeconv.algorithms.base import DeconvolutionAlgorithm
 
 def make_size_odd(image):
-    """Trim image to odd spatial dimensions."""
+    """
+    Усечение пространственных размеров изображения до нечетных значений.
+    """
     h, w = image.shape[:2]
     h = h if h % 2 == 1 else h - 1
     w = w if w % 2 == 1 else w - 1
@@ -72,32 +78,27 @@ def make_size_odd(image):
 
 class DenoiseWrapper(DeconvolutionAlgorithm):
     """
-    Pure denoising wrapper algorithm.
+    Алгоритм-обертка для применения методов шумоподавления в рамках 
+    инфраструктуры слепой деконволюции.
 
-    Applies a single denoiser with adaptive parameters estimated from
-    the noisy image itself. The output PSF is a point (Dirac delta).
+    Применяет одиночный фильтр с параметрами, которые могут вычисляться 
+    адаптивно на основе оценки уровня шума. Возвращаемая функция рассеяния 
+    точки представляет собой единичный импульс в центре.
 
-    Parameters
-    ----------
+    Параметры
+    ---------
     method : str
-        Denoiser to use: 'bm3d', 'guided', 'bilateral', 'nlm', 'tv',
-        'vst+bm3d', or 'act'.
+        Идентификатор метода шумоподавления. Допустимые значения: 'bm3d', 
+        'guided', 'bilateral', 'nlm', 'tv', 'vst+bm3d', 'act', 'median'.
     noise_estimation : str
-        Noise σ estimation method: 'chen', 'pca', or 'none'.
-        When 'none', uses default parameters for the denoiser.
-    denoiser_params : dict or None
-        Denoiser-specific parameters (optional).
-        Examples:
-            {'weight': 0.1} for TV.
-            {'h': 0.1, 'patch_size': 5, 'patch_distance': 7} for NLM.
-            {'d': 5, 'sigma_color': 0.1, 'sigma_space': 5.0} for bilateral.
-            {'radius': 4, 'eps': 0.001} for guided.
-            {'sigma': 0.05} for BM3D.
-            {'threshold_setting': 's'} for ACT.
-    noise_estimation_params : dict or None
-        Parameters for noise estimation method (rarely needed).
-    verbose : bool
-        Print progress information.
+        Идентификатор метода оценки шума: 'chen', 'pca' или 'none'. 
+        При значении 'none' используются параметры фильтра по умолчанию.
+    denoiser_params : dict, опционально
+        Словарь специфических параметров для выбранного метода шумоподавления.
+    noise_estimation_params : dict, опционально
+        Словарь параметров для алгоритма оценки шума.
+    verbose : bool, по умолчанию False
+        Флаг вывода диагностической информации в консоль.
     """
 
     def __init__(
@@ -131,21 +132,21 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
         self.noise_estimation_params = dict(noise_estimation_params or {})
         self.verbose = bool(verbose)
 
-        # Tracking
         self.history: Dict[str, list] = {}
         self.hyperparams: Dict[str, Any] = {}
 
 
     def _estimate_noise(self, image):
-        """Estimate noise level σ from image.
+        """
+        Оценка уровня шума по изображению.
 
-        Returns
-        -------
-        dict with keys:
-            'method': str (estimation method used)
-            'sigma_norm': float (σ in [0, 1] scale)
-            'sigma_pix': float (σ in [0, 255] scale)
-            additional keys depend on the method
+        Возвращает
+        ----------
+        dict или None
+            Словарь с ключами:
+            - 'method' : идентификатор использованного метода оценки.
+            - 'sigma_norm' : оценка СКО шума в масштабе [0, 1].
+            - 'sigma_pix' : оценка СКО шума в масштабе [0, 255].
         """
         if self.noise_estimation == 'none':
             return None
@@ -184,7 +185,7 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
 
 
     def _apply_tv(self, image, noise_info):
-        """Total Variation denoising (Chambolle)."""
+        """Подавление шума на основе модели полной вариации (Chambolle)."""
         from skimage.restoration import denoise_tv_chambolle
 
         p = dict(self.denoiser_params)
@@ -203,7 +204,7 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
                                         n_iter_max=p.get('max_num_iter', 200))
 
     def _apply_nlm(self, image, noise_info):
-        """Non-Local Means denoising."""
+        """Нелокальное усреднение (Non-Local Means)."""
         from skimage.restoration import denoise_nl_means, estimate_sigma
 
         p = dict(self.denoiser_params)
@@ -223,7 +224,7 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
         )
 
     def _apply_bilateral(self, image, noise_info):
-        """Bilateral filtering."""
+        """Билатеральная фильтрация."""
         import cv2
 
         p = dict(self.denoiser_params)
@@ -240,7 +241,7 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
         return result.astype(np.float64)
 
     def _apply_guided(self, image, noise_info):
-        """Guided filtering."""
+        """Фильтрация на основе направляющего изображения (Guided Filter)."""
         p = dict(self.denoiser_params)
         sigma = noise_info.get('sigma_norm') if noise_info else None
 
@@ -250,23 +251,24 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
         return self._guided_filter_impl(image, image, radius, eps)
 
     def _guided_filter_impl(self, I, p, r, eps):
-        """Guided filter implementation (from LIP).
+        """
+        Реализация алгоритма Guided Filter.
 
-        Parameters
-        ----------
-        I : ndarray (H, W)
-            Guidance image.
-        p : ndarray (H, W)
-            Input image to filter.
+        Параметры
+        ---------
+        I : ndarray
+            Направляющее изображение.
+        p : ndarray
+            Исходное изображение для фильтрации.
         r : int
-            Filter radius.
+            Радиус окна фильтрации.
         eps : float
-            Regularization parameter.
-
-        Returns
-        -------
-        q : ndarray (H, W)
-            Filtered image.
+            Параметр регуляризации.
+            
+        Возвращает
+        ----------
+        q : ndarray
+            Отфильтрованное изображение.
         """
         from scipy.ndimage import uniform_filter
 
@@ -292,7 +294,7 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
         return np.clip(q, 0, 1)
 
     def _apply_bm3d(self, image, noise_info):
-        """BM3D denoising."""
+        """Блочное сопоставление и трехмерная фильтрация (BM3D)."""
         import bm3d
 
         p = dict(self.denoiser_params)
@@ -313,7 +315,10 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
         return bm3d.bm3d(image, sigma_psd=sigma_psd, stage_arg=stage_arg)
 
     def _apply_vst_bm3d(self, image, noise_info):
-        """VST + BM3D denoising (Poisson-Gaussian noise)."""
+        """
+        Фильтрация BM3D в области стабилизации дисперсии (VST) для 
+        подавления пуассоновско-гауссовского шума.
+        """
         from blinddeconv.algorithms.mod_denoise.vst import vst_bm3d_denoise
 
         p = dict(self.denoiser_params)
@@ -330,24 +335,23 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
         return result
 
     def _apply_median(self, image, noise_info):
-        """Decision-based switching median filter for impulse noise.
+        """
+        Адаптивный медианный фильтр с логическим переключением для 
+        подавления импульсного шума.
 
-        Algorithm:
-          1. Compute the median of a (kernel_size x kernel_size) neighbourhood
-             for every pixel.
-          2. A pixel is flagged as an impulse outlier when
-             |pixel - median| > threshold * max_range,
-             where max_range is estimated from the local pixel distribution.
-          3. Only flagged pixels are replaced with the local median;
-             non-impulse pixels are kept unchanged.
+        Для каждого пикселя вычисляется медиана в заданной локальной окрестности. 
+        Пиксель классифицируется как шумовой выброс, если его абсолютное отклонение 
+        от локальной медианы превышает порог, зависящий от локального 
+        среднеквадратичного отклонения. Замене подлежат только пиксели, 
+        классифицированные как выбросы, остальные остаются без изменений.
 
-        Parameters (via denoiser_params)
-        ---------------------------------
-        kernel_size : int (default 3)
-            Neighbourhood window for the median filter.
-        threshold   : float (default 0.3)
-            Relative deviation threshold for impulse detection.
-            Larger values = less aggressive (fewer pixels replaced).
+        Параметры из словаря denoiser_params
+        ------------------------------------
+        kernel_size : int, по умолчанию 3
+            Размер стороны квадратного окна фильтра.
+        threshold : float, по умолчанию 0.3
+            Относительный порог отклонения для выявления выбросов. Большие 
+            значения делают фильтр менее агрессивным.
         """
         from scipy.ndimage import median_filter, uniform_filter
 
@@ -372,7 +376,7 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
         return result
 
     def _apply_act(self, image, noise_info):
-        """Adaptive Curvelet Thresholding."""
+        """Адаптивное пороговое ограничение в кривлет-области (ACT)."""
         from blinddeconv.algorithms.mod_denoise.act_denoise import act_denoise
 
         p = dict(self.denoiser_params)
@@ -391,20 +395,19 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
 
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Denoise a single image.
+        Выполнение процедуры шумоподавления для входного изображения.
 
-        Parameters
-        ----------
+        Параметры
+        ---------
         image : ndarray
-            Input image (H, W) or (H, W, 3), uint8 [0, 255] or float [0, 1].
+            Входное изображение размерности (H, W) или (H, W, 3).
 
-        Returns
-        -------
-        x_final : ndarray (H, W), int16, [0, 255]
-            Denoised image.
-        h : ndarray (1, 1), int16, [0]
-            Point-like PSF (Dirac delta) — this is a denoiser, not a
-            deconvolver. The "kernel" is always 0 (or 1 at center).
+        Возвращает
+        ----------
+        x_final : ndarray
+            Отфильтрованное изображение в формате int16 [0, 255].
+        h : ndarray
+            Функция рассеяния точки (матрица 1x1 с единицей).
         """
         start_time = time.time()
 
@@ -480,7 +483,6 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
 
 
     def get_param(self) -> List[Tuple[str, Any]]:
-        """Get algorithm parameters."""
         return [
             ('method', self.method),
             ('noise_estimation', self.noise_estimation),
@@ -489,7 +491,6 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
         ]
 
     def change_param(self, params: Dict[str, Any]) -> None:
-        """Change algorithm parameters."""
         for key, value in params.items():
             if key == 'method':
                 valid_methods = {'bm3d', 'guided', 'bilateral', 'nlm', 'tv',
@@ -510,9 +511,7 @@ class DenoiseWrapper(DeconvolutionAlgorithm):
                 self.verbose = bool(value)
 
     def get_history(self) -> dict:
-        """Get algorithm history."""
         return self.history
 
     def get_hyperparams(self) -> dict:
-        """Get algorithm hyperparameters."""
         return self.hyperparams

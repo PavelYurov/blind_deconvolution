@@ -1,8 +1,17 @@
 """
-utils.pyx
+utils.py
 
-Utility functions for PMP (Patch-wise Minimal Pixels) blind deconvolution.
-Cythonized for performance.
+Вспомогательные функции и операторы для алгоритма слепой деконволюции 
+на основе локальных минимальных значений интенсивности (PMP).
+
+Основано на методе:
+    F. Wen, R. Ying, Y. Liu, P. Liu, T.-K. Truong: "A Simple Local 
+    Minimal Intensity Prior and An Improved Algorithm for Blind Image 
+    Deblurring", IEEE TCSVT, 2021.
+
+Модуль включает поддержку направленной (guided) и двусторонней (bilateral) 
+фильтрации, круговое сглаживание границ изображения, а также специализированный 
+оператор поиска минимальных пикселей (или квантилей) в неперекрывающихся паттернах.
 """
 
 import numpy as np
@@ -10,14 +19,10 @@ from scipy.signal import convolve2d
 from scipy.ndimage import map_coordinates, uniform_filter
 from scipy.fft import dstn, idstn
 
-# ── Cython Imports ─────────────────────────────────────────────────────────
 cimport numpy as cnp
 cimport cython
 from libc.math cimport ceil, exp
 
-# Обязательная инициализация C-API Numpy (должна быть на уровне модуля)
-cnp.import_array()
-# ─────────────────────────────────────────────────────────────────────────────
 
 __all__ =[
     'psf2otf', 'otf2psf', 'opt_fft_size', 'wrap_boundary_liu',
@@ -25,11 +30,11 @@ __all__ =[
     'guided_filter', 'threshold_pxpy_v1', 'bilateral_filter'
 ]
 
-# ═════════════════════════════════════════════════════════════════════════════
-# PSF <-> OTF conversions
-# ═════════════════════════════════════════════════════════════════════════════
 
 def psf2otf(psf: np.ndarray, shape: tuple) -> np.ndarray:
+    """
+    Преобразование функции рассеяния точки в оптическую передаточную функцию.
+    """
     if np.all(psf == 0):
         return np.zeros(shape, dtype=np.complex128)
 
@@ -43,6 +48,9 @@ def psf2otf(psf: np.ndarray, shape: tuple) -> np.ndarray:
 
 
 def otf2psf(otf: np.ndarray, psf_size: tuple) -> np.ndarray:
+    """
+    Преобразование оптической передаточной функции в функцию рассеяния точки.
+    """
     full = np.real(np.fft.ifft2(otf))
     ph, pw = psf_size
     full = np.roll(full, ph // 2, axis=0)
@@ -50,13 +58,13 @@ def otf2psf(otf: np.ndarray, psf_size: tuple) -> np.ndarray:
     return full[:ph, :pw]
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# opt_fft_size
-# ═════════════════════════════════════════════════════════════════════════════
 
 _OPT_FFT_LUT = None
 
 def _build_opt_fft_lut(lut_size: int = 4096) -> np.ndarray:
+    """
+    Построение таблицы оптимальных размеров для быстрого преобразования Фурье.
+    """
     lut = np.zeros(lut_size + 1, dtype=np.int64)
 
     e2 = 1
@@ -87,6 +95,9 @@ def _build_opt_fft_lut(lut_size: int = 4096) -> np.ndarray:
     return lut
 
 def opt_fft_size(n) -> np.ndarray:
+    """
+    Вычисление оптимального размера массива для быстрого преобразования Фурье.
+    """
     global _OPT_FFT_LUT
     if _OPT_FFT_LUT is None:
         _OPT_FFT_LUT = _build_opt_fft_lut()
@@ -109,11 +120,11 @@ def opt_fft_size(n) -> np.ndarray:
     return m
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# wrap_boundary_liu
-# ═════════════════════════════════════════════════════════════════════════════
 
 def _solve_min_laplacian(boundary_image: np.ndarray) -> np.ndarray:
+    """
+    Решение уравнения Лапласа с граничными условиями Дирихле.
+    """
     H, W = boundary_image.shape
     boundary_image = boundary_image.copy()
 
@@ -148,6 +159,9 @@ def _solve_min_laplacian(boundary_image: np.ndarray) -> np.ndarray:
     return img_direct
 
 def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
+    """
+    Круговое сглаживание границ изображения для Фурье-деконволюции.
+    """
     if img.ndim == 2:
         img = img[:, :, np.newaxis]
 
@@ -215,14 +229,37 @@ def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
     return ret
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# find_min_pixels  (OPTIMIZED WITH CYTHON)
-# ═════════════════════════════════════════════════════════════════════════════
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.cdivision(True)
 def find_min_pixels(cnp.ndarray[cnp.float64_t, ndim=2] I, int patch_size, double quantile=0.0):
+    """
+    Поиск минимальных пикселей (или квантилей) в неперекрывающихся паттернах.
+
+    Разбивает изображение на неперекрывающиеся блоки заданного размера и
+    идентифицирует пиксель с минимальной (или соответствующей заданному квантилю)
+    интенсивностью в каждом из них. Использование малых квантилей вместо 
+    абсолютного минимума повышает устойчивость к шумовым выбросам.
+
+    Параметры
+    ---------
+    I : ndarray
+        Полутоновое изображение размерности (M, N) в формате float64.
+    patch_size : int
+        Длина стороны квадратного паттерна.
+    quantile : float
+        Уровень квантиля в диапазоне [0, 1). Значение 0.0 соответствует
+        выбору абсолютного минимума.
+
+    Возвращаемое значение
+    ---------------------
+    J : ndarray
+        Разреженное изображение размерности (M, N), содержащее найденные 
+        минимальные значения в соответствующих координатах.
+    Mask : ndarray
+        Бинарная маска размерности (M, N), отмечающая позиции локальных минимумов.
+    """
     cdef int M = I.shape[0]
     cdef int N = I.shape[1]
     cdef int Mp = int(ceil(<double>M / patch_size))
@@ -288,12 +325,11 @@ def find_min_pixels(cnp.ndarray[cnp.float64_t, ndim=2] I, int patch_size, double
         return J, Mask
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Conjugate Gradient
-# ═════════════════════════════════════════════════════════════════════════════
-
 def conjgrad(x: np.ndarray, b: np.ndarray, max_it: int, tol: float,
              ax_func, func_param) -> np.ndarray:
+    """
+    Метод сопряженных градиентов для решения систем линейных уравнений.
+    """
     x = x.copy()
     r = b - ax_func(x, func_param)
     p = r.copy()
@@ -316,11 +352,11 @@ def conjgrad(x: np.ndarray, b: np.ndarray, max_it: int, tol: float,
     return x
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# adjust_psf_center
-# ═════════════════════════════════════════════════════════════════════════════
 
 def adjust_psf_center(psf: np.ndarray) -> np.ndarray:
+    """
+    Центрирование функции рассеяния точки.
+    """
     rows, cols = psf.shape
 
     X, Y = np.meshgrid(np.arange(1, cols + 1, dtype=np.float64),
@@ -350,11 +386,11 @@ def adjust_psf_center(psf: np.ndarray) -> np.ndarray:
     return result.reshape(rows, cols)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# threshold_pxpy_v1
-# ═════════════════════════════════════════════════════════════════════════════
 
 def _histc(data: np.ndarray, edges: np.ndarray) -> np.ndarray:
+    """
+    Построение гистограммы распределения значений по заданным границам корзин.
+    """
     indices = np.searchsorted(edges, data, side='right') - 1
     indices[data == edges[-1]] = len(edges) - 1
     indices[indices < 0] = len(edges)
@@ -365,6 +401,13 @@ def _histc(data: np.ndarray, edges: np.ndarray) -> np.ndarray:
 
 def guided_filter(I: np.ndarray, p: np.ndarray,
                   radius: int, eps: float) -> np.ndarray:
+    """
+    Направленный (guided) фильтр с сохранением границ.
+
+    Выполняет сглаживание изображения p, используя опорное изображение I.
+    Для подавления шума в самом изображении используется режим самонаправленности
+    (I совпадает с p).
+    """
     ksize = 2 * radius + 1
     mean_I = uniform_filter(I.astype(np.float64), size=ksize, mode='reflect')
     mean_p = uniform_filter(p.astype(np.float64), size=ksize, mode='reflect')
@@ -387,6 +430,15 @@ def threshold_pxpy_v1(latent: np.ndarray, psf_size,
                       threshold=None,
                       denoise_eps=None, denoise_radius=2,
                       ensemble_denoise=False):
+    """
+    Адаптивное пороговое отсечение шумовых градиентов изображения с 
+    предварительной направленной фильтрацией.
+
+    Перед вычислением пространственных производных к изображению может 
+    применяться направленная фильтрация для подавления шума в гладких 
+    областях. Опционально используется ансамблевое усреднение нескольких 
+    сглаживающих окон.
+    """
     b_estimate_threshold = threshold is None
 
     if b_estimate_threshold:
@@ -452,11 +504,10 @@ def threshold_pxpy_v1(latent: np.ndarray, psf_size,
     return px, py, threshold
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# bilateral_filter
-# ═════════════════════════════════════════════════════════════════════════════
-
 def _fspecial_gaussian(size: int, sigma: float) -> np.ndarray:
+    """
+    Генерация двумерного гауссова фильтра.
+    """
     radius = (size - 1) / 2.0
     y, x = np.mgrid[-radius:radius + 1, -radius:radius + 1]
     g = np.exp(-(x * x + y * y) / (2.0 * sigma * sigma))
@@ -467,6 +518,9 @@ def _fspecial_gaussian(size: int, sigma: float) -> np.ndarray:
 @cython.cdivision(True)
 def bilateral_filter(img: np.ndarray, sigma_s: float,
                      sigma: float) -> np.ndarray:
+    """
+    Двусторонняя фильтрация изображения с сохранением границ.
+    """
     if img.ndim == 2:
         img = img[:, :, np.newaxis]
     was_2d = img.shape[2] == 1
@@ -513,7 +567,6 @@ def bilateral_filter(img: np.ndarray, sigma_s: float,
                 w_s = sw_v[y + fr, x + fr]
                 for i in range(h):
                     for j in range(w):
-                        # Compute feature distance
                         f_dist = 0.0
                         for c in range(d):
                             diff_val = lab_v[i, j, c] - p_lab_v[fr + y + i, fr + x + j, c]

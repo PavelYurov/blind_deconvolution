@@ -1,91 +1,17 @@
 """
 utils.py
 
-Utility functions for LMGP (Local Maximum Gradient Prior) blind deconvolution.
+Вспомогательные функции и операторы для алгоритмов слепой деконволюции 
+с расширенными методами пространственной фильтрации.
 
-Ported from MATLAB code by Chen, Liang et al.
-Reference:
-    L. Chen, F. Fang, T. Wang, G. Zhang:
-    "Blind Image Deblurring With Local Maximum Gradient Prior",
-    CVPR, 2019.
+Основано на методе:
+    L. Chen, F. Fang, T. Wang, G. Zhang: "Blind Image Deblurring
+    With Local Maximum Gradient Prior", CVPR, 2019.
 
-Original MATLAB code based on Jinshan Pan's DCP framework (CVPR 2016)
-and Cho & Lee (SIGGRAPH 2009).
-
-MATLAB -> Python conversion notes (CRITICAL differences):
-    ─────────────────────────────────────────────────────────────────────
-    Column-major vs row-major:
-        MATLAB flattens arrays in COLUMN-MAJOR (Fortran) order.
-        The sparse-matrix-based LMG operator (gen_partialmat, Abs_matrix,
-        Max_matrix, LMG) relies on column-major indexing throughout.
-        -> All flatten(order='F') / reshape(..., order='F') in LMG code.
-
-    Indexing:
-        MATLAB is 1-based, Python is 0-based.
-
-    max(patch(:)):
-        MATLAB flattens in COLUMN-MAJOR order.
-        -> Use patch.flatten(order='F') + np.argmax to match MATLAB
-        tie-breaking (first-in-column-major wins).
-
-    conv2(A, B, 'valid'):
-        Both MATLAB conv2 and scipy.signal.convolve2d perform TRUE
-        convolution (kernel flipped).  Result size: (M-mk+1, N-nk+1).
-
-    diff(S, 1, 2):
-        MATLAB dim 2 = Python axis=1.
-        MATLAB diff(S,1,1) -> np.diff(S, n=1, axis=0).
-
-    S(:,1,:) - S(:,end,:):
-        -> S[:, 0:1, :] - S[:, -1:, :] (slicing preserves dimensions).
-
-    fft2/ifft2/conj:
-        -> np.fft.fft2 / np.fft.ifft2 / np.conj  (identical semantics).
-
-    dst / idst (Discrete Sine Transform):
-        MATLAB's dst/idst = DST-I.
-        scipy.fft.dstn(type=1) computes DST-I with a factor of 2 per
-        dimension vs MATLAB.  This factor cancels in the roundtrip
-        dstn -> divide_by_eigenvalues -> idstn, so the result is
-        identical.
-
-    psf2otf(psf, shape):
-        Zero-pad PSF, circularly shift centre to (0,0), then fft2.
-        circshift amount: -floor(size(psf)/2) per dim.
-
-    interp2(X,Y,V,Xq,Yq,'linear'):
-        Returns NaN for out-of-bound -> replaced with 0.
-        -> scipy.ndimage.map_coordinates(mode='constant', cval=0.0).
-
-    padarray(I, [p p], 'replicate'):
-        -> np.pad(I, ((p,p),(p,p)), mode='edge').
-
-    bwconncomp(k, 8):
-        -> scipy.ndimage.label(k, structure=np.ones((3,3))).
-
-    imresize(k, ret):
-        MATLAB default = bicubic.
-        -> scipy.ndimage.zoom(k, ret, order=3).
-
-    sparse(row, col, val, M, N):
-        MATLAB sparse uses 1-based indices.
-        -> scipy.sparse.csr_matrix uses 0-based indices.
-
-Contains:
-    ── Shared utilities (from cho_code/) ──────────────────────────────
-    psf2otf / otf2psf         — PSF <-> OTF conversions
-    opt_fft_size               — optimal FFT data length
-    wrap_boundary_liu          — circular boundary padding (Liu & Jia)
-    conjgrad                   — conjugate gradient solver
-    adjust_psf_center          — PSF centre-of-mass alignment
-    threshold_pxpy_v1          — adaptive gradient thresholding
-    bilateral_filter           — bilateral filter
-
-    ── LMG-specific (from chen code/) ─────────────────────────────────
-    gen_partialmat             — sparse gradient operator matrices
-    Abs_matrix                 — diagonal sign matrix
-    Max_matrix                 — local-maximum selection matrix
-    LMG                        — full Local Maximum Gradient computation
+Модуль включает поддержку направленной (guided), двусторонней (bilateral), 
+нелокальной (NLM) и блочной (BM3D) фильтрации. Оператор поиска локального 
+максимума расширен опциональной поддержкой гладкого вероятностного взвешивания 
+через функцию softmax.
 """
 
 import numpy as np
@@ -102,20 +28,11 @@ except ImportError:
     _HAS_BM3D = False
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# PSF <-> OTF conversions
-# ═════════════════════════════════════════════════════════════════════════════
-
 def psf2otf(psf: np.ndarray, shape: tuple) -> np.ndarray:
     """
-    Convert PSF to OTF.  Equivalent to MATLAB psf2otf(psf, shape).
-
-    1. Zero-pad *psf* into an array of *shape*.
-    2. Circularly shift so that the centre of the PSF lands at index (0,0).
-    3. Return fft2.
-
-    MATLAB psf2otf circshift amounts: -floor(size(psf)/2) for each dim.
+    Преобразование функции рассеяния точки в оптическую передаточную функцию.
     """
+
     if np.all(psf == 0):
         return np.zeros(shape, dtype=np.complex128)
 
@@ -123,7 +40,6 @@ def psf2otf(psf: np.ndarray, shape: tuple) -> np.ndarray:
     padded = np.zeros(shape, dtype=np.float64)
     padded[:in_h, :in_w] = psf
 
-    # Circular shift: move PSF centre to (0,0)
     padded = np.roll(padded, -(in_h // 2), axis=0)
     padded = np.roll(padded, -(in_w // 2), axis=1)
     return np.fft.fft2(padded)
@@ -131,11 +47,7 @@ def psf2otf(psf: np.ndarray, shape: tuple) -> np.ndarray:
 
 def otf2psf(otf: np.ndarray, psf_size: tuple) -> np.ndarray:
     """
-    Convert OTF back to PSF.  Equivalent to MATLAB otf2psf(otf, psf_size).
-
-    1. ifft2 -> real part.
-    2. Circular shift by +floor(psf_size/2) for each dim.
-    3. Crop to psf_size.
+    Преобразование оптической передаточной функции в функцию рассеяния точки.
     """
     full = np.real(np.fft.ifft2(otf))
     ph, pw = psf_size
@@ -144,17 +56,16 @@ def otf2psf(otf: np.ndarray, psf_size: tuple) -> np.ndarray:
     return full[:ph, :pw]
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# opt_fft_size  (from cho_code/opt_fft_size.m)
-# ═════════════════════════════════════════════════════════════════════════════
 
-_OPT_FFT_LUT = None  # module-level cache (like MATLAB persistent)
+_OPT_FFT_LUT = None
 
 
 def _build_opt_fft_lut(lut_size: int = 4096) -> np.ndarray:
-    """Build LUT of optimal FFT sizes (products of small primes 2,3,5,7
-    with optional single factors of 11 or 13)."""
-    lut = np.zeros(lut_size + 1, dtype=np.int64)  # 1-indexed internally
+    """
+    Построение таблицы оптимальных размеров для быстрого преобразования Фурье.
+    Оптимальными считаются размеры, факторизуемые малыми простыми числами.
+    """
+    lut = np.zeros(lut_size + 1, dtype=np.int64)
 
     e2 = 1
     while e2 <= lut_size:
@@ -175,7 +86,6 @@ def _build_opt_fft_lut(lut_size: int = 4096) -> np.ndarray:
             e3 *= 3
         e2 *= 2
 
-    # Fill gaps: for each position without a valid size, use next larger
     nn = 0
     for i in range(lut_size, 0, -1):
         if lut[i] != 0:
@@ -187,16 +97,7 @@ def _build_opt_fft_lut(lut_size: int = 4096) -> np.ndarray:
 
 def opt_fft_size(n) -> np.ndarray:
     """
-    Compute optimal FFT data length(s).
-    Equivalent to MATLAB opt_fft_size.m.
-
-    Parameters
-    ----------
-    n : int or array-like of ints
-
-    Returns
-    -------
-    m : ndarray of optimal sizes (same shape as input)
+    Вычисление оптимального размера массива для быстрого преобразования Фурье.
     """
     global _OPT_FFT_LUT
     if _OPT_FFT_LUT is None:
@@ -220,27 +121,16 @@ def opt_fft_size(n) -> np.ndarray:
     return m
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# wrap_boundary_liu  (from cho_code/wrap_boundary_liu.m)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def _solve_min_laplacian(boundary_image: np.ndarray) -> np.ndarray:
     """
-    Solve Laplace equation with Dirichlet boundary conditions via DST.
-    Equivalent to the nested solve_min_laplacian in wrap_boundary_liu.m.
-
-    MATLAB uses dst()/idst() which are DST-I / IDST-I.
-    scipy.fft.dstn(type=1) computes DST-I with a factor of 2 per
-    dimension compared to MATLAB.  This factor cancels in the roundtrip
-    dstn -> divide -> idstn, so the result is identical.
+    Решение уравнения Лапласа с граничными условиями Дирихле на основе
+    дискретного синусного преобразования первого типа.
     """
     H, W = boundary_image.shape
     boundary_image = boundary_image.copy()
 
-    # Zero out interior — keep only boundary values
     boundary_image[1:-1, 1:-1] = 0.0
 
-    # Compute Laplacian of the boundary image at interior points
     f_bp = np.zeros((H, W), dtype=np.float64)
     f_bp[1:H - 1, 1:W - 1] = (
         -4.0 * boundary_image[1:H - 1, 1:W - 1]
@@ -251,14 +141,8 @@ def _solve_min_laplacian(boundary_image: np.ndarray) -> np.ndarray:
     )
 
     f1 = -f_bp
-
-    # Interior only
     f2 = f1[1:H - 1, 1:W - 1]
-
-    # 2-D DST-I
     f2sin = dstn(f2, type=1)
-
-    # Eigenvalues of the discrete Laplacian under DST-I basis
     x = np.arange(1, W - 1)
     y = np.arange(1, H - 1)
     xx, yy = np.meshgrid(x, y)
@@ -266,8 +150,6 @@ def _solve_min_laplacian(boundary_image: np.ndarray) -> np.ndarray:
             (2.0 * np.cos(np.pi * yy / (H - 1)) - 2.0)
 
     f3 = f2sin / denom
-
-    # 2-D inverse DST-I
     img_tt = idstn(f3, type=1)
 
     img_direct = boundary_image.copy()
@@ -278,17 +160,7 @@ def _solve_min_laplacian(boundary_image: np.ndarray) -> np.ndarray:
 
 def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
     """
-    Pad image so boundaries are circularly smooth for FFT-based deconvolution.
-    Equivalent to MATLAB wrap_boundary_liu.m (Cho, based on Liu & Jia ICIP 2008).
-
-    Parameters
-    ----------
-    img      : (H, W) or (H, W, Ch) input image
-    img_size : (H_out, W_out) target padded size
-
-    Returns
-    -------
-    ret : (H_out, W_out[, Ch]) boundary-wrapped image
+    Круговое сглаживание границ изображения для Фурье-деконволюции.
     """
     if img.ndim == 2:
         img = img[:, :, np.newaxis]
@@ -304,7 +176,6 @@ def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
         alpha = 1
         HG = img[:, :, ch]
 
-        # --- Build r_A: (2*alpha + H_w) x W ---
         r_A = np.zeros((alpha * 2 + H_w, W), dtype=np.float64)
         r_A[:alpha, :] = HG[-alpha:, :]
         r_A[-alpha:, :] = HG[:alpha, :]
@@ -324,7 +195,6 @@ def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
         r_A = A2
         A = r_A
 
-        # --- Build r_B: H x (2*alpha + W_w) ---
         r_B = np.zeros((H, alpha * 2 + W_w), dtype=np.float64)
         r_B[:, :alpha] = HG[:, -alpha:]
         r_B[:, -alpha:] = HG[:, :alpha]
@@ -344,7 +214,6 @@ def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
         r_B = B2
         B = r_B
 
-        # --- Build r_C: (2*alpha + H_w) x (2*alpha + W_w) ---
         r_C = np.zeros((alpha * 2 + H_w, alpha * 2 + W_w), dtype=np.float64)
         r_C[:alpha, :] = B[-alpha:, :]
         r_C[-alpha:, :] = B[:alpha, :]
@@ -355,14 +224,9 @@ def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
         r_C = C2
         C = r_C
 
-        # MATLAB: A = A(alpha:end-alpha-1, :)
         A = A[:H_w, :]
-        # MATLAB: B = B(:, alpha+1:end-alpha)
         B = B[:, 1:W_w + 1]
-        # MATLAB: C = C(alpha+1:end-alpha, alpha+1:end-alpha)
         C = C[1:H_w + 1, 1:W_w + 1]
-
-        # MATLAB: ret(:,:,ch) = [img(:,:,ch) B; A C]
         ret[:, :, ch] = np.block([[HG, B], [A, C]])
 
     if ret.shape[2] == 1:
@@ -370,30 +234,10 @@ def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
     return ret
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Conjugate Gradient  (from cho_code/conjgrad.m)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def conjgrad(x: np.ndarray, b: np.ndarray, max_it: int, tol: float,
              ax_func, func_param) -> np.ndarray:
     """
-    Conjugate gradient solver.
-    Equivalent to MATLAB cho_code/conjgrad.m (Sunghyun Cho).
-
-    Solves A*x = b where A is defined implicitly by ax_func(x, param).
-
-    Parameters
-    ----------
-    x          : initial guess (2D array)
-    b          : right-hand side (same shape)
-    max_it     : maximum iterations
-    tol        : convergence tolerance on ||r||
-    ax_func    : callable(x, param) -> A*x
-    func_param : parameters passed to ax_func
-
-    Returns
-    -------
-    x : solution array
+    Метод сопряженных градиентов для решения систем линейных уравнений.
     """
     x = x.copy()
     r = b - ax_func(x, func_param)
@@ -417,26 +261,11 @@ def conjgrad(x: np.ndarray, b: np.ndarray, max_it: int, tol: float,
     return x
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# adjust_psf_center  (from cho_code/adjust_psf_center.m)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def adjust_psf_center(psf: np.ndarray) -> np.ndarray:
     """
-    Centre the PSF by shifting its centre-of-mass to the geometric centre.
-    Equivalent to MATLAB adjust_psf_center.m (Sunghyun Cho).
-
-    MATLAB:
-        [X,Y] = meshgrid(1:cols, 1:rows)  — 1-based coords
-        xc1 = sum(psf(:) .* X(:));  yc1 = sum(psf(:) .* Y(:))
-        xc2 = (cols+1)/2;           yc2 = (rows+1)/2
-        shift = round(xc2 - xc1), round(yc2 - yc1)
-        warpProjective2(psf, [1 0 -xshift; 0 1 -yshift])
-        interp2(..., 'linear'), NaN -> 0
+    Центрирование функции рассеяния точки.
     """
     rows, cols = psf.shape
-
-    # 1-based coordinate grids (matching MATLAB)
     X, Y = np.meshgrid(np.arange(1, cols + 1, dtype=np.float64),
                         np.arange(1, rows + 1, dtype=np.float64))
 
@@ -450,43 +279,26 @@ def adjust_psf_center(psf: np.ndarray) -> np.ndarray:
     xc2 = (cols + 1) / 2.0
     yc2 = (rows + 1) / 2.0
 
-    # MATLAB ``round`` uses round-half-away-from-zero, while Python's
-    # built-in ``round`` uses banker's rounding (round-half-to-even).
-    # For shifts of exactly ±0.5, ±1.5, ±2.5, … this differs by one
-    # pixel, which then propagates through every pyramid scale and can
-    # offset the final latent by several pixels relative to GT — killing
-    # PSNR/SSIM even when the kernel shape itself is correct.
     def _matlab_round(x: float) -> int:
         return int(np.floor(np.abs(x) + 0.5) * np.sign(x)) if x != 0 else 0
 
     xshift = _matlab_round(xc2 - xc1)
     yshift = _matlab_round(yc2 - yc1)
 
-    # MATLAB warpProjective2: for each output pixel at 1-based (x,y),
-    # sample input at (x - xshift, y - yshift).
     out_rows, out_cols = np.meshgrid(np.arange(rows, dtype=np.float64),
                                       np.arange(cols, dtype=np.float64),
                                       indexing='ij')
     in_rows = out_rows - yshift
     in_cols = out_cols - xshift
 
-    # order=1 = bilinear; cval=0 matches MATLAB NaN -> 0
     result = map_coordinates(psf, [in_rows.ravel(), in_cols.ravel()],
                              order=1, mode='constant', cval=0.0)
     return result.reshape(rows, cols)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# threshold_pxpy_v1  (from cho_code/threshold_pxpy_v1.m)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def _histc(data: np.ndarray, edges: np.ndarray) -> np.ndarray:
     """
-    Equivalent to MATLAB histc(data, edges).
-
-    MATLAB histc: bin(k) counts values where edges(k) <= x < edges(k+1),
-    except the last bin also includes x == edges(end).
-    Output length = len(edges).
+    Построение гистограммы распределения значений по заданным границам корзин.
     """
     indices = np.searchsorted(edges, data, side='right') - 1
     indices[data == edges[-1]] = len(edges) - 1
@@ -500,10 +312,27 @@ def _histc(data: np.ndarray, edges: np.ndarray) -> np.ndarray:
 def guided_filter(I: np.ndarray, p: np.ndarray,
                   radius: int, eps: float) -> np.ndarray:
     """
-    Guided image filter (He, Sun, Tang, TPAMI 2013).
+    Направленный (guided) фильтр с сохранением границ.
 
-    Edge-preserving smoothing that uses *I* as a guide for filtering *p*.
-    For self-guided denoising set I = p.
+    Выполняет сглаживание изображения p, используя опорное изображение I.
+    Для подавления шума в самом изображении используется режим самонаправленности
+    (I совпадает с p).
+
+    Параметры
+    ---------
+    I : ndarray
+        Опорное изображение.
+    p : ndarray
+        Фильтруемое изображение.
+    radius : int
+        Радиус локального окна фильтра.
+    eps : float
+        Коэффициент регуляризации.
+
+    Возвращаемое значение
+    ---------------------
+    q : ndarray
+        Отфильтрованное изображение.
     """
     ksize = 2 * radius + 1
     mean_I = uniform_filter(I.astype(np.float64), size=ksize, mode='reflect')
@@ -532,49 +361,17 @@ def threshold_pxpy_v1(latent: np.ndarray, psf_size,
                       bilateral_sigma_s=2.0, bilateral_sigma_r=0.1,
                       bm3d_sigma=0.01, nlm_h=0.01):
     """
-    Gradient thresholding for kernel estimation.
-    Equivalent to MATLAB cho_code/threshold_pxpy_v1.m.
+    Адаптивное пороговое отсечение шумовых градиентов изображения с 
+    предварительной пространственной фильтрацией.
 
-    Computes image gradients (px, py) and applies an adaptive threshold
-    to suppress small gradients. If no threshold is given, estimates one
-    by building histograms of gradient magnitudes across four directional
-    bins.
-
-    In the original Cho & Lee (SIGGRAPH 2009) code, gradients were
-    computed AFTER bilateral filter denoising.  Here we support
-    multiple denoising strategies controlled by *denoise_type*.
-
-    Parameters
-    ----------
-    latent             : (M, N) image
-    psf_size           : scalar or array-like — kernel size (max used)
-    threshold          : float or None — if None, estimate from histogram
-    denoise_eps        : float or None — guided filter eps / enable flag.
-                         None = no denoise.
-    denoise_radius     : int — guided filter radius (default 2)
-    ensemble_denoise   : bool — use ensemble of 3 guided filters
-    denoise_type       : str — 'guided' | 'bilateral' | 'bm3d' | 'nlm'
-    bilateral_sigma_s  : float — bilateral spatial sigma (default 2.0)
-    bilateral_sigma_r  : float — bilateral range sigma (default 0.1)
-    bm3d_sigma         : float — BM3D noise std estimate (default 0.01)
-    nlm_h              : float — NLM filter strength (default 0.01)
-
-    Returns
-    -------
-    px, py    : gradient images with weak gradients zeroed
-    threshold : updated threshold value
-
-    MATLAB notes:
-        dx = [-1 1; 0 0]; dy = [-1 0; 1 0];
-        px = conv2(denoised, dx, 'valid');  — true convolution (flips kernel)
-        pd = atan(py./px)  — NOT atan2! gives [-pi/2, pi/2]
+    Перед вычислением производных к изображению применяется выбранный метод
+    шумоподавления для стабилизации оценки в зашумленных областях.
     """
     b_estimate_threshold = threshold is None
 
     if b_estimate_threshold:
         threshold = 0.0
 
-    # ── Denoising before gradient computation (Cho & Lee style) ──────
     if denoise_eps is not None and denoise_eps > 0:
         if denoise_type == 'bm3d':
             denoised = bm3d_filter(latent, sigma_psd=bm3d_sigma)
@@ -584,7 +381,6 @@ def threshold_pxpy_v1(latent: np.ndarray, psf_size,
             denoised = bilateral_filter(latent, bilateral_sigma_s,
                                         bilateral_sigma_r)
         else:
-            # 'guided' (default) — with optional ensemble
             d_guided = guided_filter(latent, latent, denoise_radius, denoise_eps)
             if ensemble_denoise:
                 r2 = max(1, denoise_radius - 1)
@@ -599,13 +395,11 @@ def threshold_pxpy_v1(latent: np.ndarray, psf_size,
     dx = np.array([[-1, 1], [0, 0]], dtype=np.float64)
     dy = np.array([[-1, 0], [1, 0]], dtype=np.float64)
 
-    # MATLAB conv2(denoised, dx, 'valid') — true convolution
     px = convolve2d(denoised, dx, mode='valid')
     py = convolve2d(denoised, dy, mode='valid')
     pm = px ** 2 + py ** 2
 
     if b_estimate_threshold:
-        # MATLAB: pd = atan(py./px) — gives [-pi/2, pi/2], NOT atan2
         with np.errstate(divide='ignore', invalid='ignore'):
             pd = np.arctan(py / px)
 
@@ -616,8 +410,6 @@ def threshold_pxpy_v1(latent: np.ndarray, psf_size,
         mask2 = (pd >= np.pi / 4) & (pd < np.pi / 2)
         mask3 = (pd >= -np.pi / 4) & (pd < 0)
         mask4 = (pd >= -np.pi / 2) & (pd < -np.pi / 4)
-
-        # Reverse cumulative histograms
         H1 = np.cumsum(_histc(pm[mask1], pm_steps)[::-1])
         H2 = np.cumsum(_histc(pm[mask2], pm_steps)[::-1])
         H3 = np.cumsum(_histc(pm[mask3], pm_steps)[::-1])
@@ -632,8 +424,6 @@ def threshold_pxpy_v1(latent: np.ndarray, psf_size,
             if min_h >= th:
                 threshold = pm_steps[len(pm_steps) - 1 - t]
                 break
-
-    # Thresholding
     m = pm < threshold
     while np.all(m):
         threshold = threshold * 0.81
@@ -648,26 +438,10 @@ def threshold_pxpy_v1(latent: np.ndarray, psf_size,
     return px, py, threshold
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# nlm_filter  — Non-Local Means wrapper (scikit-image)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def nlm_filter(img: np.ndarray, h: float = 0.01,
                patch_size: int = 5, patch_distance: int = 6) -> np.ndarray:
     """
-    Non-Local Means denoising via scikit-image.
-
-    Parameters
-    ----------
-    img            : (M, N) 2D float64 image in [0, 1]
-    h              : filter strength (cut-off distance). Smaller = less
-                     smoothing.  Typical range for this pipeline: 0.005–0.05.
-    patch_size     : size of patches (pixels). Default 5.
-    patch_distance : maximal distance for patches. Default 6.
-
-    Returns
-    -------
-    denoised : (M, N) float64
+    Подавление шума с использованием алгоритма нелокальных средних (NLM).
     """
     sigma_est = max(estimate_sigma(img), 1e-8)
     return denoise_nl_means(
@@ -677,24 +451,9 @@ def nlm_filter(img: np.ndarray, h: float = 0.01,
     )
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# bm3d_filter  — BM3D wrapper
-# ═════════════════════════════════════════════════════════════════════════════
-
 def bm3d_filter(img: np.ndarray, sigma_psd: float = 0.01) -> np.ndarray:
     """
-    BM3D denoising.
-
-    Requires the ``bm3d`` package (``pip install bm3d``).
-
-    Parameters
-    ----------
-    img       : (M, N) 2D float64 image in [0, 1]
-    sigma_psd : noise standard deviation estimate.  Default 0.01.
-
-    Returns
-    -------
-    denoised : (M, N) float64
+    Блочная фильтрация с трехмерным преобразованием (BM3D).
     """
     if not _HAS_BM3D:
         raise ImportError(
@@ -704,12 +463,10 @@ def bm3d_filter(img: np.ndarray, sigma_psd: float = 0.01) -> np.ndarray:
     return _bm3d_mod.bm3d(img, sigma_psd=sigma_psd)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# bilateral_filter  (from bilateral_filter.m)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def _fspecial_gaussian(size: int, sigma: float) -> np.ndarray:
-    """Equivalent to MATLAB fspecial('gaussian', size, sigma)."""
+    """
+    Генерация двумерного гауссова фильтра.
+    """
     radius = (size - 1) / 2.0
     y, x = np.mgrid[-radius:radius + 1, -radius:radius + 1]
     g = np.exp(-(x * x + y * y) / (2.0 * sigma * sigma))
@@ -719,22 +476,7 @@ def _fspecial_gaussian(size: int, sigma: float) -> np.ndarray:
 def bilateral_filter(img: np.ndarray, sigma_s: float,
                      sigma: float) -> np.ndarray:
     """
-    Bilateral filter.
-    Equivalent to MATLAB bilateral_filter.m for grayscale images.
-
-    For grayscale (d==1) the MATLAB code uses:
-        lab = img;  sigma = sigma * sqrt(d) = sigma * 1
-    so no colour conversion is needed.
-
-    Parameters
-    ----------
-    img     : (H, W) or (H, W, D) float image
-    sigma_s : spatial sigma
-    sigma   : range sigma
-
-    Returns
-    -------
-    r_img : filtered image, same shape
+    Двусторонняя фильтрация изображения с сохранением границ.
     """
     if img.ndim == 2:
         img = img[:, :, np.newaxis]
@@ -780,27 +522,31 @@ def bilateral_filter(img: np.ndarray, sigma_s: float,
     return r_img
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# find_min_pixels  (from PMP find_min_pixels.m)
-# — Patch-wise minimal pixels prior for non-blind restoration
-# ═════════════════════════════════════════════════════════════════════════════
-
 def find_min_pixels(I: np.ndarray, patch_size: int, quantile: float = 0.0):
     """
-    Find the minimum (or low-quantile) pixel in each non-overlapping patch.
-    Ported from PMP (Wen et al., TCSVT 2021) find_min_pixels.m.
+    Поиск минимальных пикселей в неперекрывающихся паттернах.
 
-    Parameters
-    ----------
-    I          : (M, N) grayscale image, float64
-    patch_size : int, side length of each non-overlapping patch
-    quantile   : float in [0, 1) — 0 = absolute minimum (original),
-                 >0 = use q-th quantile (more robust to noise)
+    При значении параметра quantile больше нуля осуществляется выбор
+    значения, соответствующего заданному квантилю, что обеспечивает
+    устойчивость алгоритма к экстремальным импульсным выбросам.
 
-    Returns
-    -------
-    J    : (M, N) sparse image — zero except at patch-wise minima
-    Mask : (M, N) binary mask — 1 at positions of patch-wise minima
+    Параметры
+    ---------
+    I : ndarray
+        Полутоновое изображение.
+    patch_size : int
+        Размер стороны квадратного паттерна.
+    quantile : float
+        Уровень квантиля в диапазоне [0, 1). Значение 0 эквивалентно
+        выбору абсолютного минимума.
+
+    Возвращаемое значение
+    ---------------------
+    J : ndarray
+        Разреженное изображение, содержащее найденные значения в 
+        соответствующих координатах.
+    Mask : ndarray
+        Бинарная маска позиций минимальных значений.
     """
     M, N = I.shape
     Mp = int(np.ceil(M / patch_size))
@@ -833,58 +579,24 @@ def find_min_pixels(I: np.ndarray, patch_size: int, quantile: float = 0.0):
     return J, Mask
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# gen_partialmat  (from chen code/gen_partialmat.m)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def gen_partialmat(im_row: int, im_col: int):
     """
-    Generate sparse gradient operator matrices (partial derivatives).
-    Equivalent to MATLAB chen code/gen_partialmat.m.
-
-    CRITICAL: Uses COLUMN-MAJOR (Fortran) linear indexing to match MATLAB.
-    When using these matrices, image vectors must be flattened/reshaped
-    with order='F'.
-
-    MATLAB:
-        ind = i + (j-1)*im_row   (1-based column-major)
-
-        py_mat (vertical / row gradient):
-            i==1: forward  difference: py(i,j) = I(i+1,j) - I(i,j)
-            else: backward difference: py(i,j) = I(i,j) - I(i-1,j)
-
-        px_mat (horizontal / column gradient):
-            j==1: forward  difference: px(i,j) = I(i,j+1) - I(i,j)
-            else: backward difference: px(i,j) = I(i,j) - I(i,j-1)
-
-    Parameters
-    ----------
-    im_row : int — number of rows (M)
-    im_col : int — number of columns (N)
-
-    Returns
-    -------
-    px_mat : (M*N, M*N) sparse CSR matrix — horizontal gradient
-    py_mat : (M*N, M*N) sparse CSR matrix — vertical gradient
+    Генерация разреженных матриц операторов частных производных.
     """
     M, N = im_row, im_col
     n = M * N
     all_inds = np.arange(n, dtype=np.int64)
 
-    # -- py_mat (vertical / row gradient) --
-    # In column-major ordering, first-row pixels are at indices 0, M, 2M, ...
     first_row_mask = (all_inds % M) == 0
     first_row = all_inds[first_row_mask]
     not_first_row = all_inds[~first_row_mask]
 
-    # First row: forward difference  (ind, ind) = -1;  (ind, ind+1) = +1
     r_fr = np.repeat(first_row, 2)
     c_fr = np.empty(2 * len(first_row), dtype=np.int64)
     c_fr[0::2] = first_row
     c_fr[1::2] = first_row + 1
     v_fr = np.tile(np.array([-1.0, 1.0]), len(first_row))
 
-    # Other rows: backward difference  (ind, ind-1) = -1;  (ind, ind) = +1
     r_nfr = np.repeat(not_first_row, 2)
     c_nfr = np.empty(2 * len(not_first_row), dtype=np.int64)
     c_nfr[0::2] = not_first_row - 1
@@ -896,20 +608,16 @@ def gen_partialmat(im_row: int, im_col: int):
     vals_py = np.concatenate([v_fr, v_nfr])
     py_mat = sparse.csr_matrix((vals_py, (rows_py, cols_py)), shape=(n, n))
 
-    # -- px_mat (horizontal / column gradient) --
-    # In column-major ordering, first-column pixels are at indices 0..M-1
     first_col_mask = all_inds < M
     first_col = all_inds[first_col_mask]
     not_first_col = all_inds[~first_col_mask]
 
-    # First column: forward difference  (ind, ind) = -1;  (ind, ind+M) = +1
     r_fc = np.repeat(first_col, 2)
     c_fc = np.empty(2 * len(first_col), dtype=np.int64)
     c_fc[0::2] = first_col
     c_fc[1::2] = first_col + M
     v_fc = np.tile(np.array([-1.0, 1.0]), len(first_col))
 
-    # Other columns: backward difference  (ind, ind) = +1;  (ind, ind-M) = -1
     r_nfc = np.repeat(not_first_col, 2)
     c_nfc = np.empty(2 * len(not_first_col), dtype=np.int64)
     c_nfc[0::2] = not_first_col
@@ -924,32 +632,10 @@ def gen_partialmat(im_row: int, im_col: int):
     return px_mat, py_mat
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Abs_matrix  (from chen code/Abs_matrix.m)
-# ═════════════════════════════════════════════════════════════════════════════
 
 def Abs_matrix(I: np.ndarray) -> sparse.dia_matrix:
     """
-    Build diagonal sign matrix.
-    Equivalent to MATLAB chen code/Abs_matrix.m.
-
-    Computes diag(sign(I)), where sign(0) = 1 (not 0).
-
-    MATLAB:
-        abs_I = abs(I) ./ I;          % = sign(I), NaN for zeros
-        abs_I(isnan(abs_I)) = 1;      % zeros -> 1
-        Abs_mat = sparse(1:MN, 1:MN, abs_I(:), MN, MN);
-
-    CRITICAL: The diagonal values are stored in COLUMN-MAJOR order
-    to match MATLAB's abs_I(:).
-
-    Parameters
-    ----------
-    I : (M, N) 2D array
-
-    Returns
-    -------
-    Abs_mat : (M*N, M*N) sparse diagonal matrix
+    Построение разреженной диагональной матрицы знаков элементов.
     """
     with np.errstate(divide='ignore', invalid='ignore'):
         abs_I = np.abs(I) / I
@@ -963,70 +649,54 @@ def Abs_matrix(I: np.ndarray) -> sparse.dia_matrix:
     return sparse.diags(diag_vals, 0, shape=(n, n), format='csr')
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Max_matrix  (from chen code/Max_matrix.m)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def Max_matrix(I: np.ndarray, patch_size: int,
                softmax_tau: float = None) -> sparse.csr_matrix:
     """
-    Build sparse matrix that maps each pixel to the position of the local
-    maximum total variation in its neighbourhood.
-    Equivalent to MATLAB chen code/Max_matrix.m.
+    Построение разреженной матрицы выбора локального максимума.
 
-    When *softmax_tau* is ``None`` or ``<= 0`` the original hard-argmax
-    behaviour is used: for each pixel exactly one neighbour is selected
-    (the one with the largest TV).  The result is a permutation-like
-    matrix with exactly one 1 per row.
+    При значении параметра softmax_tau > 0 осуществляется вероятностное
+    (мягкое) взвешивание соседей вместо жесткого выбора единичного максимума.
+    Это преобразует оператор в непрерывную функцию от входного сигнала
+    и устраняет хаотичную нестабильность при переключении индексов.
 
-    When *softmax_tau* ``> 0`` a **soft-max** weighting is used instead:
-    each row contains normalised weights
+    Параметры
+    ---------
+    I : ndarray
+        Карта полной вариации размерности (M, N).
+    patch_size : int
+        Размер окрестности локального поиска (нечетное число).
+    softmax_tau : float, опционально
+        Температурный параметр для функции softmax. Если не задан,
+        применяется стандартное жесткое отсечение.
 
-        w_i = exp(TV_i / tau) / sum_j exp(TV_j / tau)
-
-    computed over the ``patch_size x patch_size`` neighbourhood.  This
-    makes the operator a *continuous* function of the input, eliminating
-    the chaotic instability caused by noise-sensitive argmax switches.
-
-    CRITICAL: Uses COLUMN-MAJOR (Fortran) indexing internally to match
-    MATLAB.
-
-    Parameters
-    ----------
-    I           : (M, N) 2D array — typically abs(px) + abs(py) (TV map)
-    patch_size  : int — must be odd
-    softmax_tau : float or None — temperature for soft-max.  None/0 = hard.
-
-    Returns
-    -------
-    max_mat : (M*N, M*N) sparse CSR matrix
+    Возвращаемое значение
+    ---------------------
+    max_mat : sparse.csr_matrix
+        Разреженная матрица весов размерности (M*N, M*N).
     """
     M, N = I.shape
     padsize = patch_size // 2
     n_px = M * N
 
-    # ── Soft-max branch ──────────────────────────────────────────────────
     if softmax_tau is not None and softmax_tau > 0:
         row_list = []
         col_list = []
         val_list = []
 
-        for n_0 in range(N):            # col-major outer
-            for m_0 in range(M):        # col-major inner
+        for n_0 in range(N):           
+            for m_0 in range(M):        
                 r_s = max(0, m_0 - padsize)
-                r_e = min(M, m_0 + padsize + 1)  # exclusive
+                r_e = min(M, m_0 + padsize + 1)
                 c_s = max(0, n_0 - padsize)
                 c_e = min(N, n_0 + padsize + 1)
 
                 patch = I[r_s:r_e, c_s:c_e]
                 flat = patch.flatten(order='F')
 
-                # Numerically stable soft-max
                 shifted = flat - flat.max()
                 exp_v = np.exp(shifted / softmax_tau)
                 w = exp_v / exp_v.sum()
 
-                # Global column-major indices for every patch pixel
                 h1, h2 = patch.shape
                 lr = np.arange(h1)
                 lc = np.arange(h2)
@@ -1045,31 +715,25 @@ def Max_matrix(I: np.ndarray, patch_size: int,
             shape=(n_px, n_px)
         )
 
-    # ── Original hard-argmax branch ──────────────────────────────────────
-    h_val = (patch_size + 1) // 2  # ceil(patch_size/2), MATLAB 1-based centre
+    h_val = (patch_size + 1) // 2
 
     J_index = np.zeros((M, N), dtype=np.int64)
 
     for m_0 in range(M):
-        m_1 = m_0 + 1  # MATLAB 1-based
+        m_1 = m_0 + 1
         for n_0 in range(N):
-            n_1 = n_0 + 1  # MATLAB 1-based
-
-            # MATLAB: patch = I(max(1,m-padsize):min(M,m+padsize), ...)
+            n_1 = n_0 + 1
             r_start_1 = max(1, m_1 - padsize)
             r_end_1 = min(M, m_1 + padsize)
             c_start_1 = max(1, n_1 - padsize)
             c_end_1 = min(N, n_1 + padsize)
 
-            # Convert to 0-based Python slicing
             patch = I[r_start_1 - 1:r_end_1, c_start_1 - 1:c_end_1]
             h1, h2 = patch.shape
 
-            # Find max in column-major flattening (MATLAB convention)
             flat = patch.flatten(order='F')
-            tmp_idx = int(np.argmax(flat)) + 1  # 1-based
+            tmp_idx = int(np.argmax(flat)) + 1
 
-            # Compute origin offset (accounts for boundary truncation)
             ori_i = h_val - (patch_size - h1)
             ori_j = h_val - (patch_size - h2)
 
@@ -1078,19 +742,16 @@ def Max_matrix(I: np.ndarray, patch_size: int,
             if ori_j != h_val and n_1 > h_val:
                 ori_j = h2 + 1 - ori_j
 
-            # Convert column-major flat index to 2D (1-based)
             J_need = int(np.ceil(tmp_idx / h1))
             I_need = tmp_idx - (J_need - 1) * h1
 
-            # Global 1-based coordinates of the max position
             i_quote = m_1 + I_need - ori_i
             j_quote = n_1 + J_need - ori_j
 
-            # Store 0-based column-major global index
             J_index[m_0, n_0] = (i_quote - 1) + (j_quote - 1) * M
 
     sparse_row = np.arange(n_px, dtype=np.int64)
-    sparse_col = J_index.flatten(order='F')  # column-major to match MATLAB
+    sparse_col = J_index.flatten(order='F')
     sparse_val = np.ones(n_px, dtype=np.float64)
 
     return sparse.csr_matrix(
@@ -1098,57 +759,42 @@ def Max_matrix(I: np.ndarray, patch_size: int,
     )
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# LMG  (from chen code/LMG.m)  — Local Maximum Gradient
-# ═════════════════════════════════════════════════════════════════════════════
-
 def LMG(img: np.ndarray, patch_size: int, softmax_tau: float = None):
     """
-    Compute Local Maximum Gradient map and operator.
-    Equivalent to MATLAB chen code/LMG.m.
+    Вычисление локального максимального градиента и сборка оператора матрицы.
 
-    For each pixel p, the LMG prior maps it to the gradient magnitude
-    at the position q* within a patch_size x patch_size neighbourhood
-    that has the largest total variation:
+    Модифицированная реализация с опциональной поддержкой гладкого вероятностного
+    взвешивания локальных экстремумов.
 
-        LMG(I)_p = |nabla I_{q*}|,  q* = argmax_{q in Omega(p)} |nabla I_q|
+    Параметры
+    ---------
+    img : ndarray
+        Полутоновое изображение размерности (M, N).
+    patch_size : int
+        Размер квадратной окрестности поиска максимума.
+    softmax_tau : float, опционально
+        Температурный параметр сглаживания операции выбора максимума.
 
-    When *softmax_tau* > 0 the hard argmax is replaced by a soft-max
-    weighted combination, making the operator a continuous function of
-    the input (see Max_matrix docstring).
-
-    CRITICAL: All flatten/reshape use order='F' (column-major) to match
-    MATLAB's img(:).
-
-    Parameters
-    ----------
-    img         : (M, N) 2D grayscale image, float64
-    patch_size  : int — neighbourhood size (should be odd)
-    softmax_tau : float or None — temperature for soft-max. None/0 = hard.
-
-    Returns
-    -------
-    output_img : (M, N) LMG map
-    A          : (M*N, M*N) sparse matrix — the full LMG operator G_S,
-                 such that A @ img.flatten('F') = output_img.flatten('F')
+    Возвращаемое значение
+    ---------------------
+    output_img : ndarray
+        Карта локального максимального градиента.
+    A : sparse.csr_matrix
+        Разреженный линейный оператор G_S.
     """
     M, N = img.shape
     px_mat, py_mat = gen_partialmat(M, N)
     img_vec = img.flatten(order='F')
 
-    # Compute gradient images
     px = (px_mat @ img_vec).reshape((M, N), order='F')
     py = (py_mat @ img_vec).reshape((M, N), order='F')
 
-    # Diagonal sign matrices
     abs_x_mat = Abs_matrix(px)
     abs_y_mat = Abs_matrix(py)
 
-    # Local maximum TV selection matrix (hard or soft)
     tv = np.abs(px) + np.abs(py)
     max_tv_mat = Max_matrix(tv, patch_size, softmax_tau=softmax_tau)
 
-    # Full LMG operator:  G = M_max * (|sign(px)| * D_x + |sign(py)| * D_y)
     A = max_tv_mat @ (abs_x_mat @ px_mat + abs_y_mat @ py_mat)
     output_vec = A @ img_vec
     output_img = output_vec.reshape((M, N), order='F')
