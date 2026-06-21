@@ -433,8 +433,8 @@ def _downSmpImC(I, ret):
     gy_1based = np.arange(1, rows + 1e-9, 1.0 / ret)
     gx_grid, gy_grid = np.meshgrid(gx_1based, gy_1based)
 
-    gx_0 = gx_grid - 1.0   # column coords (0-based)
-    gy_0 = gy_grid - 1.0   # row coords (0-based)
+    gx_0 = gx_grid - 1.0  
+    gy_0 = gy_grid - 1.0   
 
     sI = map_coordinates(I_filtered,
                          [gy_0.ravel(), gx_0.ravel()],

@@ -1,38 +1,22 @@
 """
 solvers.py
 
-Core solver functions for ECP (Extreme Channels Prior) blind deconvolution.
+Основные функции решателей для алгоритма слепой деконволюции 
+на основе априорного распределения экстремальных каналов (ECP).
 
-Ported from MATLAB code by Yan, Ren, Guo, Wang, Cao (CVPR 2017).
+Основано на методе:
+    Y. Yan, W. Ren, Y. Guo, R. Wang, X. Cao: "Image Deblurring via
+    Extreme Channels Prior", CVPR, 2017.
 
-Reference:
-    Y. Yan, W. Ren, Y. Guo, R. Wang, X. Cao, "Image Deblurring via
-    Extreme Channels Prior", CVPR 2017.
+Алгоритм ECP расширяет подход DCP за счет добавления симметричного 
+условия для светлого канала, которое реализуется через извлечение 
+темного канала от инвертированного изображения (1 - S) внутри 
+основной оптимизационной I-подзадачи.
 
-ECP augments the Dark Channel Prior (Pan et al., CVPR 2016) with a
-symmetric Bright Channel term, realised via ``dark_channel(1 - S)``
-inside the I-sub-problem.  The bulk of the pipeline mirrors DCP; the
-ECP-specific change lives in ``L0Deblur_dark_channel_BD``.
-
-File mapping (MATLAB → Python):
-    estimate_psf.m              → estimate_psf
-    L0Deblur_dark_chanelBD.m    → L0Deblur_dark_channel_BD   (ECP I-sub)
-    L0Restoration.m             → L0Restoration
-    blind_deconv_mainBDF.m      → blind_deconv_main_BDF      (single-scale)
-    blind_deconvBDF.m           → blind_deconv               (multi-scale wrapper)
-    deblurring_adm_aniso.m      → deblurring_adm_aniso
-    ringing_artifacts_removal.m → ringing_artifacts_removal
-
-MATLAB → Python notes:
-    conv2(A,B,'valid')        → scipy.signal.convolve2d(A,B,'valid')
-    diff(S,1,2)               → np.diff(S, n=1, axis=1)
-    diff(S,1,1)               → np.diff(S, n=1, axis=0)
-    S(:,1,:) - S(:,end,:)     → S[:, 0:1, :] - S[:, -1:, :]
-    repmat(A,[1,1,D])         → np.tile(A, (1, 1, D))
-    fft2/ifft2/conj           → np.fft.fft2 / ifft2 / conj
-    bwconncomp(k,8)           → scipy.ndimage.label(k, structure=np.ones((3,3)))
-    imresize(k, ret)          → scipy.ndimage.zoom (bicubic, order=3)
-    interp2(I,gx,gy,'bilin')  → scipy.ndimage.map_coordinates
+Модифицированная версия включает поддержку передачи пользовательских 
+функций шумоподавления (blind_denoise_fn) внутрь итерационного цикла 
+слепой оценки, а также систему событийной телеметрии (progress_callback) 
+для анализа сходимости алгоритма.
 """
 
 import numpy as np
@@ -55,14 +39,12 @@ from .utils import (
 )
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# estimate_psf  (from estimate_psf.m)
-# ═════════════════════════════════════════════════════════════════════════════
 
 def _compute_Ax(x, p):
     """
-    Matrix–vector product for the PSF estimation CG system.
-    MATLAB: y = otf2psf(p.m .* psf2otf(x, p.img_size), p.psf_size) + p.lambda * x
+    Вычисление произведения матрицы на вектор для системы сопряженных градиентов.
+    
+    Реализует оператор: y = otf2psf(m * psf2otf(x)) + lambda * x
     """
     x_f = psf2otf(x, p['img_size'])
     y = otf2psf(p['m'] * x_f, p['psf_size'])
@@ -72,9 +54,28 @@ def _compute_Ax(x, p):
 
 def estimate_psf(blurred_x, blurred_y, latent_x, latent_y, weight, psf_size):
     """
-    Estimate blur kernel from gradient images via conjugate gradient.
+    Оценка ядра размытия на основе градиентных изображений с использованием 
+    метода сопряженных градиентов в частотной области.
 
-    Equivalent to MATLAB estimate_psf.m.
+    Решает оптимизационную задачу:
+        min_k || grad(I) * k - grad(B) ||_2^2 + weight * || k ||_2^2
+
+    Параметры
+    ---------
+    blurred_x, blurred_y : ndarray
+        Градиентные изображения размытого входа.
+    latent_x, latent_y : ndarray
+        Градиентные изображения скрытого изображения.
+    weight : float
+        Весовой коэффициент L2-регуляризации ядра.
+    psf_size : tuple
+        Ожидаемый пространственный размер ядра (kh, kw).
+
+    Возвращает
+    ----------
+    psf : ndarray
+        Оцененное ядро размытия, прошедшее пороговую обработку 
+        и нормализацию (сумма элементов равна 1).
     """
     latent_xf = fft2(latent_x)
     latent_yf = fft2(latent_y)
@@ -99,38 +100,43 @@ def estimate_psf(blurred_x, blurred_y, latent_x, latent_y, weight, psf_size):
     return psf
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# L0Deblur_dark_channel_BD  (from L0Deblur_dark_chanelBD.m) — ECP I-sub-problem
-# ═════════════════════════════════════════════════════════════════════════════
 
 def L0Deblur_dark_channel_BD(Im, kernel, lambda_dark, wei_grad, kappa=2.0):
     """
-    Image restoration with L0 dark-channel + L0 bright-channel + L0 gradient
-    prior.  This is the ECP I-sub-problem.
+    Восстановление изображения с совместным использованием L0-регуляризации 
+    темного канала, светлого канала и градиентов (ECP I-подзадача).
 
-    Equivalent to MATLAB L0Deblur_dark_chanelBD.m.
+    Решает оптимизационную задачу:
+        min_S || S * k - Im ||_2^2 + lambda_dark * || D(S) ||_0 
+              + lambda_dark * || 1 - B(S) ||_0 + wei_grad * || grad(S) ||_0
 
-    Objective:
-        min_S ||S*k - Im||^2 + λ_D |D(S)|_0 + λ_B |1 - B(S)|_0 + μ |∇S|_0
+    Отличия от DCP:
+    - Присутствует дополнительная пиксельная подзадача для светлого канала 
+      (вычисляется как 1 - S).
+    - В знаменателе шага обновления скрытого изображения (через БПФ) 
+      используется коэффициент 2 * mybeta_pixel для компенсации двух 
+      вспомогательных пиксельных переменных.
+    - Используется окно поиска dark_r = 45 (вместо 35).
+    - Максимальное значение штрафного пиксельного параметра ограничено числом 8.
 
-    Notes relative to the DCP version (L0Deblur_dark_chanel.m):
-        • extra pixel sub-problem for the bright channel (``1 - S``),
-        • the denominator of the FFT update contains ``2 * mybeta_pixel``
-          (two pixel-channel auxiliary variables instead of one),
-        • the dark-channel patch size is ``dark_r = 45`` (vs 35 in DCP),
-        • ``maxbeta_pixel = 8`` (same numerical value as ``2**3``).
+    Параметры
+    ---------
+    Im : ndarray
+        Размытое изображение размерности (N, M) или (N, M, D) 
+        с уже дополненными границами.
+    kernel : ndarray
+        Ядро размытия размерности (kh, kw).
+    lambda_dark : float
+        Весовой коэффициент для регуляризации экстремальных каналов.
+    wei_grad : float
+        Весовой коэффициент для регуляризации градиентов.
+    kappa : float, по умолчанию 2.0
+        Множитель увеличения штрафного параметра ADM.
 
-    Parameters
+    Возвращает
     ----------
-    Im      : (N, M) or (N, M, D) blurred image (already boundary-wrapped)
-    kernel  : (kh, kw) blur kernel
-    lambda_dark : weight for the L0 dark/bright channel priors
-    wei_grad    : weight for the L0 gradient prior
-    kappa       : ADM update ratio (default 2.0)
-
-    Returns
-    -------
-    S : (N, M) or (N, M, D) restored image
+    S : ndarray
+        Восстановленное скрытое изображение.
     """
     S = Im.copy()
     betamax = 1e5
@@ -162,25 +168,18 @@ def L0Deblur_dark_channel_BD(Im, kernel, lambda_dark, wei_grad, kappa=2.0):
 
     Normin1 = np.conj(KER) * fft2(S, axes=(0, 1))
 
-    dark_r = 45  # MATLAB L0Deblur_dark_chanelBD.m hard-codes this
+    dark_r = 45  
 
-    # MATLAB: mybeta_pixel = lambda / graythresh((S).^2)
     mybeta_pixel = lambda_dark / graythresh(S ** 2)
-    maxbeta_pixel = 8  # MATLAB: 2^3
+    maxbeta_pixel = 8  
 
     while mybeta_pixel < maxbeta_pixel:
-        # ── Dark-channel pixel sub-problem ──────────────────────────────
         J, J_idx = dark_channel(S, dark_r)
         u = J.copy()
-        # MATLAB: if D==1:  t = u.^2 < lambda/mybeta_pixel
-        #         else:     t = sum(u.^2, 3) < lambda/mybeta_pixel
-        # J from dark_channel is always 2D (min already taken across channels),
-        # so a 2D threshold is always what we want.
         t = u ** 2 < lambda_dark / mybeta_pixel
         u[t] = 0.0
         u = assign_dark_channel_to_pixel(S, u, J_idx, dark_r)
 
-        # ── Bright-channel pixel sub-problem (operate on 1 - S) ─────────
         BS = 1.0 - S
         BJ, BJ_idx = dark_channel(BS, dark_r)
         bu = BJ.copy()
@@ -188,16 +187,12 @@ def L0Deblur_dark_channel_BD(Im, kernel, lambda_dark, wei_grad, kappa=2.0):
         bu[t] = 0.0
         bu = assign_dark_channel_to_pixel(BS, bu, BJ_idx, dark_r)
 
-        # ── Gradient sub-problem ────────────────────────────────────────
         beta = 2.0 * wei_grad
         while beta < betamax:
-            # Two pixel-channel auxiliaries → ``2 * mybeta_pixel`` in denom.
             Denormin = Den_KER + beta * Denormin2 + 2.0 * mybeta_pixel
 
-            # MATLAB: h = [diff(S,1,2), S(:,1,:) - S(:,end,:)]
             h = np.concatenate([np.diff(S, n=1, axis=1),
                                 S[:, 0:1, :] - S[:, -1:, :]], axis=1)
-            # MATLAB: v = [diff(S,1,1); S(1,:,:) - S(end,:,:)]
             v = np.concatenate([np.diff(S, n=1, axis=0),
                                 S[0:1, :, :] - S[-1:, :, :]], axis=0)
 
@@ -210,16 +205,13 @@ def L0Deblur_dark_channel_BD(Im, kernel, lambda_dark, wei_grad, kappa=2.0):
             h[t] = 0.0
             v[t] = 0.0
 
-            # MATLAB: Normin2 = [h(:,end,:) - h(:,1,:), -diff(h,1,2)]
             Normin2_val = np.concatenate([h[:, -1:, :] - h[:, 0:1, :],
                                           -np.diff(h, n=1, axis=1)], axis=1)
-            # MATLAB: Normin2 = Normin2 + [v(end,:,:) - v(1,:,:); -diff(v,1,1)]
             Normin2_val = Normin2_val + np.concatenate(
                 [v[-1:, :, :] - v[0:1, :, :],
                  -np.diff(v, n=1, axis=0)], axis=0
             )
 
-            # Broadcast 2D pixel-channel auxiliaries to (N, M, D) for fft2
             if D == 1:
                 u_3d = u[:, :, np.newaxis] if u.ndim == 2 else u
                 bu_3d = bu[:, :, np.newaxis] if bu.ndim == 2 else bu
@@ -244,17 +236,30 @@ def L0Deblur_dark_channel_BD(Im, kernel, lambda_dark, wei_grad, kappa=2.0):
     return S
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# L0Restoration  (from L0Restoration.m)
-# ═════════════════════════════════════════════════════════════════════════════
 
 def L0Restoration(Im, kernel, lambda_grad, kappa=2.0):
     """
-    Image restoration with L0 gradient prior only.
+    Восстановление изображения с использованием исключительно L0-нормы градиентов.
 
-    Equivalent to MATLAB L0Restoration.m.  Boundary-wraps the input to an
-    FFT-friendly size, runs HQS on the gradient prior, and crops back to
-    the original dimensions.
+    Производит автоматическое циклическое дополнение границ до размера, 
+    оптимального для БПФ, выполняет HQS оптимизацию и обрезает результат 
+    до исходных размеров.
+
+    Параметры
+    ---------
+    Im : ndarray
+        Входное размытое изображение.
+    kernel : ndarray
+        Ядро размытия.
+    lambda_grad : float
+        Вес L0-регуляризации градиентов.
+    kappa : float, по умолчанию 2.0
+        Множитель увеличения штрафного параметра.
+
+    Возвращает
+    ----------
+    S : ndarray
+        Восстановленное изображение исходного размера.
     """
     orig_ndim = Im.ndim
     H_orig, W_orig = Im.shape[0], Im.shape[1]
@@ -327,30 +332,54 @@ def L0Restoration(Im, kernel, lambda_grad, kappa=2.0):
     return S
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# blind_deconv_main_BDF  (from blind_deconv_mainBDF.m)
-# ═════════════════════════════════════════════════════════════════════════════
 
 def blind_deconv_main_BDF(blur_B, k, lambda_dark, lambda_grad, threshold, opts,
                           blind_denoise_fn=None, progress_callback=None,
                           scale_index=None):
     """
-    Single-scale blind deconvolution — ECP variant.
+    Выполнение слепой деконволюции (вариант ECP) на одном уровне масштабной пирамиды.
 
-    Equivalent to MATLAB blind_deconv_mainBDF.m.  Alternates between:
-      • I-sub-problem ``L0Deblur_dark_channel_BD`` (dark + bright + ∇) when
-        ``lambda_dark != 0``, else ``L0Restoration`` (fallback),
-      • gradient thresholding ``threshold_pxpy_v1``,
-      • k-sub-problem ``estimate_psf`` + connected-component pruning,
-      • continuation on ``lambda_dark`` and ``lambda_grad``.
+    Включает в себя чередующиеся этапы:
+    1. Оценка скрытого изображения (I-подзадача) с применением экстремальных 
+       каналов, либо fallback на L0-регуляризацию градиентов.
+    2. Опциональное шумоподавление скрытого изображения (если задана функция 
+       blind_denoise_fn) перед ограничением градиентов.
+    3. Адаптивное пороговое ограничение градиентов.
+    4. Оценка ядра размытия (k-подзадача) в частотной области с последующей 
+       зачисткой мелких компонент связности.
+    5. Обновление параметров регуляризации и вызов функции телеметрии 
+       (если задана progress_callback).
 
-    Optional hooks (defaults None — preserve original behaviour):
-      • blind_denoise_fn(S) → S' — applied after the I-sub-problem,
-        before gradient thresholding.  Used for noise-robust pipelines.
-      • progress_callback(event_dict) — called once per iteration after
-        the kernel update with telemetry: ``{scale, iter, kernel,
-        kernel_diff, lambda_dark, lambda_grad, sparsity}``.
-      • scale_index — integer passed through to the callback.
+    Параметры
+    ---------
+    blur_B : ndarray
+        Размытое изображение.
+    k : ndarray
+        Текущая оценка ядра размытия.
+    lambda_dark : float
+        Вес регуляризации экстремальных каналов.
+    lambda_grad : float
+        Вес регуляризации градиентов.
+    threshold : float
+        Адаптивный порог для ограничения градиентов.
+    opts : dict
+        Словарь с параметрами оптимизации (например, xk_iter).
+    blind_denoise_fn : callable или None, опционально
+        Пользовательская функция пространственной фильтрации промежуточного 
+        скрытого изображения S.
+    progress_callback : callable или None, опционально
+        Функция для логирования метрик и визуализации ядра на каждой итерации.
+    scale_index : int или None, опционально
+        Индекс текущего масштаба в пирамиде (передается в callback).
+
+    Возвращает
+    ----------
+    k : ndarray
+        Обновленное ядро размытия.
+    lambda_dark, lambda_grad : float
+        Обновленные (уменьшенные) веса регуляризаторов.
+    S : ndarray
+        Промежуточная оценка скрытого изображения.
     """
     dx = np.array([[-1, 1], [0, 0]], dtype=np.float64)
     dy = np.array([[-1, 0], [1, 0]], dtype=np.float64)
@@ -364,7 +393,6 @@ def blind_deconv_main_BDF(blur_B, k, lambda_dark, lambda_grad, threshold, opts,
     blur_B_w = wrap_boundary_liu(blur_B, tuple(target_size))
     blur_B_tmp = blur_B_w[:H, :W]
 
-    # MATLAB: Bx = conv2(blur_B_tmp, dx, 'valid'); By = conv2(blur_B_tmp, dy, 'valid')
     Bx = convolve2d(blur_B_tmp, dx, mode='valid')
     By = convolve2d(blur_B_tmp, dy, mode='valid')
 
@@ -372,25 +400,20 @@ def blind_deconv_main_BDF(blur_B, k, lambda_dark, lambda_grad, threshold, opts,
 
     S = None
     for _iter in range(xk_iter):
-        # I-sub-problem
         if lambda_dark != 0:
             S = L0Deblur_dark_channel_BD(blur_B_w, k, lambda_dark, lambda_grad, 2.0)
             S = S[:H, :W]
         else:
             S = L0Restoration(blur_B, k, lambda_grad, 2.0)
 
-        # Optional blind-loop denoiser on S before gradient threshold.
         if blind_denoise_fn is not None:
             try:
                 S_dn = blind_denoise_fn(S)
                 if S_dn is not None and S_dn.shape == S.shape:
                     S = S_dn
             except Exception:
-                # Never break the solver if the user-supplied denoiser
-                # fails — silently fall back to the un-denoised S.
                 pass
 
-        # Gradient thresholding
         latent_x, latent_y, threshold = threshold_pxpy_v1(
             S, max(k.shape), threshold
         )
@@ -398,7 +421,6 @@ def blind_deconv_main_BDF(blur_B, k, lambda_dark, lambda_grad, threshold, opts,
         k_prev = k.copy()
         k = estimate_psf(Bx, By, latent_x, latent_y, 2, k_prev.shape)
 
-        # MATLAB: bwconncomp(k, 8) + prune components whose sum < 0.1
         labeled, num_features = label(k, structure=np.ones((3, 3)))
         for ii in range(1, num_features + 1):
             mask = labeled == ii
@@ -407,7 +429,6 @@ def blind_deconv_main_BDF(blur_B, k, lambda_dark, lambda_grad, threshold, opts,
         k[k < 0] = 0.0
         k = k / k.sum()
 
-        # Optional progress callback (kernel snapshot per iteration).
         if progress_callback is not None:
             try:
                 kdiff = float(np.linalg.norm(k - k_prev))
@@ -426,7 +447,6 @@ def blind_deconv_main_BDF(blur_B, k, lambda_dark, lambda_grad, threshold, opts,
             except Exception:
                 pass
 
-        # Continuation
         if lambda_dark != 0:
             lambda_dark = max(lambda_dark / 1.1, 1e-4)
         if lambda_grad != 0:
@@ -438,27 +458,23 @@ def blind_deconv_main_BDF(blur_B, k, lambda_dark, lambda_grad, threshold, opts,
     return k, lambda_dark, lambda_grad, S
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# blind_deconv  (from blind_deconvBDF.m)  +  helper sub-functions
-# ═════════════════════════════════════════════════════════════════════════════
 
 def _init_kernel(minsize):
     """
-    Initialise kernel at coarsest level.
-    MATLAB: k = zeros(minsize); k((minsize-1)/2, (minsize-1)/2:(minsize-1)/2+1) = 1/2;
-    (1-based indexing.)
+    Инициализация ядра размытия на самом грубом уровне масштабной пирамиды.
+    Ядро инициализируется двумя центральными элементами со значениями 0.5.
     """
     k = np.zeros((minsize, minsize), dtype=np.float64)
-    c = (minsize - 1) // 2     # MATLAB (minsize-1)/2 is 1-based
-    r = c - 1                  # → 0-based
+    c = (minsize - 1) // 2     
+    r = c - 1                  
     k[r, r:r + 2] = 0.5
     return k
 
 
 def _downSmpImC(I, ret):
     """
-    Gaussian pre-filter + bilinear down-sample by factor *ret* (0 < ret ≤ 1).
-    Equivalent to MATLAB downSmpImC (Levin's code).
+    Понижающее масштабирование изображения с применением антиалиасингового 
+    гауссовского фильтра перед билинейной интерполяцией.
     """
     if ret == 1:
         return I.copy()
@@ -490,7 +506,6 @@ def _downSmpImC(I, ret):
     gy_1based = np.arange(1, rows + 1e-9, 1.0 / ret)
     gx_grid, gy_grid = np.meshgrid(gx_1based, gy_1based)
 
-    # 0-based for map_coordinates
     gx_0 = gx_grid - 1.0
     gy_0 = gy_grid - 1.0
 
@@ -513,8 +528,9 @@ def _downSmpImC(I, ret):
 
 def _fixsize(f, nk1, nk2):
     """
-    Adjust array *f* to target size (nk1, nk2) by trimming/padding on the
-    side with smaller sum.  Equivalent to MATLAB fixsize (Levin's code).
+    Корректировка пространственных размеров ядра до целевых значений (nk1, nk2). 
+    Осуществляется путем добавления или удаления крайних строк и столбцов 
+    со стороны с наименьшей суммой элементов.
     """
     k1, k2 = f.shape
 
@@ -562,8 +578,9 @@ def _fixsize(f, nk1, nk2):
 
 def _resizeKer(k, ret, k1, k2):
     """
-    Resize kernel by factor *ret*, clamp to ≥ 0, fix to (k1, k2), normalise.
-    MATLAB ``imresize`` default is bicubic → ``scipy.ndimage.zoom(order=3)``.
+    Увеличение разрешения ядра размытия при переходе от грубого к более 
+    детальному масштабу с использованием бикубической интерполяции, 
+    ограничением снизу нулем и последующей нормализацией.
     """
     k = zoom(k, ret, order=3)
     k = np.maximum(k, 0.0)
@@ -576,34 +593,36 @@ def _resizeKer(k, ret, k1, k2):
 def blind_deconv(y, lambda_dark, lambda_grad, opts,
                  blind_denoise_fn=None, progress_callback=None):
     """
-    Multi-scale ECP blind deconvolution.
+    Многомасштабная слепая деконволюция на основе метода ECP.
 
-    Equivalent to MATLAB blind_deconvBDF.m.
+    Формирует пирамиду разрешений и последовательно уточняет ядро размытия, 
+    передавая его от более грубых уровней к более детальным. 
+    Поддерживает встроенные хуки для промежуточной пространственной 
+    фильтрации скрытого изображения и логирования телеметрии.
 
-    Parameters
+    Параметры
+    ---------
+    y : ndarray
+        Полутоновое размытое изображение в формате float64 [0, 1].
+    lambda_dark : float
+        Вес регуляризатора для экстремальных каналов.
+    lambda_grad : float
+        Вес регуляризатора для L0-градиентов.
+    opts : dict
+        Словарь параметров конфигурации (kernel_size, gamma_correct, 
+        xk_iter, k_thresh).
+    blind_denoise_fn : callable или None, опционально
+        Пользовательский фильтр, вызываемый на скрытом изображении 
+        перед обновлением ядра.
+    progress_callback : callable или None, опционально
+        Функция для сбора метрик и фиксации состояния ядра.
+
+    Возвращает
     ----------
-    y           : (H, W) grayscale blurred image, float64 in [0, 1]
-    lambda_dark : weight for L0 dark+bright channel priors
-    lambda_grad : weight for L0 gradient prior
-    opts        : dict with keys
-                    'kernel_size'   : int — target kernel size (square, odd)
-                    'gamma_correct' : float — gamma correction exponent
-                    'xk_iter'       : int — iterations per scale
-                    'k_thresh'      : float — final kernel threshold
-                                      (>0: zero entries < max/k_thresh)
-    blind_denoise_fn : callable or None
-        Optional denoiser called on the latent image inside each
-        blind iteration (after the I-sub-problem, before gradient
-        thresholding).  Default None — paper-faithful behaviour.
-    progress_callback : callable or None
-        Optional telemetry hook.  Receives a dict per event with keys
-        ``event`` ∈ {'scale_start','iter','scale_end'} plus iteration
-        details (kernel snapshot, diffs, λ values).  Default None.
-
-    Returns
-    -------
-    kernel         : (kernel_size, kernel_size) estimated kernel
-    interim_latent : intermediate latent image at the finest scale
+    kernel : ndarray
+        Финально оцененное ядро размытия.
+    interim_latent : ndarray
+        Промежуточная оценка скрытого изображения на исходном масштабе.
     """
     gamma_correct = opts.get('gamma_correct', 1.0)
     if gamma_correct != 1:
@@ -619,7 +638,7 @@ def blind_deconv(y, lambda_dark, lambda_grad, opts,
 
     retv = ret ** np.arange(0, maxitr + 1)
     k1list = np.ceil(kernel_size * retv).astype(int)
-    k1list = k1list + (k1list % 2 == 0)  # odd sizes
+    k1list = k1list + (k1list % 2 == 0)  
     k2list = k1list.copy()
 
     threshold = None
@@ -627,7 +646,7 @@ def blind_deconv(y, lambda_dark, lambda_grad, opts,
     interim_latent = None
     kernel = None
 
-    for s in range(num_scales - 1, -1, -1):  # MATLAB: num_scales:-1:1
+    for s in range(num_scales - 1, -1, -1):  
         if s == num_scales - 1:
             ks = _init_kernel(int(k1list[s]))
         else:
@@ -684,20 +703,11 @@ def blind_deconv(y, lambda_dark, lambda_grad, opts,
     return kernel, interim_latent
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# deblurring_adm_aniso  (from deblurring_adm_aniso.m)
-# ═════════════════════════════════════════════════════════════════════════════
 
 def _computeDenominator(y, k):
     """
-    Compute spectral denominator components for the ADM / Split-Bregman
-    TV-ℓ² solver.  MATLAB: computeDenominator(y, k).
-
-    Returns
-    -------
-    Nomin1 : conj(F(k)) · F(y)
-    Denom1 : |F(k)|^2
-    Denom2 : |F(dx)|^2 + |F(dy)|^2
+    Предварительное вычисление компонентов знаменателя для метода 
+    расщепления Брэгмана (ADM) в частотной области.
     """
     sizey = y.shape[:2]
     otfk = psf2otf(k, sizey)
@@ -710,14 +720,28 @@ def _computeDenominator(y, k):
 
 def deblurring_adm_aniso(B, k, lambda_tv, alpha):
     """
-    TV-ℓ² deblurring via ADM / Split Bregman (anisotropic TV).
+    Неслепая TV-l2 деконволюция с использованием анизотропной полной вариации 
+    (метод ADM / Split Bregman).
 
-    Equivalent to MATLAB deblurring_adm_aniso.m.
+    В рамках текущего конвейера (и оригинальной реализации) функция всегда 
+    вызывается с параметром alpha=1, соответствующим мягкому пороговому 
+    ограничению.
 
-    In the ECP pipeline this is always invoked with ``alpha = 1`` from
-    ``ringing_artifacts_removal``, so only the soft-thresholding branch
-    is needed.  The α ≠ 1 branch (hyper-Laplacian via lookup table) is
-    not used and raises ``NotImplementedError`` on request.
+    Параметры
+    ---------
+    B : ndarray
+        Размытое изображение.
+    k : ndarray
+        Ядро размытия.
+    lambda_tv : float
+        Весовой коэффициент TV-регуляризатора.
+    alpha : int
+        Экспонента нормы. Поддерживается только alpha=1.
+
+    Возвращает
+    ----------
+    I : ndarray
+        Восстановленное изображение.
     """
     beta = 1.0 / lambda_tv
     beta_min = 0.001
@@ -742,10 +766,8 @@ def deblurring_adm_aniso(B, k, lambda_tv, alpha):
                 "deblurring_adm_aniso: only alpha=1 is used in the ECP pipeline"
             )
 
-        # MATLAB: Wxx = [Wx(:,end) - Wx(:,1), -diff(Wx,1,2)]
         Wxx = np.concatenate([Wx[:, -1:] - Wx[:, 0:1],
                               -np.diff(Wx, n=1, axis=1)], axis=1)
-        # MATLAB: Wxx = Wxx + [Wy(end,:) - Wy(1,:); -diff(Wy,1,1)]
         Wxx = Wxx + np.concatenate([Wy[-1:, :] - Wy[0:1, :],
                                     -np.diff(Wy, n=1, axis=0)], axis=0)
 
@@ -760,22 +782,38 @@ def deblurring_adm_aniso(B, k, lambda_tv, alpha):
     return I
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# ringing_artifacts_removal  (from ringing_artifacts_removal.m)
-# ═════════════════════════════════════════════════════════════════════════════
 
 def ringing_artifacts_removal(y, kernel, lambda_tv, lambda_l0, weight_ring):
     """
-    Non-blind deconvolution with TV + L0 + bilateral-based ringing removal.
+    Комплексное подавление артефактов звона после неслепой деконволюции.
 
-    Equivalent to MATLAB ringing_artifacts_removal.m.
+    Конвейер восстановления:
+    1. Расширение границ изображения до оптимального для БПФ размера.
+    2. Поканальная TV-l2 деконволюция (алгоритм ADM).
+    3. Если подавление звона отключено (weight_ring == 0), возвращается 
+       результат метода TV.
+    4. Иначе выполняется параллельная L0-деконволюция исходного изображения.
+    5. Разница между результатами TV и L0 пропускается через билатеральный фильтр 
+       и вычитается из результата TV для устранения высокочастотного звона 
+       с сохранением исходной текстуры.
 
-    Pipeline:
-        1. wrap_boundary_liu to an FFT-friendly size.
-        2. Per-channel TV-ℓ² deblurring (``deblurring_adm_aniso``).
-        3. If ``weight_ring == 0`` return the TV result.
-        4. L0 deblurring (``L0Restoration``) of the original-size image.
-        5. ``result = Latent_tv - weight_ring * bilateral(Latent_tv - Latent_l0)``.
+    Параметры
+    ---------
+    y : ndarray
+        Входное размытое полноцветное изображение.
+    kernel : ndarray
+        Ядро размытия.
+    lambda_tv : float
+        Вес TV-регуляризации.
+    lambda_l0 : float
+        Вес L0-регуляризации градиентов.
+    weight_ring : float
+        Сила вычитания артефактов звона.
+
+    Возвращает
+    ----------
+    result : ndarray
+        Восстановленное изображение без эффекта звона.
     """
     H, W = y.shape[0], y.shape[1]
 
@@ -784,7 +822,6 @@ def ringing_artifacts_removal(y, kernel, lambda_tv, lambda_l0, weight_ring):
     )
     y_pad = wrap_boundary_liu(y, tuple(target_size))
 
-    # Per-channel TV deblurring
     if y_pad.ndim == 2:
         Latent_tv = deblurring_adm_aniso(y_pad, kernel, lambda_tv, 1)
     else:
@@ -803,7 +840,6 @@ def ringing_artifacts_removal(y, kernel, lambda_tv, lambda_l0, weight_ring):
     if weight_ring == 0:
         return Latent_tv
 
-    # L0 deblurring; L0Restoration handles boundary wrapping + crop internally
     Latent_l0 = L0Restoration(y, kernel, lambda_l0, 2)
 
     diff_img = Latent_tv - Latent_l0

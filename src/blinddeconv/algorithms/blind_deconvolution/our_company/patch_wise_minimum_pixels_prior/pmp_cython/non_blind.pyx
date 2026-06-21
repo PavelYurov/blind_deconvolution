@@ -136,8 +136,8 @@ def _fast_deconv_adaptive(yin, kernel, alpha, alpha_n, lam):
 
     K = _psf2otf(kernel, (M, N))
     Y = fft2(yin)
-    Nomin1 = np.conj(K) * Y       # K^T · B
-    Denom1 = np.abs(K) ** 2        # |K|^2
+    Nomin1 = np.conj(K) * Y       
+    Denom1 = np.abs(K) ** 2        
 
     gx = np.array([[1, -1]], dtype=np.float64)
     gy = np.array([[1], [-1]], dtype=np.float64)
@@ -152,7 +152,7 @@ def _fast_deconv_adaptive(yin, kernel, alpha, alpha_n, lam):
     youtn = yin - np.real(ifft2(fft2(yout) * K))
 
     betas = np.geomspace(1, 2 ** 8, num=9)
-    gamma = 1.0 / 50.0     # = beta_g / beta_n
+    gamma = 1.0 / 50.0     
     beta_n = betas * lam / gamma
     beta_g = betas
 

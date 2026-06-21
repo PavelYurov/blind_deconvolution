@@ -1,39 +1,36 @@
 """
 esm.py
 
-Blind Image Deblurring with the Enhanced Sparse Model (ESM).
+Слепая деконволюция изображений с использованием улучшенной разреженной 
+модели (Enhanced Sparse Model, ESM) с расширенным конвейером шумоподавления.
 
-Reference:
+Основано на методе:
     L. Chen, F. Fang, S. Lei, F. Li, G. Zhang: "Enhanced Sparse Model
-    for Blind Deblurring", ECCV 2020.
+    for Blind Deblurring", ECCV, 2020.
 
-Pipeline (mirrors MATLAB demo_deblurring.m):
-    1. Normalise input to float64 [0, 1].
-    2. Convert to grayscale for kernel estimation (if colour).
-    3. (Optional) noise pipeline — disabled by default; behaviour is
-       bit-for-bit identical to the original ESM demo when every noise
-       toggle is left at ``'none'`` and ``auto_mode='off'``.
-    4. Multi-scale ESM blind kernel estimation (blind_deconv).
-    5. Non-blind restoration on the full (colour) image — either the
-       paper-default ``ringing_artifacts_removal`` (TV-ℓ² + L0 +
-       bilateral-filter ringing subtraction) or ``adaptive_lp``.
-    6. Return restored image (int16, [0, 255]) and the PSF.
+Конвейер обработки включает модификации для работы с зашумленными данными:
+1. Нормализация входного изображения к диапазону float64 [0, 1].
+2. Преобразование в полутоновый формат для оценки ядра размытия.
+3. Опциональный конвейер обработки шума (обнаружение импульсного шума, 
+   оценка дисперсии, пространственная фильтрация и фильтрация спектра мощности).
+4. Многомасштабная слепая оценка ядра размытия методом ESM с возможностью 
+   промежуточного шумоподавления.
+5. Неслепое восстановление полноцветного изображения с подавлением 
+   артефактов звона или с использованием адаптивного Lp-регуляризатора.
+6. Возврат восстановленного изображения (в формате int16 [0, 255]) и 
+   оцененного ядра.
 
-The optional noise pipeline mirrors the LIP / ECP modules so that all
-three methods expose the same interface for noise-aware experiments.
-The ESM *core* parameters (``lambda_data``, ``lambda_grad``, ``theta``,
-``xk_iter``, ``k_thresh``, ``kernel_size``) are kept **paper-faithful**
-in every regime — the robust orchestrator only adapts denoisers and
-the non-blind step.  Optional ESM-specific adaptations (σ-floors on
-the ℓ0−ℓ1 thresholds, ∇B sanitation, continuation-rate override) are
-gated behind the ``expert_noise_adapt`` flag.
+Базовые параметры ESM (веса регуляризации, параметр theta, размер ядра) 
+остаются неизменными в любых режимах, в то время как робастный оркестратор 
+автоматически адаптирует выбор фильтров и параметры неслепой деконволюции 
+на основе оцененного уровня шума. Специфические для ESM экспертные 
+адаптации порогов доступны через включение соответствующего флага.
 """
 
 import numpy as np
 import time
 from typing import Tuple, List, Any, Dict, Callable, Optional
 
-# ── Framework base class import (DO NOT MODIFY) ─────────────────────────────
 import sys
 from pathlib import Path
 
@@ -57,7 +54,6 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
         sys.path.insert(0, _path)
 
 from blinddeconv.algorithms.base import DeconvolutionAlgorithm
-# ─────────────────────────────────────────────────────────────────────────────
 
 from .solvers import blind_deconv, ringing_artifacts_removal
 from blinddeconv.algorithms.mod_denoise.impulse_noise_estimation import (
@@ -69,125 +65,93 @@ from blinddeconv.algorithms.mod_denoise.impulse_noise_estimation import (
 
 class ESM_BD(DeconvolutionAlgorithm):
     """
-    Blind deconvolution using the Enhanced Sparse Model (ECCV 2020).
+    Алгоритм слепой деконволюции на основе улучшенной разреженной модели 
+    с поддержкой адаптивного шумоподавления.
 
-    Pipeline (mirrors MATLAB ``demo_deblurring.m`` from ESM):
-        1. Normalise input to float64 [0, 1].
-        2. Convert to grayscale for kernel estimation.
-        3. Noise pipeline (impulse → estimation → orchestrator →
-           ScreeNOT/ACT → preprocess → PSD filtering).
-        4. Multi-scale ESM blind kernel estimation (blind_deconv) with
-           optional ``blind_denoise`` before each kernel step.
-        5. Pre-nonblind denoising (optional, on the full colour image).
-        6. Non-blind restoration: ``ringing_removal`` (default) or
-           ``adaptive_lp``.
-        7. Return restored image (int16, [0, 255]) and kernel.
+    Если все опции шумоподавления отключены ('none') и отключен 
+    автоматический режим, конвейер полностью соответствует оригинальному 
+    алгоритму ESM.
 
-    With every noise toggle left at ``'none'`` and ``auto_mode='off'``
-    the pipeline is bit-for-bit identical to the original ESM demo.
+    Параметры алгоритма деконволюции
+    --------------------------------
+    kernel_size : int, по умолчанию 35
+        Пространственный размер неизвестной функции рассеяния точки (нечетное число).
+    lambda_data : float, по умолчанию 4e-3
+        Весовой коэффициент для L0-L1 априорного распределения остатка градиентов данных.
+    lambda_grad : float, по умолчанию 4e-3
+        Весовой коэффициент для L0-L1 априорного распределения градиентов изображения.
+    theta : float, по умолчанию 1.0
+        Параметр улучшенного разреженного L0-L1 распределения, контролирующий 
+        ширину зоны сжатия.
+    xk_iter : int, по умолчанию 5
+        Количество итераций слепой оценки на каждом уровне пирамиды масштабов.
+    gamma_correct : float, по умолчанию 1.0
+        Экспонента гамма-коррекции, применяемая перед оценкой ядра.
+    k_thresh : float, по умолчанию 20.0
+        Относительный порог обнуления шума в ядре.
+    lambda_tv : float, по умолчанию 0.002
+        Вес TV-регуляризации для этапа подавления звона.
+    lambda_l0 : float, по умолчанию 2e-4
+        Вес L0-регуляризации градиентов для этапа подавления звона.
+    weight_ring : float, по умолчанию 1.0
+        Коэффициент подавления артефактов звона.
+    final_deconv : str, по умолчанию 'ringing_removal'
+        Метод финальной неслепой деконволюции ('ringing_removal' или 'adaptive_lp').
+    verbose : bool, по умолчанию False
+        Флаг вывода подробной информации о решениях оркестратора.
+    progress_callback : callable, опционально
+        Функция обратного вызова для отслеживания прогресса многомасштабного решателя.
 
-    Parameters
-    ----------
-    kernel_size   : int — spatial support of the unknown PSF (square,
-                    odd).  Default 35 (as in demo_deblurring.m).
-    lambda_data   : float — weight of the ℓ0−ℓ1 prior on the
-                    data-gradient residual ``k*∇I − ∇B``.  Default 4e-3.
-    lambda_grad   : float — weight of the ℓ0−ℓ1 prior on ∇I.  Default 4e-3.
-    theta         : float — θ parameter of the ℓ0−ℓ1 enhanced-sparse
-                    prior.  Default 1.0.
-    xk_iter       : int — inner I/k alternations per pyramid level.
-                    Default 5.
-    gamma_correct : float — gamma correction applied before kernel
-                    estimation.  1.0 = no correction.  Default 1.0.
-    k_thresh      : float — final kernel threshold.  Default 20.
-    lambda_tv     : float — TV weight for the non-blind step.  Default 0.002.
-    lambda_l0     : float — L0 weight for the non-blind step.  Default 2e-4.
-    weight_ring   : float — ringing-suppression weight (0 = TV only).
-                    Default 1.0.
-    final_deconv  : ``'ringing_removal'`` (default, paper) or
-                    ``'adaptive_lp'``.
-    verbose       : print orchestrator decisions when ``auto_mode='robust'``.
-    progress_callback : optional ``callable(event_dict)`` invoked by the
-                    multi-scale solver.  Events: ``scale_start``, ``iter``
-                    (with kernel snapshot, ``kernel_diff``, λ values),
-                    ``scale_end``.
+    Параметры шумоподавления (по умолчанию отключены)
+    -------------------------------------------------
+    impulse_preprocess : str, по умолчанию 'none'
+        Режим подавления импульсного шума ('auto' или 'none').
+    impulse_params : dict, опционально
+        Параметры детектора импульсного шума.
+    noise_estimation : str, по умолчанию 'none'
+        Метод оценки дисперсии шума ('pca', 'chen' или 'none').
+    screenot_preprocess : str, по умолчанию 'none'
+        Использование SVD-фильтрации ScreeNOT перед слепой оценкой.
+    screenot_params : dict, опционально
+        Параметры фильтрации ScreeNOT.
+    act_preprocess : str, по умолчанию 'none'
+        Использование адаптивной фильтрации на основе курвлетов (ACT).
+    act_params : dict, опционально
+        Параметры ACT-фильтрации.
+    preprocess : str, по умолчанию 'none'
+        Пространственный фильтр для подготовки полутонового изображения.
+    preprocess_params : dict, опционально
+        Параметры пространственного фильтра. Можно передать 'use_vst': True 
+        для использования обобщенного преобразования Энскомба.
+    noise_preprocess : str, по умолчанию 'none'
+        Фильтрация на основе анализа спектра мощности (PSD).
+    noise_preprocess_params : dict, опционально
+        Параметры PSD-фильтрации.
+    blind_denoise : str, по умолчанию 'none'
+        Метод фильтрации промежуточного скрытого изображения внутри 
+        итераций оценки ядра.
+    blind_denoise_params : dict, опционально
+        Параметры фильтрации скрытого изображения.
+    pre_nonblind : str, по умолчанию 'none'
+        Метод фильтрации полноцветного изображения перед финальной деконволюцией.
+    pre_nonblind_params : dict, опционально
+        Параметры фильтра перед неслепым восстановлением.
+    nb_params : dict, опционально
+        Переопределение параметров финальной деконволюции.
+    auto_mode : str, по умолчанию 'off'
+        Режим работы оркестратора: 'off' или 'robust'.
+    auto_mode_params : dict, опционально
+        Параметры настройки оркестратора.
 
-    Noise Pipeline Parameters (all disabled by default)
-    ---------------------------------------------------
-    impulse_preprocess : str
-        'auto' — detect & remove impulse noise before blind deconvolution.
-        'none' — skip.
-    impulse_params : dict or None
-        Keys: 'density_threshold' (default 0.0005),
-              'outlier_threshold' (default 0.08),
-              'max_window' (default 7).
-    noise_estimation : str
-        'pca'  — Pyatykh et al. (TIP 2013) PCA + VST + kurtosis (preferred).
-        'chen' — Chen et al. (ICCV 2015) wavelet-based σ (fallback).
-        'none' — skip.  Auto-promoted to 'pca' when ``auto_mode='robust'``.
-    act_preprocess : str
-        'auto' — Adaptive Curvelet Thresholding before blind step.
-        'none' — skip.  Mutually exclusive with ``screenot_preprocess``.
-    act_params : dict or None
-        Keys: 'noise_var', 'threshold_setting' ('s'/'h').
-    screenot_preprocess : str
-        'auto' — ScreeNOT SVD denoising before blind step.  Fallback.
-        'none' — skip.
-    screenot_params : dict or None
-        Keys: 'k', 'strategy', 'mode', 'patch_size', 'stride'.
-    preprocess : str
-        Spatial denoiser before the pyramid: 'tv', 'nlm', 'bilateral',
-        'guided', 'bm3d', 'act', 'ensemble', or 'none'.
-    preprocess_params : dict or None
-        Denoiser-specific.  Pass ``{'use_vst': True}`` to wrap in a
-        Generalized Anscombe VST (requires PCA noise estimation).
-    noise_preprocess : str
-        PSD-based filter: 'auto', 'notch', 'bandstop', or 'none'.
-    noise_preprocess_params : dict or None
-    blind_denoise : str
-        Denoiser applied to S before each kernel update inside the
-        blind loop.  Same options as ``preprocess``.
-    blind_denoise_params : dict or None
-    pre_nonblind : str
-        Denoiser applied to the full colour image before the non-blind
-        step.  Same options as ``preprocess``.
-    pre_nonblind_params : dict or None
-    nb_params : dict or None
-        Override dict for the non-blind solver.
-        ``ringing_removal`` keys: 'lambda_tv', 'lambda_l0', 'weight_ring'.
-        ``adaptive_lp``     keys: 'alpha', 'two_stage'.
-    auto_mode : str
-        'off' (default) or 'robust'.  In 'robust' mode the orchestrator
-        estimates σ (PCA) and soft-blends the non-blind weights and
-        denoiser choices.  ESM core weights (λ_data, λ_grad, θ,
-        kernel_size, xk_iter) are **never** modified — the paper has
-        no σ rule for them.
-    auto_mode_params : dict or None
-        Orchestrator knobs.  Keys:
-        'sigma_clean' (default 0.005), 'sigma_heavy' (default 0.05),
-        'force_heavy_sigma' (default 0.01),
-        'k_lambda_tv' (default 0.05), 'k_lambda_l0' (default 0.01),
-        'k_weight_ring' (default 1.0), 'k_alpha' (default 0.1),
-        'ensemble_members' (default ('bm3d','nlm','bilateral')).
-    expert_noise_adapt : bool
-        Enable ESM-specific (paper-NON-faithful) adaptations of the
-        ℓ0−ℓ1 solver — σ-floors on the q/g hard/soft thresholds in
-        ``L0Restoration_HS`` and ``estimate_psf_l0``, optional ∇B
-        sanitation, and continuation-rate override.  Default False.
-        Requires ``noise_estimation`` ≠ 'none' (or ``auto_mode='robust'``)
-        to know σ.  Has no effect when σ ≈ 0.
-    expert_noise_adapt_params : dict or None
-        Knobs for ``expert_noise_adapt``:
-          'q_floor_factor'      (default 9.0) — c_hard for q² floor.
-          'g_floor_factor'      (default 9.0) — c_hard for g² floor.
-          'q_soft_floor_factor' (default 3.0) — c_soft for q soft floor.
-          'g_soft_floor_factor' (default 3.0) — c_soft for g soft floor.
-          'sanitize_grad'       (default False) — bilateral-filter Bx, By
-                                inside the blind loop.
-          'sanitize_grad_d'     (default 5)
-          'kappa'               (default None — keep paper 2.0).
-          'betamax'             (default None — keep paper 1e5).
-        Set any factor to 0 to disable that floor.
+    Экспертные параметры адаптации к шуму
+    -------------------------------------
+    expert_noise_adapt : bool, по умолчанию False
+        Включение специфичных для ESM модификаций, отклоняющихся от оригинальной 
+        статьи: введение порогов обнуления шума при оценке скрытого изображения 
+        и ядра (основанных на sigma), опциональная фильтрация градиентов данных.
+    expert_noise_adapt_params : dict, опционально
+        Параметры экспертной адаптации (коэффициенты жестких и мягких порогов, 
+        флаги санирования градиентов).
     """
 
     def __init__(
@@ -205,7 +169,6 @@ class ESM_BD(DeconvolutionAlgorithm):
         final_deconv: str = 'ringing_removal',
         verbose: bool = False,
         progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
-        # ── Noise pipeline (all disabled by default) ────────────────
         impulse_preprocess: str = 'none',
         impulse_params: Optional[dict] = None,
         noise_estimation: str = 'none',
@@ -229,7 +192,6 @@ class ESM_BD(DeconvolutionAlgorithm):
     ):
         super().__init__(name='ESM-BD')
 
-        # Core (paper-faithful)
         self.kernel_size = kernel_size
         self.lambda_data = lambda_data
         self.lambda_grad = lambda_grad
@@ -244,7 +206,6 @@ class ESM_BD(DeconvolutionAlgorithm):
         self.verbose = verbose
         self.progress_callback = progress_callback
 
-        # Noise pipeline
         self.impulse_preprocess = impulse_preprocess
         self.impulse_params = impulse_params
         self.noise_estimation = noise_estimation
@@ -266,9 +227,6 @@ class ESM_BD(DeconvolutionAlgorithm):
         self.expert_noise_adapt = bool(expert_noise_adapt)
         self.expert_noise_adapt_params = expert_noise_adapt_params
 
-        # Snapshot of defaults used by the robust orchestrator so that
-        # soft-blending always starts from values the user supplied,
-        # not from values overwritten on a previous process() call.
         self._defaults_snapshot = {
             'lambda_tv': float(lambda_tv),
             'lambda_l0': float(lambda_l0),
@@ -290,24 +248,47 @@ class ESM_BD(DeconvolutionAlgorithm):
         }
         self.hyperparams: Dict[str, Any] = {}
 
-    # ── Main entry point ─────────────────────────────────────────────────
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Запуск алгоритма слепой деконволюции с учетом конвейера шумоподавления.
+
+        Процесс включает:
+        1. Инициализацию истории выполнения и нормализацию входного изображения.
+        2. Извлечение яркостного канала для оценки ядра размытия.
+        3. Обработку дефектов: поиск и устранение импульсного шума, оценку 
+           параметров шума (sigma), отработку робастного оркестратора.
+        4. Предварительную фильтрацию (ScreeNOT, ACT, классические 
+           пространственные и частотные фильтры).
+        5. Многомасштабную оценку ядра методом ESM с опциональной фильтрацией 
+           скрытого изображения на каждой итерации и использованием 
+           экспертных адаптаций.
+        6. Финальную фильтрацию полноцветного размытого изображения 
+           и неслепую деконволюцию.
+
+        Параметры
+        ---------
+        image : ndarray
+            Входное изображение.
+
+        Возвращает
+        ----------
+        x_final : ndarray
+            Восстановленное изображение в формате int16 [0, 255].
+        kernel : ndarray
+            Оцененное ядро размытия.
+        """
         start_time = time.time()
 
-        # Reset run-local history (don't leak across process() calls).
         self.history = {
             'kernel_diff': [],
             'iterations': [],
             'scale_kernels': [],
         }
 
-        # ── 1. Normalise to float64 [0, 1] ──────────────────────────────
         y = image.astype(np.float64)
         if y.max() > 1.0:
             y /= 255.0
 
-        # ── 2. Grayscale for kernel estimation ──────────────────────────
-        # MATLAB: yg = im2double(rgb2gray(y))
         if y.ndim == 3 and y.shape[2] == 3:
             yg = 0.2989 * y[:, :, 0] + 0.5870 * y[:, :, 1] + 0.1140 * y[:, :, 2]
         elif y.ndim == 2:
@@ -327,7 +308,6 @@ class ESM_BD(DeconvolutionAlgorithm):
             return im[:, :, 0]
 
         def _per_channel(im, fn):
-            """Apply a 2D → 2D function ``fn`` per channel of ``im``."""
             if im.ndim == 2:
                 return fn(im)
             out = np.empty_like(im)
@@ -335,17 +315,10 @@ class ESM_BD(DeconvolutionAlgorithm):
                 out[:, :, _c] = fn(im[:, :, _c])
             return out
 
-        # Ensure kernel_size is odd (matches MATLAB convention)
         ks_size = int(self.kernel_size)
         if ks_size % 2 == 0:
             ks_size += 1
 
-        # ── 3a. Impulse noise detection & removal ──────────────────────
-        # Run the colour-aware ``remove_impulse_noise`` on the full image
-        # (detects on grayscale, then re-detects single-channel hits that
-        # are invisible on the luma map) and re-derive yg from the cleaned
-        # y_full so kernel estimation and the non-blind solver see a
-        # consistent input.
         impulse_info = None
         if self.impulse_preprocess == 'auto':
             ip = self.impulse_params or {}
@@ -372,7 +345,6 @@ class ESM_BD(DeconvolutionAlgorithm):
                 else:
                     yg = y_full
 
-        # ── 3b. Noise estimation ────────────────────────────────────────
         noise_info = None
         if self.noise_estimation != 'none':
             noise_info = self._estimate_noise(yg)
@@ -380,18 +352,13 @@ class ESM_BD(DeconvolutionAlgorithm):
             self.noise_estimation = 'pca'
             noise_info = self._estimate_noise(yg)
         elif self.expert_noise_adapt:
-            # Expert path also needs σ.
             self.noise_estimation = 'pca'
             noise_info = self._estimate_noise(yg)
 
-        # ── 3c. Robust orchestrator ─────────────────────────────────────
         orchestrator_info = None
         if self.auto_mode == 'robust':
             orchestrator_info = self._orchestrate_robust(noise_info)
 
-        # ── 3d. ScreeNOT SVD denoising (optional, fallback) ─────────────
-        # Per-channel onto y_full so non-blind also sees denoised image
-        # (LIP/PMP-style propagation). yg = luma(y_full).
         screenot_info = None
         if self.screenot_preprocess == 'auto':
             from blinddeconv.algorithms.mod_denoise.screenot import screenot_denoise
@@ -416,7 +383,6 @@ class ESM_BD(DeconvolutionAlgorithm):
                 y_full = _out
             yg = _luma(y_full)
 
-        # ── 3e. ACT curvelet denoising (preferred sanitation) ──────────
         act_info = None
         if self.act_preprocess == 'auto':
             if self.screenot_preprocess == 'auto':
@@ -444,7 +410,6 @@ class ESM_BD(DeconvolutionAlgorithm):
                 y_full = _out
             yg = _luma(y_full)
 
-        # ── 3f. Pre-pyramid spatial denoising ──────────────────────────
         if self.preprocess not in (None, 'none'):
             y_full = _per_channel(
                 y_full,
@@ -453,7 +418,6 @@ class ESM_BD(DeconvolutionAlgorithm):
             )
             yg = _luma(y_full)
 
-        # ── 3g. PSD-based noise preprocessing ──────────────────────────
         psd_info = None
         if self.noise_preprocess != 'none':
             if y_full.ndim == 2:
@@ -469,7 +433,6 @@ class ESM_BD(DeconvolutionAlgorithm):
                 y_full = _out
             yg = _luma(y_full)
 
-        # ── 4. Build optional blind-loop denoiser + telemetry ──────────
         blind_denoise_fn = None
         if self.blind_denoise not in (None, 'none'):
             def blind_denoise_fn(s_arr, _info=noise_info):
@@ -477,10 +440,8 @@ class ESM_BD(DeconvolutionAlgorithm):
 
         progress_proxy = self._make_progress_proxy()
 
-        # ── 4b. Build expert_adapt dict (paper-NON-faithful, opt-in) ───
         expert_adapt = self._build_expert_adapt(noise_info)
 
-        # ── 5. Blind kernel estimation (ESM multi-scale) ───────────────
         opts = {
             'kernel_size': ks_size,
             'gamma_correct': self.gamma_correct,
@@ -496,15 +457,12 @@ class ESM_BD(DeconvolutionAlgorithm):
             progress_callback=progress_proxy,
         )
 
-        # ── 6. Pre-nonblind denoising (operates on full image) ─────────
         if self.pre_nonblind not in (None, 'none'):
             y_full = self._apply_pre_nonblind(y_full, noise_info)
 
-        # ── 7. Non-blind restoration ───────────────────────────────────
         Latent = self._final_deconv(y_full, kernel, noise_info)
         Latent = np.clip(Latent, 0.0, 1.0)
 
-        # ── 8. Output / telemetry ──────────────────────────────────────
         self.hyperparams = {
             'kernel_size': ks_size,
             'lambda_data': self.lambda_data,
@@ -544,13 +502,12 @@ class ESM_BD(DeconvolutionAlgorithm):
         x_final = np.clip(x_final, 0, 255).astype(np.int16)
         return x_final, kernel
 
-    # ── expert_adapt builder ────────────────────────────────────────────
     def _build_expert_adapt(self, noise_info):
-        """Construct the optional ESM-specific adaptation dict.
+        """
+        Формирование словаря экспертных параметров для адаптации к шуму.
 
-        Returns ``None`` (= disabled) unless ``expert_noise_adapt`` is
-        True.  ``None`` keeps ``L0Restoration_HS`` / ``estimate_psf_l0``
-        bit-for-bit identical to the paper.
+        Если флаг expert_noise_adapt установлен в False, возвращает None, 
+        что обеспечивает полное соответствие поведения решателей оригинальной статье.
         """
         if not self.expert_noise_adapt:
             return None
@@ -558,8 +515,6 @@ class ESM_BD(DeconvolutionAlgorithm):
         if noise_info is not None:
             sigma = float(noise_info.get('sigma_norm', 0.0) or 0.0)
         if sigma <= 0.0:
-            # Estimator failed or image is clean — disable to avoid
-            # accidentally diverging from the paper.
             return None
         ep = dict(self.expert_noise_adapt_params or {})
 
@@ -595,15 +550,16 @@ class ESM_BD(DeconvolutionAlgorithm):
                   f"kappa={adapt.get('kappa', 'paper')}")
         return adapt
 
-    # ── Non-blind solver dispatch ────────────────────────────────────────
     def _final_deconv(self, y_full, kernel, noise_info):
+        """
+        Маршрутизация финального этапа неслепой деконволюции.
+
+        Выбирает метод восстановления (ringing_removal или adaptive_lp) 
+        и применяет его к изображению.
+        """
         nbp = self.nb_params or {}
         method = self.final_deconv
 
-        # 'auto' may survive into _final_deconv when the user sets
-        # final_deconv='auto' without auto_mode='robust' (orchestrator
-        # is the only place that resolves it).  Fall back to the paper
-        # default rather than raise.
         if method == 'auto':
             method = 'ringing_removal'
             self.final_deconv = method
@@ -639,13 +595,14 @@ class ESM_BD(DeconvolutionAlgorithm):
             f"Unknown final_deconv='{self.final_deconv}'. "
             "Choose 'ringing_removal' or 'adaptive_lp'.")
 
-    # ── Progress callback proxy ─────────────────────────────────────────
     def _make_progress_proxy(self):
-        """Wrap the user-supplied callback so we also record telemetry
-        in ``self.history``.  Always returns a callable so the multi-scale
-        solver records kernel snapshots even when no user callback is
-        supplied."""
-        user_cb = self._callback  # set via set_callback() in the base class
+        """
+        Обертка для пользовательской функции обратного вызова.
+
+        Записывает эволюцию параметров и ядра в словарь истории 
+        и передает форматированные события во внешний логгер.
+        """
+        user_cb = self._callback 
         history = self.history
 
         def proxy(event):
@@ -663,11 +620,6 @@ class ESM_BD(DeconvolutionAlgorithm):
                     })
             except Exception:
                 pass
-            # Forward only 'iter' events to the user callback.
-            # Translate the solver's flat event dict into the format that
-            # IterationLogger (and other callbacks) expect:
-            #   solver key 'iter'  → 'iteration'
-            #   remaining keys     → nested under 'metrics'
             if user_cb is not None and event.get('event') == 'iter':
                 try:
                     _meta = {'event', 'scale', 'num_scales',
@@ -686,9 +638,12 @@ class ESM_BD(DeconvolutionAlgorithm):
 
         return proxy
 
-    # ── Guided filter (box-filter variant, He et al. 2013) ─────────────
     @staticmethod
     def _guided_filter(I, p, r, eps):
+        """
+        Ускоренная реализация фильтра Guided Filter на основе усредняющих 
+        фильтров прямоугольного окна.
+        """
         from scipy.ndimage import uniform_filter
         size = 2 * r + 1
 
@@ -704,9 +659,10 @@ class ESM_BD(DeconvolutionAlgorithm):
         b = mean_p - a * mean_I
         return box(a) * I + box(b)
 
-    # ── Universal denoiser dispatch ─────────────────────────────────────
     def _apply_denoise(self, img, method, params, noise_info):
-        """Apply a spatial denoiser to a single-channel image [0, 1]."""
+        """
+        Применение пространственного фильтра к одноканальному изображению.
+        """
         if method is None or method == 'none':
             return img
         p = dict(params or {})
@@ -790,9 +746,11 @@ class ESM_BD(DeconvolutionAlgorithm):
                 f"'tv', 'nlm', 'bilateral', 'guided', 'bm3d', "
                 f"'act', 'ensemble', 'none'")
 
-    # ── Generalized Anscombe VST wrapper ────────────────────────────────
     def _apply_denoise_vst(self, img, method, params, noise_info):
-        """Generalized Anscombe VST → denoise → inverse VST."""
+        """
+        Обобщенное преобразование Энскомба (VST) для фильтрации данных, 
+        подверженных пуассоновско-гауссовскому шуму.
+        """
         a = float(noise_info.get('a', 0.0) or 0.0) if noise_info else 0.0
         b = float(noise_info.get('b', 0.0) or 0.0) if noise_info else 0.0
         A = a / 255.0
@@ -825,8 +783,10 @@ class ESM_BD(DeconvolutionAlgorithm):
         x_rec = (z_clean / 2.0) ** 2 - (3.0 / 8.0) * A - B / max(A, 1e-8)
         return np.clip(x_rec, 0.0, 1.0)
 
-    # ── Noise estimation ────────────────────────────────────────────────
     def _estimate_noise(self, yg):
+        """
+        Диспетчеризация методов оценки дисперсии шума.
+        """
         if self.noise_estimation == 'chen':
             from blinddeconv.algorithms.mod_denoise.chen_noise_estimate import estimate_noise_level
             sigma = estimate_noise_level(yg)
@@ -839,23 +799,18 @@ class ESM_BD(DeconvolutionAlgorithm):
             return result
         return None
 
-    # ── Robust orchestrator ─────────────────────────────────────────────
     def _orchestrate_robust(self, noise_info):
-        """Soft-weighted auto configuration of the noise pipeline.
+        """
+        Автоматическая адаптация параметров конвейера на основе уровня шума.
 
-        Same overall logic as ``ECP_BD._orchestrate_robust``.  ESM core
-        weights (λ_data, λ_grad, θ, kernel_size, xk_iter) are **never**
-        touched — the paper does not motivate σ-driven adaptation of
-        them.  Optional ESM-specific solver-level adaptations live behind
-        the separate ``expert_noise_adapt`` flag.
-
-        Always starts by resetting mutable fields from the __init__
-        snapshot so repeated process() calls are deterministic.
+        Базовые весовые коэффициенты ESM (lambda_data, lambda_grad, theta, 
+        kernel_size, xk_iter) остаются неизменными согласно оригинальной статье. 
+        Подстраиваются только параметры финальной деконволюции и 
+        выбор алгоритмов шумоподавления в зависимости от интенсивности шума (sigma).
         """
         snap = self._defaults_snapshot
         amp = dict(self.auto_mode_params or {})
 
-        # 1) Reset from snapshot — avoid sticky state between calls.
         self.lambda_tv = snap['lambda_tv']
         self.lambda_l0 = snap['lambda_l0']
         self.weight_ring = snap['weight_ring']
@@ -868,7 +823,6 @@ class ESM_BD(DeconvolutionAlgorithm):
         self.pre_nonblind_params = snap['pre_nonblind_params']
         self.nb_params = snap['nb_params']
 
-        # 2) Read σ.
         sigma = 0.0
         if noise_info is not None:
             sigma = float(noise_info.get('sigma_norm', 0.0) or 0.0)
@@ -882,11 +836,7 @@ class ESM_BD(DeconvolutionAlgorithm):
         if nt in ('poisson', 'poisson_gaussian') and sigma >= force_heavy_sigma:
             force_heavy = True
 
-        # 3) Clean branch — DO NOT alter denoisers or parameters.
         if sigma <= sigma_clean and not force_heavy:
-            # Resolve final_deconv='auto' even on the clean path so the
-            # non-blind step has a concrete method.  ESM's clean default
-            # is the ringing-aware solver.
             if snap['final_deconv'] == 'auto':
                 self.final_deconv = 'ringing_removal'
             if self.verbose:
@@ -903,7 +853,6 @@ class ESM_BD(DeconvolutionAlgorithm):
                 'weight_ring': float(self.weight_ring),
             }
 
-        # 4) Heavy branch.
         w = 1.0 if sigma >= sigma_heavy else (
             (sigma - sigma_clean) / (sigma_heavy - sigma_clean))
         regime = 'heavy' if w > 0.95 else 'medium'
@@ -912,7 +861,6 @@ class ESM_BD(DeconvolutionAlgorithm):
         poisson_like = noise_type in ('poisson', 'poisson_gaussian',
                                       'unknown')
 
-        # 4a) σ-driven non-blind weights.
         k_lambda_tv = float(amp.get('k_lambda_tv', 0.05))
         k_lambda_l0 = float(amp.get('k_lambda_l0', 0.01))
         k_weight_ring = float(amp.get('k_weight_ring', 1.0))
@@ -926,7 +874,6 @@ class ESM_BD(DeconvolutionAlgorithm):
         self.lambda_l0 = (1.0 - w) * snap['lambda_l0'] + w * lam_l0_noisy
         self.weight_ring = (1.0 - w) * snap['weight_ring'] + w * wring_noisy
 
-        # 4b) Blind-loop denoiser.
         if w < 0.5:
             self.blind_denoise = 'bilateral'
             self.blind_denoise_params = {
@@ -940,7 +887,6 @@ class ESM_BD(DeconvolutionAlgorithm):
                 'sigma_space': 7.0,
             }
 
-        # 4c) Pre-pyramid denoiser.
         if poisson_like:
             self.preprocess = 'act'
             self.preprocess_params = {'threshold_setting': 's'}
@@ -954,7 +900,6 @@ class ESM_BD(DeconvolutionAlgorithm):
             self.preprocess = 'bm3d'
             self.preprocess_params = {'sigma': float(sigma)}
 
-        # 4d) Pre-nonblind denoiser.
         if poisson_like:
             self.pre_nonblind = 'act'
             self.pre_nonblind_params = {'threshold_setting': 's'}
@@ -969,7 +914,6 @@ class ESM_BD(DeconvolutionAlgorithm):
                                    ('bm3d', 'nlm', 'bilateral')),
             }
 
-        # 4e) Final deconv routing for snapshot=='auto'.
         if snap['final_deconv'] == 'auto':
             if poisson_like and w >= 0.5:
                 self.final_deconv = 'adaptive_lp'
@@ -1003,8 +947,11 @@ class ESM_BD(DeconvolutionAlgorithm):
                   f"final={self.final_deconv}")
         return info
 
-    # ── PSD-based noise preprocessing ───────────────────────────────────
     def _apply_noise_preprocess(self, yg):
+        """
+        Устранение периодических шумовых структур на основе анализа 
+        спектра плотности мощности (PSD).
+        """
         from blinddeconv.algorithms.mod_denoise.noise_psd_analysis import (
             analyze_noise_psd, noise_preprocess,
             notch_filter, bandstop_filter,
@@ -1050,17 +997,20 @@ class ESM_BD(DeconvolutionAlgorithm):
 
         return yg_out, psd_info
 
-    # ── Blind-loop denoiser (S before kernel step) ──────────────────────
     def _apply_blind_denoise(self, x, noise_info):
+        """
+        Фильтрация скрытого изображения внутри цикла оценки ядра.
+        """
         p = dict(self.blind_denoise_params or {})
         if self.blind_denoise == 'guided':
             p.setdefault('radius', 2)
         return self._apply_denoise(x, self.blind_denoise, p, noise_info)
 
-    # ── Pre-nonblind denoiser ──────────────────────────────────────────
     def _apply_pre_nonblind(self, img, noise_info):
-        """Apply the pre-nonblind denoiser.  Handles colour by denoising
-        each channel independently with the same parameters."""
+        """
+        Независимое поканальное применение пространственного фильтра 
+        к полноцветному изображению перед финальной деконволюцией.
+        """
         if img.ndim == 2:
             return self._apply_denoise(
                 img, self.pre_nonblind, self.pre_nonblind_params, noise_info)
@@ -1071,7 +1021,6 @@ class ESM_BD(DeconvolutionAlgorithm):
                 self.pre_nonblind_params, noise_info))
         return np.stack(chans, axis=2)
 
-    # ── Interface methods ────────────────────────────────────────────────
     def get_param(self) -> List[Tuple[str, Any]]:
         return [
             ('kernel_size', self.kernel_size),
@@ -1112,8 +1061,6 @@ class ESM_BD(DeconvolutionAlgorithm):
         for key, value in params.items():
             if hasattr(self, key):
                 setattr(self, key, value)
-                # Keep the orchestrator's snapshot in sync with
-                # parameters the user updates after construction.
                 if key in self._defaults_snapshot:
                     self._defaults_snapshot[key] = (
                         float(value)

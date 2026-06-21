@@ -1,29 +1,32 @@
 """
 ecp.py
 
-Blind Image Deblurring via Extreme Channels Prior (ECP).
+Слепая деконволюция изображений с использованием априорного 
+распределения экстремальных каналов (Extreme Channels Prior, ECP).
 
-Reference:
+Основано на методе:
     Y. Yan, W. Ren, Y. Guo, R. Wang, X. Cao: "Image Deblurring via
-    Extreme Channels Prior", CVPR 2017.
+    Extreme Channels Prior", CVPR, 2017.
 
-ECP extends the Dark Channel Prior (Pan et al., CVPR 2016) with a
-symmetric Bright Channel term and solves the resulting energy with HQS.
+Метод расширяет подход на основе темного канала (DCP), добавляя 
+симметричное условие для светлого канала. Результирующая 
+оптимизационная задача решается с помощью метода полуквадратичного 
+расщепления (Half-Quadratic Splitting, HQS).
 
-Pipeline (mirrors MATLAB demo_deblurring.m from ECP-main):
-    1. Normalise input to float64 [0, 1].
-    2. Convert to grayscale for kernel estimation.
-    3. Multi-scale ECP blind kernel estimation (blind_deconv).
-    4. Non-blind restoration on the full (colour) image
-       via ringing_artifacts_removal.
-    5. Return restored image (int16, [0, 255]) and kernel.
+Конвейер обработки:
+1. Нормализация входного изображения к диапазону float64 [0, 1].
+2. Преобразование в полутоновый формат для оценки ядра размытия.
+3. Многомасштабная слепая оценка ядра размытия.
+4. Неслепое восстановление полноцветного изображения с подавлением 
+   артефактов звона.
+5. Возврат восстановленного изображения (в формате int16 [0, 255]) и 
+   оцененного ядра.
 """
 
 import numpy as np
 import time
 from typing import Tuple, List, Any, Dict
 
-# ── Framework base class import (DO NOT MODIFY) ─────────────────────────────
 import sys
 from pathlib import Path
 
@@ -47,35 +50,39 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
         sys.path.insert(0, _path)
 
 from blinddeconv.algorithms.base import DeconvolutionAlgorithm
-# ─────────────────────────────────────────────────────────────────────────────
 
 from .solvers import blind_deconv, ringing_artifacts_removal
 
 
 class ECP_BD(DeconvolutionAlgorithm):
     """
-    Blind deconvolution using the Extreme Channels Prior (dark + bright).
+    Алгоритм слепой деконволюции на основе априорного распределения 
+    экстремальных каналов (светлого и темного).
 
-    Parameters
-    ----------
-    kernel_size   : int — spatial support of the unknown PSF (square, odd).
-                    Default 35 (representative value from demo_deblurring.m).
-    lambda_dark   : float — weight for the L0 extreme-channels prior
-                    (applied symmetrically to the dark and bright channels).
-                    Default 4e-3.
-    lambda_grad   : float — weight for the L0 gradient prior. Default 4e-3.
-    xk_iter       : int — number of blind iterations per pyramid level.
-                    Default 5.
-    gamma_correct : float — gamma correction exponent applied before
-                    kernel estimation.  1.0 = no correction.  Default 1.0.
-    k_thresh      : float — final kernel threshold.
-                    kernel values < max(k)/k_thresh are zeroed.  Default 20.
-    lambda_tv     : float — weight for TV non-blind deconvolution.
-                    Default 0.001.
-    lambda_l0     : float — weight for L0 non-blind deconvolution.
-                    Default 5e-4.
-    weight_ring   : float — ringing suppression weight (0 = no suppression).
-                    Default 1.0.
+    Параметры
+    ---------
+    kernel_size : int, по умолчанию 35
+        Пространственный размер неизвестной функции рассеяния точки (нечетное число).
+    lambda_dark : float, по умолчанию 4e-3
+        Весовой коэффициент для L0-регуляризации интенсивности экстремальных 
+        каналов (применяется симметрично к темному и светлому каналам).
+    lambda_grad : float, по умолчанию 4e-3
+        Весовой коэффициент для L0-регуляризации градиентов.
+    xk_iter : int, по умолчанию 5
+        Количество итераций слепой оценки на каждом уровне пирамиды масштабов.
+    gamma_correct : float, по умолчанию 1.0
+        Экспонента гамма-коррекции, применяемая перед оценкой ядра. 
+        Значение 1.0 означает отсутствие коррекции.
+    k_thresh : float, по умолчанию 20.0
+        Относительный порог для финального ядра. Значения ядра, меньшие чем 
+        max(k) / k_thresh, обнуляются.
+    lambda_tv : float, по умолчанию 0.001
+        Весовой коэффициент TV-регуляризации для этапа неслепой деконволюции.
+    lambda_l0 : float, по умолчанию 5e-4
+        Весовой коэффициент L0-регуляризации для этапа неслепой деконволюции.
+    weight_ring : float, по умолчанию 1.0
+        Коэффициент подавления артефактов звона (0 соответствует отключению 
+        дополнительного подавления).
     """
 
     def __init__(
@@ -105,23 +112,38 @@ class ECP_BD(DeconvolutionAlgorithm):
         self.history: Dict[str, list] = {'kernel_diff': []}
         self.hyperparams: Dict[str, Any] = {}
 
-    # ── Main entry point ─────────────────────────────────────────────────
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Запуск алгоритма слепой деконволюции.
+
+        Выполняет предварительную обработку входного изображения (нормализацию и 
+        перевод в полутоновый формат), многомасштабную оценку ядра размытия и 
+        последующее неслепое восстановление полноцветного изображения с подавлением 
+        артефактов звона.
+
+        Параметры
+        ---------
+        image : ndarray
+            Входное размытое изображение.
+
+        Возвращает
+        ----------
+        x_final : ndarray
+            Восстановленное изображение в формате int16 [0, 255].
+        kernel : ndarray
+            Оцененное ядро размытия.
+        """
         start_time = time.time()
 
-        # ── 1. Normalise to float64 [0, 1] ──────────────────────────────
         y = image.astype(np.float64)
         if y.max() > 1.0:
             y /= 255.0
 
-        # ── 2. Grayscale for kernel estimation ──────────────────────────
-        # MATLAB: yg = im2double(rgb2gray(y))
         if y.ndim == 3 and y.shape[2] == 3:
             yg = 0.2989 * y[:, :, 0] + 0.5870 * y[:, :, 1] + 0.1140 * y[:, :, 2]
         else:
             yg = y.copy() if y.ndim == 2 else y[:, :, 0]
 
-        # ── 3. Blind kernel estimation (ECP multi-scale) ────────────────
         opts = {
             'kernel_size': self.kernel_size,
             'gamma_correct': self.gamma_correct,
@@ -133,14 +155,11 @@ class ECP_BD(DeconvolutionAlgorithm):
             yg, self.lambda_dark, self.lambda_grad, opts
         )
 
-        # ── 4. Non-blind restoration ────────────────────────────────────
-        # MATLAB: Latent = ringing_artifacts_removal(y, kernel, ...)
         Latent = ringing_artifacts_removal(
             y, kernel, self.lambda_tv, self.lambda_l0, self.weight_ring
         )
         Latent = np.clip(Latent, 0.0, 1.0)
 
-        # ── 5. Output ──────────────────────────────────────────────────
         self.hyperparams = {
             'kernel_size': self.kernel_size,
             'lambda_dark': self.lambda_dark,
@@ -155,7 +174,6 @@ class ECP_BD(DeconvolutionAlgorithm):
         x_final = np.clip(x_final, 0, 255).astype(np.int16)
         return x_final, kernel
 
-    # ── Interface methods ────────────────────────────────────────────────
     def get_param(self) -> List[Tuple[str, Any]]:
         return [
             ('kernel_size', self.kernel_size),

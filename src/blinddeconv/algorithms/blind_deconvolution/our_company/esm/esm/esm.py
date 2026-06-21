@@ -1,27 +1,28 @@
 """
 esm.py
 
-Blind Image Deblurring with the Enhanced Sparse Model (ESM).
+Слепая деконволюция изображений с использованием улучшенной разреженной 
+модели (Enhanced Sparse Model, ESM).
 
-Reference:
+Основано на методе:
     L. Chen, F. Fang, S. Lei, F. Li, G. Zhang: "Enhanced Sparse Model
-    for Blind Deblurring", ECCV 2020.
+    for Blind Deblurring", ECCV, 2020.
 
-Pipeline (mirrors MATLAB demo_deblurring.m):
-    1. Normalise input to float64 [0, 1].
-    2. Convert to grayscale for kernel estimation (if colour).
-    3. Multi-scale blind deconvolution (blind_deconv) — produces the PSF.
-    4. Non-blind restoration on the full image via
-       ringing_artifacts_removal (TV-ℓ² + L0 + bilateral-filter ringing
-       subtraction).
-    5. Return restored image (int16, [0, 255]) and the PSF.
+Конвейер обработки:
+1. Нормализация входного изображения к диапазону float64 [0, 1].
+2. Преобразование в полутоновый формат для оценки ядра размытия.
+3. Многомасштабная слепая деконволюция для оценки функции рассеяния точки (PSF).
+4. Неслепое восстановление полноцветного изображения с подавлением 
+   артефактов звона (используется TV-l2 деконволюция в сочетании с L0 
+   и вычитанием высокочастотных артефактов через билатеральный фильтр).
+5. Возврат восстановленного изображения (в формате int16 [0, 255]) и 
+   оцененного ядра.
 """
 
 import numpy as np
 import time
 from typing import Tuple, List, Any, Dict
 
-# ── Framework base class import (DO NOT MODIFY) ─────────────────────────────
 import sys
 from pathlib import Path
 
@@ -45,40 +46,44 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
         sys.path.insert(0, _path)
 
 from blinddeconv.algorithms.base import DeconvolutionAlgorithm
-# ─────────────────────────────────────────────────────────────────────────────
 
 from .solvers import blind_deconv, ringing_artifacts_removal
 
 
 class ESM_BD(DeconvolutionAlgorithm):
     """
-    Blind deconvolution using the Enhanced Sparse Model (ECCV 2020).
+    Алгоритм слепой деконволюции на основе улучшенной разреженной модели.
 
-    Parameters
-    ----------
-    kernel_size   : int — spatial support of the unknown PSF (square, odd).
-                    Default 35 (as in demo_deblurring.m).
-    lambda_data   : float — weight of the ℓ0−ℓ1 prior on the data-gradient
-                    residual  k*∇I − ∇B.  Default 4e-3.
-    lambda_grad   : float — weight of the ℓ0−ℓ1 prior on ∇I.  Default 4e-3.
-    theta         : float — θ parameter of the ℓ0−ℓ1 enhanced-sparse prior
-                    (controls the shrinkage zone width).  Default 1.0.
-    xk_iter       : int — inner I/k alternations per pyramid level.
-                    Default 5.
-    gamma_correct : float — gamma correction applied before kernel
-                    estimation.  1.0 = no correction.  Default 1.0.
-    k_thresh      : float — final kernel threshold.  Entries below
-                    max(k)/k_thresh are zeroed.  Default 20.
-    saturation    : bool — if True (saturated input), use the L0 + TV +
-                    bilateral ring-removal pipeline for the non-blind step.
-                    If False, this wrapper still uses the same
-                    ringing_artifacts_removal call but the TV-only branch
-                    is selected by setting weight_ring=0 externally.
-                    Default False.
-    lambda_tv     : float — TV weight for the non-blind step.  Default 0.002.
-    lambda_l0     : float — L0 weight for the non-blind step.  Default 2e-4.
-    weight_ring   : float — ringing suppression weight (0 = TV only).
-                    Default 1.0.
+    Параметры
+    ---------
+    kernel_size : int, по умолчанию 35
+        Пространственный размер неизвестной функции рассеяния точки (нечетное число).
+    lambda_data : float, по умолчанию 4e-3
+        Весовой коэффициент для L0-L1 априорного распределения остатка 
+        градиентов данных.
+    lambda_grad : float, по умолчанию 4e-3
+        Весовой коэффициент для L0-L1 априорного распределения градиентов 
+        изображения.
+    theta : float, по умолчанию 1.0
+        Параметр улучшенного разреженного L0-L1 распределения, контролирующий 
+        ширину зоны сжатия.
+    xk_iter : int, по умолчанию 5
+        Количество итераций поочередного обновления скрытого изображения 
+        и ядра на каждом уровне масштабной пирамиды.
+    gamma_correct : float, по умолчанию 1.0
+        Экспонента гамма-коррекции, применяемая перед оценкой ядра.
+    k_thresh : float, по умолчанию 20.0
+        Относительный порог для финального ядра. Значения ядра, меньшие 
+        чем max(k) / k_thresh, обнуляются.
+    saturation : bool, по умолчанию False
+        Флаг наличия пересвеченных участков. В текущей реализации 
+        управление подавлением звона переопределяется внешне через weight_ring.
+    lambda_tv : float, по умолчанию 0.002
+        Вес TV-регуляризации для этапа неслепой деконволюции.
+    lambda_l0 : float, по умолчанию 2e-4
+        Вес L0-регуляризации для этапа неслепой деконволюции.
+    weight_ring : float, по умолчанию 1.0
+        Коэффициент подавления артефактов звона.
     """
 
     def __init__(
@@ -110,17 +115,33 @@ class ESM_BD(DeconvolutionAlgorithm):
         self.history: Dict[str, list] = {'kernel_diff': []}
         self.hyperparams: Dict[str, Any] = {}
 
-    # ── Main entry point ─────────────────────────────────────────────────
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Запуск алгоритма слепой деконволюции.
+
+        Выполняет предварительную обработку входного изображения (нормализацию, 
+        преобразование в градации серого), многомасштабную оценку ядра 
+        методом ESM и последующее неслепое восстановление полноцветного 
+        изображения с подавлением артефактов звона.
+
+        Параметры
+        ---------
+        image : ndarray
+            Входное размытое изображение.
+
+        Возвращает
+        ----------
+        x_final : ndarray
+            Восстановленное изображение в формате int16 [0, 255].
+        kernel : ndarray
+            Оцененное ядро размытия.
+        """
         start_time = time.time()
 
-        # ── 1. Normalise to float64 [0, 1] ──────────────────────────────
         y = image.astype(np.float64)
         if y.max() > 1.0:
             y /= 255.0
 
-        # ── 2. Grayscale for kernel estimation ──────────────────────────
-        # MATLAB: yg = im2double(rgb2gray(y))
         if y.ndim == 3 and y.shape[2] == 3:
             yg = 0.2989 * y[:, :, 0] + 0.5870 * y[:, :, 1] + 0.1140 * y[:, :, 2]
         elif y.ndim == 2:
@@ -128,12 +149,10 @@ class ESM_BD(DeconvolutionAlgorithm):
         else:
             yg = y[:, :, 0]
 
-        # Ensure kernel_size is odd (matches MATLAB convention)
         ks = int(self.kernel_size)
         if ks % 2 == 0:
             ks += 1
 
-        # ── 3. Blind kernel estimation (ECCV20 Algorithm 1) ─────────────
         opts = {
             'kernel_size': ks,
             'gamma_correct': self.gamma_correct,
@@ -146,15 +165,11 @@ class ESM_BD(DeconvolutionAlgorithm):
             yg, self.lambda_data, self.lambda_grad, opts
         )
 
-        # ── 4. Non-blind restoration on the full-resolution image ───────
-        # MATLAB: Latent = ringing_artifacts_removal(y, kernel, lambda_tv,
-        #                                            lambda_l0, weight_ring)
         Latent = ringing_artifacts_removal(
             y, kernel, self.lambda_tv, self.lambda_l0, self.weight_ring
         )
         Latent = np.clip(Latent, 0.0, 1.0)
 
-        # ── 5. Output ──────────────────────────────────────────────────
         self.hyperparams = {
             'kernel_size': ks,
             'lambda_data': self.lambda_data,
@@ -173,7 +188,6 @@ class ESM_BD(DeconvolutionAlgorithm):
         x_final = np.clip(x_final, 0, 255).astype(np.int16)
         return x_final, kernel
 
-    # ── Interface methods ────────────────────────────────────────────────
     def get_param(self) -> List[Tuple[str, Any]]:
         return [
             ('kernel_size', self.kernel_size),

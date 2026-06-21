@@ -1,45 +1,19 @@
 """
 utils.py
 
-Utility functions for the ECP (Extreme Channels Prior) blind deconvolution.
+Вспомогательные вычислительные функции для алгоритма слепой 
+деконволюции на основе априорного распределения экстремальных 
+каналов (ECP).
 
-Ported from MATLAB code by Yanyang Yan, Wenqi Ren et al. (CVPR 2017).
+Основано на методе:
+    Y. Yan, W. Ren, Y. Guo, R. Wang, X. Cao: "Image Deblurring via
+    Extreme Channels Prior", CVPR, 2017.
 
-Reference:
-    Y. Yan, W. Ren, Y. Guo, R. Wang, X. Cao, "Image Deblurring via
-    Extreme Channels Prior", CVPR 2017.
-
-The ECP method builds on the DCP framework of Pan et al. (CVPR 2016) by
-adding a Bright Channel term.  Most utilities are therefore identical to
-the DCP port; the only extra helper exposed here is ``bright_channel``
-(the ``bright_channel.m`` file in the ECP repository).  Internally, the
-ECP solver re-uses ``dark_channel`` on ``1 - S`` rather than calling the
-bright-channel primitive directly, exactly as in the MATLAB code.
-
-MATLAB → Python conversion notes (CRITICAL differences):
-    ─────────────────────────────────────────────────────────────────────
-    conv2(A, B, 'valid'):
-        MATLAB conv2 performs TRUE convolution (kernel flipped).
-        → scipy.signal.convolve2d(A, B, mode='valid') — also true conv.
-
-    padarray(I, [p p], 'replicate'):
-        → np.pad(I, ((p,p),(p,p)), mode='edge')
-
-    MATLAB indexing is 1-based, column-major (Fortran order).  In
-    dark_channel / assign_dark_channel_to_pixel the linear index returned
-    by ``min(tmp(:))`` is a COLUMN-MAJOR 1-based index into the patch.
-    We preserve that convention (``flatten(order='F')`` /
-    ``np.unravel_index(..., order='F')``) so the round-trip matches
-    MATLAB exactly.
-
-    graythresh(img):  Otsu on [0,1] float → manual 256-bin version.
-    fspecial('gaussian', hsize, sigma):  manual Gaussian, sum = 1.
-    histc(x, edges):  last bin includes right edge; output length == len(edges).
-    dst / idst (Liu boundary Poisson solver):  MATLAB's dst is DST-I.
-        scipy.fft.dstn / idstn with type=1 round-trip matches MATLAB.
-    psf2otf / otf2psf:  zero-pad, circshift by -floor(psf/2), fft2 (and inverse).
-    interp2 'linear' with out-of-bound NaNs:  scipy.ndimage.map_coordinates
-        with cval=0 (MATLAB replaces NaNs by 0 in adjust_psf_center).
+Метод базируется на архитектуре извлечения темного канала с добавлением 
+светлого. Внутри основного решателя светлый канал реализуется через 
+вычисление темного канала от инвертированного изображения (1 - S). 
+В данном файле дополнительно приведена прямая функция вычисления 
+светлого канала (bright_channel) для совместимости структуры модулей.
 """
 
 import numpy as np
@@ -48,17 +22,14 @@ from scipy.ndimage import map_coordinates
 from scipy.fft import dstn, idstn
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# PSF ↔ OTF conversions
-# ═════════════════════════════════════════════════════════════════════════════
 
 def psf2otf(psf: np.ndarray, shape: tuple) -> np.ndarray:
     """
-    Convert PSF to OTF.  Equivalent to MATLAB psf2otf(psf, shape).
+    Преобразование функции рассеяния точки (PSF) в оптическую 
+    передаточную функцию (OTF).
 
-    1. Zero-pad *psf* into an array of *shape*.
-    2. Circularly shift so that the centre of the PSF lands at index (0,0).
-    3. Return fft2.
+    Производится дополнение нулями до заданного размера и циклический 
+    сдвиг для совмещения центра ядра с началом координат перед БПФ.
     """
     if np.all(psf == 0):
         return np.zeros(shape, dtype=np.complex128)
@@ -74,7 +45,8 @@ def psf2otf(psf: np.ndarray, shape: tuple) -> np.ndarray:
 
 def otf2psf(otf: np.ndarray, psf_size: tuple) -> np.ndarray:
     """
-    Convert OTF back to PSF.  Equivalent to MATLAB otf2psf(otf, psf_size).
+    Преобразование оптической передаточной функции (OTF) обратно 
+    в функцию рассеяния точки (PSF) заданного размера.
     """
     full = np.real(np.fft.ifft2(otf))
     ph, pw = psf_size
@@ -83,15 +55,14 @@ def otf2psf(otf: np.ndarray, psf_size: tuple) -> np.ndarray:
     return full[:ph, :pw]
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# opt_fft_size  (from cho_code/opt_fft_size.m)
-# ═════════════════════════════════════════════════════════════════════════════
-
-_OPT_FFT_LUT = None  # module-level cache (MATLAB `persistent`)
+_OPT_FFT_LUT = None
 
 
 def _build_opt_fft_lut(lut_size: int = 4096) -> np.ndarray:
-    """Build the LUT of optimal FFT sizes (products of primes ≤ 13)."""
+    """
+    Формирование справочной таблицы оптимальных размеров для быстрого 
+    преобразования Фурье (числа, являющиеся произведением малых простых).
+    """
     lut = np.zeros(lut_size + 1, dtype=np.int64)
 
     e2 = 1
@@ -124,7 +95,8 @@ def _build_opt_fft_lut(lut_size: int = 4096) -> np.ndarray:
 
 def opt_fft_size(n) -> np.ndarray:
     """
-    Compute optimal FFT data length(s).  Equivalent to MATLAB opt_fft_size.m.
+    Поиск оптимального размера данных для быстрого преобразования Фурье 
+    с использованием предварительно рассчитанной справочной таблицы.
     """
     global _OPT_FFT_LUT
     if _OPT_FFT_LUT is None:
@@ -148,26 +120,17 @@ def opt_fft_size(n) -> np.ndarray:
     return m
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# wrap_boundary_liu  (from cho_code/wrap_boundary_liu.m)
-# ═════════════════════════════════════════════════════════════════════════════
 
 def _solve_min_laplacian(boundary_image: np.ndarray) -> np.ndarray:
     """
-    Solve a Poisson equation with Dirichlet boundary via 2-D DST-I.
-    Equivalent to the nested solve_min_laplacian helper in
-    wrap_boundary_liu.m.
-
-    MATLAB's dst is DST-I.  scipy.fft.dstn / idstn with type=1 round-trip
-    correctly (forward scale factor cancels in forward + inverse).
+    Решение уравнения Пуассона с граничными условиями Дирихле 
+    через двумерное дискретное синус-преобразование (DST).
     """
     H, W = boundary_image.shape
     boundary_image = boundary_image.copy()
 
-    # Keep only the boundary; zero the interior
     boundary_image[1:-1, 1:-1] = 0.0
 
-    # Laplacian of the boundary image at interior points
     f_bp = np.zeros((H, W), dtype=np.float64)
     f_bp[1:H - 1, 1:W - 1] = (
         -4.0 * boundary_image[1:H - 1, 1:W - 1]
@@ -198,10 +161,8 @@ def _solve_min_laplacian(boundary_image: np.ndarray) -> np.ndarray:
 
 def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
     """
-    Pad image so boundaries are circularly smooth for FFT deconvolution.
-    Equivalent to MATLAB wrap_boundary_liu.m (Cho; based on Liu & Jia, ICIP'08).
-
-    NOTE: the MATLAB code hard-codes alpha=1; this port does the same.
+    Дополнение границ изображения для обеспечения циклической гладкости 
+    при выполнении деконволюции на основе БПФ.
     """
     if img.ndim == 2:
         img = img[:, :, np.newaxis]
@@ -217,7 +178,6 @@ def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
         alpha = 1
         HG = img[:, :, ch]
 
-        # ── r_A: (2*alpha + H_w) × W ────────────────────────────────────
         r_A = np.zeros((alpha * 2 + H_w, W), dtype=np.float64)
         r_A[:alpha, :] = HG[-alpha:, :]
         r_A[-alpha:, :] = HG[:alpha, :]
@@ -233,7 +193,6 @@ def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
         r_A = A2
         A = r_A
 
-        # ── r_B: H × (2*alpha + W_w) ────────────────────────────────────
         r_B = np.zeros((H, alpha * 2 + W_w), dtype=np.float64)
         r_B[:, :alpha] = HG[:, -alpha:]
         r_B[:, -alpha:] = HG[:, :alpha]
@@ -249,7 +208,6 @@ def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
         r_B = B2
         B = r_B
 
-        # ── r_C: (2*alpha + H_w) × (2*alpha + W_w) ──────────────────────
         r_C = np.zeros((alpha * 2 + H_w, alpha * 2 + W_w), dtype=np.float64)
         r_C[:alpha, :] = B[-alpha:, :]
         r_C[-alpha:, :] = B[:alpha, :]
@@ -260,7 +218,6 @@ def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
         r_C = C2
         C = r_C
 
-        # Crop (MATLAB uses alpha=1 throughout)
         A = A[:H_w, :]
         B = B[:, 1:W_w + 1]
         C = C[1:H_w + 1, 1:W_w + 1]
@@ -272,20 +229,29 @@ def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
     return ret
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# dark_channel  (from dark_channel.m)
-# ═════════════════════════════════════════════════════════════════════════════
 
 def dark_channel(I: np.ndarray, patch_size: int):
     """
-    Compute the dark channel of an image.  Equivalent to MATLAB dark_channel.m.
+    Вычисление темного канала изображения.
 
-    Returns
-    -------
-    J       : (M, N) dark channel
-    J_index : (M, N) int — 1-based COLUMN-MAJOR linear index into the patch
-              where the minimum was found (matches MATLAB exactly so that
-              assign_dark_channel_to_pixel.patch(idx) round-trips).
+    Для каждого пикселя вычисляется минимальное значение интенсивности 
+    в локальном окне заданного размера по всем каналам.
+
+    Параметры
+    ---------
+    I : ndarray
+        Входное изображение.
+    patch_size : int
+        Размер локального окна поиска.
+
+    Возвращает
+    ----------
+    J : ndarray
+        Изображение темного канала.
+    J_index : ndarray
+        Массив линейных индексов, указывающих позицию минимального элемента 
+        внутри блока (индексация в столбцовом порядке). Используется для 
+        последующего возврата уточненных значений.
     """
     if I.ndim == 2:
         I = I[:, :, np.newaxis]
@@ -304,24 +270,34 @@ def dark_channel(I: np.ndarray, patch_size: int):
             tmp_flat = tmp.flatten(order='F')
             tmp_idx = np.argmin(tmp_flat)
             J[m, n] = tmp_flat[tmp_idx]
-            J_index[m, n] = tmp_idx + 1  # 1-based, column-major
+            J_index[m, n] = tmp_idx + 1 
 
     return J, J_index
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# bright_channel  (from bright_channel.m)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def bright_channel(I: np.ndarray, patch_size: int):
     """
-    Compute the bright channel of an image.  Equivalent to MATLAB
-    bright_channel.m — max over channel AND patch.
+    Вычисление светлого канала изображения.
 
-    NOTE: the ECP solver does NOT actually call this function; it instead
-    computes the bright channel via ``dark_channel(1 - S)``, exactly
-    mirroring L0Deblur_dark_chanelBD.m.  This primitive is exposed here
-    purely to preserve the one-to-one mapping with the MATLAB repository.
+    Для каждого пикселя вычисляется максимальное значение интенсивности 
+    в локальном окне. Данная функция приводится для полноты API; в основном 
+    решателе ECP вместо нее применяется вычисление темного канала 
+    от инвертированного изображения.
+
+    Параметры
+    ---------
+    I : ndarray
+        Входное изображение.
+    patch_size : int
+        Размер локального окна поиска.
+
+    Возвращает
+    ----------
+    J : ndarray
+        Изображение светлого канала.
+    J_index : ndarray
+        Массив линейных индексов максимумов внутри блока 
+        (индексация в столбцовом порядке).
     """
     if I.ndim == 2:
         I = I[:, :, np.newaxis]
@@ -340,29 +316,37 @@ def bright_channel(I: np.ndarray, patch_size: int):
             tmp_flat = tmp.flatten(order='F')
             tmp_idx = np.argmax(tmp_flat)
             J[m, n] = tmp_flat[tmp_idx]
-            J_index[m, n] = tmp_idx + 1  # 1-based, column-major
+            J_index[m, n] = tmp_idx + 1
 
     return J, J_index
 
-
-# ═════════════════════════════════════════════════════════════════════════════
-# assign_dark_channel_to_pixel  (from assign_dark_channel_to_pixel.m)
-# ═════════════════════════════════════════════════════════════════════════════
 
 def assign_dark_channel_to_pixel(S: np.ndarray,
                                  dark_channel_refine: np.ndarray,
                                  dark_channel_index: np.ndarray,
                                  patch_size: int) -> np.ndarray:
     """
-    Assign refined dark-channel values back to pixel positions.
-    Equivalent to MATLAB assign_dark_channel_to_pixel.m.
+    Присвоение уточненных значений экстремального канала обратно пикселям 
+    изображения на основе сохраненных индексов.
 
-    ``dark_channel_index`` must be 1-based column-major, as returned by
-    ``dark_channel`` / ``bright_channel``.
+    Эта же функция используется для обновления пикселей светлого канала, 
+    поскольку логика перезаписи зависит только от переданного массива индексов.
 
-    The same function is used by the bright-channel branch in the ECP
-    solver (called on ``1 - S``), matching MATLAB's behaviour: the update
-    rule only depends on the stored indices, not on min-vs-max semantics.
+    Параметры
+    ---------
+    S : ndarray
+        Текущая оценка изображения.
+    dark_channel_refine : ndarray
+        Уточненные значения экстремального канала.
+    dark_channel_index : ndarray
+        Индексы элементов внутри блоков (в столбцовом порядке).
+    patch_size : int
+        Размер использованного локального окна.
+
+    Возвращает
+    ----------
+    outImg : ndarray
+        Обновленное изображение.
     """
     if S.ndim == 2:
         S_3d = S[:, :, np.newaxis]
@@ -380,7 +364,7 @@ def assign_dark_channel_to_pixel(S: np.ndarray,
             patch = S_padd[m:m + patch_size, n:n + patch_size, :].copy()
 
             if np.min(patch) != dark_channel_refine[m, n]:
-                idx = int(dark_channel_index[m, n]) - 1  # → 0-based
+                idx = int(dark_channel_index[m, n]) - 1 
                 coords = np.unravel_index(idx, (patch_size, patch_size, C),
                                           order='F')
                 patch[coords] = dark_channel_refine[m, n]
@@ -389,7 +373,6 @@ def assign_dark_channel_to_pixel(S: np.ndarray,
 
     outImg = S_padd[padsize:padsize + M, padsize:padsize + N, :]
 
-    # Restore the original border values (MATLAB boundary processing)
     outImg[:padsize, :, :] = S_3d[:padsize, :, :]
     outImg[-padsize:, :, :] = S_3d[-padsize:, :, :]
     outImg[:, :padsize, :] = S_3d[:, :padsize, :]
@@ -400,15 +383,12 @@ def assign_dark_channel_to_pixel(S: np.ndarray,
     return outImg
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# conjgrad  (from cho_code/conjgrad.m)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def conjgrad(x: np.ndarray, b: np.ndarray, max_it: int, tol: float,
              ax_func, func_param) -> np.ndarray:
     """
-    Conjugate gradient solver.  Equivalent to cho_code/conjgrad.m.
-    Solves A·x = b where A is supplied implicitly by ``ax_func``.
+    Решение линейной системы A*x = b методом сопряженных градиентов.
+    Операция умножения на матрицу A передается через пользовательскую 
+    функцию ax_func.
     """
     x = x.copy()
     r = b - ax_func(x, func_param)
@@ -432,14 +412,10 @@ def conjgrad(x: np.ndarray, b: np.ndarray, max_it: int, tol: float,
     return x
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# adjust_psf_center  (from cho_code/adjust_psf_center.m)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def adjust_psf_center(psf: np.ndarray) -> np.ndarray:
     """
-    Centre the PSF by shifting its centre-of-mass to the geometric centre.
-    Equivalent to MATLAB adjust_psf_center.m.
+    Центрирование ядра размытия (PSF) путем расчета центра масс 
+    и его последующего смещения в геометрический центр матрицы.
     """
     rows, cols = psf.shape
 
@@ -468,15 +444,11 @@ def adjust_psf_center(psf: np.ndarray) -> np.ndarray:
     return result.reshape(rows, cols)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# threshold_pxpy_v1  (from cho_code/threshold_pxpy_v1.m)
-# ═════════════════════════════════════════════════════════════════════════════
 
 def _histc(data: np.ndarray, edges: np.ndarray) -> np.ndarray:
     """
-    Equivalent to MATLAB histc(data, edges):
-    bin k counts values where edges[k] <= x < edges[k+1]; the last bin
-    also includes x == edges[-1]; output length == len(edges).
+    Вспомогательная функция для подсчета элементов гистограммы 
+    с включением правого граничного значения в последний бин.
     """
     indices = np.searchsorted(edges, data, side='right') - 1
     indices[data == edges[-1]] = len(edges) - 1
@@ -489,8 +461,27 @@ def _histc(data: np.ndarray, edges: np.ndarray) -> np.ndarray:
 
 def threshold_pxpy_v1(latent: np.ndarray, psf_size, threshold=None):
     """
-    Gradient thresholding for kernel estimation.
-    Equivalent to MATLAB cho_code/threshold_pxpy_v1.m.
+    Адаптивное пороговое ограничение градиентов для подавления шума 
+    при оценке функции рассеяния точки.
+
+    Малые градиенты обнуляются. Если порог не задан, он вычисляется 
+    автоматически на основе анализа направленности и магнитуды градиентов.
+
+    Параметры
+    ---------
+    latent : ndarray
+        Скрытое изображение на текущей итерации.
+    psf_size : int или array-like
+        Размер ядра размытия.
+    threshold : float или None
+        Текущее значение порога градиентов.
+
+    Возвращает
+    ----------
+    px, py : ndarray
+        Градиенты изображения по осям X и Y после пороговой обработки.
+    threshold : float
+        Обновленное значение порога.
     """
     b_estimate_threshold = threshold is None
     if b_estimate_threshold:
@@ -501,13 +492,11 @@ def threshold_pxpy_v1(latent: np.ndarray, psf_size, threshold=None):
     dx = np.array([[-1, 1], [0, 0]], dtype=np.float64)
     dy = np.array([[-1, 0], [1, 0]], dtype=np.float64)
 
-    # MATLAB conv2(..., 'valid') is true convolution → scipy.convolve2d matches.
     px = convolve2d(denoised, dx, mode='valid')
     py = convolve2d(denoised, dy, mode='valid')
     pm = px ** 2 + py ** 2
 
     if b_estimate_threshold:
-        # MATLAB uses atan(py./px) — we mirror that (NOT arctan2).
         with np.errstate(divide='ignore', invalid='ignore'):
             pd = np.arctan(py / px)
 
@@ -530,7 +519,6 @@ def threshold_pxpy_v1(latent: np.ndarray, psf_size, threshold=None):
         for t in range(len(pm_steps)):
             min_h = min(H1[t], H2[t], H3[t], H4[t])
             if min_h >= th:
-                # MATLAB: threshold = pm_steps(end - t + 1)  (t is 1-based there)
                 threshold = pm_steps[len(pm_steps) - 1 - t]
                 break
 
@@ -548,14 +536,9 @@ def threshold_pxpy_v1(latent: np.ndarray, psf_size, threshold=None):
     return px, py, threshold
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# bilateral_filter  (from bilateral_filter.m)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def _fspecial_gaussian(size: int, sigma: float) -> np.ndarray:
     """
-    Equivalent to MATLAB fspecial('gaussian', size, sigma).
-    size×size Gaussian, sum normalised to 1.
+    Формирование двумерного ядра распределения Гаусса с единичной суммой элементов.
     """
     radius = (size - 1) / 2.0
     y, x = np.mgrid[-radius:radius + 1, -radius:radius + 1]
@@ -566,9 +549,8 @@ def _fspecial_gaussian(size: int, sigma: float) -> np.ndarray:
 def bilateral_filter(img: np.ndarray, sigma_s: float,
                      sigma: float) -> np.ndarray:
     """
-    Bilateral filter (grayscale / multi-channel non-RGB path of MATLAB's
-    bilateral_filter.m).  Called as bilateral_filter(diff, 3, 0.1) inside
-    ringing_artifacts_removal.m.
+    Билатеральный фильтр для сохранения краев при подавлении шума.
+    Используется для выделения высокочастотных артефактов звона.
     """
     if img.ndim == 2:
         img = img[:, :, np.newaxis]
@@ -577,7 +559,6 @@ def bilateral_filter(img: np.ndarray, sigma_s: float,
     h, w, d = img.shape
     img = img.astype(np.float32)
 
-    # Non-RGB branch of the MATLAB code
     lab = img.copy()
     sigma = sigma * np.sqrt(d)
 
@@ -615,14 +596,15 @@ def bilateral_filter(img: np.ndarray, sigma_s: float,
     return r_img
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# graythresh  (Otsu's method, matching MATLAB)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def graythresh(img: np.ndarray) -> float:
     """
-    Otsu's threshold.  Equivalent to MATLAB graythresh(img) on [0,1] float.
-    Uses a 256-bin histogram over [0,1] and returns a threshold in [0,1].
+    Вычисление оптимального порога бинаризации методом Оцу.
+    Работает с вещественными массивами в диапазоне [0, 1].
+
+    Возвращает
+    ----------
+    threshold : float
+        Пороговое значение.
     """
     img_flat = img.ravel().astype(np.float64)
     img_flat = np.clip(img_flat, 0.0, 1.0)
@@ -648,14 +630,24 @@ def graythresh(img: np.ndarray) -> float:
     return bin_centres[max_idx]
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# fftconv  (from fftconv.m) — lightweight FFT-based convolution helper
-# ═════════════════════════════════════════════════════════════════════════════
-
 def fftconv(I: np.ndarray, filt: np.ndarray, b_otf: bool = False) -> np.ndarray:
     """
-    FFT-based convolution.  Equivalent to MATLAB fftconv.m.
-    If ``b_otf`` is True, ``filt`` is already an OTF of the same shape as I.
+    Быстрая свертка изображения с фильтром на основе преобразования Фурье.
+
+    Параметры
+    ---------
+    I : ndarray
+        Исходное изображение.
+    filt : ndarray
+        Ядро фильтра или готовая оптическая передаточная функция (OTF).
+    b_otf : bool, по умолчанию False
+        Флаг, указывающий, что `filt` уже находится в частотной области 
+        (совпадает по размерности с изображением).
+
+    Возвращает
+    ----------
+    out : ndarray
+        Результат свертки.
     """
     if I.ndim == 3 and I.shape[2] == 3:
         H, W, _ = I.shape

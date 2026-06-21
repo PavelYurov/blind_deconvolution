@@ -1,47 +1,12 @@
 """
 utils.py
 
-Utility functions for the ESM (Enhanced Sparse Model) blind deconvolution.
+Вспомогательные вычислительные функции для алгоритма слепой деконволюции 
+на основе улучшенной разреженной модели (ESM).
 
-Ported from MATLAB code by Chen et al. (ECCV 2020).
-Reference:
+Основано на методе:
     L. Chen, F. Fang, S. Lei, F. Li, G. Zhang: "Enhanced Sparse Model
-    for Blind Deblurring", ECCV 2020.
-
-These utilities are the shared "cho_code" + bilateral_filter helpers from
-the MATLAB reference implementation located at
-    ECCV20_enhanced_sparse_model/cho_code/*
-    ECCV20_enhanced_sparse_model/bilateral_filter.m
-
-MATLAB → Python conversion notes (CRITICAL differences):
-    ─────────────────────────────────────────────────────────────────────
-    conv2(A, B, 'valid'):
-        MATLAB conv2 performs TRUE convolution (flips kernel B).
-        → scipy.signal.convolve2d(A, B, mode='valid')
-        Both produce the same output size (M-mk+1, N-nk+1).
-
-    padarray(I, [p p], 'replicate'):
-        → np.pad(I, ((p,p),(p,p)), mode='edge')
-
-    fspecial('gaussian', hsize, sigma):
-        hsize×hsize Gaussian kernel, normalised to sum = 1.
-        → Manual construction (_fspecial_gaussian).
-
-    histc(x, edges):
-        Same length as edges; last bin includes right edge exactly.
-        → _histc helper using np.searchsorted.
-
-    psf2otf(psf, shape):
-        Zero-pad PSF, circularly shift centre to (0,0), fft2.
-        → Manual implementation matching MATLAB exactly.
-
-    dst / idst (Discrete Sine Transform — Type-I):
-        MATLAB's dst is Type-I DST.  scipy.fft.dstn type=1 matches
-        up to a constant factor that cancels in forward/inverse.
-
-    interp2(..., 'linear') (MATLAB):
-        NaN for out-of-bound samples.
-        → scipy.ndimage.map_coordinates with cval=0.
+    for Blind Deblurring", ECCV, 2020.
 """
 
 import numpy as np
@@ -50,19 +15,15 @@ from scipy.ndimage import map_coordinates
 from scipy.fft import dstn, idstn
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# PSF ↔ OTF conversions
-# ═════════════════════════════════════════════════════════════════════════════
 
 def psf2otf(psf: np.ndarray, shape: tuple) -> np.ndarray:
     """
-    Convert PSF to OTF.  Equivalent to MATLAB psf2otf(psf, shape).
+    Преобразование функции рассеяния точки (PSF) в оптическую передаточную 
+    функцию (OTF).
 
-    1. Zero-pad *psf* into an array of *shape*.
-    2. Circularly shift so that the centre of the PSF lands at index (0, 0).
-    3. Return fft2.
-
-    MATLAB circshift amounts: -floor(size(psf)/2) for each dim.
+    Выполняет дополнение ядра нулями до заданного размера с последующим 
+    циклическим сдвигом (для центрирования в нулевой координате) 
+    и быстрым преобразованием Фурье.
     """
     if np.all(psf == 0):
         return np.zeros(shape, dtype=np.complex128)
@@ -78,7 +39,8 @@ def psf2otf(psf: np.ndarray, shape: tuple) -> np.ndarray:
 
 def otf2psf(otf: np.ndarray, psf_size: tuple) -> np.ndarray:
     """
-    Convert OTF back to PSF.  Equivalent to MATLAB otf2psf(otf, psf_size).
+    Преобразование оптической передаточной функции (OTF) обратно в 
+    функцию рассеяния точки (PSF) требуемого размера.
     """
     full = np.real(np.fft.ifft2(otf))
     ph, pw = psf_size
@@ -87,28 +49,22 @@ def otf2psf(otf: np.ndarray, psf_size: tuple) -> np.ndarray:
     return full[:ph, :pw]
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# fftconv  (from cho_code/fftconv.m)
-# ═════════════════════════════════════════════════════════════════════════════
 
 def fftconv(I: np.ndarray, filt: np.ndarray) -> np.ndarray:
     """
-    FFT-based circular convolution.
-    Equivalent to MATLAB cho_code/fftconv.m (uniform-blur branch).
+    Быстрая циклическая свертка изображения и фильтра в частотной области.
 
-        cI = real(ifft2(fft2(I) .* psf2otf(filt, size(I))))
+    Параметры
+    ---------
+    I : ndarray
+        Изображение размерности (H, W) или (H, W, D).
+    filt : ndarray
+        Двумерное ядро фильтра.
 
-    For 2-D input I (single channel).  The MATLAB file also has a 3-channel
-    dispatch branch; we handle that via a simple loop for completeness.
-
-    Parameters
+    Возвращает
     ----------
-    I : (H, W) or (H, W, D) float array
-    filt : 2-D kernel
-
-    Returns
-    -------
-    cI : same shape as I
+    cI : ndarray
+        Результат свертки, сохраняющий размерность входного изображения.
     """
     if I.ndim == 3:
         out = np.zeros_like(I)
@@ -121,16 +77,16 @@ def fftconv(I: np.ndarray, filt: np.ndarray) -> np.ndarray:
     return np.real(np.fft.ifft2(np.fft.fft2(I) * otf))
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# opt_fft_size  (from cho_code/opt_fft_size.m)
-# ═════════════════════════════════════════════════════════════════════════════
 
-_OPT_FFT_LUT = None  # module-level cache (like MATLAB persistent)
+_OPT_FFT_LUT = None 
 
 
 def _build_opt_fft_lut(lut_size: int = 4096) -> np.ndarray:
-    """Build the LUT of optimal FFT sizes (products of 2,3,5,7 * {1,11,13})."""
-    lut = np.zeros(lut_size + 1, dtype=np.int64)  # 1-indexed
+    """
+    Построение справочной таблицы оптимальных размеров для быстрого 
+    преобразования Фурье (множители 2, 3, 5, 7, 11, 13).
+    """
+    lut = np.zeros(lut_size + 1, dtype=np.int64)
 
     e2 = 1
     while e2 <= lut_size:
@@ -151,7 +107,6 @@ def _build_opt_fft_lut(lut_size: int = 4096) -> np.ndarray:
             e3 *= 3
         e2 *= 2
 
-    # Fill gaps: for each position, use the next larger valid size
     nn = 0
     for i in range(lut_size, 0, -1):
         if lut[i] != 0:
@@ -163,9 +118,7 @@ def _build_opt_fft_lut(lut_size: int = 4096) -> np.ndarray:
 
 def opt_fft_size(n) -> np.ndarray:
     """
-    Compute optimal FFT data length(s).  Equivalent to MATLAB opt_fft_size.m.
-
-    Returns -1 for sizes above LUT range.
+    Поиск ближайшего сверху оптимального размера массива для БПФ.
     """
     global _OPT_FFT_LUT
     if _OPT_FFT_LUT is None:
@@ -189,22 +142,18 @@ def opt_fft_size(n) -> np.ndarray:
     return m
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# wrap_boundary_liu  (from cho_code/wrap_boundary_liu.m)
-# ═════════════════════════════════════════════════════════════════════════════
 
 def _solve_min_laplacian(boundary_image: np.ndarray) -> np.ndarray:
     """
-    Solve Laplace equation with Dirichlet boundary conditions via DST-I.
-    Matches the nested solve_min_laplacian in wrap_boundary_liu.m.
+    Решение уравнения Лапласа с граничными условиями Дирихле через 
+    дискретное синус-преобразование первого типа (DST-I).
+    Используется для гладкого заполнения дополненных областей.
     """
     H, W = boundary_image.shape
     boundary_image = boundary_image.copy()
 
-    # Keep only boundary values
     boundary_image[1:-1, 1:-1] = 0.0
 
-    # Discrete Laplacian of boundary at interior points
     f_bp = np.zeros((H, W), dtype=np.float64)
     f_bp[1:H - 1, 1:W - 1] = (
         -4.0 * boundary_image[1:H - 1, 1:W - 1]
@@ -215,13 +164,10 @@ def _solve_min_laplacian(boundary_image: np.ndarray) -> np.ndarray:
     )
     f1 = -f_bp
 
-    # Interior only
     f2 = f1[1:H - 1, 1:W - 1]
 
-    # 2-D DST-I (forward).  The implicit scale factor cancels with idstn.
     f2sin = dstn(f2, type=1)
 
-    # Eigenvalues of the 5-point Laplacian under DST-I
     x = np.arange(1, W - 1)
     y = np.arange(1, H - 1)
     xx, yy = np.meshgrid(x, y)
@@ -240,10 +186,8 @@ def _solve_min_laplacian(boundary_image: np.ndarray) -> np.ndarray:
 
 def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
     """
-    Pad image with circularly smooth boundaries for FFT-based deconvolution.
-    Equivalent to MATLAB wrap_boundary_liu.m (Liu & Jia, ICIP 2008).
-
-    alpha = 1 always (hard-coded in MATLAB source).
+    Дополнение границ изображения для циклической гладкости при выполнении 
+    деконволюции на основе БПФ.
     """
     if img.ndim == 2:
         img = img[:, :, np.newaxis]
@@ -259,7 +203,6 @@ def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
         alpha = 1
         HG = img[:, :, ch]
 
-        # --- r_A: (2*alpha + H_w) × W ---------------------------------
         r_A = np.zeros((alpha * 2 + H_w, W), dtype=np.float64)
         r_A[:alpha, :] = HG[-alpha:, :]
         r_A[-alpha:, :] = HG[:alpha, :]
@@ -271,11 +214,9 @@ def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
         r_A[alpha:alpha + H_w, 0] = (1 - a) * r_A[alpha - 1, 0] + a * r_A[-alpha, 0]
         r_A[alpha:alpha + H_w, -1] = (1 - a) * r_A[alpha - 1, -1] + a * r_A[-alpha, -1]
 
-        # MATLAB (alpha=1): r_A(alpha:end-alpha+1,:) covers all rows
         r_A = _solve_min_laplacian(r_A)
         A = r_A
 
-        # --- r_B: H × (2*alpha + W_w) ---------------------------------
         r_B = np.zeros((H, alpha * 2 + W_w), dtype=np.float64)
         r_B[:, :alpha] = HG[:, -alpha:]
         r_B[:, -alpha:] = HG[:, :alpha]
@@ -290,7 +231,6 @@ def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
         r_B = _solve_min_laplacian(r_B)
         B = r_B
 
-        # --- r_C: (2*alpha + H_w) × (2*alpha + W_w) -------------------
         r_C = np.zeros((alpha * 2 + H_w, alpha * 2 + W_w), dtype=np.float64)
         r_C[:alpha, :] = B[-alpha:, :]
         r_C[-alpha:, :] = B[:alpha, :]
@@ -300,13 +240,10 @@ def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
         r_C = _solve_min_laplacian(r_C)
         C = r_C
 
-        # Strip wrapping rows/columns (alpha=1 ⇒ drop one border row/col
-        # in the right places to reassemble the final padded image)
         A = A[:H_w, :]
         B = B[:, 1:W_w + 1]
         C = C[1:H_w + 1, 1:W_w + 1]
 
-        # MATLAB: ret = [img, B; A, C]
         ret[:, :, ch] = np.block([[HG, B], [A, C]])
 
     if ret.shape[2] == 1:
@@ -314,14 +251,11 @@ def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
     return ret
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Conjugate Gradient  (from cho_code/conjgrad.m)
-# ═════════════════════════════════════════════════════════════════════════════
 
 def conjgrad(x: np.ndarray, b: np.ndarray, max_it: int, tol: float,
              ax_func, func_param) -> np.ndarray:
     """
-    Conjugate gradient.  Solves A x = b with A defined by ax_func(x, param).
+    Решение системы линейных уравнений методом сопряженных градиентов.
     """
     x = x.copy()
     r = b - ax_func(x, func_param)
@@ -345,17 +279,11 @@ def conjgrad(x: np.ndarray, b: np.ndarray, max_it: int, tol: float,
     return x
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# adjust_psf_center  (from cho_code/adjust_psf_center.m)
-# ═════════════════════════════════════════════════════════════════════════════
 
 def adjust_psf_center(psf: np.ndarray) -> np.ndarray:
     """
-    Shift the PSF so its centre of mass coincides with the geometric centre.
-
-    MATLAB uses 1-based meshgrid, integer-rounded shifts, bilinear interp2,
-    and NaN → 0 for out-of-bound samples.  We replicate this with
-    map_coordinates(cval=0, order=1).
+    Центрирование функции рассеяния точки путем сдвига ее центра масс 
+    в геометрический центр массива.
     """
     rows, cols = psf.shape
 
@@ -386,25 +314,16 @@ def adjust_psf_center(psf: np.ndarray) -> np.ndarray:
     return result.reshape(rows, cols)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# threshold_pxpy_v1  (from cho_code/threshold_pxpy_v1.m)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def _histc(data: np.ndarray, edges: np.ndarray) -> np.ndarray:
     """
-    MATLAB histc(data, edges).
-
-    Counts values where edges[k] <= x < edges[k+1], and the last bin
-    additionally includes x == edges[-1].  Output length = len(edges).
+    Построение гистограммы значений с включением правой границы в последний бин.
     """
     data = np.asarray(data).ravel()
     if data.size == 0:
         return np.zeros(len(edges), dtype=np.int64)
 
     indices = np.searchsorted(edges, data, side='right') - 1
-    # Values exactly at the last edge go to the last bin
     indices[data == edges[-1]] = len(edges) - 1
-    # Out of range → a sentinel slot we will drop
     indices[indices < 0] = len(edges)
     indices[indices >= len(edges)] = len(edges)
 
@@ -414,14 +333,8 @@ def _histc(data: np.ndarray, edges: np.ndarray) -> np.ndarray:
 
 def threshold_pxpy_v1(latent: np.ndarray, psf_size, threshold=None):
     """
-    Selective gradient thresholding used inside the kernel-estimation loop.
-    Equivalent to MATLAB cho_code/threshold_pxpy_v1.m.
-
-    Returns (px, py, threshold) where px, py are weak-gradient-zeroed
-    derivatives of *latent*.
-
-    Derivative filters:   dx = [-1 1; 0 0]   dy = [-1 0; 1 0]
-    Applied via 'valid' convolution (true convolution, kernel flipped).
+    Селективное ограничение градиентов для повышения робастности оценки ядра.
+    Слабые перепады обнуляются, чтобы исключить влияние шума и мелких текстур.
     """
     b_estimate_threshold = threshold is None
     if b_estimate_threshold:
@@ -437,11 +350,9 @@ def threshold_pxpy_v1(latent: np.ndarray, psf_size, threshold=None):
     pm = px ** 2 + py ** 2
 
     if b_estimate_threshold:
-        # MATLAB: pd = atan(py./px) — principal branch, range (-pi/2, pi/2)
         with np.errstate(divide='ignore', invalid='ignore'):
             pd = np.arctan(py / px)
 
-        # MATLAB: pm_steps = 0:0.00006:2
         pm_steps = np.arange(0.0, 2.0 + 0.00006 / 2.0, 0.00006)
         pm_steps = pm_steps[pm_steps <= 2.0 + 1e-12]
 
@@ -450,7 +361,6 @@ def threshold_pxpy_v1(latent: np.ndarray, psf_size, threshold=None):
         mask3 = (pd >= -np.pi / 4) & (pd < 0)
         mask4 = (pd >= -np.pi / 2) & (pd < -np.pi / 4)
 
-        # MATLAB: cumsum(flipud(histc(...)))
         H1 = np.cumsum(_histc(pm[mask1], pm_steps)[::-1])
         H2 = np.cumsum(_histc(pm[mask2], pm_steps)[::-1])
         H3 = np.cumsum(_histc(pm[mask3], pm_steps)[::-1])
@@ -463,9 +373,6 @@ def threshold_pxpy_v1(latent: np.ndarray, psf_size, threshold=None):
         for t in range(len(pm_steps)):
             min_h = min(H1[t], H2[t], H3[t], H4[t])
             if min_h >= th:
-                # MATLAB: threshold = pm_steps(end - t + 1)
-                # t is 1-based in MATLAB → Python loop index t (0-based) maps
-                # to MATLAB's (t+1).  pm_steps(end - t) in 0-based.
                 threshold = pm_steps[len(pm_steps) - 1 - t]
                 break
 
@@ -483,12 +390,11 @@ def threshold_pxpy_v1(latent: np.ndarray, psf_size, threshold=None):
     return px, py, threshold
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# bilateral_filter  (from bilateral_filter.m)
-# ═════════════════════════════════════════════════════════════════════════════
 
 def _fspecial_gaussian(size: int, sigma: float) -> np.ndarray:
-    """MATLAB fspecial('gaussian', size, sigma) — centred, sum-normalised."""
+    """
+    Формирование центрированного двумерного фильтра Гаусса.
+    """
     radius = (size - 1) / 2.0
     y, x = np.mgrid[-radius:radius + 1, -radius:radius + 1]
     g = np.exp(-(x * x + y * y) / (2.0 * sigma * sigma))
@@ -498,13 +404,9 @@ def _fspecial_gaussian(size: int, sigma: float) -> np.ndarray:
 def bilateral_filter(img: np.ndarray, sigma_s: float,
                      sigma: float) -> np.ndarray:
     """
-    Bilateral filter for grayscale / multi-channel non-RGB images.
-    Equivalent to MATLAB bilateral_filter.m when the colour branch is not
-    taken (i.e. D != 3 or a diff image is passed).  ESM's pipeline calls:
-        bilateral_filter(diff, 3, 0.1)
-    where ``diff`` is the difference of two deconvolution results, typically
-    3-channel; we follow the non-LAB branch exactly:
-        lab = img;  sigma *= sqrt(d)
+    Билатеральная фильтрация для полутоновых или многоканальных изображений.
+    Используется в ESM-конвейере для извлечения высокочастотного звона 
+    на этапе неслепой деконволюции.
     """
     if img.ndim == 2:
         img = img[:, :, np.newaxis]
