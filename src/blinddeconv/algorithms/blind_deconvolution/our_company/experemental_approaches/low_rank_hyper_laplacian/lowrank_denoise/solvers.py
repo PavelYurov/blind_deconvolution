@@ -5,7 +5,6 @@ from numpy.fft import fft2, ifft2
 
 from .utils import psf2otf
 
-
 def optimize_image(
     x: np.ndarray,
     kernel: np.ndarray,
@@ -16,43 +15,18 @@ def optimize_image(
     exp_a: float = 0.8,
     thr_e: float = 1.0 / 1500,
 ) -> np.ndarray:
-    """
-    Estimate the latent sharp image via IRLS with hyper-Laplacian prior.
 
-    Parameters:
-    x : np.ndarray, shape (H, W)
-        Current sharp-image estimate (initialised to blurred image).
-    kernel : np.ndarray, shape (kh, kw)
-        Current blur-kernel estimate.
-    blurred : np.ndarray, shape (H, W)
-        Observed blurred image.
-    reg_weight : float
-        Edge-regularisation weight α.
-    max_irls : int
-        IRLS outer iterations.
-    max_cg : int
-        CG inner iterations per IRLS step.
-    exp_a : float
-        Hyper-Laplacian exponent *p* (0 < p ≤ 2; typical 0.5–0.8).
-    thr_e : float
-        Smoothing parameter ε to avoid division by zero in weights.
+    dxf = np.array([[1.0, -1.0]])
+    dyf = np.array([[1.0], [-1.0]])
 
-    Returns:
-    x : np.ndarray, shape (H, W)
-        Updated sharp-image estimate.
-    """
-    dxf = np.array([[1.0, -1.0]])       
-    dyf = np.array([[1.0], [-1.0]])      
+    dxf_t = dxf[::-1, ::-1]
+    dyf_t = dyf[::-1, ::-1]
 
-
-    dxf_t = dxf[::-1, ::-1]            
-    dyf_t = dyf[::-1, ::-1]             
-
-    kernel_rot = np.rot90(kernel, 2)     
+    kernel_rot = np.rot90(kernel, 2)
 
     for irls_it in range(max_irls):
-        dx = fftconvolve(x, dxf, mode='valid')  
-        dy = fftconvolve(x, dyf, mode='valid')   
+        dx = fftconvolve(x, dxf, mode='valid')
+        dy = fftconvolve(x, dyf, mode='valid')
 
         weight_x = (thr_e + dx ** 2) ** (exp_a / 2.0 - 1.0)
         weight_y = (thr_e + dy ** 2) ** (exp_a / 2.0 - 1.0)
@@ -107,23 +81,7 @@ def optimize_kernel(
     beta: float = 3e-3,
     max_iter: int = 50,
 ) -> np.ndarray:
-    """
-    Parameters:
-    x : np.ndarray, shape (H, W)
-        Current sharp-image estimate.
-    kernel : np.ndarray, shape (kh, kw)
-        Current kernel estimate.
-    blurred : np.ndarray, shape (H, W)
-        Observed blurred image.
-    beta : float
-        Tikhonov regularisation weight.
-    max_iter : int
-        Maximum CG iterations.
 
-    Returns:
-    kernel : np.ndarray, shape (kh, kw)
-        Updated kernel estimate (non-negative, sums to one).
-    """
     kh, kw = kernel.shape
     bhs_y, bhs_x = kh // 2, kw // 2
 
@@ -136,7 +94,7 @@ def optimize_kernel(
     k0 = kernel.copy()
 
     def _apply_A(k):
-        """Compute  (X^T X + β I) k."""
+
         Xk = fftconvolve(x, k, mode='valid')
         XtXk = fftconvolve(x_rot, Xk, mode='valid')
         return XtXk + beta * k
@@ -180,23 +138,7 @@ def low_rank_regularization(
     tau: float = 1e-5,
     delta: float = 1e-5,
 ) -> np.ndarray:
-    """
-    Low-rank kernel regularisation via Iteratively Reweighted Nuclear
-    Norm (IRNN) minimisation.
-    Parameters:
-    kernel : np.ndarray, shape (kh, kw)
-        Current kernel estimate.
-    max_iter : int
-        Number of MM iterations (typically 3–10).
-    tau : float
-        Proximal parameter (smaller ⟹ solution stays closer to *k₀*).
-    delta : float
-        Smoothing parameter for the ``log det`` surrogate.
 
-    Returns:
-    kernel : np.ndarray
-        Low-rank–regularised kernel.
-    """
     X = kernel.copy()
 
     w = np.ones(min(X.shape))
@@ -212,7 +154,6 @@ def low_rank_regularization(
 
     return X
 
-
 def fast_deconv_hyper_laplacian(
     blurred: np.ndarray,
     kernel: np.ndarray,
@@ -222,30 +163,7 @@ def fast_deconv_hyper_laplacian(
     max_outer: int = 50,
     max_inner: int = 1,
 ) -> np.ndarray:
-    """
-    Non-blind image deconvolution with hyper-Laplacian prior.
 
-    Solves the MAP restoration problem ([4], Eq. (1)):
-    Parameters:
-    blurred : np.ndarray, shape (H, W)
-        Observed blurred image.
-    kernel  : np.ndarray, shape (kh, kw)
-        Estimated PSF.
-    lambda_ : float
-        Data-fidelity weight.
-    alpha   : float
-        Hyper-Laplacian exponent.
-        α = 1: Laplacian (L₁);  α = 2/3 or 1/2: hyper-Laplacian.
-    beta    : float
-        ADMM penalty (augmented Lagrangian parameter).
-    max_outer : int
-        Outer ADMM iterations.
-    max_inner : int
-        Inner iterations per ADMM step.
-
-    Returns:
-    restored : np.ndarray, shape (H, W)
-    """
     H, W = blurred.shape
     g = blurred.copy()
 
@@ -255,13 +173,12 @@ def fast_deconv_hyper_laplacian(
     dyt = dy[::-1, ::-1]
 
     otf_k = psf2otf(kernel, (H, W))
-    Ktf   = np.conj(otf_k) * np.fft.fft2(blurred)   
-    KtK   = np.abs(otf_k) ** 2                        
+    Ktf   = np.conj(otf_k) * np.fft.fft2(blurred)
+    KtK   = np.abs(otf_k) ** 2
 
     Fdx = np.abs(psf2otf(dx, (H, W))) ** 2
     Fdy = np.abs(psf2otf(dy, (H, W))) ** 2
-    DtD = Fdx + Fdy                                   
-
+    DtD = Fdx + Fdy
 
     gx = fftconvolve(g, dx, mode='valid')
     gy = fftconvolve(g, dy, mode='valid')
@@ -290,20 +207,14 @@ def fast_deconv_hyper_laplacian(
 
             g = np.real(np.fft.ifft2(numer / (denom + 1e-10)))
 
-            # Recompute gradients of g
             gx = fftconvolve(g, dx, mode='valid')
             gy = fftconvolve(g, dy, mode='valid')
 
     return g
 
-
-
 def _soft_threshold(x: np.ndarray, t: float) -> np.ndarray:
-    """
-    Soft-thresholding — proximal operator of the L1 norm.
-    """
-    return np.sign(x) * np.maximum(np.abs(x) - t, 0.0)
 
+    return np.sign(x) * np.maximum(np.abs(x) - t, 0.0)
 
 def _hyper_laplacian_proximal(
     v: np.ndarray,
@@ -316,7 +227,7 @@ def _hyper_laplacian_proximal(
     w_min = (alpha * (1.0 - alpha) / beta) ** (1.0 / (2.0 - alpha))
 
     v_max = float(v_abs.max()) + 1.0
-    w_max = v_max  
+    w_max = v_max
 
     w_lut = np.linspace(w_min, w_max, n_lut)
     v_lut = w_lut + (alpha / beta) * w_lut ** (alpha - 1.0)
@@ -342,15 +253,10 @@ def _hyper_laplacian_proximal(
 
     return signs * w_out
 
-
-# ═════════════════════════════════════════════════════════════════════════════
-# Optimal FFT size
-# ═════════════════════════════════════════════════════════════════════════════
-
 _OPT_FFT_LUT = None
 
 def _build_opt_fft_lut(max_n: int = 4096) -> list:
-    """Build look-up table mapping n → smallest efficient FFT length ≥ n."""
+
     from itertools import count
     efficient = set()
     for i2 in count():
@@ -379,9 +285,8 @@ def _build_opt_fft_lut(max_n: int = 4096) -> list:
                 break
     return lut
 
-
 def opt_fft_size(n) -> np.ndarray:
-    """Optimal FFT data length(s) — smallest efficient size ≥ n."""
+
     global _OPT_FFT_LUT
     if _OPT_FFT_LUT is None:
         _OPT_FFT_LUT = _build_opt_fft_lut()
@@ -400,13 +305,8 @@ def opt_fft_size(n) -> np.ndarray:
         return int(m.flat[0])
     return m
 
-
-# ═════════════════════════════════════════════════════════════════════════════
-# wrap_boundary_liu  (Liu & Jia ICIP 2008, Cho implementation)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def _solve_min_laplacian(boundary_image: np.ndarray) -> np.ndarray:
-    """Solve Laplace eq. with Dirichlet BC via DST-I (Poisson solver)."""
+
     H, W = boundary_image.shape
     bi = boundary_image.copy()
     bi[1:-1, 1:-1] = 0.0
@@ -424,7 +324,7 @@ def _solve_min_laplacian(boundary_image: np.ndarray) -> np.ndarray:
     x = np.arange(1, W - 1)
     y = np.arange(1, H - 1)
     xx, yy = np.meshgrid(x, y)
-    denom = (2.0 * np.cos(np.pi * xx / (W - 1)) - 2.0) + \
+    denom = (2.0 * np.cos(np.pi * xx / (W - 1)) - 2.0) +\
             (2.0 * np.cos(np.pi * yy / (H - 1)) - 2.0)
 
     f3 = f2sin / denom
@@ -434,12 +334,8 @@ def _solve_min_laplacian(boundary_image: np.ndarray) -> np.ndarray:
     result[1:H-1, 1:W-1] = img_tt
     return result
 
-
 def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
-    """
-    Pad image so boundaries are circularly smooth for FFT-based deconv.
-    Based on Liu & Jia (ICIP 2008), Cho implementation.
-    """
+
     if img.ndim == 2:
         img = img[:, :, np.newaxis]
     H, W, Ch = img.shape
@@ -453,7 +349,6 @@ def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
         alpha = 1
         HG = img[:, :, ch]
 
-        # --- vertical wrap ---
         r_A = np.zeros((alpha * 2 + H_w, W), dtype=np.float64)
         r_A[:alpha, :] = HG[-alpha:, :]
         r_A[-alpha:, :] = HG[:alpha, :]
@@ -469,7 +364,6 @@ def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
         A2 = _solve_min_laplacian(
             r_A[alpha - 1: alpha + H_w + 1, :])
 
-        # --- horizontal wrap ---
         r_B = np.zeros((H, alpha * 2 + W_w), dtype=np.float64)
         r_B[:, :alpha] = HG[:, -alpha:]
         r_B[:, -alpha:] = HG[:, :alpha]
@@ -485,24 +379,22 @@ def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
         B2 = _solve_min_laplacian(
             r_B[:, alpha - 1: alpha + W_w + 1])
 
-        # --- assemble ---
         ret[:H, :W, ch] = HG
         ret[H:, :W, ch] = A2[1:-1, :]
         ret[:H, W:, ch] = B2[:, 1:-1]
 
         if H_w > 0 and W_w > 0:
             r_C = np.zeros((H_w + 2, W_w + 2), dtype=np.float64)
-            # Boundary values with periodic wrap-around at the far corner
-            # Top row: [ret[H-1, W-1], ..., ret[H-1, W_out-1], ret[H-1, 0]]
+
             r_C[0, :-1] = ret[H - 1, W - 1:, ch]
             r_C[0, -1]  = ret[H - 1, 0, ch]
-            # Bottom row: wraps to row 0
+
             r_C[-1, :-1] = ret[0, W - 1:, ch]
             r_C[-1, -1]  = ret[0, 0, ch]
-            # Left col: [ret[H-1, W-1], ..., ret[H_out-1, W-1], ret[0, W-1]]
+
             r_C[:-1, 0]  = ret[H - 1:, W - 1, ch]
             r_C[-1, 0]   = ret[0, W - 1, ch]
-            # Right col: wraps to col 0
+
             r_C[:-1, -1] = ret[H - 1:, 0, ch]
             r_C[-1, -1]  = ret[0, 0, ch]
             C2 = _solve_min_laplacian(r_C)
@@ -512,13 +404,8 @@ def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
         return ret[:, :, 0]
     return ret
 
-
-# ═════════════════════════════════════════════════════════════════════════════
-# TV deblurring (ADM anisotropic — Split Bregman)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def _computeDenominator(B, k):
-    """Pre-compute frequency-domain terms for ADM TV deblurring."""
+
     m, n = B.shape
     otf_k = psf2otf(k, (m, n))
     Nomin1 = np.conj(otf_k) * fft2(B)
@@ -530,9 +417,8 @@ def _computeDenominator(B, k):
               np.abs(psf2otf(dy, (m, n))) ** 2)
     return Nomin1, Denom1, Denom2
 
-
 def deblurring_adm_aniso(B, k, lambda_tv, alpha):
-    """TV-ℓ² deblurring via ADM/Split Bregman with anisotropic TV."""
+
     beta = 1.0 / lambda_tv
     beta_min = 0.001
     m, n = B.shape
@@ -567,13 +453,8 @@ def deblurring_adm_aniso(B, k, lambda_tv, alpha):
 
     return I
 
-
-# ═════════════════════════════════════════════════════════════════════════════
-# L0 gradient restoration
-# ═════════════════════════════════════════════════════════════════════════════
-
 def L0Restoration(Im, kernel, lambda_grad, kappa=2.0):
-    """Image restoration with L0 gradient prior."""
+
     H_orig, W_orig = Im.shape[0], Im.shape[1]
     target_size = opt_fft_size(
         np.array([H_orig, W_orig]) + np.array(kernel.shape[:2]) - 1)
@@ -629,21 +510,15 @@ def L0Restoration(Im, kernel, lambda_grad, kappa=2.0):
         S = S[:, :, 0]
     return S
 
-
-# ═════════════════════════════════════════════════════════════════════════════
-# Bilateral filter (spatial × photometric Gaussian)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def _fspecial_gaussian(size, sigma):
-    """2-D Gaussian kernel (like MATLAB fspecial('gaussian', ...))."""
+
     x = np.arange(size) - size // 2
     g = np.exp(-x ** 2 / (2 * sigma ** 2))
     h = np.outer(g, g)
     return h / h.sum()
 
-
 def bilateral_filter(img, sigma_s, sigma):
-    """Bilateral filter for grayscale images."""
+
     was_2d = img.ndim == 2
     if was_2d:
         img = img[:, :, np.newaxis]
@@ -678,31 +553,9 @@ def bilateral_filter(img, sigma_s, sigma):
         return r_img[:, :, 0]
     return r_img
 
-
-# ═════════════════════════════════════════════════════════════════════════════
-# Ringing artifacts removal  (Pan et al. CVPR 2014)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def ringing_artifacts_removal(y, kernel, lambda_tv=1e-3,
                               lambda_l0=2e-3, weight_ring=1.0):
-    """
-    Non-blind deconvolution with ringing suppression.
 
-    Uses TV deconv + L0 deconv + bilateral filter on their difference
-    to identify and subtract ringing artifacts.
-
-    Parameters
-    ----------
-    y           : (H, W) blurred image (single channel, float [0,1])
-    kernel      : blur kernel
-    lambda_tv   : TV regularisation weight
-    lambda_l0   : L0 gradient prior weight
-    weight_ring : ringing suppression strength (0 = TV only)
-
-    Returns
-    -------
-    result : (H, W) deblurred image
-    """
     H, W = y.shape[:2]
     target_size = opt_fft_size(
         np.array([H, W]) + np.array(kernel.shape[:2]) - 1)

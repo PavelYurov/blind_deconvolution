@@ -15,24 +15,19 @@ from .utils import (
     bilateral_filter,
 )
 
-
 def _compute_Ax(x, p):
-
 
     x_f = psf2otf(x, p['img_size'])
     y = otf2psf(p['m'] * x_f, p['psf_size'])
     y = y + p['lambda'] * x
     return y
 
-
 def estimate_psf(blurred_x, blurred_y, latent_x, latent_y, weight, psf_size):
-
 
     latent_xf = fft2(latent_x)
     latent_yf = fft2(latent_y)
     blurred_xf = fft2(blurred_x)
     blurred_yf = fft2(blurred_y)
-
 
     b_f = np.conj(latent_xf) * blurred_xf + np.conj(latent_yf) * blurred_yf
     b = np.real(otf2psf(b_f, psf_size))
@@ -44,10 +39,8 @@ def estimate_psf(blurred_x, blurred_y, latent_x, latent_y, weight, psf_size):
         'lambda': weight,
     }
 
-
     psf = np.ones(psf_size, dtype=np.float64) / np.prod(psf_size)
     psf = conjgrad(psf, b, 20, 1e-5, _compute_Ax, p)
-
 
     psf[psf < psf.max() * 0.05] = 0.0
     psf_sum = psf.sum()
@@ -55,9 +48,7 @@ def estimate_psf(blurred_x, blurred_y, latent_x, latent_y, weight, psf_size):
         psf = psf / psf_sum
     return psf
 
-
 def deblur_tv_pmpr(Im, kernel, lambda_pmp, mu, opts):
-
 
     S = Im.copy()
     alphamax = 1e5
@@ -65,14 +56,12 @@ def deblur_tv_pmpr(Im, kernel, lambda_pmp, mu, opts):
     M, N = Im.shape[:2]
     sizeI2D = (M, N)
 
-
     otfFh = psf2otf(np.array([[1, -1]], dtype=np.float64), sizeI2D)
     otfFv = psf2otf(np.array([[1], [-1]], dtype=np.float64), sizeI2D)
     otfKER = psf2otf(kernel, sizeI2D)
 
     denKER = np.abs(otfKER) ** 2
     denGrad = np.abs(otfFh) ** 2 + np.abs(otfFv) ** 2
-
 
     Fk_FI = np.conj(otfKER) * fft2(Im)
 
@@ -88,14 +77,11 @@ def deblur_tv_pmpr(Im, kernel, lambda_pmp, mu, opts):
     while alpha < alphamax:
         for _k in range(K):
 
-
             Z, Md = find_min_pixels(S, patch_r, quantile=pmp_quantile)
-
 
             z = Z[Md > 0]
 
             if current_scale < total_scales / 2.0:
-
 
                 if z.size > 0:
                     lambdat = min(max(lambda_pmp, np.mean(np.abs(z))), 0.1)
@@ -105,12 +91,9 @@ def deblur_tv_pmpr(Im, kernel, lambda_pmp, mu, opts):
                 Z[np.abs(Z) < lambdat] = 0.0
             else:
 
-
                 Z = np.sign(Z) * np.maximum(Z - lambda_pmp, 0.0)
 
-
             S = S * (1.0 - Md) + Z * Md
-
 
             Gh = np.concatenate([np.diff(S, n=1, axis=1),
                                  S[:, 0:1] - S[:, -1:]], axis=1)
@@ -118,18 +101,15 @@ def deblur_tv_pmpr(Im, kernel, lambda_pmp, mu, opts):
             Gv = np.concatenate([np.diff(S, n=1, axis=0),
                                  S[0:1, :] - S[-1:, :]], axis=0)
 
-
             t = (Gh ** 2 + Gv ** 2) < mu / alpha
             Gh[t] = 0.0
             Gv[t] = 0.0
-
 
             gh = np.concatenate([Gh[:, -1:] - Gh[:, 0:1],
                                  -np.diff(Gh, n=1, axis=1)], axis=1)
 
             gv = np.concatenate([Gv[-1:, :] - Gv[0:1, :],
                                  -np.diff(Gv, n=1, axis=0)], axis=0)
-
 
             Fs = (Fk_FI + alpha * fft2(gh + gv)) / (denKER + alpha * denGrad)
             S = np.real(ifft2(Fs))
@@ -138,12 +118,9 @@ def deblur_tv_pmpr(Im, kernel, lambda_pmp, mu, opts):
 
     return S
 
-
 def L0Restoration(Im, kernel, lambda_grad, kappa=2.0):
 
-
     H_orig, W_orig = Im.shape[0], Im.shape[1]
-
 
     target_size = opt_fft_size(
         np.array([H_orig, W_orig]) + np.array(kernel.shape[:2]) - 1
@@ -156,7 +133,6 @@ def L0Restoration(Im, kernel, lambda_grad, kappa=2.0):
     fx = np.array([[1, -1]], dtype=np.float64)
     fy = np.array([[1], [-1]], dtype=np.float64)
 
-
     N, M = Im.shape[:2]
     sizeI2D = (N, M)
 
@@ -168,13 +144,11 @@ def L0Restoration(Im, kernel, lambda_grad, kappa=2.0):
 
     Denormin2 = np.abs(otfFx) ** 2 + np.abs(otfFy) ** 2
 
-
     Normin1 = np.conj(KER) * fft2(S)
 
     beta = 2 * lambda_grad
     while beta < betamax:
         Denormin = Den_KER + beta * Denormin2
-
 
         h = np.concatenate([np.diff(S, n=1, axis=1),
                             S[:, 0:1] - S[:, -1:]], axis=1)
@@ -182,11 +156,9 @@ def L0Restoration(Im, kernel, lambda_grad, kappa=2.0):
         v = np.concatenate([np.diff(S, n=1, axis=0),
                             S[0:1, :] - S[-1:, :]], axis=0)
 
-
         t = (h ** 2 + v ** 2) < lambda_grad / beta
         h[t] = 0.0
         v[t] = 0.0
-
 
         Normin2_val = np.concatenate([h[:, -1:] - h[:, 0:1],
                                       -np.diff(h, n=1, axis=1)], axis=1)
@@ -199,21 +171,17 @@ def L0Restoration(Im, kernel, lambda_grad, kappa=2.0):
         S = np.real(ifft2(FS))
         beta = beta * kappa
 
-
     S = S[:H_orig, :W_orig]
     return S
 
-
 def blind_deconv_main(blur_B, k, lambda_pmp, lambda_grad, threshold, opts,
                       blind_denoise_fn=None, iteration_callback=None):
-
 
     dx = np.array([[-1, 1], [0, 0]], dtype=np.float64)
     dy = np.array([[-1, 0], [1, 0]], dtype=np.float64)
 
     H = blur_B.shape[0]
     W = blur_B.shape[1]
-
 
     target_size = opt_fft_size(
         np.array([H, W]) + np.array(k.shape[:2]) - 1
@@ -222,10 +190,8 @@ def blind_deconv_main(blur_B, k, lambda_pmp, lambda_grad, threshold, opts,
 
     blur_B_tmp = blur_B_w[:H, :W]
 
-
     Bx = convolve2d(blur_B_tmp, dx, mode='valid')
     By = convolve2d(blur_B_tmp, dy, mode='valid')
-
 
     grad_smooth_sigma = opts.get('grad_smooth_sigma', None)
     if grad_smooth_sigma is not None and grad_smooth_sigma > 0:
@@ -237,7 +203,6 @@ def blind_deconv_main(blur_B, k, lambda_pmp, lambda_grad, threshold, opts,
     denoise_radius = opts.get('denoise_radius', 2)
     ensemble_denoise = opts.get('ensemble_denoise', False)
     estimate_noise = opts.get('estimate_noise', False)
-
 
     noise_sigma_mult = opts.get('noise_sigma_mult', 10.0)
     if estimate_noise and denoise_eps is not None and denoise_eps > 0:
@@ -264,9 +229,7 @@ def blind_deconv_main(blur_B, k, lambda_pmp, lambda_grad, threshold, opts,
 
             S = L0Restoration(blur_B, k, lambda_grad, 2.0)
 
-
         S_for_kernel = blind_denoise_fn(S) if blind_denoise_fn is not None else S
-
 
         latent_x, latent_y, threshold = threshold_pxpy_v1(
             S_for_kernel, max(k.shape), threshold,
@@ -276,9 +239,7 @@ def blind_deconv_main(blur_B, k, lambda_pmp, lambda_grad, threshold, opts,
 
         k_prev = k.copy()
 
-
         k = estimate_psf(Bx, By, latent_x, latent_y, 2, k_prev.shape)
-
 
         labeled, num_features = label(k, structure=np.ones((3, 3)))
         for ii in range(1, num_features + 1):
@@ -288,13 +249,11 @@ def blind_deconv_main(blur_B, k, lambda_pmp, lambda_grad, threshold, opts,
         k[k < 0] = 0.0
         k = k / k.sum()
 
-
         if lambda_pmp != 0:
             lambda_pmp = max(lambda_pmp / 1.1, 1e-2)
 
         if lambda_grad != 0:
             lambda_grad = max(lambda_grad / 1.1, 1e-4)
-
 
         if iteration_callback is not None:
             iteration_callback({
@@ -310,15 +269,12 @@ def blind_deconv_main(blur_B, k, lambda_pmp, lambda_grad, threshold, opts,
                 },
             })
 
-
     k[k < 0] = 0.0
     k = k / k.sum()
 
     return k, lambda_pmp, lambda_grad, S
 
-
 def _init_kernel(minsize):
-
 
     k = np.zeros((minsize, minsize), dtype=np.float64)
     c = (minsize - 1) // 2
@@ -326,9 +282,7 @@ def _init_kernel(minsize):
     k[r, r:r + 2] = 0.5
     return k
 
-
 def _downSmpImC(I, ret):
-
 
     if ret == 1:
         return I.copy()
@@ -342,12 +296,10 @@ def _downSmpImC(I, ret):
     ii = np.where(csf > 0.05)[0]
     sf = sf[ii]
 
-
     sf_row = sf.reshape(1, -1)
     sf_col = sf.reshape(-1, 1)
     I_filtered = convolve2d(I, sf_row, mode='valid')
     I_filtered = convolve2d(I_filtered, sf_col, mode='valid')
-
 
     rows, cols = I_filtered.shape[0], I_filtered.shape[1]
 
@@ -355,10 +307,8 @@ def _downSmpImC(I, ret):
     gy_1based = np.arange(1, rows + 1e-9, 1.0 / ret)
     gx_grid, gy_grid = np.meshgrid(gx_1based, gy_1based)
 
-
     gx_0 = gx_grid - 1.0
     gy_0 = gy_grid - 1.0
-
 
     sI = map_coordinates(I_filtered,
                          [gy_0.ravel(), gx_0.ravel()],
@@ -367,9 +317,7 @@ def _downSmpImC(I, ret):
 
     return sI
 
-
 def _fixsize(f, nk1, nk2):
-
 
     k1, k2 = f.shape
 
@@ -418,9 +366,7 @@ def _fixsize(f, nk1, nk2):
 
     return f
 
-
 def _resizeKer(k, ret, k1, k2):
-
 
     k = zoom(k, ret, order=3)
     k = np.maximum(k, 0.0)
@@ -429,10 +375,8 @@ def _resizeKer(k, ret, k1, k2):
         k = k / k.sum()
     return k
 
-
 def blind_deconv(y, lambda_pmp, lambda_grad, opts, patch_r=None,
                  blind_denoise_fn=None, iteration_callback=None):
-
 
     gamma_correct = opts.get('gamma_correct', 1.0)
     if gamma_correct != 1:
@@ -442,19 +386,16 @@ def blind_deconv(y, lambda_pmp, lambda_grad, opts, patch_r=None,
     if isinstance(kernel_size, (list, tuple, np.ndarray)):
         kernel_size = int(kernel_size[0])
 
-
     ret = np.sqrt(0.5)
 
     maxitr = max(int(np.floor(np.log(5.0 / kernel_size) / np.log(ret))), 0)
     num_scales = maxitr + 1
-
 
     retv = ret ** np.arange(0, maxitr + 1)
 
     k1list = np.ceil(kernel_size * retv).astype(int)
     k1list = k1list + (k1list % 2 == 0)
     k2list = k1list.copy()
-
 
     if patch_r is None:
         opts['r'] = max(1, int(np.floor(0.025 * np.mean(y.shape[:2]))))
@@ -466,7 +407,6 @@ def blind_deconv(y, lambda_pmp, lambda_grad, opts, patch_r=None,
     threshold = None
     ks = None
     interim_latent = None
-
 
     for s_idx in range(num_scales - 1, -1, -1):
 
@@ -480,14 +420,11 @@ def blind_deconv(y, lambda_pmp, lambda_grad, opts, patch_r=None,
             ks = _resizeKer(ks, 1.0 / ret,
                             int(k1list[s_idx]), int(k2list[s_idx]))
 
-
         cret = retv[s_idx]
         ys = _downSmpImC(y, cret)
 
-
         if s_idx == num_scales - 1:
             _, _, threshold = threshold_pxpy_v1(ys, max(ks.shape))
-
 
         opts['s'] = s_matlab
         opts['_current_scale'] = s_idx
@@ -498,11 +435,9 @@ def blind_deconv(y, lambda_pmp, lambda_grad, opts, patch_r=None,
             iteration_callback=iteration_callback,
         )
 
-
         ks = adjust_psf_center(ks)
         ks[ks < 0] = 0.0
         ks = ks / ks.sum()
-
 
         if s_idx == 0:
             kernel = ks.copy()
@@ -515,9 +450,7 @@ def blind_deconv(y, lambda_pmp, lambda_grad, opts, patch_r=None,
 
     return kernel, interim_latent
 
-
 def _computeDenominator(y, k):
-
 
     sizey = y.shape[:2]
     otfk = psf2otf(k, sizey)
@@ -527,9 +460,7 @@ def _computeDenominator(y, k):
               + np.abs(psf2otf(np.array([[1], [-1]], dtype=np.float64), sizey)) ** 2)
     return Nomin1, Denom1, Denom2
 
-
 def deblurring_adm_aniso(B, k, lambda_tv, alpha):
-
 
     beta = 1.0 / lambda_tv
     beta_min = 0.001
@@ -538,7 +469,6 @@ def deblurring_adm_aniso(B, k, lambda_tv, alpha):
     I = B.copy()
 
     Nomin1, Denom1, Denom2 = _computeDenominator(B, k)
-
 
     Ix = np.concatenate([np.diff(I, n=1, axis=1),
                          I[:, 0:1] - I[:, -1:]], axis=1)
@@ -560,7 +490,6 @@ def deblurring_adm_aniso(B, k, lambda_tv, alpha):
                 f"only alpha=1 supported"
             )
 
-
         Wxx = np.concatenate([Wx[:, -1:] - Wx[:, 0:1],
                               -np.diff(Wx, n=1, axis=1)], axis=1)
 
@@ -570,29 +499,23 @@ def deblurring_adm_aniso(B, k, lambda_tv, alpha):
         Fyout = (Nomin1 + gamma * fft2(Wxx)) / Denom
         I = np.real(ifft2(Fyout))
 
-
         Ix = np.concatenate([np.diff(I, n=1, axis=1),
                              I[:, 0:1] - I[:, -1:]], axis=1)
         Iy = np.concatenate([np.diff(I, n=1, axis=0),
                              I[0:1, :] - I[-1:, :]], axis=0)
 
-
         beta = beta / 2.0
 
     return I
 
-
 def ringing_artifacts_removal(y, kernel, lambda_tv, lambda_l0, weight_ring):
 
-
     H, W = y.shape[:2]
-
 
     target_size = opt_fft_size(
         np.array([H, W]) + np.array(kernel.shape[:2]) - 1
     )
     y_pad = wrap_boundary_liu(y, tuple(target_size))
-
 
     Latent_tv = deblurring_adm_aniso(y_pad, kernel, lambda_tv, 1)
     Latent_tv = Latent_tv[:H, :W]
@@ -600,10 +523,8 @@ def ringing_artifacts_removal(y, kernel, lambda_tv, lambda_l0, weight_ring):
     if weight_ring == 0:
         return Latent_tv
 
-
     Latent_l0 = L0Restoration(y_pad, kernel, lambda_l0, 2)
     Latent_l0 = Latent_l0[:H, :W]
-
 
     diff_img = Latent_tv - Latent_l0
     bf_diff = bilateral_filter(diff_img, 3, 0.1)

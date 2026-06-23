@@ -30,7 +30,6 @@ def solve_image_cg(
     jacobi_mode: str = "scalar",
 ) -> Tuple[np.ndarray, np.ndarray]:
 
-
     H, W = y.shape
     N = H * W
 
@@ -53,7 +52,6 @@ def solve_image_cg(
                         maxiter=max_cg_iter, atol=cg_tol)
     x_out = x_flat.reshape((H, W))
 
-
     reg_strength = (gamma_x + np.roll(gamma_x, 1, axis=1) +
                     gamma_y + np.roll(gamma_y, 1, axis=0))
 
@@ -68,7 +66,6 @@ def solve_image_cg(
 
     return np.maximum(x_out, 0.0), sigma_sq
 
-
 def solve_filtered_image_cg(
     y_n: np.ndarray,
     h: np.ndarray,
@@ -78,7 +75,6 @@ def solve_filtered_image_cg(
     max_cg_iter: int = 50,
     cg_tol: float = 1e-6,
 ) -> Tuple[np.ndarray, np.ndarray]:
-
 
     H, W = y_n.shape
     N = H * W
@@ -103,12 +99,10 @@ def solve_filtered_image_cg(
                     maxiter=max_cg_iter, atol=cg_tol)
     x_n = x_flat.reshape((H, W))
 
-
     h_energy = np.sum(h ** 2)
     sigma_sq_n = 1.0 / (beta_n * h_energy + theta_n + EPSILON)
 
     return x_n, sigma_sq_n
-
 
 def solve_kernel_fourier_filterspace(
     filtered_data: list,
@@ -117,7 +111,6 @@ def solve_kernel_fourier_filterspace(
     lambda_h: float,
     do_threshold: bool = True,
 ) -> np.ndarray:
-
 
     H, W = filtered_data[0][0].shape
 
@@ -136,7 +129,6 @@ def solve_kernel_fourier_filterspace(
         numerator += F_yn * np.conj(F_xn)
         denominator += np.abs(F_xn) ** 2
 
-
         uncertainty_total += np.mean(sigma_sq_n)
 
     denominator += H * W * uncertainty_total + (lambda_h / beta) + EPSILON
@@ -151,7 +143,6 @@ def solve_kernel_fourier_filterspace(
 
     return h
 
-
 def solve_kernel_qp_filterspace(
     filtered_data: list,
     kernel_shape: Tuple[int, int],
@@ -160,20 +151,16 @@ def solve_kernel_qp_filterspace(
     threshold_ratio: float = 0.05,
 ) -> np.ndarray:
 
-
     kh, kw = kernel_shape
     K = kh * kw
     H_img, W_img = filtered_data[0][0].shape
-
 
     idx = np.arange(K)
     a_coords = idx // kw
     b_coords = idx % kw
 
-
     da_mat = (a_coords[:, None] - a_coords[None, :]) % H_img
     db_mat = (b_coords[:, None] - b_coords[None, :]) % W_img
-
 
     a_off = (a_coords - kh // 2) % H_img
     b_off = (b_coords - kw // 2) % W_img
@@ -185,34 +172,25 @@ def solve_kernel_qp_filterspace(
         F_xn = fft2(m_xn)
         F_yn = fft2(y_n)
 
-
         R_xx = np.real(ifft2(np.abs(F_xn) ** 2))
-
 
         R_yx = np.real(ifft2(np.conj(F_xn) * F_yn))
 
-
         C_h += R_xx[da_mat, db_mat]
-
 
         C_h[np.diag_indices(K)] += float(np.sum(sigma_sq_n))
 
-
         b_h += R_yx[a_off, b_off]
-
 
     if lambda_h > 0.0:
         C_h[np.diag_indices(K)] += lambda_h
 
-
     C_h[np.diag_indices(K)] += 1e-10
-
 
     try:
         h_flat = np.linalg.solve(C_h, b_h)
     except np.linalg.LinAlgError:
         h_flat, _, _, _ = np.linalg.lstsq(C_h, b_h, rcond=None)
-
 
     h_flat = np.maximum(h_flat, 0.0)
 
@@ -229,7 +207,6 @@ def solve_kernel_qp_filterspace(
 
     return h_flat.reshape(kh, kw)
 
-
 def solve_kernel_fourier(
     y: np.ndarray,
     x: np.ndarray,
@@ -240,16 +217,13 @@ def solve_kernel_fourier(
     do_threshold: bool = True,
 ) -> np.ndarray:
 
-
     H, W = y.shape
-
 
     dy_x = forward_diff_x(y)
     dy_y = forward_diff_y(y)
 
     dx_x = forward_diff_x(x)
     dx_y = forward_diff_y(x)
-
 
     dy_x[:, -1] = 0.0
     dx_x[:, -1] = 0.0
@@ -260,21 +234,16 @@ def solve_kernel_fourier(
     F_dx_x = fft2(dx_x)
     F_dx_y = fft2(dx_y)
 
-
     numerator = (F_dy_x * np.conj(F_dx_x)) + (F_dy_y * np.conj(F_dx_y))
 
-
     denominator = (np.abs(F_dx_x)**2) + (np.abs(F_dx_y)**2)
-
 
     sigma_grad_mean = 2.0 * np.mean(sigma_sq)
     uncertainty_term = H * W * sigma_grad_mean
 
-
     denominator += uncertainty_term + (lambda_h / beta) + EPSILON
 
     F_h = numerator / denominator
-
 
     h = otf2psf(F_h, kernel_shape)
 
@@ -285,7 +254,6 @@ def solve_kernel_fourier(
         h = project_kernel(h)
 
     return h
-
 
 def update_noise_precision(y: np.ndarray, h: np.ndarray, x: np.ndarray, beta_prev: float, damping: float = 0.5) -> float:
     H, W = y.shape
@@ -298,18 +266,14 @@ def update_noise_precision(y: np.ndarray, h: np.ndarray, x: np.ndarray, beta_pre
     beta = float(np.clip(beta, 1.0, 1e8))
     return beta
 
-
 def update_hs_weights(x: np.ndarray, sigma_sq: np.ndarray, b: float) -> Tuple:
-
 
     dx = forward_diff_x(x)
     dy = forward_diff_y(x)
     from .utils import compute_hs_weights
     return compute_hs_weights(dx, dy, sigma_sq, b)
 
-
 def final_deconvolution(y: np.ndarray, h: np.ndarray, beta: float, lambda_reg: float) -> np.ndarray:
-
 
     kh, kw = h.shape
     pad_h = kh
@@ -320,15 +284,12 @@ def final_deconvolution(y: np.ndarray, h: np.ndarray, beta: float, lambda_reg: f
 
     x = y_padded.copy()
 
-
     p = 0.8
     irls_iters = 15
-
 
     F_h = psf2otf(h, (Hp, Wp))
     F_h_conj = np.conj(F_h)
     F_h_sq = np.abs(F_h) ** 2
-
 
     F_y = fft2(y_padded)
     rhs_base = beta * np.real(ifft2(F_h_conj * F_y))
@@ -336,7 +297,6 @@ def final_deconvolution(y: np.ndarray, h: np.ndarray, beta: float, lambda_reg: f
     for i in range(irls_iters):
         dx = forward_diff_x(x)
         dy = forward_diff_y(x)
-
 
         power = (p - 2.0) / 2.0
 
@@ -348,7 +308,6 @@ def final_deconvolution(y: np.ndarray, h: np.ndarray, beta: float, lambda_reg: f
 
         wx = np.clip(wx, 0.0, 1e4)
         wy = np.clip(wy, 0.0, 1e4)
-
 
         wx *= lambda_reg
         wy *= lambda_reg
@@ -371,16 +330,13 @@ def _solve_image_irls_step(
     cg_iter: int = 20
 ) -> np.ndarray:
 
-
     H, W = x_init.shape
     N = H * W
 
     def _matvec(v_flat: np.ndarray) -> np.ndarray:
         v = v_flat.reshape((H, W))
 
-
         Av = beta * np.real(ifft2(F_h_sq * fft2(v)))
-
 
         dx_v = forward_diff_x(v)
         dy_v = forward_diff_y(v)
@@ -398,7 +354,6 @@ def _solve_image_irls_step(
     x_flat, _ = cg(A_op, rhs.ravel(), x0=x_init.ravel(), maxiter=cg_iter, atol=1e-5)
 
     return x_flat.reshape((H, W))
-
 
 def solve_image_irw(*args, **kwargs):
     raise NotImplementedError("IRW solver is not fully adapted for the new variance tracking. Use 'cg'.")

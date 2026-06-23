@@ -3,8 +3,6 @@ from scipy.signal import fftconvolve
 from scipy.ndimage import zoom
 from typing import Tuple, List, Optional
 
-
-
 def psf2otf(psf: np.ndarray, shape: Tuple[int, int]) -> np.ndarray:
     if np.all(psf == 0):
         return np.zeros(shape, dtype=np.complex128)
@@ -18,11 +16,9 @@ def psf2otf(psf: np.ndarray, shape: Tuple[int, int]) -> np.ndarray:
 
     return np.fft.fft2(padded)
 
-
 def convolve2d(image: np.ndarray, kernel: np.ndarray,
                mode: str = 'same') -> np.ndarray:
     return fftconvolve(image, kernel, mode=mode)
-
 
 def compute_gradients(image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     dx = np.array([[1.0, -1.0],
@@ -36,7 +32,7 @@ def compute_gradients(image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     return grad_x, grad_y
 
 def build_scale_pyramid(kernel_size: int) -> List[int]:
-    assert kernel_size >= 3 and kernel_size % 2 == 1, \
+    assert kernel_size >= 3 and kernel_size % 2 == 1,\
         "kernel_size must be odd and >= 3"
 
     min_scale = max(2 * ((kernel_size - 1) // 32) + 1, 3)
@@ -96,7 +92,6 @@ def center_kernel(
 
     return kernel_centered
 
-
 def normalize_kernel(kernel: np.ndarray,
                      threshold: float = 0.0) -> np.ndarray:
     kernel = np.clip(kernel, 0, None)
@@ -109,7 +104,6 @@ def normalize_kernel(kernel: np.ndarray,
         kernel /= total
 
     return kernel
-
 
 def edgetaper(image: np.ndarray, kernel: np.ndarray) -> np.ndarray:
     blurred = fftconvolve(image, kernel, mode='same')
@@ -135,7 +129,6 @@ def edgetaper(image: np.ndarray, kernel: np.ndarray) -> np.ndarray:
 
     return weight * image + (1.0 - weight) * blurred
 
-
 def resize_image(image: np.ndarray,
                  target_shape: Tuple[int, int]) -> np.ndarray:
     h_in, w_in = image.shape[:2]
@@ -145,8 +138,7 @@ def resize_image(image: np.ndarray,
         return image.copy()
 
     factors = (h_out / h_in, w_out / w_in)
-    return zoom(image, factors, order=1)   
-
+    return zoom(image, factors, order=1)
 
 def rgb_to_ycbcr(image: np.ndarray) -> np.ndarray:
     M = np.array([
@@ -157,7 +149,6 @@ def rgb_to_ycbcr(image: np.ndarray) -> np.ndarray:
     ycbcr = image @ M.T
     ycbcr[:, :, 1:] += 0.5
     return ycbcr
-
 
 def ycbcr_to_rgb(ycbcr: np.ndarray) -> np.ndarray:
     ycbcr = ycbcr.copy()

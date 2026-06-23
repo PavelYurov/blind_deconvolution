@@ -8,61 +8,48 @@ __all__ = [
     'remove_impulse_noise',
 ]
 
-
 def _histogram_extremes(image, low_thresh=0.01, high_thresh=0.99):
-
 
     total = image.size
     frac_low = np.count_nonzero(image <= low_thresh) / total
     frac_high = np.count_nonzero(image >= high_thresh) / total
     return frac_low, frac_high, frac_low + frac_high
 
-
 def _local_outlier_mask(image, window_size=5, threshold=0.15):
-
 
     local_med = _scipy_median_filter(image, size=window_size)
     diff = np.abs(image - local_med)
     return diff > threshold
 
-
 def detect_impulse_noise(image, low_thresh=0.01, high_thresh=0.99,
                          outlier_window=5, outlier_threshold=0.15,
                          density_threshold=0.0005):
 
-
     img = np.asarray(image, dtype=np.float64)
     if img.max() > 1.0:
         img = img / 255.0
-
 
     if img.ndim == 3:
         gray = 0.2989 * img[:, :, 0] + 0.5870 * img[:, :, 1] + 0.1140 * img[:, :, 2]
     else:
         gray = img
 
-
     frac_low, frac_high, frac_total = _histogram_extremes(
         gray, low_thresh, high_thresh)
-
 
     outlier_mask = _local_outlier_mask(
         gray, outlier_window, outlier_threshold)
     outlier_frac = np.count_nonzero(outlier_mask) / gray.size
 
-
     extreme_mask = (gray <= low_thresh) | (gray >= high_thresh)
 
-
     impulse_mask = extreme_mask & outlier_mask
-
 
     strong_outlier = _local_outlier_mask(gray, outlier_window,
                                          outlier_threshold * 2.0)
     extreme_and_strong = extreme_mask & strong_outlier
     if np.count_nonzero(impulse_mask) < np.count_nonzero(extreme_and_strong):
         impulse_mask = extreme_and_strong
-
 
     density = np.count_nonzero(impulse_mask) / gray.size
 
@@ -77,16 +64,12 @@ def detect_impulse_noise(image, low_thresh=0.01, high_thresh=0.99,
         'impulse_mask': impulse_mask,
     }
 
-
 def estimate_impulse_density(image, **kwargs):
-
 
     result = detect_impulse_noise(image, **kwargs)
     return result['density'] if result['has_impulse'] else 0.0
 
-
 def adaptive_median_filter(image, impulse_mask, max_window=7):
-
 
     filtered = image.copy()
     remaining = impulse_mask.copy()
@@ -103,18 +86,15 @@ def adaptive_median_filter(image, impulse_mask, max_window=7):
 
     return filtered
 
-
 def remove_impulse_noise(image, density_threshold=0.005,
                          max_window=7, outlier_window=5,
                          outlier_threshold=0.15):
-
 
     img = np.asarray(image, dtype=np.float64)
     if img.max() > 1.0:
         img = img / 255.0
 
     is_color = img.ndim == 3
-
 
     info = detect_impulse_noise(
         img,

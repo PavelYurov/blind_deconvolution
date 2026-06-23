@@ -1,8 +1,3 @@
-"""
-utils.py
-Вспомогательные функции.
-"""
-
 import numpy as np
 from scipy.ndimage import gaussian_filter
 

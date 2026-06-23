@@ -3,7 +3,6 @@ from scipy.signal import fftconvolve
 
 from .utils import psf2otf
 
-
 def optimize_image(
     x: np.ndarray,
     kernel: np.ndarray,
@@ -14,43 +13,18 @@ def optimize_image(
     exp_a: float = 0.8,
     thr_e: float = 1.0 / 1500,
 ) -> np.ndarray:
-    """
-    Estimate the latent sharp image via IRLS with hyper-Laplacian prior.
 
-    Parameters:
-    x : np.ndarray, shape (H, W)
-        Current sharp-image estimate (initialised to blurred image).
-    kernel : np.ndarray, shape (kh, kw)
-        Current blur-kernel estimate.
-    blurred : np.ndarray, shape (H, W)
-        Observed blurred image.
-    reg_weight : float
-        Edge-regularisation weight α.
-    max_irls : int
-        IRLS outer iterations.
-    max_cg : int
-        CG inner iterations per IRLS step.
-    exp_a : float
-        Hyper-Laplacian exponent *p* (0 < p ≤ 2; typical 0.5–0.8).
-    thr_e : float
-        Smoothing parameter ε to avoid division by zero in weights.
+    dxf = np.array([[1.0, -1.0]])
+    dyf = np.array([[1.0], [-1.0]])
 
-    Returns:
-    x : np.ndarray, shape (H, W)
-        Updated sharp-image estimate.
-    """
-    dxf = np.array([[1.0, -1.0]])       
-    dyf = np.array([[1.0], [-1.0]])      
+    dxf_t = dxf[::-1, ::-1]
+    dyf_t = dyf[::-1, ::-1]
 
-
-    dxf_t = dxf[::-1, ::-1]            
-    dyf_t = dyf[::-1, ::-1]             
-
-    kernel_rot = np.rot90(kernel, 2)     
+    kernel_rot = np.rot90(kernel, 2)
 
     for irls_it in range(max_irls):
-        dx = fftconvolve(x, dxf, mode='valid')  
-        dy = fftconvolve(x, dyf, mode='valid')   
+        dx = fftconvolve(x, dxf, mode='valid')
+        dy = fftconvolve(x, dyf, mode='valid')
 
         weight_x = (thr_e + dx ** 2) ** (exp_a / 2.0 - 1.0)
         weight_y = (thr_e + dy ** 2) ** (exp_a / 2.0 - 1.0)
@@ -105,23 +79,7 @@ def optimize_kernel(
     beta: float = 3e-3,
     max_iter: int = 50,
 ) -> np.ndarray:
-    """
-    Parameters:
-    x : np.ndarray, shape (H, W)
-        Current sharp-image estimate.
-    kernel : np.ndarray, shape (kh, kw)
-        Current kernel estimate.
-    blurred : np.ndarray, shape (H, W)
-        Observed blurred image.
-    beta : float
-        Tikhonov regularisation weight.
-    max_iter : int
-        Maximum CG iterations.
 
-    Returns:
-    kernel : np.ndarray, shape (kh, kw)
-        Updated kernel estimate (non-negative, sums to one).
-    """
     kh, kw = kernel.shape
     bhs_y, bhs_x = kh // 2, kw // 2
 
@@ -134,7 +92,7 @@ def optimize_kernel(
     k0 = kernel.copy()
 
     def _apply_A(k):
-        """Compute  (X^T X + β I) k."""
+
         Xk = fftconvolve(x, k, mode='valid')
         XtXk = fftconvolve(x_rot, Xk, mode='valid')
         return XtXk + beta * k
@@ -178,23 +136,7 @@ def low_rank_regularization(
     tau: float = 1e-5,
     delta: float = 1e-5,
 ) -> np.ndarray:
-    """
-    Low-rank kernel regularisation via Iteratively Reweighted Nuclear
-    Norm (IRNN) minimisation.
-    Parameters:
-    kernel : np.ndarray, shape (kh, kw)
-        Current kernel estimate.
-    max_iter : int
-        Number of MM iterations (typically 3–10).
-    tau : float
-        Proximal parameter (smaller ⟹ solution stays closer to *k₀*).
-    delta : float
-        Smoothing parameter for the ``log det`` surrogate.
 
-    Returns:
-    kernel : np.ndarray
-        Low-rank–regularised kernel.
-    """
     X = kernel.copy()
 
     w = np.ones(min(X.shape))
@@ -210,7 +152,6 @@ def low_rank_regularization(
 
     return X
 
-
 def fast_deconv_hyper_laplacian(
     blurred: np.ndarray,
     kernel: np.ndarray,
@@ -220,30 +161,7 @@ def fast_deconv_hyper_laplacian(
     max_outer: int = 50,
     max_inner: int = 1,
 ) -> np.ndarray:
-    """
-    Non-blind image deconvolution with hyper-Laplacian prior.
 
-    Solves the MAP restoration problem ([4], Eq. (1)):
-    Parameters:
-    blurred : np.ndarray, shape (H, W)
-        Observed blurred image.
-    kernel  : np.ndarray, shape (kh, kw)
-        Estimated PSF.
-    lambda_ : float
-        Data-fidelity weight.
-    alpha   : float
-        Hyper-Laplacian exponent.
-        α = 1: Laplacian (L₁);  α = 2/3 or 1/2: hyper-Laplacian.
-    beta    : float
-        ADMM penalty (augmented Lagrangian parameter).
-    max_outer : int
-        Outer ADMM iterations.
-    max_inner : int
-        Inner iterations per ADMM step.
-
-    Returns:
-    restored : np.ndarray, shape (H, W)
-    """
     H, W = blurred.shape
     g = blurred.copy()
 
@@ -253,13 +171,12 @@ def fast_deconv_hyper_laplacian(
     dyt = dy[::-1, ::-1]
 
     otf_k = psf2otf(kernel, (H, W))
-    Ktf   = np.conj(otf_k) * np.fft.fft2(blurred)   
-    KtK   = np.abs(otf_k) ** 2                        
+    Ktf   = np.conj(otf_k) * np.fft.fft2(blurred)
+    KtK   = np.abs(otf_k) ** 2
 
     Fdx = np.abs(psf2otf(dx, (H, W))) ** 2
     Fdy = np.abs(psf2otf(dy, (H, W))) ** 2
-    DtD = Fdx + Fdy                                   
-
+    DtD = Fdx + Fdy
 
     gx = fftconvolve(g, dx, mode='valid')
     gy = fftconvolve(g, dy, mode='valid')
@@ -288,20 +205,14 @@ def fast_deconv_hyper_laplacian(
 
             g = np.real(np.fft.ifft2(numer / (denom + 1e-10)))
 
-            # Recompute gradients of g
             gx = fftconvolve(g, dx, mode='valid')
             gy = fftconvolve(g, dy, mode='valid')
 
     return g
 
-
-
 def _soft_threshold(x: np.ndarray, t: float) -> np.ndarray:
-    """
-    Soft-thresholding — proximal operator of the L1 norm.
-    """
-    return np.sign(x) * np.maximum(np.abs(x) - t, 0.0)
 
+    return np.sign(x) * np.maximum(np.abs(x) - t, 0.0)
 
 def _hyper_laplacian_proximal(
     v: np.ndarray,
@@ -314,7 +225,7 @@ def _hyper_laplacian_proximal(
     w_min = (alpha * (1.0 - alpha) / beta) ** (1.0 / (2.0 - alpha))
 
     v_max = float(v_abs.max()) + 1.0
-    w_max = v_max  
+    w_max = v_max
 
     w_lut = np.linspace(w_min, w_max, n_lut)
     v_lut = w_lut + (alpha / beta) * w_lut ** (alpha - 1.0)

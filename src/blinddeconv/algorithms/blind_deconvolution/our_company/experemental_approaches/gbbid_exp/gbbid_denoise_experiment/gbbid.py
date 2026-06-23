@@ -12,10 +12,8 @@ import numpy as np
 import time
 from typing import Tuple, List, Any, Dict
 
-
 import sys
 from pathlib import Path
-
 
 def _find_project_root(start: Path) -> Path:
     path = start.resolve()
@@ -24,7 +22,6 @@ def _find_project_root(start: Path) -> Path:
             raise RuntimeError("Cannot locate project root")
         path = path.parent
     return path
-
 
 _CURRENT_FILE = Path(__file__).resolve()
 _PROJECT_ROOT = _find_project_root(_CURRENT_FILE)
@@ -36,7 +33,6 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
         sys.path.insert(0, _path)
 
 from blinddeconv.algorithms.base import DeconvolutionAlgorithm
-
 
 from .solvers import (
     bid_rgtv_c2f_cg,
@@ -50,9 +46,7 @@ from .non_blind import adaptive_lp_deconv
 from .impulse_noise_estimation import detect_impulse_noise, adaptive_median_filter
 from .utils import opt_fft_size, wrap_boundary_liu
 
-
 class GBBID(DeconvolutionAlgorithm):
-
 
     def __init__(
         self,
@@ -110,7 +104,6 @@ class GBBID(DeconvolutionAlgorithm):
         self.auto_mode = (auto_mode or 'off').lower()
         self.auto_mode_params = auto_mode_params
 
-
         self._defaults_snapshot = {
             'lambda_fhlp': float(lambda_fhlp),
             'alpha_fhlp': float(alpha_fhlp),
@@ -127,15 +120,12 @@ class GBBID(DeconvolutionAlgorithm):
         self.history: Dict[str, list] = {'kernel_diff': []}
         self.hyperparams: Dict[str, Any] = {}
 
-
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         start_time = time.time()
-
 
         y = image.astype(np.float64)
         if y.max() > 1.0:
             y /= 255.0
-
 
         if y.ndim == 3 and y.shape[2] == 3:
             yg = 0.2989 * y[:, :, 0] + 0.5870 * y[:, :, 1] + 0.1140 * y[:, :, 2]
@@ -143,7 +133,6 @@ class GBBID(DeconvolutionAlgorithm):
             yg = y[:, :, 0]
         else:
             yg = y.copy() if y.ndim == 2 else y[:, :, 0]
-
 
         sanitation_result = None
         impulse_info = None
@@ -161,7 +150,6 @@ class GBBID(DeconvolutionAlgorithm):
 
             if y.ndim == 3:
 
-
                 for ch in range(y.shape[2]):
                     res_ch = _sanitize(y[:, :, ch], verbose=False)
                     y[:, :, ch] = res_ch.image_clean
@@ -174,7 +162,6 @@ class GBBID(DeconvolutionAlgorithm):
                       f"{sanitation_result.branch}, "
                       f"residual_σ={sanitation_result.residual_sigma:.5f}, "
                       f"residual_type={sanitation_result.residual_type}")
-
 
         if self.impulse_preprocess == 'auto' and self.auto_mode != 'sanitation':
             ip = self.impulse_params or {}
@@ -204,7 +191,6 @@ class GBBID(DeconvolutionAlgorithm):
                 else:
                     y = yg.copy()
 
-
         if self.screenot_preprocess == 'auto' and self.auto_mode != 'sanitation':
             from .screenot import screenot_denoise
             sp = self.screenot_params or {}
@@ -230,7 +216,6 @@ class GBBID(DeconvolutionAlgorithm):
             else:
                 y = yg.copy()
 
-
         if self.noise_estimation != 'none' and self.auto_mode != 'sanitation':
             noise_info = self._estimate_noise(yg)
         elif self.auto_mode == 'robust':
@@ -238,10 +223,8 @@ class GBBID(DeconvolutionAlgorithm):
             self.noise_estimation = 'pyatykh'
             noise_info = self._estimate_noise(yg)
 
-
         if self.auto_mode == 'robust':
             orchestrator_info = self._orchestrate_robust(noise_info)
-
 
         if self.act_preprocess == 'auto' and self.auto_mode != 'sanitation':
             if self.screenot_preprocess == 'auto':
@@ -250,7 +233,6 @@ class GBBID(DeconvolutionAlgorithm):
                     "be 'auto'. Choose one denoiser.")
             from .act_denoise import act_denoise
             ap = self.act_params or {}
-
 
             act_noise_var = ap.get('noise_var', None)
             if act_noise_var is None and noise_info is not None:
@@ -271,13 +253,11 @@ class GBBID(DeconvolutionAlgorithm):
             else:
                 y = yg.copy()
 
-
         b = self.border
         if b > 0:
             yg_cropped = yg[b:-b, b:-b]
         else:
             yg_cropped = yg
-
 
         if self.noise_preprocess != 'none' and self.auto_mode != 'sanitation':
             yg, psd_info = self._apply_noise_preprocess(yg)
@@ -285,7 +265,6 @@ class GBBID(DeconvolutionAlgorithm):
                 yg_cropped = yg[b:-b, b:-b]
             else:
                 yg_cropped = yg
-
 
         eff_pp = self.preprocess_params
         eff_pkp = self.pre_kernel_params
@@ -296,13 +275,11 @@ class GBBID(DeconvolutionAlgorithm):
             eff_pp, eff_pkp, eff_nbp = self._compute_adaptive_params(
                 sigma, eff_pp, eff_pkp, eff_nbp)
 
-
         eff_preprocess = self.preprocess
         eff_pre_kernel = self.pre_kernel
         if self.auto_mode == 'sanitation':
             eff_preprocess = 'none'
             eff_pre_kernel = 'none'
-
 
         kernel, _skeleton = bid_rgtv_c2f_cg(
             yg_cropped, self.k_estimate_size,
@@ -314,11 +291,9 @@ class GBBID(DeconvolutionAlgorithm):
             iteration_callback=self._callback,
         )
 
-
         if (self.pre_nonblind not in (None, 'none')
                 and self.auto_mode != 'sanitation'):
             y = self._apply_pre_nonblind(y, noise_info)
-
 
         nb = self.nonblind_method
         nb_p = eff_nbp or {}
@@ -332,7 +307,6 @@ class GBBID(DeconvolutionAlgorithm):
             Latent = self._nonblind_single(y, kernel, nb, nb_p)
 
         Latent = np.clip(Latent, 0.0, 1.0)
-
 
         self.hyperparams = {
             'k_estimate_size': self.k_estimate_size,
@@ -383,7 +357,6 @@ class GBBID(DeconvolutionAlgorithm):
         x_final = np.clip(x_final, 0, 255).astype(np.int16)
         return x_final, kernel
 
-
     def _nonblind_single(self, y_ch, kernel, method, params):
 
         if method == 'fhlp':
@@ -426,13 +399,10 @@ class GBBID(DeconvolutionAlgorithm):
                 f"Choose from: 'fhlp', 'tv_adm', 'l0', 'ringing_removal', "
                 f"'adaptive_lp'")
 
-
     def _orchestrate_robust(self, noise_info):
-
 
         snap = self._defaults_snapshot
         amp = dict(self.auto_mode_params or {})
-
 
         self.lambda_fhlp = snap['lambda_fhlp']
         self.alpha_fhlp = snap['alpha_fhlp']
@@ -445,7 +415,6 @@ class GBBID(DeconvolutionAlgorithm):
         self.nonblind_method = snap['nonblind_method']
         self.nonblind_params = snap['nonblind_params']
 
-
         sigma = 0.0
         if noise_info is not None:
             sigma = float(noise_info.get('sigma_norm', 0.0) or 0.0)
@@ -454,11 +423,9 @@ class GBBID(DeconvolutionAlgorithm):
         sigma_heavy = float(amp.get('sigma_heavy', 0.05))
         force_heavy_sigma = float(amp.get('force_heavy_sigma', 0.01))
 
-
         nt = (noise_info or {}).get('noise_type', None)
         force_heavy = (nt in ('poisson', 'poisson_gaussian')
                        and sigma >= force_heavy_sigma)
-
 
         if sigma <= sigma_clean and not force_heavy:
             if snap['nonblind_method'] == 'auto':
@@ -475,7 +442,6 @@ class GBBID(DeconvolutionAlgorithm):
                 'alpha_fhlp': float(self.alpha_fhlp),
             }
 
-
         w = 1.0 if sigma >= sigma_heavy else (
             (sigma - sigma_clean) / (sigma_heavy - sigma_clean))
         regime = 'heavy' if w > 0.95 else 'medium'
@@ -483,7 +449,6 @@ class GBBID(DeconvolutionAlgorithm):
         noise_type = nt or 'gaussian'
         poisson_like = noise_type in ('poisson', 'poisson_gaussian',
                                       'unknown')
-
 
         k_lambda_fhlp = float(amp.get('k_lambda_fhlp', 50.0))
         k_alpha_fhlp = float(amp.get('k_alpha_fhlp', 0.6))
@@ -495,9 +460,7 @@ class GBBID(DeconvolutionAlgorithm):
         self.lambda_fhlp = (1.0 - w) * snap['lambda_fhlp'] + w * lam_noisy
         self.alpha_fhlp = (1.0 - w) * snap['alpha_fhlp'] + w * alpha_noisy
 
-
         if poisson_like:
-
 
             self.preprocess = 'bilateral'
             self.preprocess_params = {
@@ -514,14 +477,12 @@ class GBBID(DeconvolutionAlgorithm):
             self.preprocess = 'bm3d'
             self.preprocess_params = {'sigma_psd': float(sigma)}
 
-
         if (not poisson_like) and w >= 0.5:
             self.pre_kernel = 'bilateral'
             self.pre_kernel_params = {
                 'sigma_color': float(max(0.5 * sigma, 0.005)),
                 'sigma_spatial': 2.0,
             }
-
 
         if poisson_like:
             self.pre_nonblind = 'act'
@@ -535,7 +496,6 @@ class GBBID(DeconvolutionAlgorithm):
         else:
             self.pre_nonblind = 'bm3d'
             self.pre_nonblind_params = {'sigma_psd': float(sigma)}
-
 
         nb_auto_heavy = amp.get('nonblind_auto_heavy', 'ringing_removal')
         if snap['nonblind_method'] == 'auto':
@@ -554,9 +514,7 @@ class GBBID(DeconvolutionAlgorithm):
         }
         return info
 
-
     def _apply_noise_preprocess(self, yg):
-
 
         from .noise_psd_analysis import (
             analyze_noise_psd, noise_preprocess,
@@ -574,7 +532,6 @@ class GBBID(DeconvolutionAlgorithm):
                 notch_radius=p.get('notch_radius', 3),
             )
             return result['image'], result['psd_info']
-
 
         psd_info = analyze_noise_psd(
             yg,
@@ -612,13 +569,10 @@ class GBBID(DeconvolutionAlgorithm):
 
         return yg_out, psd_info
 
-
     def _apply_pre_nonblind(self, y, noise_info):
-
 
         method = self.pre_nonblind
         params = dict(self.pre_nonblind_params or {})
-
 
         sigma = None
         if noise_info is not None:
@@ -640,7 +594,6 @@ class GBBID(DeconvolutionAlgorithm):
                                    threshold_setting=ts)
             return y
 
-
         if method == 'bm3d' and 'sigma_psd' not in params and sigma is not None:
             params['sigma_psd'] = sigma
         elif method == 'nlm' and 'h' not in params and sigma is not None:
@@ -658,7 +611,6 @@ class GBBID(DeconvolutionAlgorithm):
             y = apply_denoiser(y, method, **params)
         return y
 
-
     def _estimate_noise(self, yg):
 
         if self.noise_estimation == 'chen':
@@ -674,7 +626,6 @@ class GBBID(DeconvolutionAlgorithm):
         return None
 
     def _compute_adaptive_params(self, sigma, pp, pkp, nbp):
-
 
         if sigma < 1e-6:
             return pp, pkp, nbp
@@ -713,7 +664,6 @@ class GBBID(DeconvolutionAlgorithm):
 
         return pp, pkp, nbp
 
-
     def get_param(self) -> List[Tuple[str, Any]]:
         return [
             ('k_estimate_size', self.k_estimate_size),
@@ -747,7 +697,6 @@ class GBBID(DeconvolutionAlgorithm):
         for key, value in params.items():
             if hasattr(self, key):
                 setattr(self, key, value)
-
 
                 if key in self._defaults_snapshot:
                     self._defaults_snapshot[key] = (

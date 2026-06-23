@@ -4,22 +4,18 @@ from typing import Tuple
 
 import numpy as np
 
-
 from ..pmp_denoise.pmp import PMP_BD as _LegacyPMP_BD
 
 __all__ = ['PMP_BD']
-
 
 _HEAVY_SIGMA_THRESHOLD = 0.015
 _IMPULSE_DENSITY_HEAVY = 0.01
 _POISSON_A_THRESHOLD = 1e-3
 
-
 def _classify_branch(image: np.ndarray,
                      heavy_sigma_threshold: float,
                      impulse_density_heavy: float,
                      poisson_a_threshold: float) -> Tuple[str, dict]:
-
 
     from ..pmp_denoise_fix.noise_orchestrator import (
         analyze_noise,
@@ -32,7 +28,6 @@ def _classify_branch(image: np.ndarray,
     poisson_a = float(info.get('poisson_a', 0.0))
     correlated = bool(info.get('correlated', False))
 
-
     if correlated and not _is_truly_correlated(info):
         correlated = False
         info['correlated'] = False
@@ -44,9 +39,7 @@ def _classify_branch(image: np.ndarray,
 
     return ('robust' if heavy else 'legacy', info)
 
-
 class PMP_BD(_LegacyPMP_BD):
-
 
     _IN_DISPATCH_ATTR = '_pmp_improved_in_dispatch'
 
@@ -66,19 +59,15 @@ class PMP_BD(_LegacyPMP_BD):
         self.last_branch: str | None = None
         self.last_descriptor: dict | None = None
 
-
     def process(self, image):
-
 
         if getattr(self, self._IN_DISPATCH_ATTR, False):
             return super().process(image)
-
 
         if self.auto_mode != 'robust' and self.force is None:
             return super().process(image)
 
         return self._dispatch(image)
-
 
     def _dispatch(self, image):
         if self.force in ('robust', 'legacy'):
@@ -99,12 +88,10 @@ class PMP_BD(_LegacyPMP_BD):
             return self._run_robust(image)
         return self._run_legacy(image)
 
-
     def _run_robust(self, image):
         from ..pmp_denoise_fix.pmp_robust import PMP_BD_Robust
 
         alg = PMP_BD_Robust(kernel_size=self.kernel_size)
-
 
         cb = getattr(self, '_callback', None)
         if cb is not None and hasattr(alg, 'set_callback'):
@@ -115,14 +102,12 @@ class PMP_BD(_LegacyPMP_BD):
 
         result = alg.process(image)
 
-
         timer = getattr(alg, 'timer', None)
         if timer is not None:
             self.timer = timer
         return result
 
     def _run_legacy(self, image):
-
 
         setattr(self, self._IN_DISPATCH_ATTR, True)
         try:

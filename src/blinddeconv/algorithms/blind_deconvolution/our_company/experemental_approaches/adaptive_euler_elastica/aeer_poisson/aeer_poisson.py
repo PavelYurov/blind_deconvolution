@@ -1,17 +1,9 @@
-"""
-aeer.py
-
-Blind Image Deconvolution Based on Adaptive Euler’s Elastica Regularization.
-Реализация класса алгоритма для фреймворка.
-"""
-
 import numpy as np
 import time
 import os
 import matplotlib.pyplot as plt
 from typing import Tuple, List, Any, Dict
 import scipy.ndimage
-
 
 import sys
 from pathlib import Path
@@ -51,7 +43,6 @@ class AEER_BD(DeconvolutionAlgorithm):
         iota: float = 5.0,
         delta: float = 1.0,
 
-
         r1: float = 50.0,
         r2: float = 50.0,
         r3: float = 200.0,
@@ -61,11 +52,9 @@ class AEER_BD(DeconvolutionAlgorithm):
         max_iter: int = 50,
         tol: float = 1e-5,
 
-
         clean_kernel: bool = False,
         boundary_handling: str = 'padding',
         grad_threshold: float = 0.0,
-
 
         final_deconv: str = 'admm',
         nb_iter: int = 30,
@@ -124,23 +113,19 @@ class AEER_BD(DeconvolutionAlgorithm):
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         start_time = time.time()
 
-
         f_orig = image.astype(np.float64)
         if f_orig.max() > 1.0: f_orig /= 255.0
         H_orig, W_orig = f_orig.shape
         kh, kw = self.kernel_shape
 
-
         f= edgetaper(f_orig, (kh, kw))
         H, W = f.shape
-
 
         OTF_dx, OTF_dy, _, _ = get_gradient_operators((H, W))
         t1, t2 = compute_adaptive_matrix_T(f, self.iota, self.delta)
 
         u = f.copy()
         g = f.copy()
-
 
         k = np.zeros((H, W))
         ks_init = max(kh, kw) // 2
@@ -165,11 +150,9 @@ class AEER_BD(DeconvolutionAlgorithm):
         if self.debug:
             self._save_debug_image(f, "processed_input", 0)
 
-
         for n in range(self.max_iter):
             k_prev = k.copy()
             u_prev = u.copy()
-
 
             k_raw = solve_k_subproblem(u, g, lambda4, w, lambda3, self.r3, self.r4, OTF_dx, OTF_dy)
             k = np.fft.fftshift(k_raw)
@@ -192,7 +175,6 @@ class AEER_BD(DeconvolutionAlgorithm):
             if s > 1e-12: k /= s
             else: k[H//2, W//2] = 1.0
 
-
             u = solve_u_subproblem(k, g, lambda4, p, lambda1, self.r1, self.r4, OTF_dx, OTF_dy)
             u = np.maximum(u, 0.0)
             u = np.minimum(u, 1.0)
@@ -204,14 +186,11 @@ class AEER_BD(DeconvolutionAlgorithm):
                 vis_k = k[H//2-vis_size:H//2+vis_size, W//2-vis_size:W//2+vis_size]
                 self._save_debug_image(vis_k, "k", n+1)
 
-
             p = solve_p_subproblem(u, q, lambda1, lambda2, t1, t2, self.r1, self.r2)
             q = solve_q_subproblem(p, u_prev, lambda2, t1, t2, self.alpha, self.r2)
             w = solve_w_subproblem(k, lambda3, self.beta, self.r3)
 
-
             g = solve_g_subproblem(k, u, f, lambda4, self.lambda_val, self.r4)
-
 
             grad_x_u = np.roll(u, -1, axis=1) - u
             grad_y_u = np.roll(u, -1, axis=0) - u
@@ -229,7 +208,6 @@ class AEER_BD(DeconvolutionAlgorithm):
             grad_y_k = np.roll(k, -1, axis=0) - k
             grad_k = np.stack([grad_x_k, grad_y_k])
 
-
             F_k = psf2otf(k, (H, W))
             Ku = np.real(np.fft.ifft2(F_k * np.fft.fft2(u)))
 
@@ -243,7 +221,6 @@ class AEER_BD(DeconvolutionAlgorithm):
             if diff < self.tol and n > 10:
                 print(f"Kernel converged at iter {n}")
                 break
-
 
         cy, cx = H // 2, W // 2
         sy, sx = cy - kh // 2, cx - kw // 2

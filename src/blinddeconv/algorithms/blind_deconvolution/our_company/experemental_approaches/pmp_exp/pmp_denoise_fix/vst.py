@@ -8,9 +8,7 @@ __all__ = [
     'vst_bm3d_denoise',
 ]
 
-
 def gat_forward(image: np.ndarray, a: float, b: float) -> np.ndarray:
-
 
     if a <= 0:
         raise ValueError(
@@ -21,9 +19,7 @@ def gat_forward(image: np.ndarray, a: float, b: float) -> np.ndarray:
     arg = a * image + 3.0 * a * a / 8.0 + b
     return (2.0 / a) * np.sqrt(np.maximum(arg, 0.0))
 
-
 def gat_inverse_asymptotic(z: np.ndarray, a: float, b: float) -> np.ndarray:
-
 
     if a <= 0:
         raise ValueError(f"gat_inverse_asymptotic: a must be positive, got {a}.")
@@ -31,13 +27,11 @@ def gat_inverse_asymptotic(z: np.ndarray, a: float, b: float) -> np.ndarray:
     b = float(b)
     return a * ((z / 2.0) ** 2 - 3.0 / 8.0 - b / (a * a))
 
-
 def vst_bm3d_denoise(image: np.ndarray,
                      a: float,
                      b: float,
                      stage_arg: str | None = None,
                      ) -> tuple[np.ndarray, dict]:
-
 
     try:
         import bm3d
@@ -50,9 +44,7 @@ def vst_bm3d_denoise(image: np.ndarray,
     if img.ndim != 2:
         raise ValueError(f"Expected 2D image, got shape {img.shape}")
 
-
     z = gat_forward(img, a=a, b=b)
-
 
     if stage_arg is None:
         z_hat = bm3d.bm3d(z, sigma_psd=1.0)
@@ -68,7 +60,6 @@ def vst_bm3d_denoise(image: np.ndarray,
                 f"stage_arg must be one of {list(stage_map)} or None, "
                 f"got {stage_arg!r}")
         z_hat = bm3d.bm3d(z, sigma_psd=1.0, stage_arg=stage_map[stage_arg])
-
 
     y_hat = gat_inverse_asymptotic(z_hat, a=a, b=b)
     y_hat = np.clip(y_hat, 0.0, None)

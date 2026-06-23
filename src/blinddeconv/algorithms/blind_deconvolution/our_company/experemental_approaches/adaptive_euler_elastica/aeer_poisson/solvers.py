@@ -1,9 +1,3 @@
-"""
-solvers.py
-Реализация подзадач алгоритма AEE-BD для POISSON шума.
-Адаптировано под формулы (9)-(21) из статьи "Blind Restoration of Poisson Images...".
-"""
-
 import numpy as np
 from scipy.signal import convolve2d
 from .utils import psf2otf, soft_threshold, compute_curvature, gaussian_kernel
@@ -24,13 +18,10 @@ def solve_k_subproblem(u: np.ndarray, g: np.ndarray, lambda4: np.ndarray,
                        r3: float, r4: float,
                        dx_otf: np.ndarray, dy_otf: np.ndarray) -> np.ndarray:
 
-
     H, W = g.shape
-
 
     F_g_l4 = np.fft.fft2(g - lambda4)
     F_u = np.fft.fft2(u)
-
 
     term_x = w[0] - lambda3[0]
     term_y = w[1] - lambda3[1]
@@ -49,7 +40,6 @@ def solve_u_subproblem(k: np.ndarray, g: np.ndarray, lambda4: np.ndarray,
                        p: np.ndarray, lambda1: np.ndarray,
                        r1: float, r4: float,
                        dx_otf: np.ndarray, dy_otf: np.ndarray) -> np.ndarray:
-
 
     H, W = g.shape
 
@@ -112,17 +102,13 @@ def solve_w_subproblem(k: np.ndarray, lambda3: np.ndarray,
 def solve_g_subproblem(k: np.ndarray, u: np.ndarray, f: np.ndarray,
                        lambda4: np.ndarray, lambda_val: float, r4: float) -> np.ndarray:
 
-
     H, W = f.shape
     F_k = psf2otf(k, (H, W))
     F_u = np.fft.fft2(u)
 
-
     Ku = np.real(np.fft.ifft2(F_k * F_u))
 
-
     b = Ku + lambda4 - lambda_val / r4
-
 
     g_new = b / 2.0 + np.sqrt((b / 2.0)**2 + (lambda_val * f) / r4)
 

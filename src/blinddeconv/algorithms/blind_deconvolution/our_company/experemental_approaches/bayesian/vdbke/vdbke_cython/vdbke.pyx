@@ -1,10 +1,7 @@
 """
-vdbke.py — Variational Dirichlet Blur Kernel Estimation.
+vdbke.py
 
-Multi-scale blind deconvolution framework wrapper.
-
-Ported from ``ms_ngm_dirichlet_ubc_img.m`` by X. Zhou et al.
-Reference:
+Источник:
     X. Zhou, J. Mateos, F. Zhou, R. Molina, A.K. Katsaggelos:
     "Variational Dirichlet Blur Kernel Estimation",
     IEEE TIP, vol. 24, no. 12, pp. 5127-5139, 2015.
@@ -17,7 +14,6 @@ from typing import Tuple, List, Any, Dict
 import sys
 from pathlib import Path
 
-
 def _find_project_root(start: Path) -> Path:
     path = start.resolve()
     while not (path / "pyproject.toml").exists():
@@ -25,7 +21,6 @@ def _find_project_root(start: Path) -> Path:
             raise RuntimeError("Cannot locate project root")
         path = path.parent
     return path
-
 
 _CURRENT_FILE = Path(__file__).resolve()
 _PROJECT_ROOT = _find_project_root(_CURRENT_FILE)
@@ -46,182 +41,7 @@ from .solvers import (center_kernel_img_space, ss_ngm_dirichlet_ubc_img,
 from .impulse_noise_estimation import detect_impulse_noise, adaptive_median_filter
 from scipy.signal import convolve2d
 
-
 class VDBKE(DeconvolutionAlgorithm):
-    """Variational Dirichlet Blur Kernel Estimation (VDBKE).
-
-    Multi-scale blind deconvolution followed by non-blind deconvolution.
-    Ported from ``ms_ngm_dirichlet_ubc_img.m``.
-
-    Reference
-    ---------
-    X. Zhou, J. Mateos, F. Zhou, R. Molina, A.K. Katsaggelos,
-    "Variational Dirichlet Blur Kernel Estimation",
-    IEEE TIP, vol. 24, no. 12, pp. 5127-5139, 2015.
-
-    Parameters
-    ----------
-    **Общие параметры**
-
-    kernel_size : tuple of int
-        Размер оцениваемого ядра (высота, ширина). Должен быть нечётным.
-    gamma_correct : float
-        Гамма-коррекция входного изображения. 1.0 = выключена.
-    use_ycbcr : bool
-        Если True, не-слепая деконволюция применяется только к Y-каналу
-        (YCbCr). Если False — поканально RGB.
-    kernel_est_win : tuple or None
-        Окно (r1, c1, r2, c2) для обрезки изображения перед оценкой
-        ядра. None = всё изображение.
-    verbose : bool
-        Выводить промежуточную информацию (шаги, шум, параметры).
-
-    **Параметры оценки ядра (kernel_*)** [★ = итерационные]
-
-    kernel_lambda : float
-        Регуляризация Дирихле ядра.
-    kernel_max_iter : int  ★
-        Макс. число итераций Ньютона для оценки ядра (на каждом
-        альтернирующем шаге). HPO: [5, 50].
-    kernel_back_alpha : float
-        Начальный шаг backtracking line-search.
-    kernel_back_beta : float
-        Коэфф. уменьшения шага backtracking.
-    kernel_lower_bound : float
-        Нижняя граница параметров Дирихле (α₀).
-    kernel_ng_min : float
-        Мин. норма градиента для остановки Ньютона.
-    kernel_cost_display : int
-        Вывод стоимости ядра каждые N итераций (0 = выкл).
-    kernel_mode : int
-        Режим: 0 = стандартный, 1 = альтернативный.
-    kernel_Laplacian_filter : ndarray or None
-        Лапласиан-фильтр для приора на ядро. None = identity (Гауссов приор).
-    kernel_lambda_C : float
-        Дополнительная регуляризация (Companion term). 0 = выкл.
-
-    **Параметры оценки изображения (img_*)** [★ = итерационные]
-
-    img_lambda1 : float
-        Основная регуляризация NGM (Non-Gaussian Model) для изображения.
-    img_lambda_min : float
-        Мин. значение λ при адаптивной регуляризации.
-    img_lambda_max : float
-        Макс. значение λ при адаптивной регуляризации.
-    img_IF : float or None
-        Inflation Factor для λ. None → √2.
-    img_N1 : int  ★
-        Внешние итерации оценки изображения. HPO: [5, 40].
-    img_N2 : int  ★
-        Внутренние итерации оценки изображения (CG). HPO: [1, 5].
-    img_lambda_u : float
-        Начальное значение λ_u.
-    img_xv_iter : int  ★
-        Итерации x-v подзадачи. HPO: [1, 3].
-    img_cost_display : int
-        Вывод стоимости изображения каждые N итераций (0 = выкл).
-
-    **Альтернирующие итерации** [★ = итерационные]
-
-    xk_iter : int  ★
-        Число x↔k альтернирующих итераций на каждом уровне пирамиды.
-        HPO: [5, 30].
-    k_tol : float
-        Допуск сходимости ядра (ранняя остановка).
-
-    **Не-слепая деконволюция (FIRLS)** [★ = итерационные]
-
-    firls_lambda : float
-        Регуляризация FIRLS.
-    firls_alpha : float
-        Степень Lp-нормы (2/3 ≈ сверхразреженный приор).
-    firls_out_iter : int  ★
-        Внешние итерации FIRLS. HPO: [2, 10].
-    firls_inner_iter : int  ★
-        Внутренние итерации FIRLS (CG-шаги). HPO: [2, 8].
-
-    **Пайплайн обработки шума** (все выключены по умолчанию)
-
-    impulse_preprocess : str
-        'auto' — обнаружение и удаление импульсного шума,
-        'none' — выключено.
-    impulse_params : dict or None
-        {'density_threshold': 0.0005, 'outlier_threshold': 0.08,
-         'max_window': 7}.
-    noise_estimation : str
-        Метод оценки уровня шума: 'chen', 'pca', 'none'.
-    auto_params : bool or dict or None
-        Авто-подбор img_lambda1 и firls_lambda из оценённого σ.
-        - None / False — выключено.
-        - True — включено с коэффициентами по умолчанию.
-        - dict — включено с пользовательскими коэффициентами:
-          {'k_img_lambda1': 200.0, 'k_firls_lambda': 200.0}.
-          Формула: λ = k · σ².
-    screenot_preprocess : str
-        'auto' — ScreeNOT SVD-шумоподавление, 'none' — выключено.
-        Взаимоисключающий с act_preprocess.
-    screenot_params : dict or None
-        {'k': 10, 'strategy': 'i', 'mode': 'full',
-         'patch_size': 8, 'stride': 3}.
-    act_preprocess : str
-        'auto' — ACT curvelet-шумоподавление, 'none' — выключено.
-        Взаимоисключающий с screenot_preprocess.
-    act_params : dict or None
-        {'noise_var': None, 'threshold_setting': 's'}.
-    preprocess : str
-        Пространственный денойзер перед пирамидой:
-        'tv', 'nlm', 'bilateral', 'guided', 'bm3d', 'none'.
-    preprocess_params : dict or None
-        Параметры для выбранного денойзера (зависят от метода).
-    noise_preprocess : str
-        PSD-фильтрация: 'auto', 'notch', 'bandstop', 'none'.
-    noise_preprocess_params : dict or None
-        {'pch_size': 32, 'n_smooth': 100, 'peak_threshold': 100.0,
-         'notch_radius': 3, 'freq_low': 0.3, 'freq_high': 0.5,
-         'order': 2}.
-    blind_denoise : str
-        Денойзер внутри blind-цикла (перед grad для ядра):
-        'tv', 'nlm', 'bilateral', 'guided', 'bm3d', 'none'.
-    blind_denoise_params : dict or None
-        Параметры для blind-денойзера.
-    kernel_threshold : float
-        Порог обнуления малых значений ядра (доля от max).
-        0.0 = выключено. Типично 0.01–0.15.
-    pre_nonblind : str
-        Денойзер перед не-слепым шагом (Y-канал): те же варианты.
-    pre_nonblind_params : dict or None
-        Параметры для pre_nonblind денойзера.
-    final_deconv : str
-        Метод не-слепой деконволюции:
-        'firls' (по умолчанию), 'blend' (FIRLS + ringing_removal),
-        'ringing_removal', 'adaptive_lp', 'tikhonov', 'wiener', 'auto'.
-        'auto' разрешается оркестратором (auto_mode='robust') в 'blend'
-        на чистых/средних данных и 'ringing_removal' на сильном шуме.
-    final_alpha : float
-        Регуляризация для tikhonov/wiener.
-    nb_params : dict or None
-        Доп. параметры для final_deconv:
-        - ringing_removal: {'lambda_tv': 1e-3, 'lambda_l0': 2e-3,
-          'weight_ring': 1.0}
-        - adaptive_lp: {'alpha': 0.8, 'two_stage': True}
-        - blend: те же ключи + 'blend_weight' (вес ringing_removal,
-          по умолчанию 0.5).
-    auto_mode : str
-        'off' (по умолчанию) — оркестратор выключен.
-        'robust' — мягкое автоконфигурирование шумового пайплайна
-        по оценённой σ. VDBKE довольно хорошо справляется с шумом
-        сам по себе, поэтому оркестратор намеренно консервативный:
-        не трогает screenot/act_preprocess/noise_preprocess, лишь
-        мягко поднимает λ-регуляризации, включает дешёвый bilateral
-        внутри блайнд-цикла и (для poisson-like шума) выбирает ACT
-        для pre_nonblind.
-    auto_mode_params : dict or None
-        Параметры оркестратора:
-        {'sigma_clean': 0.005, 'sigma_heavy': 0.05,
-         'force_heavy_sigma': 0.012,
-         'k_img_lambda1': 200.0, 'k_firls_lambda': 200.0,
-         'k_alpha': 0.1, 'blend_weight': 0.5}.
-    """
 
     def __init__(
         self,
@@ -229,7 +49,7 @@ class VDBKE(DeconvolutionAlgorithm):
         gamma_correct: float = 1.0,
         use_ycbcr: bool = True,
         kernel_est_win=None,
-        # ── kernel estimation parameters ──
+
         kernel_lambda: float = 1e-6,
         kernel_max_iter: int = 20,
         kernel_back_alpha: float = 0.01,
@@ -240,7 +60,7 @@ class VDBKE(DeconvolutionAlgorithm):
         kernel_mode: int = 0,
         kernel_Laplacian_filter=None,
         kernel_lambda_C: float = 0.0,
-        # ── image estimation parameters ──
+
         img_lambda1: float = 0.002,
         img_lambda_min: float = 0.01,
         img_lambda_max: float = 1.0,
@@ -250,15 +70,15 @@ class VDBKE(DeconvolutionAlgorithm):
         img_lambda_u: float = 0.1,
         img_xv_iter: int = 1,
         img_cost_display: int = 0,
-        # ── alternating iteration parameters ──
+
         xk_iter: int = 20,
         k_tol: float = 5e-4,
-        # ── non-blind deconvolution (FIRLS) parameters ──
+
         firls_lambda: float = 0.002,
         firls_alpha: float = 2.0 / 3.0,
         firls_out_iter: int = 5,
         firls_inner_iter: int = 4,
-        # ── noise pipeline (all disabled by default) ──
+
         verbose: bool = False,
         impulse_preprocess: str = 'none',
         impulse_params: dict = None,
@@ -290,7 +110,6 @@ class VDBKE(DeconvolutionAlgorithm):
         self.use_ycbcr = use_ycbcr
         self.kernel_est_win = kernel_est_win
 
-        # Kernel estimation
         self.kernel_lambda = kernel_lambda
         self.kernel_max_iter = kernel_max_iter
         self.kernel_back_alpha = kernel_back_alpha
@@ -299,7 +118,7 @@ class VDBKE(DeconvolutionAlgorithm):
         self.kernel_ng_min = kernel_ng_min
         self.kernel_cost_display = kernel_cost_display
         self.kernel_mode = kernel_mode
-        # Default Laplacian filter: identity (Gaussian prior on kernel)
+
         if kernel_Laplacian_filter is None:
             self.kernel_Laplacian_filter = np.array(
                 [[0, 0, 0], [0, 1, 0], [0, 0, 0]], dtype=np.float64)
@@ -307,7 +126,6 @@ class VDBKE(DeconvolutionAlgorithm):
             self.kernel_Laplacian_filter = np.asarray(kernel_Laplacian_filter, dtype=np.float64)
         self.kernel_lambda_C = kernel_lambda_C
 
-        # Image estimation
         self.img_lambda1 = img_lambda1
         self.img_lambda_min = img_lambda_min
         self.img_lambda_max = img_lambda_max
@@ -318,17 +136,14 @@ class VDBKE(DeconvolutionAlgorithm):
         self.img_xv_iter = img_xv_iter
         self.img_cost_display = img_cost_display
 
-        # Alternating
         self.xk_iter = xk_iter
         self.k_tol = k_tol
 
-        # FIRLS
         self.firls_lambda = firls_lambda
         self.firls_alpha = firls_alpha
         self.firls_out_iter = firls_out_iter
         self.firls_inner_iter = firls_inner_iter
 
-        # Noise pipeline
         self.verbose = verbose
         self.impulse_preprocess = impulse_preprocess
         self.impulse_params = impulse_params
@@ -353,9 +168,6 @@ class VDBKE(DeconvolutionAlgorithm):
         self.auto_mode = (auto_mode or 'off').lower()
         self.auto_mode_params = auto_mode_params
 
-        # Snapshot of defaults for the robust orchestrator so soft
-        # blending always starts from the values supplied at construction
-        # time, not from values overwritten on a previous process() call.
         self._defaults_snapshot = {
             'img_lambda1': float(img_lambda1),
             'firls_lambda': float(firls_lambda),
@@ -376,27 +188,15 @@ class VDBKE(DeconvolutionAlgorithm):
         self.history: Dict[str, list] = {'kernel_diff': []}
         self.hyperparams: Dict[str, Any] = {}
 
-    # ─────────────────────────────────────────────────────────────────────
-    # process — main entry point  (← ms_ngm_dirichlet_ubc_img.m)
-    # ─────────────────────────────────────────────────────────────────────
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         start_time = time.time()
 
-        # Convert to float64 [0, 1]
         y_in = image.astype(np.float64)
         if y_in.max() > 1.0:
             y_in /= 255.0
 
-        # Gamma correction first (so non-blind sees the same colour space
-        # as blind, mirroring LIP's single-image pipeline).
         y_in = y_in ** self.gamma_correct
 
-        # Extract luminance: every denoising step in the chain is applied
-        # to a single 2-D channel.  For colour input, we run on Y of YCbCr
-        # and rebuild the cleaned RGB image afterwards — that way the
-        # non-blind step receives the *same* denoised signal as the kernel
-        # estimator (matching LIP semantics, where ``f`` carries every
-        # preprocess effect into non-blind).
         has_color = (y_in.ndim == 3 and y_in.shape[2] == 3)
         if has_color:
             ycbcr_full = rgb2ycbcr(y_in)
@@ -405,15 +205,9 @@ class VDBKE(DeconvolutionAlgorithm):
             ycbcr_full = None
             y = y_in if y_in.ndim == 2 else y_in[:, :, 0].copy()
 
-        # ── Robust mode: force protective flags BEFORE the pipeline ─────
-        # impulse detection must run on the raw image (it uses the image
-        # itself to find spikes), so we cannot enable it retroactively
-        # from the orchestrator.  Force it here when robust mode is on
-        # and the user did not pick anything explicit.
         if self.auto_mode == 'robust' and self.impulse_preprocess == 'none':
             self.impulse_preprocess = 'auto'
 
-        # ── 4a. Impulse noise detection & removal ───────────────────────
         impulse_info = None
         if self.impulse_preprocess == 'auto':
             ip = self.impulse_params or {}
@@ -430,7 +224,6 @@ class VDBKE(DeconvolutionAlgorithm):
                     print(f"[{self.name}] impulse noise removed "
                           f"(density={impulse_info['density']:.4f})")
 
-        # ── 4b. Noise estimation ────────────────────────────────────────
         noise_info = None
         if self.noise_estimation != 'none':
             noise_info = self._estimate_noise(y)
@@ -439,16 +232,14 @@ class VDBKE(DeconvolutionAlgorithm):
                       f"({noise_info.get('method','?')}): "
                       f"σ={noise_info.get('sigma_norm', 0):.5f}")
         elif self.auto_mode == 'robust':
-            # Orchestrator needs σ — force PCA if user left it 'none'.
+
             self.noise_estimation = 'pca'
             noise_info = self._estimate_noise(y)
 
-        # ── 4b¼. Robust orchestrator (soft-weighted auto config) ────────
         orchestrator_info = None
         if self.auto_mode == 'robust':
             orchestrator_info = self._orchestrate_robust(noise_info)
 
-        # ── 4b½. Auto-params from σ ────────────────────────────────────
         if self.auto_params and noise_info is not None:
             sigma_n = noise_info.get('sigma_norm', None)
             if sigma_n is not None and sigma_n > 0:
@@ -462,7 +253,6 @@ class VDBKE(DeconvolutionAlgorithm):
                           f"img_λ1={self.img_lambda1:.6f}, "
                           f"firls_λ={self.firls_lambda:.6f}")
 
-        # ── 4c-1. ScreeNOT SVD denoising ───────────────────────────────
         screenot_info = None
         if self.screenot_preprocess == 'auto':
             from .screenot import screenot_denoise
@@ -478,7 +268,6 @@ class VDBKE(DeconvolutionAlgorithm):
             if self.verbose:
                 print(f"[{self.name}] ScreeNOT denoising applied")
 
-        # ── 4c-2. ACT curvelet denoising ───────────────────────────────
         act_info = None
         if self.act_preprocess == 'auto':
             if self.screenot_preprocess == 'auto':
@@ -498,7 +287,6 @@ class VDBKE(DeconvolutionAlgorithm):
             if self.verbose:
                 print(f"[{self.name}] ACT curvelet denoising applied")
 
-        # ── 4c-3. PSD-based noise filtering ────────────────────────────
         psd_info = None
         if self.noise_preprocess != 'none':
             y, psd_info = self._apply_noise_preprocess(y)
@@ -506,18 +294,12 @@ class VDBKE(DeconvolutionAlgorithm):
                 print(f"[{self.name}] noise_preprocess="
                       f"'{self.noise_preprocess}' applied")
 
-        # ── 4c-4. Pre-pyramid spatial denoising ────────────────────────
         if self.preprocess not in (None, 'none'):
             y = self._apply_denoise(
                 y, self.preprocess, self.preprocess_params, noise_info)
             if self.verbose:
                 print(f"[{self.name}] preprocess='{self.preprocess}' applied")
 
-        # ── Rebuild cleaned full-resolution image for non-blind ─────────
-        # ``yorig`` carries every step of the denoising chain; the
-        # non-blind solver therefore sees the same signal that the
-        # kernel was estimated from, instead of the raw blurry input
-        # (this fixes the divergence with LIP).
         if has_color:
             ycbcr_clean = ycbcr_full.copy()
             ycbcr_clean[:, :, 0] = y
@@ -525,16 +307,12 @@ class VDBKE(DeconvolutionAlgorithm):
         else:
             yorig = y.copy()
 
-        # Optional crop only for kernel estimation (non-blind still uses
-        # the full-resolution ``yorig``).
         if self.kernel_est_win is not None:
-            w = self.kernel_est_win  # (r1, c1, r2, c2) 0-indexed
+            w = self.kernel_est_win
             y = y[w[0]:w[2], w[1]:w[3]]
 
-        blur_size = self.kernel_size  # (ks1, ks2)
+        blur_size = self.kernel_size
 
-        # ── Determine kernel sizes at each scale ──
-        # MATLAB: [max_ks, ind1] = max(opts.kernel_size)
         max_ks = max(blur_size)
         ind1 = 0 if blur_size[0] >= blur_size[1] else 1
         ind2 = 1 - ind1
@@ -550,7 +328,7 @@ class VDBKE(DeconvolutionAlgorithm):
             print(f'Kernel size at coarsest level is [{minsize[0]}, {minsize[1]}]')
 
         resize_step = np.sqrt(2)
-        # Build ksize list for each scale
+
         ksize = []
         tmp = minsize[ind1]
         while tmp < max_ks:
@@ -569,30 +347,27 @@ class VDBKE(DeconvolutionAlgorithm):
         ksize.append(tuple(blur_size))
         num_scales = len(ksize)
 
-        # Storage per scale
         ks = [None] * num_scales
         alphas = [None] * num_scales
         ls = [None] * num_scales
 
         lambda_C = self.kernel_lambda_C
 
-        # ── Build blind_denoise callback ────────────────────────────────
         blind_denoise_fn = None
         if self.blind_denoise not in (None, 'none'):
             def blind_denoise_fn(u_arr):
                 return self._apply_blind_denoise(u_arr, noise_info)
 
-        # ── Multi-scale loop ──
         for s in range(num_scales):
             k1, k2 = ksize[s]
 
             if s == 0:
-                # Coarsest level: initialise kernel as Gaussian
+
                 Gsigma = 1.0 if max_ks > 50 else 0.5
                 ks[s] = fspecial_gaussian((k1, k2), Gsigma)
                 alphas[s] = ks[s] + self.kernel_lower_bound
             else:
-                # Up-sample kernel from previous level
+
                 tmp_k = ks[s - 1].copy()
                 tmp_k[tmp_k < 0] = 0
                 tmp_k /= tmp_k.sum()
@@ -601,7 +376,6 @@ class VDBKE(DeconvolutionAlgorithm):
                 ks[s][ks[s] < 0] = 0
                 ks[s] /= ks[s].sum()
 
-            # Image size at this level
             r = int(np.floor(y.shape[0] * k1 / blur_size[0]))
             c = int(np.floor(y.shape[1] * k2 / blur_size[1]))
             if s == num_scales - 1:
@@ -611,7 +385,6 @@ class VDBKE(DeconvolutionAlgorithm):
                 print(f'Processing scale {s + 1}/{num_scales}; '
                       f'kernel size {k1}x{k2}; image size {r}x{c}')
 
-            # Resize y to current scale
             ys = imresize(y, (r, c), 'bilinear')
 
             if s == 0:
@@ -619,21 +392,18 @@ class VDBKE(DeconvolutionAlgorithm):
             else:
                 ls[s] = imresize(ls[s - 1], (r, c), 'bilinear')
 
-            # Lambda_C schedule
             if s == num_scales - 1:
                 cur_lambda_C = lambda_C
             else:
                 cur_lambda_C = (lambda_C * ksize[s][0] * ksize[s][1]
                                 / (ksize[-1][0] * ksize[-1][1]))
 
-            # Centre the kernel
             ls[s], ks[s], shift_kernel = center_kernel_img_space(
                 ls[s], ks[s], verbose=self.verbose)
             alphas[s] = np.maximum(
                 convolve2d(alphas[s], shift_kernel, 'same'),
                 self.kernel_lower_bound)
 
-            # Build parameter dicts for this scale
             kernel_pars = {
                 'lambda': self.kernel_lambda,
                 'max_iter': self.kernel_max_iter,
@@ -668,18 +438,15 @@ class VDBKE(DeconvolutionAlgorithm):
                 'k_tol': self.k_tol,
             }
 
-            # Single-scale alternating estimation
             ls[s], ks[s], alphas[s] = ss_ngm_dirichlet_ubc_img(
                 ys, ls[s], ks[s], alphas[s], pars,
                 blind_denoise_fn=blind_denoise_fn,
                 verbose=self.verbose)
 
-            # At finest scale, extract final kernel
             if s == num_scales - 1:
                 kernel = alphas[s] - self.kernel_lower_bound
                 kernel = kernel / kernel.sum()
 
-        # ── Kernel thresholding ─────────────────────────────────────────
         if self.kernel_threshold > 0:
             kernel[kernel < self.kernel_threshold * kernel.max()] = 0.0
             k_sum = kernel.sum()
@@ -689,14 +456,12 @@ class VDBKE(DeconvolutionAlgorithm):
                 print(f"[{self.name}] kernel thresholded "
                       f"(thr={self.kernel_threshold:.3f})")
 
-        # ── Pre-nonblind denoising ──────────────────────────────────────
         if self.pre_nonblind not in (None, 'none'):
             yorig = self._apply_pre_nonblind(yorig, noise_info)
             if self.verbose:
                 print(f"[{self.name}] pre_nonblind='{self.pre_nonblind}' "
                       f"applied to yorig")
 
-        # ── Non-blind deconvolution ──
         if self.final_deconv == 'ringing_removal':
             nbp = self.nb_params or {}
             deblur = self._nonblind_channel_dispatch(
@@ -734,7 +499,7 @@ class VDBKE(DeconvolutionAlgorithm):
             deblur = self._nonblind_channel_dispatch(
                 yorig, kernel, _freq_deconv)
 
-        else:  # default: 'firls' or 'blend'
+        else:
             firls_opts = {
                 'lambda': self.firls_lambda,
                 'alpha': self.firls_alpha,
@@ -747,14 +512,9 @@ class VDBKE(DeconvolutionAlgorithm):
                 return x_fov
 
             if self.final_deconv == 'blend':
-                # Weighted average of FIRLS (sharp, sparse-prior detail)
-                # and ringing_removal (smoother, fewer inverse-filter
-                # ripples).  Both already cope with mild noise, so the
-                # blend keeps detail while suppressing residual ringing —
-                # a safer alternative than tikhonov+rr because tikhonov
-                # is much more noise-sensitive.
+
                 nbp = self.nb_params or {}
-                blend_w = float(nbp.get('blend_weight', 0.5))  # weight of RR
+                blend_w = float(nbp.get('blend_weight', 0.5))
                 def _blend(ch, k):
                     u_firls = _firls(ch, k)
                     u_rr = ringing_artifacts_removal(
@@ -768,7 +528,7 @@ class VDBKE(DeconvolutionAlgorithm):
                     return ((1.0 - blend_w) * u_firls[:h, :w_]
                             + blend_w * u_rr[:h, :w_])
                 deblur = self._nonblind_channel_dispatch(yorig, kernel, _blend)
-            else:  # 'firls'
+            else:
                 deblur = self._nonblind_channel_dispatch(
                     yorig, kernel, _firls)
 
@@ -802,19 +562,11 @@ class VDBKE(DeconvolutionAlgorithm):
             'time': time.time() - start_time,
         }
 
-        # Output: int16 [0, 255], kernel
         x_final = np.clip(deblur * 255.0, 0, 255).astype(np.int16)
         return x_final, kernel
 
-    # ─────────────────────────────────────────────────────────────────────
-    # Channel dispatch for non-blind deconvolution
-    # ─────────────────────────────────────────────────────────────────────
     def _nonblind_channel_dispatch(self, img, kernel, deconv_fn):
-        """Apply a non-blind deconvolution function to each channel.
 
-        Uses YCbCr (luminance only) or per-channel RGB depending on
-        ``self.use_ycbcr``.
-        """
         if self.use_ycbcr:
             if img.ndim == 3 and img.shape[2] == 3:
                 ycbcr = rgb2ycbcr(img)
@@ -832,9 +584,6 @@ class VDBKE(DeconvolutionAlgorithm):
                 return np.clip(out, 0.0, 1.0)
             return np.clip(deconv_fn(img, kernel), 0.0, 1.0)
 
-    # ─────────────────────────────────────────────────────────────────────
-    # PSD-based noise preprocessing
-    # ─────────────────────────────────────────────────────────────────────
     def _apply_noise_preprocess(self, yg):
         from .noise_psd_analysis import (
             analyze_noise_psd, noise_preprocess,
@@ -881,9 +630,6 @@ class VDBKE(DeconvolutionAlgorithm):
                 f"Choose from: 'auto', 'notch', 'bandstop', 'none'")
         return yg_out, psd_info
 
-    # ─────────────────────────────────────────────────────────────────────
-    # Guided filter (box-filter variant, He et al. 2013)
-    # ─────────────────────────────────────────────────────────────────────
     @staticmethod
     def _guided_filter(I, p, r, eps):
         from scipy.ndimage import uniform_filter
@@ -899,14 +645,8 @@ class VDBKE(DeconvolutionAlgorithm):
         b = mean_p - a * mean_I
         return box(a) * I + box(b)
 
-    # ─────────────────────────────────────────────────────────────────────
-    # Universal denoiser dispatch
-    # ─────────────────────────────────────────────────────────────────────
     def _apply_denoise(self, img, method, params, noise_info):
-        """Apply a spatial denoiser to a single-channel image [0, 1].
 
-        Supported methods: 'tv', 'nlm', 'bilateral', 'guided', 'bm3d'.
-        """
         if method is None or method == 'none':
             return img
         p = dict(params or {})
@@ -965,23 +705,14 @@ class VDBKE(DeconvolutionAlgorithm):
                 f"Unknown denoiser='{method}'. Choose from: "
                 f"'tv', 'nlm', 'bilateral', 'guided', 'bm3d', 'act', 'none'")
 
-    # ─────────────────────────────────────────────────────────────────────
-    # Blind-loop denoiser (x_fov before kernel step)
-    # ─────────────────────────────────────────────────────────────────────
     def _apply_blind_denoise(self, x, noise_info):
         p = dict(self.blind_denoise_params or {})
         if self.blind_denoise == 'guided':
             p.setdefault('radius', 2)
         return self._apply_denoise(x, self.blind_denoise, p, noise_info)
 
-    # ─────────────────────────────────────────────────────────────────────
-    # Pre-nonblind denoiser
-    # ─────────────────────────────────────────────────────────────────────
     def _apply_pre_nonblind(self, img, noise_info):
-        """Apply denoiser to image before non-blind step.
 
-        For color images: denoise luminance channel only (YCbCr).
-        """
         if img.ndim == 3 and img.shape[2] == 3:
             ycbcr = rgb2ycbcr(img)
             ycbcr[:, :, 0] = self._apply_denoise(
@@ -991,20 +722,8 @@ class VDBKE(DeconvolutionAlgorithm):
         return self._apply_denoise(
             img, self.pre_nonblind, self.pre_nonblind_params, noise_info)
 
-    # ─────────────────────────────────────────────────────────────────────
-    # Noise estimation helper
-    # ─────────────────────────────────────────────────────────────────────
     def _estimate_noise(self, yg):
-        """Estimate noise level from a grayscale image [0, 1].
 
-        Parameters
-        ----------
-        yg : ndarray — input image (2-D or 3-D; converted to gray internally).
-
-        Returns
-        -------
-        dict with keys 'method', 'sigma_norm', 'sigma', or None.
-        """
         img = yg
         if img.ndim == 3 and img.shape[2] == 3:
             img = rgb2gray(img)
@@ -1021,52 +740,11 @@ class VDBKE(DeconvolutionAlgorithm):
             return result
         return None
 
-    # ─────────────────────────────────────────────────────────────────────
-    # Robust orchestrator (soft-weighted auto config for the noise pipeline)
-    # ─────────────────────────────────────────────────────────────────────
     def _orchestrate_robust(self, noise_info):
-        """Conservative robust auto-config for VDBKE.
 
-        VDBKE is already noise-tolerant on its own (Dirichlet prior +
-        adaptive λ during image estimation).  Empirically, a *minimal*
-        intervention reproduces the best hand-tuned config the author
-        found:
-
-            impulse_preprocess='auto'  (forced earlier in process())
-            act_preprocess='auto'      (curvelet denoising on Y)
-            pre_nonblind='guided'      (light edge-preserving filter)
-            kernel_threshold ≈ 0.05    (kill spurious tails)
-
-        Aggressive choices that *kill the kernel* (collapse it to a
-        single pixel) were observed and removed:
-
-            ✗ ``blind_denoise='bilateral'`` — over-smooths u inside the
-              alternating loop, the gradient w.r.t. k vanishes, and α
-              concentrates on one pixel.
-            ✗ σ-scaling of img_lambda1 / firls_lambda with k≈200 — at
-              σ≈0.05 this raises img_lambda1 ~250× over its default and
-              suppresses the image step entirely; the kernel update sees
-              a zero-content image and collapses.
-            ✗ Adding extra ``preprocess`` on top of ``act_preprocess`` —
-              double smoothing destroys the high-frequency content the
-              kernel estimator relies on.
-
-        Policy:
-            • Clean regime (σ ≤ σ_clean) — keep all user defaults.
-              ``final_deconv='auto'`` → 'blend'.
-            • Heavy regime (σ  > σ_clean) — only enable the protective
-              flags above (when the user left them at 'none' / 0.0),
-              and route ``final_deconv='auto'`` to 'blend' (medium) or
-              'ringing_removal' (heavy).  Do NOT change λ-regularisation
-              or add blind_denoise.
-
-        Always resets mutable fields from the __init__ snapshot so
-        repeated process() calls are deterministic.
-        """
         snap = self._defaults_snapshot
         amp = dict(self.auto_mode_params or {})
 
-        # ── 1) Reset from snapshot ───────────────────────────────────
         self.img_lambda1 = snap['img_lambda1']
         self.firls_lambda = snap['firls_lambda']
         self.final_alpha = snap['final_alpha']
@@ -1079,7 +757,6 @@ class VDBKE(DeconvolutionAlgorithm):
         self.act_preprocess = snap['act_preprocess']
         self.kernel_threshold = snap['kernel_threshold']
 
-        # ── 2) σ + thresholds ────────────────────────────────────────
         sigma = 0.0
         if noise_info is not None:
             sigma = float(noise_info.get('sigma_norm', 0.0) or 0.0)
@@ -1094,7 +771,6 @@ class VDBKE(DeconvolutionAlgorithm):
         if nt in ('poisson', 'poisson_gaussian') and sigma >= force_heavy_sigma:
             force_heavy = True
 
-        # ── 3) Clean branch — keep user defaults. ────────────────────
         if sigma <= sigma_clean and not force_heavy:
             regime = 'clean'
             if snap['final_deconv'] == 'auto':
@@ -1115,7 +791,6 @@ class VDBKE(DeconvolutionAlgorithm):
                 'kernel_threshold': self.kernel_threshold,
             }
 
-        # ── 4) Heavy/medium branch ───────────────────────────────────
         w = 1.0 if sigma >= sigma_heavy else (
             (sigma - sigma_clean) / max(sigma_heavy - sigma_clean, 1e-9))
         w = float(np.clip(w, 0.0, 1.0))
@@ -1125,17 +800,10 @@ class VDBKE(DeconvolutionAlgorithm):
         poisson_like = noise_type in ('poisson', 'poisson_gaussian',
                                       'unknown')
 
-        # (a) ACT curvelet denoising — only enable if neither it nor
-        #     screenot is already chosen by the user.
         if (snap['act_preprocess'] in (None, 'none')
                 and snap['screenot_preprocess'] in (None, 'none')):
             self.act_preprocess = 'auto'
 
-        # (b) pre_nonblind — light guided filter unless user picked
-        #     something else.  Guided is fast, edge-preserving, and the
-        #     author confirmed it gives the best visual quality on heavy
-        #     noise.  For poisson-like noise we still use guided — ACT
-        #     is already doing the heavy lifting in (a).
         if snap['pre_nonblind'] in (None, 'none'):
             self.pre_nonblind = 'guided'
             self.pre_nonblind_params = {
@@ -1143,19 +811,11 @@ class VDBKE(DeconvolutionAlgorithm):
                 'eps': float(max(sigma, 0.01)) ** 2 * 4.0,
             }
 
-        # (c) kernel_threshold — kill spurious tails on noisy ψ.  Only
-        #     bump if the user left it at 0 (off).
         if snap['kernel_threshold'] <= 0.0:
             self.kernel_threshold = float(amp.get('kernel_threshold', 0.05))
 
-        # (d) final_deconv routing.  FIRLS handles moderate noise well,
-        #     but its sparse prior amplifies kernel-mismatch ringing on
-        #     very noisy data — RR damps that explicitly.
         if snap['final_deconv'] == 'auto':
             self.final_deconv = 'ringing_removal' if w >= 0.85 else 'blend'
-
-        # NOTE: img_lambda1, firls_lambda, blind_denoise, preprocess,
-        # noise_preprocess are deliberately NOT touched — see docstring.
 
         info = {
             'sigma_norm': sigma, 'w': w, 'regime': regime,
@@ -1175,9 +835,6 @@ class VDBKE(DeconvolutionAlgorithm):
                   f"final={self.final_deconv}")
         return info
 
-    # ─────────────────────────────────────────────────────────────────────
-    # Framework interface methods
-    # ─────────────────────────────────────────────────────────────────────
     def get_param(self) -> List[Tuple[str, Any]]:
         return [
             ('kernel_size', self.kernel_size),
@@ -1228,8 +885,7 @@ class VDBKE(DeconvolutionAlgorithm):
                     self.kernel_size = tuple(value)
                 else:
                     setattr(self, key, value)
-                # Keep the orchestrator's default-snapshot in sync with
-                # parameters the user updates after construction.
+
                 if key in self._defaults_snapshot:
                     if key in ('img_lambda1', 'firls_lambda', 'final_alpha'):
                         self._defaults_snapshot[key] = float(value)

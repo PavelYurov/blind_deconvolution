@@ -1,38 +1,17 @@
 """
 pam.py
 
-Blind Image Deconvolution via Total Variation (Perrone-Favaro CVPR 2014)
-with optional noise-aware preprocessing, LIP-style robust orchestrator
-and post-CTF non-blind restoration.
-
-Reference (paper core):
+Источник:
     D. Perrone and P. Favaro: "Total Variation Blind Deconvolution:
     The Devil is in the Details", CVPR 2014.
-
-Pipeline (default = paper-pure if all noise knobs left at 'none'):
-    1.  Normalise to float64 [0, 1] and ensure grayscale.
-    2.  Impulse noise detection & removal (optional).
-    3.  Noise sigma estimation (optional, auto-promoted in robust mode).
-    4.  Auto-params from sigma (user-driven, optional): lam = k_lam * sigma.
-    5.  LIP-style robust orchestrator (optional).
-    6.  ScreeNOT SVD denoising (optional).
-    7.  ACT curvelet denoising (optional, mutually exclusive with ScreeNOT).
-    8.  Spatial pre-blind denoising (optional).
-    9.  PSD-based noise filtering (optional).
-    10. Histogram equalization (optional).
-    11. Coarse-to-fine blind deconvolution (deblur, paper core).
-    12. Optional post-CTF non-blind restoration.
-    13. Crop padding, resize back to original (H, W), clip to int16 [0, 255].
 """
 
 import numpy as np
 import time
 from typing import Tuple, List, Any, Dict
 
-# -- Framework base class import (DO NOT MODIFY) ---------------------------
 import sys
 from pathlib import Path
-
 
 def _find_project_root(start: Path) -> Path:
     path = start.resolve()
@@ -41,7 +20,6 @@ def _find_project_root(start: Path) -> Path:
             raise RuntimeError("Cannot locate project root")
         path = path.parent
     return path
-
 
 _CURRENT_FILE = Path(__file__).resolve()
 _PROJECT_ROOT = _find_project_root(_CURRENT_FILE)
@@ -53,98 +31,20 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
         sys.path.insert(0, _path)
 
 from blinddeconv.algorithms.base import DeconvolutionAlgorithm
-# --------------------------------------------------------------------------
 
 from .solvers import deblur, dec
 
-
 class PAM_BD(DeconvolutionAlgorithm):
-    """
-    Blind deconvolution using Total Variation (Perrone & Favaro, CVPR 2014).
-
-    Operates on grayscale images.  When `auto_mode='off'` and all noise
-    pipeline knobs are at 'none', the algorithm is identical to the
-    original paper port (`our_company/pam/pam`).
-
-    Paper-core parameters (do NOT auto-tune)
-    ----------------------------------------
-    kernel_shape  : (int, int) PSF support, both values odd.  Default (25, 25).
-    lam           : TV regularisation weight.
-                    Typical: 3e-4 .. 6e-4.  Noisy: 1e-3 .. 3e-3.  Default 3e-4.
-    iters         : iterations per blind/non-blind call per pyramid scale.
-                    Default 1000.
-    gamma_correct : bool, gamma correction before kernel estimation.
-                    Default False.
-    gamma         : gamma exponent (used iff gamma_correct).  Default 1.0.
-
-    Noise pipeline (orthogonal to orchestrator, never auto-tuned)
-    -------------------------------------------------------------
-    impulse_preprocess  : 'none' | 'auto'.  Default 'none'.
-    noise_estimation    : 'none' | 'pca' | 'chen'.  Default 'none'.
-                          Auto-promoted to 'pca' when auto_mode='robust'.
-    auto_params         : None or dict of {k_lam, lam_min, lam_max}.  When set,
-                          lam is rescaled as
-                              lam = clip(k_lam * sigma, lam_min, lam_max).
-                          Defaults if dict is given but keys missing:
-                              k_lam=0.05, lam_min=5e-4, lam_max=5e-3.
-                          When None (default), lam stays as user-provided.
-    screenot_preprocess : 'none' | 'auto'.  Default 'none'.
-    noise_preprocess    : 'none' | 'auto' | 'notch' | 'bandstop'.  Default 'none'.
-    histogram_eq        : 'none' | 'clahe' | 'global'.  Default 'none'.
-
-    Orchestrator-managed groups (controlled by auto_mode)
-    -----------------------------------------------------
-    preprocess        : 'none' | 'tv' | 'nlm' | 'bilateral' | 'guided' | 'bm3d'
-                        | 'act'.  Default 'none'.
-    act_preprocess    : 'none' | 'auto'.  Default 'none'.
-    pre_nonblind      : same options as preprocess; applied to the input
-                        before the post-CTF non-blind step.  Default 'none'.
-                        Effective only when final_nb != 'none'.
-    final_nb          : 'none' | 'dec' | 'ringing_removal' | 'adaptive_lp'
-                        | 'wiener' | 'tikhonov'.  Default 'none' (paper-pure).
-                        - 'none'             : output the coarse_to_fine result.
-                        - 'dec'              : run paper PF dec() with the
-                                               estimated kernel on a (possibly
-                                               denoised) input.
-                        - 'ringing_removal'  : Pan et al. TV+L0+bilateral diff.
-                        - 'adaptive_lp'      : Wang et al. (non_blind.adaptive_lp_deconv).
-                        - 'wiener', 'tikhonov': simple FFT-based fallbacks.
-    nb_params         : dict of method-specific params (see _run_final_nb).
-
-    LIP-style robust orchestrator
-    -----------------------------
-    auto_mode         : 'off' | 'robust'.  Default 'off'.
-    auto_mode_params  : dict of orchestrator thresholds.  Defaults:
-        sigma_clean             = 0.005
-        sigma_heavy             = 0.05
-        force_heavy_sigma       = 0.01    (poisson-like only)
-        prefer_act_for_gaussian = False
-        poisson_denoiser        = 'act'   — denoiser for Poisson-like noise:
-                                  'act'      — Adaptive Curvelet Thresholding
-                                               (default; ACT in preprocess +
-                                               pre_nonblind).
-                                  'vst_bm3d' — Generalized Anscombe VST + BM3D
-                                               (Mäkitalo–Foi 2013); more
-                                               accurate for heavier Poisson.
-        act_preprocess_gaussian = False   — use ACT instead of bilateral/bm3d
-                                  for preprocess on Gaussian/correlated noise.
-                                  Best for colored (1/f, 1/f²) noise where
-                                  BM3D produces color artifacts.
-        act_pre_nonblind_gaussian = False — use ACT instead of bm3d for
-                                  pre_nonblind on Gaussian/correlated noise.
-                                  noise_var=σ² from Pyatykh (more accurate
-                                  than blind-MAD for colored noise).
-    """
 
     def __init__(
         self,
-        # -- Paper core (untouched by orchestrator) --
+
         kernel_shape: tuple = (25, 25),
         lam: float = 3e-4,
         iters: int = 1000,
         gamma_correct: bool = False,
         gamma: float = 1.0,
-        # -- Orthogonal noise pipeline --
+
         impulse_preprocess: str = 'none',
         impulse_params: dict = None,
         noise_estimation: str = 'none',
@@ -155,7 +55,7 @@ class PAM_BD(DeconvolutionAlgorithm):
         noise_preprocess_params: dict = None,
         histogram_eq: str = 'none',
         histogram_eq_params: dict = None,
-        # -- Orchestrator-managed --
+
         preprocess: str = 'none',
         preprocess_params: dict = None,
         act_preprocess: str = 'none',
@@ -164,23 +64,21 @@ class PAM_BD(DeconvolutionAlgorithm):
         pre_nonblind_params: dict = None,
         final_nb: str = 'none',
         nb_params: dict = None,
-        # -- LIP-style orchestrator switch --
+
         auto_mode: str = 'off',
         auto_mode_params: dict = None,
         visualize: bool = False,
-        # -- Kernel threshold --
+
         kernel_threshold: float = 0.0,
     ):
         super().__init__(name='PAM-BD')
 
-        # Paper core
         self.kernel_shape = tuple(kernel_shape)
         self.lam = lam
         self.iters = iters
         self.gamma_correct = gamma_correct
         self.gamma = gamma
 
-        # Orthogonal pipeline
         self.impulse_preprocess = impulse_preprocess
         self.impulse_params = impulse_params
         self.noise_estimation = noise_estimation
@@ -192,7 +90,6 @@ class PAM_BD(DeconvolutionAlgorithm):
         self.histogram_eq = histogram_eq
         self.histogram_eq_params = histogram_eq_params
 
-        # Orchestrator-managed
         self.preprocess = preprocess
         self.preprocess_params = preprocess_params
         self.act_preprocess = act_preprocess
@@ -202,15 +99,12 @@ class PAM_BD(DeconvolutionAlgorithm):
         self.final_nb = (final_nb or 'none').lower()
         self.nb_params = nb_params
 
-        # LIP-style
         self.auto_mode = (auto_mode or 'off').lower()
         self.auto_mode_params = auto_mode_params
 
         self.visualize = visualize
         self.kernel_threshold = float(kernel_threshold)
 
-        # Snapshot for orchestrator (used to restore on clean branch and
-        # to compute the (1-w)*default + w*noisy lam blend on heavy branch).
         self._defaults_snapshot = {
             'preprocess':          preprocess,
             'preprocess_params':   preprocess_params,
@@ -226,13 +120,9 @@ class PAM_BD(DeconvolutionAlgorithm):
         self.history: Dict[str, list] = {'kernel_diff': []}
         self.hyperparams: Dict[str, Any] = {}
 
-    # ============================================================
-    # Main entry point
-    # ============================================================
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         start_time = time.time()
 
-        # -- 1. Normalise & coerce to grayscale float64 [0, 1] -----------
         f = image.astype(np.float64)
         if f.max() > 1.0:
             f = f / 255.0
@@ -243,12 +133,10 @@ class PAM_BD(DeconvolutionAlgorithm):
                 f = (0.2989 * f[:, :, 0]
                      + 0.5870 * f[:, :, 1]
                      + 0.1140 * f[:, :, 2])
-        # Keep the raw input for post-CTF NB (where pre_nonblind may be
-        # different from the pre-blind preprocess chain).
+
         f_raw = f.copy()
         orig_H, orig_W = f.shape[:2]
 
-        # -- 2. Impulse noise detection & removal ------------------------
         impulse_info = None
         if self.impulse_preprocess == 'auto':
             from .impulse_noise_estimation import (
@@ -271,7 +159,6 @@ class PAM_BD(DeconvolutionAlgorithm):
                     max_window=ip.get('max_window', 7))
                 f_raw = f.copy()
 
-        # -- 3. Noise estimation -----------------------------------------
         if self.auto_mode == 'robust' and self.noise_estimation == 'none':
             self.noise_estimation = 'pca'
             if self.visualize:
@@ -286,7 +173,6 @@ class PAM_BD(DeconvolutionAlgorithm):
                       f"({self.noise_estimation}): "
                       f"sigma={sigma:.5f}  (sigma_255={sigma * 255:.2f})")
 
-        # -- 4. User auto_params: sigma -> lam ---------------------------
         if self.auto_params is not None and noise_info is not None:
             sigma_n = noise_info.get('sigma_norm', None)
             if sigma_n is not None and sigma_n > 0:
@@ -299,10 +185,8 @@ class PAM_BD(DeconvolutionAlgorithm):
                     print(f"[PAM-BD] auto_params(sigma={sigma_n:.5f}): "
                           f"lam={self.lam:.5e}")
 
-        # -- 5. LIP-style robust orchestrator ----------------------------
         orchestrator_info = self._orchestrate_robust(noise_info)
 
-        # -- 6. ScreeNOT SVD denoising -----------------------------------
         screenot_info = None
         if self.screenot_preprocess == 'auto':
             if self.act_preprocess == 'auto':
@@ -323,7 +207,6 @@ class PAM_BD(DeconvolutionAlgorithm):
                 print(f"[PAM-BD] ScreeNOT applied "
                       f"(rank={screenot_info.get('rank', '?')})")
 
-        # -- 7. ACT curvelet denoising -----------------------------------
         act_info = None
         if self.act_preprocess == 'auto':
             from .act_denoise import act_denoise
@@ -339,14 +222,12 @@ class PAM_BD(DeconvolutionAlgorithm):
             if self.visualize:
                 print("[PAM-BD] ACT curvelet denoising applied")
 
-        # -- 8. Spatial pre-blind denoising ------------------------------
         if self.preprocess not in (None, 'none'):
             f = self._apply_denoise(f, self.preprocess,
                                     self.preprocess_params, noise_info)
             if self.visualize:
                 print(f"[PAM-BD] Pre-blind denoise: {self.preprocess}")
 
-        # -- 9. PSD-based noise preprocessing ----------------------------
         psd_info = None
         if self.noise_preprocess != 'none':
             f, psd_info = self._apply_noise_preprocess(f)
@@ -354,13 +235,11 @@ class PAM_BD(DeconvolutionAlgorithm):
                 print(f"[PAM-BD] PSD noise preprocess: "
                       f"{self.noise_preprocess}")
 
-        # -- 10. Histogram equalization ----------------------------------
         if self.histogram_eq not in (None, 'none'):
             f = self._apply_histogram_eq(f)
             if self.visualize:
                 print(f"[PAM-BD] Histogram equalization: {self.histogram_eq}")
 
-        # -- 11. Coarse-to-fine blind deconvolution (paper core) ---------
         MK, NK = self.kernel_shape
         u, kernel = deblur(
             f,
@@ -372,13 +251,10 @@ class PAM_BD(DeconvolutionAlgorithm):
             visualize=self.visualize,
         )
 
-        # -- 12. Crop padding back to original-image domain --------------
-        # deblur() returns u of size (M_odd + MK - 1, N_odd + NK - 1)
         pad_h = MK // 2
         pad_w = NK // 2
         u = u[pad_h:u.shape[0] - pad_h, pad_w:u.shape[1] - pad_w]
 
-        # -- Kernel threshold before non-blind --------------------------
         if self.kernel_threshold > 0.0:
             k_max = kernel.max()
             if k_max > 0:
@@ -387,10 +263,8 @@ class PAM_BD(DeconvolutionAlgorithm):
                 if k_sum > 0:
                     kernel /= k_sum
 
-        # -- 13. Optional post-CTF non-blind restoration -----------------
         if self.final_nb not in (None, 'none'):
-            # pre_nonblind is applied to the RAW input (not the pre-blind
-            # denoised one) so users can decouple the two stages.
+
             f_pre_nb = f_raw
             if self.pre_nonblind not in (None, 'none'):
                 f_pre_nb = self._apply_denoise(
@@ -402,12 +276,10 @@ class PAM_BD(DeconvolutionAlgorithm):
             if self.visualize:
                 print(f"[PAM-BD] Final NB: {self.final_nb}")
 
-        # -- 14. Resize back if even->odd cropping happened in deblur ----
         if u.shape[0] != orig_H or u.shape[1] != orig_W:
             from .utils import imresize
             u = imresize(u, (orig_H, orig_W), method='bicubic')
 
-        # -- 15. Output --------------------------------------------------
         u = np.clip(u, 0.0, 1.0)
         self.hyperparams = {
             'kernel_shape': self.kernel_shape,
@@ -446,20 +318,8 @@ class PAM_BD(DeconvolutionAlgorithm):
         x_final = np.clip(x_final, 0, 255).astype(np.int16)
         return x_final, kernel
 
-    # ============================================================
-    # LIP-style robust orchestrator (schema A)
-    # ============================================================
     def _orchestrate_robust(self, noise_info):
-        """Adjust orchestrator-managed groups based on estimated noise.
 
-        Manages: preprocess, act_preprocess, pre_nonblind, final_nb, nb_params,
-        and the paper-core lam (via blend, only if user's auto_params is
-        not active so we don't double-scale).
-
-        Untouched: kernel_shape, iters, gamma, gamma_correct (paper core);
-        impulse_preprocess, screenot_preprocess, noise_preprocess,
-        histogram_eq (orthogonal user knobs).
-        """
         info = {'triggered': False, 'mode': self.auto_mode}
 
         if self.auto_mode != 'robust':
@@ -502,7 +362,6 @@ class PAM_BD(DeconvolutionAlgorithm):
             'act_pre_nonblind_gaussian': gauss_act_pre_nonblind,
         })
 
-        # -- Clean branch: restore user values, paper-pure run -----------
         if not heavy:
             info['branch'] = 'clean'
             self.preprocess          = snap['preprocess']
@@ -519,7 +378,6 @@ class PAM_BD(DeconvolutionAlgorithm):
                       "-> paper defaults restored")
             return info
 
-        # -- Heavy branch -----------------------------------------------
         info['branch'] = 'heavy'
         sigma_eff = max(sigma, 1e-3)
 
@@ -603,7 +461,6 @@ class PAM_BD(DeconvolutionAlgorithm):
                 self.final_nb          = 'ringing_removal'
                 self.nb_params         = None
 
-        # -- lam blend: only if user auto_params is NOT active ----------
         if self.auto_params is None:
             w = (sigma - sigma_clean) / max(sigma_heavy - sigma_clean, 1e-6)
             w = float(np.clip(w, 0.0, 1.0))
@@ -627,9 +484,6 @@ class PAM_BD(DeconvolutionAlgorithm):
 
         return info
 
-    # ============================================================
-    # Final non-blind dispatch
-    # ============================================================
     def _run_final_nb(self, blurred, kernel, noise_info):
         method = self.final_nb
         nbp = self.nb_params or {}
@@ -639,7 +493,7 @@ class PAM_BD(DeconvolutionAlgorithm):
             lam_nb = float(nbp.get('lam', self.lam))
             u = dec(blurred, kernel, lam=lam_nb,
                     iters=iters, visualize=self.visualize)
-            # dec() returns padded image (M+MK-1, N+NK-1); crop back.
+
             MK, NK = kernel.shape
             pad_h = MK // 2
             pad_w = NK // 2
@@ -680,9 +534,6 @@ class PAM_BD(DeconvolutionAlgorithm):
             "'wiener', 'tikhonov'."
         )
 
-    # ============================================================
-    # Wiener / Tikhonov fallbacks (FFT-based, single channel)
-    # ============================================================
     @staticmethod
     def _wiener_filter(b, k, noise_snr):
         H, W = b.shape
@@ -696,7 +547,7 @@ class PAM_BD(DeconvolutionAlgorithm):
         H, W = b.shape
         K = np.fft.fft2(k, s=(H, W))
         B = np.fft.fft2(b)
-        # Differential operator (Laplacian) in FFT domain.
+
         cy = np.array([[0, -1, 0], [-1, 4, -1], [0, -1, 0]], dtype=np.float64)
         L = np.fft.fft2(cy, s=(H, W))
         K_conj = np.conj(K)
@@ -704,9 +555,6 @@ class PAM_BD(DeconvolutionAlgorithm):
             K_conj * B / (np.abs(K) ** 2 + alpha * np.abs(L) ** 2)
         ))
 
-    # ============================================================
-    # Universal denoiser dispatch (single-channel)
-    # ============================================================
     def _apply_denoise(self, img, method, params, noise_info):
         if method is None or method == 'none':
             return img
@@ -792,9 +640,6 @@ class PAM_BD(DeconvolutionAlgorithm):
         b = mean_p - a * mean_I
         return box(a) * I + box(b)
 
-    # ============================================================
-    # Noise estimation
-    # ============================================================
     def _estimate_noise(self, yg):
         if self.noise_estimation == 'chen':
             from .chen_noise_estimate import estimate_noise_level
@@ -808,9 +653,6 @@ class PAM_BD(DeconvolutionAlgorithm):
             return result
         return None
 
-    # ============================================================
-    # PSD-based noise preprocessing (orthogonal)
-    # ============================================================
     def _apply_noise_preprocess(self, yg):
         from .noise_psd_analysis import (
             analyze_noise_psd, noise_preprocess as _npp,
@@ -827,9 +669,6 @@ class PAM_BD(DeconvolutionAlgorithm):
                 return yg, psd_info
         return _npp(yg, method, npp), psd_info
 
-    # ============================================================
-    # Histogram equalization (orthogonal)
-    # ============================================================
     def _apply_histogram_eq(self, yg):
         method = self.histogram_eq
         hp = self.histogram_eq_params or {}
@@ -847,9 +686,6 @@ class PAM_BD(DeconvolutionAlgorithm):
             f"Unknown histogram_eq='{method}'. "
             "Choose 'clahe', 'global', or 'none'.")
 
-    # ============================================================
-    # Interface methods
-    # ============================================================
     def get_param(self) -> List[Tuple[str, Any]]:
         return [
             ('kernel_shape', self.kernel_shape),

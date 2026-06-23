@@ -1,9 +1,3 @@
-"""
-Solver routines for Blind Image Deconvolution.
-Now supports Hysteresis Gradient Thresholding, Richardson-Lucy restoration,
-and correct Boundary Handling (Pad/Crop).
-"""
-
 from __future__ import annotations
 
 import numpy as np
@@ -32,13 +26,11 @@ from .utils import (
 
 _EPS = 1e-8
 
-
 def solve_u_subproblem(f: np.ndarray, alpha: float,
                        lam: float, rho1: float) -> np.ndarray:
     grad_x = fractional_gradient_x(f, alpha)
     tau = np.sqrt(2.0 * lam / rho1)
     return hard_threshold(grad_x, tau)
-
 
 def solve_v_subproblem(f: np.ndarray, alpha: float,
                        lam: float, rho2: float) -> np.ndarray:
@@ -46,13 +38,11 @@ def solve_v_subproblem(f: np.ndarray, alpha: float,
     tau = np.sqrt(2.0 * lam / rho2)
     return hard_threshold(grad_y, tau)
 
-
 def solve_w_subproblem(f: np.ndarray, gamma: float, rho3: float,
                        patch_size: int) -> np.ndarray:
     pmp_f = pmp_operator(f, patch_size)
     tau = np.sqrt(2.0 * gamma / rho3)
     return hard_threshold(pmp_f, tau)
-
 
 def solve_f_subproblem_fft(
     g: np.ndarray,
@@ -86,7 +76,6 @@ def solve_f_subproblem_fft(
     f_new = np.real(ifft2(numer / denom))
     return f_new
 
-
 def apply_pmp_constraint(
     f: np.ndarray,
     w: np.ndarray,
@@ -96,7 +85,6 @@ def apply_pmp_constraint(
     f_new = f.copy()
     f_new[mask > 0] = w[mask > 0]
     return f_new
-
 
 def solve_h_subproblem(
     g: np.ndarray,
@@ -116,7 +104,6 @@ def solve_h_subproblem(
     fx, fy = compute_gradients(f)
     gx, gy = compute_gradients(g)
 
-
     if shape[0] > 2*border_w and shape[1] > 2*border_w:
         fx[:, :border_w] = 0; fx[:, -border_w:] = 0
         gx[:, :border_w] = 0; gx[:, -border_w:] = 0
@@ -128,7 +115,6 @@ def solve_h_subproblem(
         gy[:, :border_w] = 0; gy[:, -border_w:] = 0
 
     mag = np.sqrt(fx**2 + fy**2)
-
 
     if grad_thresh_factor > 0:
         high_t = grad_thresh_factor * np.mean(mag)
@@ -160,7 +146,6 @@ def solve_h_subproblem(
     h_cropped = kernel_threshold_and_normalize(h_cropped, rel_thresh)
     return h_cropped
 
-
 def blind_deconv_single_scale(
     g: np.ndarray,
     h_init: np.ndarray,
@@ -187,7 +172,6 @@ def blind_deconv_single_scale(
     for _ in range(max_iter):
         h_old = h.copy()
 
-
         u = solve_u_subproblem(f, alpha, lam, rho1)
         v = solve_v_subproblem(f, alpha, lam, rho2)
         f_temp = solve_f_subproblem_fft(g, h, u, v, alpha, mu, rho1, rho2)
@@ -195,7 +179,6 @@ def blind_deconv_single_scale(
         w = solve_w_subproblem(f_temp, gamma, rho3, patch_size)
         f = apply_pmp_constraint(f_temp, w, patch_size)
         np.clip(f, 0.0, 1.0, out=f)
-
 
         h = solve_h_subproblem(g, f, beta, mu, h.shape, params)
 
@@ -206,7 +189,6 @@ def blind_deconv_single_scale(
         rho2 *= rho_factor
 
     return f, h, kernel_diffs
-
 
 def blind_deconv_multiscale(
     g: np.ndarray,
@@ -230,17 +212,14 @@ def blind_deconv_multiscale(
 
     history: Dict[str, list] = {'kernel_diff': []}
 
-
     for s, g_s in enumerate(pyramid):
         scale_ratio = g_s.shape[0] / g.shape[0]
         kh_s = max(3, int(round(kernel_shape[0] * scale_ratio)) | 1)
         kw_s = max(3, int(round(kernel_shape[1] * scale_ratio)) | 1)
 
-
         if boundary_mode == 'edgetaper':
             g_s_proc = edgetaper(g_s, (kh_s, kw_s))
         elif boundary_mode == 'pad':
-
 
             pad_h = kh_s // 2
             pad_w = kw_s // 2
@@ -256,22 +235,18 @@ def blind_deconv_multiscale(
         if s == 0:
              scale_params['iter_per_scale'] = max(iter_per_sc, 15)
 
-
         f_s, h, kdiffs = blind_deconv_single_scale(
             g_s_proc, h, scale_params, max_iter=scale_params['iter_per_scale'],
         )
         history['kernel_diff'].extend(kdiffs)
-
 
     if h.shape != kernel_shape:
         h = resize_kernel(h, kernel_shape)
     h = center_kernel(h)
     h = kernel_threshold_and_normalize(h, params.get('kernel_threshold', 0.05))
 
-
     pad_h, pad_w = 0, 0
     g_final = g
-
 
     if boundary_mode == 'pad':
         pad_h = kernel_shape[0]
@@ -280,7 +255,6 @@ def blind_deconv_multiscale(
         g_final = np.pad(g, ((pad_h, pad_h), (pad_w, pad_w)), mode='edge')
     elif boundary_mode == 'edgetaper':
         g_final = edgetaper(g, kernel_shape)
-
 
     if final_mode == 'tikhonov':
         reg_weight = params.get('lam_nonblind', 2e-3)
@@ -292,20 +266,17 @@ def blind_deconv_multiscale(
 
         f_est = final_nonblind_deconv(g_final, h, params)
 
-
     if boundary_mode == 'pad':
 
         f_est = f_est[pad_h:-pad_h, pad_w:-pad_w]
 
     return f_est, h, history
 
-
 def final_restore_tikhonov(
     g: np.ndarray,
     h: np.ndarray,
     reg_weight: float = 5e-3
 ) -> np.ndarray:
-
 
     shape = g.shape
     H = psf2otf(h, shape)
@@ -322,22 +293,18 @@ def final_restore_tikhonov(
     np.clip(f, 0.0, 1.0, out=f)
     return f
 
-
 def final_restore_richardson_lucy(
     g: np.ndarray,
     h: np.ndarray,
     iterations: int = 30
 ) -> np.ndarray:
 
-
     g = np.maximum(g, 1e-6)
     h = np.maximum(h, 1e-9)
     if h.sum() > 0:
         h /= h.sum()
 
-
     u = g.copy()
-
 
     H = psf2otf(h, u.shape)
     H_conj = np.conj(H)
@@ -347,18 +314,14 @@ def final_restore_richardson_lucy(
         est_blur = np.real(ifft2(H * fft2(u)))
         est_blur = np.maximum(est_blur, 1e-6)
 
-
         ratio = g / est_blur
 
-
         correction = np.real(ifft2(H_conj * fft2(ratio)))
-
 
         u = u * correction
         np.clip(u, 0.0, 1.0, out=u)
 
     return u
-
 
 def final_nonblind_deconv(
     g: np.ndarray,
@@ -377,7 +340,6 @@ def final_nonblind_deconv(
     Dx = fractional_otf_x(alpha, shape)
     Dy = fractional_otf_y(alpha, shape)
     G  = fft2(g)
-
 
     f = np.real(ifft2(np.conj(H)*G / (np.abs(H)**2 + 1e-2)))
     np.clip(f, 0, 1, out=f)
@@ -399,7 +361,6 @@ def final_nonblind_deconv(
         rho *= 1.5
 
     return f
-
 
 def _crop_kernel_center(h_full: np.ndarray, kh: int, kw: int) -> np.ndarray:
     M, N = h_full.shape

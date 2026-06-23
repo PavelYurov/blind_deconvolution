@@ -1,4 +1,3 @@
-# setup.py
 import sys
 import numpy
 import glob
@@ -24,8 +23,8 @@ ext_modules =[
 setup(
     name="VDBKE cythonized",
     ext_modules=cythonize(
-        ext_modules, 
-        language_level="3", 
+        ext_modules,
+        language_level="3",
         annotate=False,
         build_dir="build_c_files"
     )

@@ -5,12 +5,9 @@ import numpy as np
 
 from .pmp import PMP_BD
 
-
 __all__ = ['PMP_BD_Robust']
 
-
 class PMP_BD_Robust(PMP_BD):
-
 
     _LEGACY_DENOISE_FLAGS_OFF = {
         'impulse_preprocess':   'none',
@@ -41,7 +38,6 @@ class PMP_BD_Robust(PMP_BD):
         for k in self._LEGACY_PARAM_DICT_FLAGS:
             kwargs[k] = None
 
-
         try:
             super().__init__(*args, **kwargs)
         except TypeError:
@@ -53,14 +49,11 @@ class PMP_BD_Robust(PMP_BD):
 
         self._last_robust_info: dict | None = None
 
-
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-
 
         from .noise_orchestrator import robust_denoise
 
         cleaned, info = robust_denoise(image, verbose=False)
         self._last_robust_info = info
-
 
         return super().process(cleaned)

@@ -11,9 +11,7 @@ __all__ = [
     'bandstop_filter',
 ]
 
-
 def _radial_profile(psd_2d):
-
 
     H, W = psd_2d.shape
     cy, cx = H // 2, W // 2
@@ -28,9 +26,7 @@ def _radial_profile(psd_2d):
             profile[r] = psd_2d[mask].mean()
     return radii, profile
 
-
 def _extract_smooth_patches(image, pch_size=32, stride=None, n_patches=100):
-
 
     H, W = image.shape
     if stride is None:
@@ -49,9 +45,7 @@ def _extract_smooth_patches(image, pch_size=32, stride=None, n_patches=100):
     candidates.sort(key=lambda t: t[0])
     return [c[1] for c in candidates[:n_patches]]
 
-
 def _detrend_patch(patch):
-
 
     h, w = patch.shape
     yy, xx = np.mgrid[0:h, 0:w]
@@ -62,20 +56,16 @@ def _detrend_patch(patch):
     trend = (A @ coef).reshape(h, w)
     return patch - trend
 
-
 def _detect_periodic_peaks_2d(psd_2d, threshold_factor=8.0, min_radius=5,
                               max_peaks=20):
 
-
     H, W = psd_2d.shape
     cy, cx = H // 2, W // 2
-
 
     Y, X = np.ogrid[:H, :W]
     R = np.sqrt((X - cx) ** 2 + (Y - cy) ** 2)
     R_int = R.astype(int)
     max_r = min(cy, cx)
-
 
     radial_avg = np.zeros(max_r + 1, dtype=np.float64)
     radial_cnt = np.zeros(max_r + 1, dtype=np.float64)
@@ -85,14 +75,12 @@ def _detect_periodic_peaks_2d(psd_2d, threshold_factor=8.0, min_radius=5,
             radial_avg[r] = np.median(psd_2d[mask_r])
             radial_cnt[r] = mask_r.sum()
 
-
     baseline = np.ones_like(psd_2d) * np.median(psd_2d)
     for r in range(max_r + 1):
         mask_r = R_int == r
         baseline[mask_r] = max(radial_avg[r], 1e-30)
 
     ratio_map = psd_2d / baseline
-
 
     border = 2
     peak_mask = (
@@ -105,12 +93,10 @@ def _detect_periodic_peaks_2d(psd_2d, threshold_factor=8.0, min_radius=5,
     peak_mask[:, :border] = False
     peak_mask[:, -border:] = False
 
-
     peaks = []
     coords = np.argwhere(peak_mask)
     if len(coords) == 0:
         return peaks
-
 
     powers = psd_2d[peak_mask]
     order = np.argsort(-powers)
@@ -137,9 +123,7 @@ def _detect_periodic_peaks_2d(psd_2d, threshold_factor=8.0, min_radius=5,
 
     return peaks[:max_peaks]
 
-
 def estimate_noise_psd(image, pch_size=32, n_smooth=100):
-
 
     img = np.asarray(image, dtype=np.float64)
     if img.max() > 1.0:
@@ -149,7 +133,6 @@ def estimate_noise_psd(image, pch_size=32, n_smooth=100):
     if img.ndim == 3:
         img = 0.2989 * img[:, :, 0] + 0.587 * img[:, :, 1] + 0.114 * img[:, :, 2]
 
-
     patches = _extract_smooth_patches(img, pch_size=pch_size, n_patches=n_smooth)
     if len(patches) < 5:
 
@@ -158,7 +141,6 @@ def estimate_noise_psd(image, pch_size=32, n_smooth=100):
         radii, profile = _radial_profile(psd_full)
         max_r = min(H // 2, W // 2)
         return psd_full, radii / max_r, profile, psd_full
-
 
     window = np.outer(np.hanning(pch_size), np.hanning(pch_size))
     window_energy = np.sum(window ** 2)
@@ -170,17 +152,14 @@ def estimate_noise_psd(image, pch_size=32, n_smooth=100):
     psd_avg /= len(patches)
     psd_avg /= window_energy
 
-
     radii, radial_psd = _radial_profile(psd_avg)
     max_r_patch = pch_size // 2
     norm_freq = radii / max(max_r_patch, 1)
-
 
     cy, cx = H // 2, W // 2
     max_r_full = min(cy, cx)
     Y, X = np.ogrid[:H, :W]
     R_full = np.sqrt((X - cx) ** 2 + (Y - cy) ** 2)
-
 
     scale = max_r_patch / max(max_r_full, 1)
     R_patch = R_full * scale
@@ -192,9 +171,7 @@ def estimate_noise_psd(image, pch_size=32, n_smooth=100):
 
     return psd_2d_full, norm_freq, radial_psd, psd_avg
 
-
 def _lag1_autocorrelation(image, pch_size=32, n_patches=100):
-
 
     img = np.asarray(image, dtype=np.float64)
     if img.max() > 1.0:
@@ -227,17 +204,14 @@ def _lag1_autocorrelation(image, pch_size=32, n_patches=100):
     lag1_h = float(np.median(lag1_h_list))
     lag1_v = float(np.median(lag1_v_list))
 
-
     expected_std = 1.0 / pch_size
     threshold = 3.0 * expected_std
     is_correlated = (lag1_h > threshold) or (lag1_v > threshold)
 
     return lag1_h, lag1_v, is_correlated
 
-
 def classify_noise(radial_freq, radial_psd, psd_2d_full=None,
                    peak_threshold=100.0, image=None):
-
 
     valid = (radial_freq > 0.35) & (radial_freq < 0.9)
     if valid.sum() < 3:
@@ -252,18 +226,15 @@ def classify_noise(radial_freq, radial_psd, psd_2d_full=None,
     noise_floor = float(np.median(radial_psd[valid])) if valid.sum() >= 3\
         else float(np.median(radial_psd))
 
-
     peaks = []
     if psd_2d_full is not None:
         peaks = _detect_periodic_peaks_2d(psd_2d_full,
                                           threshold_factor=peak_threshold)
     has_periodic = len(peaks) > 0
 
-
     lag1_h, lag1_v, is_corr = 0.0, 0.0, False
     if image is not None:
         lag1_h, lag1_v, is_corr = _lag1_autocorrelation(image)
-
 
     if has_periodic:
         noise_class = 'periodic'
@@ -283,10 +254,8 @@ def classify_noise(radial_freq, radial_psd, psd_2d_full=None,
         'lag1_v': lag1_v,
     }
 
-
 def analyze_noise_psd(image, pch_size=32, n_smooth=100,
                       peak_threshold=100.0):
-
 
     img = np.asarray(image, dtype=np.float64)
     if img.max() > 1.0:
@@ -296,7 +265,6 @@ def analyze_noise_psd(image, pch_size=32, n_smooth=100,
 
     psd_2d, radial_freq, radial_psd, psd_patches = estimate_noise_psd(
         img, pch_size=pch_size, n_smooth=n_smooth)
-
 
     F = fftshift(fft2(img))
     psd_full_2d = np.abs(F) ** 2 / (img.shape[0] * img.shape[1])
@@ -315,9 +283,7 @@ def analyze_noise_psd(image, pch_size=32, n_smooth=100,
         **classification,
     }
 
-
 def notch_filter(image, peaks, notch_radius=3, rolloff=2):
-
 
     img = np.asarray(image, dtype=np.float64)
     was_255 = img.max() > 1.0
@@ -334,7 +300,6 @@ def notch_filter(image, peaks, notch_radius=3, rolloff=2):
     H, W = img.shape
     cy, cx = H // 2, W // 2
     Y, X = np.mgrid[:H, :W]
-
 
     mask = np.ones((H, W), dtype=np.float64)
     for pk in peaks:
@@ -360,9 +325,7 @@ def notch_filter(image, peaks, notch_radius=3, rolloff=2):
 
     return filtered * 255.0 if was_255 else filtered
 
-
 def bandstop_filter(image, freq_low, freq_high, order=2):
-
 
     img = np.asarray(image, dtype=np.float64)
     was_255 = img.max() > 1.0
@@ -382,15 +345,12 @@ def bandstop_filter(image, freq_low, freq_high, order=2):
     Y, X = np.ogrid[:H, :W]
     R_norm = np.sqrt((X - cx) ** 2 + (Y - cy) ** 2) / max_r
 
-
     f_centre = (freq_low + freq_high) / 2.0
     f_width = (freq_high - freq_low) / 2.0
-
 
     D = np.abs(R_norm - f_centre)
     D = np.maximum(D, 1e-10)
     mask = 1.0 - 1.0 / (1.0 + (D / max(f_width, 1e-6)) ** (2 * order))
-
 
     mask[cy, cx] = 1.0
 
@@ -400,9 +360,7 @@ def bandstop_filter(image, freq_low, freq_high, order=2):
 
     return filtered * 255.0 if was_255 else filtered
 
-
 def prewhiten(image, psd_2d, reg=1e-3):
-
 
     img = np.asarray(image, dtype=np.float64)
     was_255 = img.max() > 1.0
@@ -418,14 +376,11 @@ def prewhiten(image, psd_2d, reg=1e-3):
     H, W = img.shape
     psd = np.asarray(psd_2d, dtype=np.float64)
 
-
     if psd.shape != (H, W):
         from scipy.ndimage import zoom
         psd = zoom(psd, (H / psd.shape[0], W / psd.shape[1]), order=1)
 
-
     W_filter = 1.0 / np.sqrt(psd + reg)
-
 
     med = np.median(W_filter)
     if med > 0:
@@ -435,26 +390,21 @@ def prewhiten(image, psd_2d, reg=1e-3):
     F_whitened = F * W_filter
     whitened = np.real(ifft2(ifftshift(F_whitened)))
 
-
     whitened = np.clip(whitened, 0.0, 1.0)
 
     return whitened * 255.0 if was_255 else whitened
-
 
 def noise_preprocess(image, pch_size=32, n_smooth=100,
                      peak_threshold=100.0,
                      notch_radius=3):
 
-
     img = np.asarray(image, dtype=np.float64)
     was_255 = img.max() > 1.0
-
 
     if was_255:
         work = img / 255.0
     else:
         work = img.copy()
-
 
     if work.ndim == 3:
         gray = 0.2989 * work[:, :, 0] + 0.587 * work[:, :, 1] + 0.114 * work[:, :, 2]
@@ -467,7 +417,6 @@ def noise_preprocess(image, pch_size=32, n_smooth=100,
 
     applied = []
     processed = work.copy()
-
 
     if psd_info['has_periodic']:
         processed = notch_filter(processed, psd_info['periodic_peaks'],

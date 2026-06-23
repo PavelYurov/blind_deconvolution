@@ -1,43 +1,3 @@
-"""
-solvers.py
-
-Core solvers of the EML (Efficient Marginal Likelihood) blind deconvolution
-algorithm of Levin et al., CVPR 2011.
-
-This module ports the recommended pipeline of the reference MATLAB package
-(``LevinEtalCVPR2011Code/BlindDeconvCode``):
-
-    deconv_diagfe_filt_sps.m
-        → multires_deconv.m
-            → deconv1.m
-                → update_x_conjgrad_diagfe_filt_space.m
-                    → conjgrad_deconv_g.m
-                → update_k.m
-                    → getAutoCor.m / getCory.m / getCorAbDiagCov.m
-                    → solve_for_sps_kernel.m (positivity-constrained QP)
-        → deconvSps.m  (final non-blind restoration, Levin SIGGRAPH 2007)
-            → deconvL2_w.m
-
-All functions match the MATLAB originals as closely as possible.
-See utils.py for the MATLAB↔Python convention notes.
-
-Implementation notes
-────────────────────
-* The positivity-constrained QP ``solve_for_sps_kernel`` is solved with
-  ``scipy.optimize.minimize(method='L-BFGS-B')`` with bounds ``k ≥ 0``.  The
-  objective is the same convex quadratic  ``½ kᵀAk − bᵀk``  as MATLAB's
-  ``quadprog(A, -b, [], [], [], [], zeros(...))``.
-
-* ``getAutoCor`` returns an A-matrix whose linear index ordering is the
-  MATLAB column-major one (``i = i2·k_sz1 + i1 + 1``).  Therefore the
-  solution vector is reshaped to ``(k_sz1, k_sz2)`` with
-  ``order='F'``, matching MATLAB's ``reshape(k, k_sz1, k_sz2)``.
-
-* The problem dict ``prob`` is the Python equivalent of the MATLAB struct
-  of the same name (see README.txt of the reference package for the list
-  of fields).  Mutations happen in place on the supplied dict.
-"""
-
 from __future__ import annotations
 
 from typing import List, Tuple
@@ -59,52 +19,25 @@ from .utils import (
     filt_y,
 )
 
-
-# ════════════════════════════════════════════════════════════════════════════
-# conjgrad_deconv_g  (from conjgrad_deconv_g.m)
-# ════════════════════════════════════════════════════════════════════════════
-
 def _pad_replicate(ty: np.ndarray, hfs_y1: int, hfs_y2: int,
                    hfs_x1: int, hfs_x2: int) -> np.ndarray:
-    """
-    Replicate-pad an image, equivalent to MATLAB
-        ty([ones(1,hfs_y1), 1:end, end*ones(1,hfs_y2)],
-           [ones(1,hfs_x1), 1:end, end*ones(1,hfs_x2)]).
-    """
+
     return np.pad(ty,
                   ((hfs_y1, hfs_y2), (hfs_x1, hfs_x2)),
                   mode='edge')
-
 
 def conjgrad_deconv_g(y: np.ndarray, k: np.ndarray, we: float,
                       max_it: int = 200,
                       weight_i: np.ndarray = None,
                       x: np.ndarray = None) -> np.ndarray:
-    """
-    Weighted conjugate-gradient deconvolution in the gradient domain.
 
-    Solves  (1/σ²·Kᵀ M K + diag(w)) x = 1/σ²·Kᵀ M y  by CG, where M is a
-    mask that zeroes the boundary padding.
-
-    Equivalent to MATLAB conjgrad_deconv_g.m.
-
-    Parameters
-    ----------
-    y        : (N1_orig, N2_orig) blurred (gradient) image
-    k        : (k1, k2) kernel
-    we       : σ²  (noise variance scalar)  [same name as MATLAB ``we``]
-    max_it   : CG iterations (default 200)
-    weight_i : (N1, N2) per-pixel Tikhonov weights, where
-               N1 = N1_orig + k1 - 1, N2 = N2_orig + k2 - 1.
-    x        : (N1, N2) initial guess.  Default: replicate-pad y.
-    """
     y = np.asarray(y, dtype=np.float64)
     k = np.asarray(k, dtype=np.float64)
 
     N1o, N2o = y.shape
     fs_y, fs_x = k.shape
-    hfs1_x1 = (fs_x - 1) // 2            # MATLAB floor((sz-1)/2)
-    hfs1_x2 = (fs_x - 1) - hfs1_x1        # MATLAB ceil((sz-1)/2)
+    hfs1_x1 = (fs_x - 1) // 2
+    hfs1_x2 = (fs_x - 1) - hfs1_x1
     hfs1_y1 = (fs_y - 1) // 2
     hfs1_y2 = (fs_y - 1) - hfs1_y1
     hfs_x1, hfs_x2 = hfs1_x1, hfs1_x2
@@ -127,10 +60,8 @@ def conjgrad_deconv_g(y: np.ndarray, k: np.ndarray, we: float,
     else:
         x = np.asarray(x, dtype=np.float64).copy()
 
-    # b = conv2(y .* mask, k, 'same')
     b = convolve2d(y * mask, k, mode='same')
 
-    # Pad k to a good-FFT size for fast convolution.
     N1p = goodfactor(N1 + hfs1_y1 + hfs1_y2)
     N2p = goodfactor(N2 + hfs1_x1 + hfs1_x2)
     K_pad = zero_pad2(
@@ -174,27 +105,15 @@ def conjgrad_deconv_g(y: np.ndarray, k: np.ndarray, we: float,
 
     return x
 
-
-# ════════════════════════════════════════════════════════════════════════════
-# deconvL2_w  (from deconvL2_w.m)
-# ════════════════════════════════════════════════════════════════════════════
-
 def _full_conv(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    """MATLAB ``conv2(a, b)`` without shape arg == 'full' mode."""
-    return convolve2d(a, b, mode='full')
 
+    return convolve2d(a, b, mode='full')
 
 def deconvL2_w(I: np.ndarray, k: np.ndarray, we: float, max_it: int,
                weight_x: np.ndarray, weight_y: np.ndarray,
                weight_xx: np.ndarray, weight_yy: np.ndarray,
                weight_xy: np.ndarray) -> np.ndarray:
-    """
-    Weighted L2 non-blind deconvolution with 1st and 2nd order gradient
-    regularisers.  Equivalent to MATLAB ``deconvL2_w.m``.
 
-    The output has the size of the replicate-padded image (N1, N2),
-    exactly as in MATLAB (the caller crops back).
-    """
     I = np.asarray(I, dtype=np.float64)
     k = np.asarray(k, dtype=np.float64)
 
@@ -228,7 +147,6 @@ def deconvL2_w(I: np.ndarray, k: np.ndarray, we: float, max_it: int,
     )
     K = fft2(ifftshift(K_pad))
 
-    # Derivative filters (identical to MATLAB).
     dxf = np.array([[1.0, -1.0]])
     dyf = np.array([[1.0], [-1.0]])
     dyyf = np.array([[-1.0], [2.0], [-1.0]])
@@ -244,7 +162,7 @@ def deconvL2_w(I: np.ndarray, k: np.ndarray, we: float, max_it: int,
         else:
             inner = fftconvf(v, flp(k), np.conj(K), 'same') * mask
             out = fftconvf(inner, k, K, 'same')
-        # Regularisation: ∑ we · conv2(w_f · conv2(v, flp(f), 'valid'), f, 'full')
+
         out = out + we * _full_conv(weight_x * convolve2d(v, flp(dxf), 'valid'), dxf)
         out = out + we * _full_conv(weight_y * convolve2d(v, flp(dyf), 'valid'), dyf)
         out = out + we * _full_conv(weight_xx * convolve2d(v, flp(dxxf), 'valid'), dxxf)
@@ -275,28 +193,9 @@ def deconvL2_w(I: np.ndarray, k: np.ndarray, we: float, max_it: int,
 
     return x
 
-
-# ════════════════════════════════════════════════════════════════════════════
-# deconvSps  (from deconvSps.m) — final non-blind deconvolution
-# ════════════════════════════════════════════════════════════════════════════
-
 def deconvSps(I: np.ndarray, k: np.ndarray, we: float,
               max_it: int = 200) -> np.ndarray:
-    """
-    Sparse non-blind deconvolution with |z|^0.8 prior on 1st/2nd derivatives.
-    Equivalent to MATLAB deconvSps.m (Levin SIGGRAPH 2007).
 
-    Parameters
-    ----------
-    I      : (H, W) blurred image
-    k      : (k1, k2) kernel (odd dimensions)
-    we     : regularisation / noise scale (MATLAB ``edges_w``, default 0.0068)
-    max_it : CG iterations per IRLS pass (default 200)
-
-    Returns
-    -------
-    x : (H, W) restored image, cropped back to the size of I.
-    """
     I = np.asarray(I, dtype=np.float64)
     k = np.asarray(k, dtype=np.float64)
 
@@ -312,19 +211,16 @@ def deconvSps(I: np.ndarray, k: np.ndarray, we: float,
     N1 = N1o + hfs_y1 + hfs_y2
     N2 = N2o + hfs_x1 + hfs_x2
 
-    # I padded with zeros (for likelihood term), x initialised to same
     tI = I
     I_pad = np.zeros((N1, N2), dtype=np.float64)
     I_pad[hfs_y1:N1 - hfs_y2, hfs_x1:N2 - hfs_x2] = tI
 
-    # Derivative filters (for re-weighting)
     dxf = np.array([[1.0, -1.0]])
     dyf = np.array([[1.0], [-1.0]])
     dyyf = np.array([[-1.0], [2.0], [-1.0]])
     dxxf = np.array([[-1.0, 2.0, -1.0]])
     dxyf = np.array([[-1.0, 1.0], [1.0, -1.0]])
 
-    # First pass: unit weights
     weight_x = np.ones((N1, N2 - 1), dtype=np.float64)
     weight_y = np.ones((N1 - 1, N2), dtype=np.float64)
     weight_xx = np.ones((N1, N2 - 2), dtype=np.float64)
@@ -360,22 +256,8 @@ def deconvSps(I: np.ndarray, k: np.ndarray, we: float,
     x = x[hfs_y1:N1 - hfs_y2, hfs_x1:N2 - hfs_x2]
     return x
 
-
-# ════════════════════════════════════════════════════════════════════════════
-# getAutoCor / getCory  (from getAutoCor.m, getCory.m)
-# ════════════════════════════════════════════════════════════════════════════
-
 def getAutoCor(x: np.ndarray, k_sz1: int, k_sz2: int) -> np.ndarray:
-    """
-    Efficient computation of the auto-correlation matrix A of all
-    (k_sz1 × k_sz2) sliding windows in x.  Equivalent to
-    MATLAB ``getAutoCor.m``.
 
-    The linear index ordering is MATLAB column-major:
-        i = i2 * k_sz1 + i1   (0-based),
-    so the returned A can be used as-is in a system whose solution k is
-    reshaped with ``order='F'``.
-    """
     x = np.asarray(x, dtype=np.float64)
     M1, M2 = x.shape
     sM1 = M1 - k_sz1 + 1
@@ -384,10 +266,9 @@ def getAutoCor(x: np.ndarray, k_sz1: int, k_sz2: int) -> np.ndarray:
 
     A = np.zeros((k_sz, k_sz), dtype=np.float64)
 
-    # ── Block 1: shifts (+d1, +d2), d1 = 0..k_sz1-1, d2 = 0..k_sz2-1 ──
     for d2 in range(k_sz2):
         for d1 in range(k_sz1):
-            # xx = x(1:end-d1, 1:end-d2) .* x(d1+1:end, d2+1:end)
+
             if d1 == 0:
                 xa_r = x
                 xb_r = x
@@ -409,7 +290,7 @@ def getAutoCor(x: np.ndarray, k_sz1: int, k_sz2: int) -> np.ndarray:
                     i2 = j2 + d2
                     i = i2 * k_sz1 + i1
                     j = j2 * k_sz1 + j1
-                    if (i >= k_sz) or (i1 >= k_sz1) or (i2 >= k_sz2) \
+                    if (i >= k_sz) or (i1 >= k_sz1) or (i2 >= k_sz2)\
                             or (i1 < 0) or (i2 < 0):
                         continue
                     ts = cs[j1 + sM1 - 1, j2 + sM2 - 1]
@@ -422,16 +303,9 @@ def getAutoCor(x: np.ndarray, k_sz1: int, k_sz2: int) -> np.ndarray:
                     A[j, i] = ts
                     A[i, j] = ts
 
-    # ── Block 2: shifts (-d1, +d2), d1 = 1..k_sz1-1, d2 = 0..k_sz2-1 ──
-    # MATLAB:
-    #   xx = x(d1+1:end, 1:end-d2) .* x(1:end-d1, d2+1:end)
-    #   for j2=0..k_sz2-1, for j1=d1..k_sz1-1:
-    #     i1 = j1 - d1;  i2 = j2 + d2;
-    #     ts = cs(j1-d1+sM1, j2+sM2) [minus boundary terms]
     for d2 in range(k_sz2):
         for d1 in range(1, k_sz1):
-            # x(d1+1:end, ...) → 0-based x[d1:, ...]
-            # x(1:end-d1, ...) → 0-based x[:-d1, ...]
+
             xa_r = x[d1:, :]
             xb_r = x[:-d1, :]
             if d2 == 0:
@@ -449,10 +323,10 @@ def getAutoCor(x: np.ndarray, k_sz1: int, k_sz2: int) -> np.ndarray:
                     i2 = j2 + d2
                     i = i2 * k_sz1 + i1
                     j = j2 * k_sz1 + j1
-                    if (i >= k_sz) or (i1 >= k_sz1) or (i2 >= k_sz2) \
+                    if (i >= k_sz) or (i1 >= k_sz1) or (i2 >= k_sz2)\
                             or (i1 < 0) or (i2 < 0):
                         continue
-                    # MATLAB 1-based cs(j1-d1+sM1, j2+sM2) → 0-based
+
                     ts = cs[(j1 - d1) + sM1 - 1, j2 + sM2 - 1]
                     if j1 > d1:
                         ts -= cs[(j1 - d1) - 1, j2 + sM2 - 1]
@@ -465,22 +339,15 @@ def getAutoCor(x: np.ndarray, k_sz1: int, k_sz2: int) -> np.ndarray:
 
     return A
 
-
 def getCory(x: np.ndarray, y: np.ndarray,
             k_sz1: int, k_sz2: int) -> np.ndarray:
-    """
-    Cross-correlation vector b = Xᵀ y for all (k_sz1 × k_sz2) sliding
-    windows of x against the smaller y.  Equivalent to ``getCory.m``.
 
-    Linear index ordering is MATLAB column-major (matches ``getAutoCor``).
-    """
     x = np.asarray(x, dtype=np.float64)
     y = np.asarray(y, dtype=np.float64)
     n1, n2 = x.shape
     k_sz = k_sz1 * k_sz2
     b = np.zeros(k_sz, dtype=np.float64)
 
-    # Python end indices: MATLAB (1+d:end-k_sz+1+d) == (d : n-k_sz+1+d) 0-based
     d = 0
     for d2 in range(k_sz2):
         for d1 in range(k_sz1):
@@ -489,34 +356,21 @@ def getCory(x: np.ndarray, y: np.ndarray,
             d += 1
     return b
 
-
-# ════════════════════════════════════════════════════════════════════════════
-# getCorAbDiagCov  (from getCorAbDiagCov.m)
-# ════════════════════════════════════════════════════════════════════════════
-
 def getCorAbDiagCov(x: np.ndarray, y: np.ndarray, xcov: np.ndarray,
                     k_sz1: int, k_sz2: int) -> Tuple[np.ndarray, np.ndarray, float]:
-    """
-    Build (A, b, c) for the kernel M-step under a diagonal covariance
-    approximation.  Equivalent to ``getCorAbDiagCov.m``.
 
-    A = getAutoCor(x) + diag-contributions of xcov
-    b = getCory(x, y)
-    c = ‖y‖²
-    """
     A = getAutoCor(x, k_sz1, k_sz2)
     b = getCory(x, y, k_sz1, k_sz2)
 
     M1, M2 = x.shape
     N1, N2 = y.shape
 
-    # cs = cumsum(cumsum(xcov, 1), 2)
     cs = np.cumsum(np.cumsum(xcov, axis=0), axis=1)
 
     ind = 0
-    for i2 in range(1, k_sz2 + 1):      # MATLAB i2 = 1..k_sz2
-        for i1 in range(1, k_sz1 + 1):  # MATLAB i1 = 1..k_sz1
-            # ts = cs(i1 + N1 - 1, i2 + N2 - 1)   (1-based)
+    for i2 in range(1, k_sz2 + 1):
+        for i1 in range(1, k_sz1 + 1):
+
             r = (i1 + N1 - 1) - 1
             c_ = (i2 + N2 - 1) - 1
             ts = cs[r, c_]
@@ -532,19 +386,10 @@ def getCorAbDiagCov(x: np.ndarray, y: np.ndarray, xcov: np.ndarray,
     c = float(np.sum(np.abs(y) ** 2))
     return A, b, c
 
-
-# ════════════════════════════════════════════════════════════════════════════
-# solve_for_sps_kernel / solve_for_sps_kernel_unconst
-# ════════════════════════════════════════════════════════════════════════════
-
 def _qp_nonneg(A: np.ndarray, b: np.ndarray) -> np.ndarray:
-    """
-    Solve  min  ½ kᵀA k − bᵀk   s.t. k ≥ 0.
-    A is assumed symmetric positive semi-definite.
-    Equivalent to MATLAB  ``quadprog(A, -b, [], [], [], [], zeros(n, 1))``.
-    """
+
     n = A.shape[0]
-    A = 0.5 * (A + A.T)  # symmetrise
+    A = 0.5 * (A + A.T)
 
     def _f(v):
         Av = A @ v
@@ -556,14 +401,10 @@ def _qp_nonneg(A: np.ndarray, b: np.ndarray) -> np.ndarray:
                    options={'maxiter': 2000, 'ftol': 1e-12, 'gtol': 1e-10})
     return np.maximum(res.x, 0.0)
 
-
 def solve_for_sps_kernel(A: np.ndarray, b: np.ndarray,
                          k_sz1: int, k_sz2: int,
                          scla: float = 0.005) -> np.ndarray:
-    """
-    Kernel M-step with positivity and ``|k|^0.5``-style IRLS sparse prior.
-    Equivalent to MATLAB ``solve_for_sps_kernel.m``.
-    """
+
     exp_a = 0.5
     thr_0 = 1e-4
 
@@ -576,14 +417,10 @@ def solve_for_sps_kernel(A: np.ndarray, b: np.ndarray,
 
     return k.reshape((k_sz1, k_sz2), order='F')
 
-
 def solve_for_sps_kernel_unconst(A: np.ndarray, b: np.ndarray,
                                  k_sz1: int, k_sz2: int,
                                  scla: float = 0.005) -> np.ndarray:
-    """
-    Unconstrained version (no positivity), via linear solve.  Equivalent
-    to MATLAB ``solve_for_sps_kernel_unconst.m``.
-    """
+
     exp_a = 0.5
     thr_0 = 1e-4
     A0 = 0.5 * (A + A.T)
@@ -594,19 +431,8 @@ def solve_for_sps_kernel_unconst(A: np.ndarray, b: np.ndarray,
         k = np.linalg.solve(A0 + scla * np.diag(w), b)
     return k.reshape((k_sz1, k_sz2), order='F')
 
-
-# ════════════════════════════════════════════════════════════════════════════
-# update_x_conjgrad_diagfe_filt_space  (main E-step of the recommended algo)
-# ════════════════════════════════════════════════════════════════════════════
-
 def update_x_conjgrad_diagfe_filt_space(prob: dict) -> dict:
-    """
-    E-step: update x (and its diagonal covariance) under a MOG prior on
-    filter-space variables, with the free-energy diagonal approximation
-    and conjugate-gradient solver.
 
-    Equivalent to MATLAB ``update_x_conjgrad_diagfe_filt_space.m``.
-    """
     sig_noise = prob['sig_noise']
     filty = prob['filty']
     N1, N2, N3 = filty.shape
@@ -621,7 +447,6 @@ def update_x_conjgrad_diagfe_filt_space(prob: dict) -> dict:
     prior_pi = np.asarray(prob['prior_pi'], dtype=np.float64).ravel()
     L = prior_ivar.size
 
-    # mask for A_1 diagonal:  zero_pad(ones(N1,N2), (k_sz1-1)/2, (k_sz2-1)/2)
     pad_h = (k_sz1 - 1) // 2
     pad_w = (k_sz2 - 1) // 2
     mask = np.zeros((M1, M2), dtype=np.float64)
@@ -631,7 +456,6 @@ def update_x_conjgrad_diagfe_filt_space(prob: dict) -> dict:
 
     init_iv = float(np.sum(prior_ivar * prior_pi))
 
-    # itrN = 2*(L > 1) + 1
     itrN = 2 * (1 if L > 1 else 0) + 1
 
     use_prev_x = ((not prob.get('init_x_every_itr', 1))
@@ -639,7 +463,6 @@ def update_x_conjgrad_diagfe_filt_space(prob: dict) -> dict:
                        and np.size(prob.get('filtx', np.array([]))) > 0)
                   and (L > 1))
 
-    # Allocate outputs
     filtx_out = np.zeros((M1, M2, N3), dtype=np.float64)
     filtxcov_out: List[np.ndarray] = [None] * N3
     freeeng_qlogp_ycx = np.zeros(N3)
@@ -647,7 +470,6 @@ def update_x_conjgrad_diagfe_filt_space(prob: dict) -> dict:
     freeeng_qpilogqpi = np.zeros(N3)
     freeeng_qxlogqx = np.zeros(N3)
 
-    # Pre-flipped k used inside the free-energy computation.
     k_flip = flp(k)
 
     for j in range(N3):
@@ -669,21 +491,19 @@ def update_x_conjgrad_diagfe_filt_space(prob: dict) -> dict:
                 cpi = np.tile(prior_pi[np.newaxis, :], (M, 1))
             else:
                 ex2 = np.abs(x).ravel(order='F') ** 2 + xcov.ravel(order='F')
-                # logpi = -0.5 * ex2 * prior_ivar + log(prior_pi) + 0.5*log(prior_ivar)
+
                 logpi = (-0.5 * np.outer(ex2, prior_ivar)
                          + np.ones((M, 1)) * (np.log(prior_pi)
                                               + 0.5 * np.log(prior_ivar)))
                 cpi = normexp(logpi)
-                w_vec = cpi @ prior_ivar            # (M,)
+                w_vec = cpi @ prior_ivar
                 w = w_vec.reshape((M1, M2), order='F')
 
-            # Solve weighted deconvolution for the mean μ_j = x.
             x = conjgrad_deconv_g(filty[:, :, j], k, sig_noise ** 2,
                                   15, w)
             da2 = w
             xcov = 1.0 / (da1 + da2)
 
-        # Free-energy terms (for monitoring; replicate MATLAB code).
         sumA1xcov = float(np.sum(da1 * xcov))
         sumA2xcov = float(np.sum(da2 * xcov))
         xA1x = (1.0 / sig_noise ** 2) * float(np.sum(
@@ -724,16 +544,8 @@ def update_x_conjgrad_diagfe_filt_space(prob: dict) -> dict:
                             + freeeng_qxlogqx.sum())
     return prob
 
-
-# ════════════════════════════════════════════════════════════════════════════
-# update_k  (from update_k.m) — diag covariance branch only
-# ════════════════════════════════════════════════════════════════════════════
-
 def update_k(prob: dict) -> dict:
-    """
-    M-step: update kernel k.  Equivalent to ``update_k.m`` restricted to
-    the diagonal-covariance, filter-space branch (the recommended algo).
-    """
+
     sig_noise = prob['sig_noise']
     k_sz1 = prob['k_sz1']
     k_sz2 = prob['k_sz2']
@@ -780,7 +592,6 @@ def update_k(prob: dict) -> dict:
     prob['k'] = k_new
     k_vec = k_new.ravel(order='F')
 
-    # Recompute the likelihood term of the free energy.
     freeeng_qlogp_ycx = np.zeros(N3)
     for j in range(N3):
         freeeng_qlogp_ycx[j] = (
@@ -794,25 +605,9 @@ def update_k(prob: dict) -> dict:
                             + prob['freeeng_qxlogqx'].sum())
     return prob
 
-
-# ════════════════════════════════════════════════════════════════════════════
-# deconv1  (from deconv1.m)  — inner EM loop for one pyramid level
-# ════════════════════════════════════════════════════════════════════════════
-
 def deconv1(prob: dict, sig_noise_v: np.ndarray,
             verbose: bool = False) -> Tuple[dict, np.ndarray, np.ndarray]:
-    """
-    EM loop on one pyramid level.  Equivalent to MATLAB ``deconv1.m``.
 
-    Only dispatches the combination actually used by the recommended
-    diagfe_filt_sps algorithm; raises NotImplementedError otherwise.
-
-    Returns
-    -------
-    prob    : updated problem dict
-    kList   : (k_sz1, k_sz2, maxItr) history of kernels per iteration
-    freeeng : (2, maxItr) free energies after x- and k-updates
-    """
     sig_noise_v = np.asarray(sig_noise_v, dtype=np.float64).ravel()
     maxItr = sig_noise_v.size
 
@@ -846,42 +641,21 @@ def deconv1(prob: dict, sig_noise_v: np.ndarray,
 
     return prob, kList, freeeng
 
-
-# ════════════════════════════════════════════════════════════════════════════
-# multires_deconv  (from multires_deconv.m)
-# ════════════════════════════════════════════════════════════════════════════
-
 def multires_deconv(prob: dict, ret: float, sig_noise_v: np.ndarray,
                     verbose: bool = False) -> Tuple[dict, List[np.ndarray]]:
-    """
-    Coarse-to-fine blind deconvolution.  Equivalent to ``multires_deconv.m``.
 
-    Parameters
-    ----------
-    prob        : initial problem dict (with ``y``, ``k``, ``k_sz1/2``, ...)
-    ret         : pyramid rescale factor, typically 0.5**0.5.
-    sig_noise_v : vector of noise std per EM iteration.
-
-    Returns
-    -------
-    prob     : final problem dict (finest level)
-    kListItr : list of kernel-histories per pyramid level (length = #levels)
-    """
     k1 = prob['k_sz1']
     k2 = prob['k_sz2']
-    # maxitr = max(floor(log(5 / min(k1, k2)) / log(ret)), 0)
+
     maxitr = max(int(np.floor(np.log(5.0 / min(k1, k2)) / np.log(ret))), 0)
 
-    # retv = ret.^[0:maxitr]
     retv = np.power(ret, np.arange(0, maxitr + 1))
 
-    # Kernel sizes per level, forced to be odd (MATLAB-exact).
     k1list = np.ceil(k1 * retv).astype(int)
     k1list = k1list + (k1list % 2 == 0).astype(int)
     k2list = np.ceil(k2 * retv).astype(int)
     k2list = k2list + (k2list % 2 == 0).astype(int)
 
-    # Start at the coarsest level.
     cret = float(retv[-1])
     k = resizeKer(prob['k'], cret, int(k1list[-1]), int(k2list[-1]))
 
@@ -892,7 +666,7 @@ def multires_deconv(prob: dict, ret: float, sig_noise_v: np.ndarray,
         cret = float(retv[itr])
         sy = downSmpImC(prob['y'], cret)
 
-        tprob = dict(prob)  # shallow copy of top-level fields
+        tprob = dict(prob)
         tprob['y'] = sy
         tprob['k'] = k
         tprob = set_sizes(tprob)

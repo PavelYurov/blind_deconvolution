@@ -5,7 +5,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-
 from src.blinddeconv.algorithms.base import DeconvolutionAlgorithm
 
 from ..pmp_denoise_fix.noise_orchestrator import (
@@ -13,9 +12,7 @@ from ..pmp_denoise_fix.noise_orchestrator import (
     _is_truly_correlated,
 )
 
-
 __all__ = ['PMP_BD_Merged']
-
 
 _LEGACY_DEFAULT_KWARGS: dict = dict(
     denoise_eps=0.006, denoise_radius=2,
@@ -30,16 +27,13 @@ _LEGACY_DEFAULT_KWARGS: dict = dict(
     auto_mode='robust',
 )
 
-
 _HEAVY_SIGMA_DEFAULT = 0.015
 
 _IMPULSE_DENSITY_HEAVY = 0.01
 
 _POISSON_A_NORM = 1e-3
 
-
 class PMP_BD_Merged(DeconvolutionAlgorithm):
-
 
     name = 'PMP_BD_Merged'
 
@@ -71,14 +65,11 @@ class PMP_BD_Merged(DeconvolutionAlgorithm):
         self.legacy_kwargs = dict(legacy_kwargs or {})
         self.verbose = bool(verbose)
 
-
         self.last_branch: Optional[str] = None
         self.last_descriptor: Optional[dict] = None
         self.last_inner_alg: Any = None
 
-
     def change_param(self, param: Dict[str, Any]) -> None:
-
 
         own = {'kernel_size', 'force', 'heavy_sigma_threshold',
                'impulse_density_heavy', 'poisson_a_threshold',
@@ -112,7 +103,6 @@ class PMP_BD_Merged(DeconvolutionAlgorithm):
             for k, v in self.last_descriptor.items():
                 out.append((f'descriptor__{k}', v))
         return out
-
 
     def _classify(self, image: np.ndarray) -> Tuple[str, dict]:
 
@@ -170,7 +160,6 @@ class PMP_BD_Merged(DeconvolutionAlgorithm):
             f"{self.heavy_sigma_threshold}, fall through to legacy")
         return 'legacy', descriptor
 
-
     def _make_robust(self):
         from ..pmp_denoise_fix.pmp_robust import PMP_BD_Robust
         return PMP_BD_Robust(kernel_size=self.kernel_size,
@@ -182,9 +171,7 @@ class PMP_BD_Merged(DeconvolutionAlgorithm):
         kwargs.update(self.legacy_kwargs)
         return PMP_BD(kernel_size=self.kernel_size, **kwargs)
 
-
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-
 
         t0 = time.time()
         branch, descriptor = self._classify(image)
@@ -201,7 +188,6 @@ class PMP_BD_Merged(DeconvolutionAlgorithm):
         else:
             alg = self._make_legacy()
         self.last_inner_alg = alg
-
 
         if self._callback is not None and hasattr(alg, 'set_callback'):
             try:

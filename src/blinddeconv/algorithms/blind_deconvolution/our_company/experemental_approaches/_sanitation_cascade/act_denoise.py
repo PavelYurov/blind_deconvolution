@@ -4,21 +4,15 @@ from numpy.fft import ifft2, fftshift
 
 __all__ = ['act_denoise']
 
-
 def _choose_num_scales(H, W):
-
 
     return max(2, min(4, int(np.ceil(np.log2(min(H, W)))) - 2))
 
-
 def _udct_pad_multiple(num_scales):
-
 
     return 1 << max(num_scales - 1, 0)
 
-
 def _make_udct(H, W, num_scales=None):
-
 
     from curvelets.numpy import UDCT
 
@@ -27,9 +21,7 @@ def _make_udct(H, W, num_scales=None):
 
     return UDCT(shape=(H, W), num_scales=num_scales, transform_kind='real')
 
-
 def _compute_curvelet_noise_rootpsd(fft_psd, udct_op):
-
 
     kernel_noise = fftshift(ifft2(np.sqrt(fft_psd.astype(np.complex128)))).real
 
@@ -47,9 +39,7 @@ def _compute_curvelet_noise_rootpsd(fft_psd, udct_op):
         rootpsd.append(dirs)
     return rootpsd
 
-
 def _ml_estimator(noisy_coeffs, noise_rootpsd, noise_type):
-
 
     if noise_type == 'white':
 
@@ -60,19 +50,15 @@ def _ml_estimator(noisy_coeffs, noise_rootpsd, noise_type):
         k = np.ones((31, 31), dtype=np.float64) / 960.0
         k[15, 15] = 0.0
 
-
     power = (np.abs(noisy_coeffs) ** 2).astype(np.float64)
     local_var = _ndconvolve(power, k, mode='wrap')
-
 
     clean_var = local_var - noise_rootpsd ** 2
     clean_var = np.maximum(clean_var, 0.0)
 
     return np.sqrt(clean_var)
 
-
 def _apply_act(c_struct, rootpsd, threshold_setting, noise_type):
-
 
     nscales = len(c_struct)
     denoised = []
@@ -83,7 +69,6 @@ def _apply_act(c_struct, rootpsd, threshold_setting, noise_type):
             wedges = []
             for W in range(len(c_struct[J][D])):
                 coeff = c_struct[J][D][W].copy()
-
 
                 if J == 0:
                     wedges.append(coeff)
@@ -101,7 +86,6 @@ def _apply_act(c_struct, rootpsd, threshold_setting, noise_type):
 
                         threshold = np.sqrt(2.0) * (sigma_n ** 2) / safe_std
                         threshold = np.where(clean_std > 0, threshold, np.inf)
-
 
                         shrunk = np.maximum(mag - threshold, 0.0)
                         coeff = np.where(
@@ -131,9 +115,7 @@ def _apply_act(c_struct, rootpsd, threshold_setting, noise_type):
 
     return denoised
 
-
 def act_denoise(image, noise_var=None, threshold_setting='s'):
-
 
     if threshold_setting not in ('s', 'h', 'ksigma'):
         raise ValueError(
@@ -144,7 +126,6 @@ def act_denoise(image, noise_var=None, threshold_setting='s'):
     if img.ndim != 2:
         raise ValueError(f"Expected 2D grayscale image, got shape {img.shape}")
     H, W = img.shape
-
 
     num_scales = _choose_num_scales(H, W)
     pad_mult = _udct_pad_multiple(num_scales)
@@ -158,13 +139,10 @@ def act_denoise(image, noise_var=None, threshold_setting='s'):
 
     udct_op = _make_udct(Hp, Wp, num_scales=num_scales)
 
-
     c_struct = udct_op.forward(img)
-
 
     blind = noise_var is None
     if blind:
-
 
         mads = []
         for direction in c_struct[-1]:
@@ -175,7 +153,6 @@ def act_denoise(image, noise_var=None, threshold_setting='s'):
                     np.median(np.abs(vals - np.median(vals))) / 0.6745)
         noise_std = float(np.median(mads))
         noise_var = noise_std ** 2
-
 
     scalar_var = (np.isscalar(noise_var)
                   or (isinstance(noise_var, np.ndarray)
@@ -197,18 +174,14 @@ def act_denoise(image, noise_var=None, threshold_setting='s'):
         psd_range = float(fft_psd.max() - fft_psd.min())
         noise_type = 'white' if psd_range < 0.015 * N else 'colored'
 
-
     rootpsd = _compute_curvelet_noise_rootpsd(fft_psd, udct_op)
-
 
     denoised_struct = _apply_act(
         c_struct, rootpsd, threshold_setting, noise_type)
 
-
     denoised = udct_op.backward(denoised_struct)
     if np.iscomplexobj(denoised):
         denoised = denoised.real
-
 
     denoised = denoised[:H, :W]
 

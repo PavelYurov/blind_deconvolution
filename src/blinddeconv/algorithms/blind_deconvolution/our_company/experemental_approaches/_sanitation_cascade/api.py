@@ -5,7 +5,6 @@ from typing import Any, Dict, List, Tuple
 
 import numpy as np
 
-
 from .impulse_noise_estimation import detect_impulse_noise, adaptive_median_filter
 from .noise_psd_analysis import analyze_noise_psd, notch_filter
 from .pyatykh_noise_reconstruction import estimate_noise_params
@@ -13,18 +12,13 @@ from .chen_noise_estimate import estimate_noise_level
 
 __all__ = ['sanitize', 'SanitationResult']
 
-
 _DEFAULT_NOISE_FLOOR = 0.005
-
 
 _BORDERLINE_SIGMA = 0.010
 
-
 _BORDERLINE_LAG1_GATE = 0.65
 
-
 _ACT_COLORED_MIN_SIGMA = 0.020
-
 
 _MIN_A_FOR_VST = 1e-6
 _MIN_IMPULSE_DENSITY = 5e-3
@@ -33,10 +27,8 @@ _PERIODIC_LAG1_GATE = 0.5
 _TRUE_CORRELATION_LAG1 = 0.5
 _TRUE_CORRELATION_CV = 0.3
 
-
 @dataclass
 class SanitationResult:
-
 
     image_clean: np.ndarray
     noise_info: Dict[str, Any]
@@ -45,7 +37,6 @@ class SanitationResult:
     residual_type: str
     branch: str
     raw: Dict[str, Any] = field(default_factory=dict)
-
 
 def _to_grayscale_norm(image: np.ndarray) -> np.ndarray:
     img = np.asarray(image, dtype=np.float64)
@@ -63,16 +54,13 @@ def _to_grayscale_norm(image: np.ndarray) -> np.ndarray:
         img = img / 255.0
     return img
 
-
 def _psd_to_act_fft_format(psd_centered: np.ndarray) -> np.ndarray:
 
     psd_centered = np.asarray(psd_centered, dtype=np.float64)
     H, W = psd_centered.shape
     return np.fft.ifftshift(psd_centered) * (H * W)
 
-
 def _is_truly_correlated(psd_info: dict) -> bool:
-
 
     lag1_max = max(abs(psd_info.get('lag1_h', 0.0)),
                    abs(psd_info.get('lag1_v', 0.0)))
@@ -89,7 +77,6 @@ def _is_truly_correlated(psd_info: dict) -> bool:
     cv = float(band.std() / max(band.mean(), 1e-12))
     return cv >= _TRUE_CORRELATION_CV
 
-
 def _denoise_white_bm3d(image: np.ndarray, sigma: float) -> np.ndarray:
 
     try:
@@ -99,7 +86,6 @@ def _denoise_white_bm3d(image: np.ndarray, sigma: float) -> np.ndarray:
     if sigma <= 0:
         return image.copy()
     return bm3d.bm3d(image, sigma_psd=float(sigma))
-
 
 def _denoise_colored_act(image: np.ndarray,
                          psd_centered: np.ndarray,
@@ -111,7 +97,6 @@ def _denoise_colored_act(image: np.ndarray,
     return act_denoise(image, noise_var=fft_psd,
                        threshold_setting=threshold_setting)
 
-
 def _denoise_poisson_vst(image: np.ndarray,
                          a_norm: float, b_norm: float,
                          ) -> Tuple[np.ndarray, dict]:
@@ -120,7 +105,6 @@ def _denoise_poisson_vst(image: np.ndarray,
     a_eff = max(float(a_norm), 1e-6)
     b_eff = max(float(b_norm), 0.0)
     return vst_bm3d_denoise(image, a=a_eff, b=b_eff)
-
 
 def sanitize(image: np.ndarray,
              *,
@@ -131,13 +115,11 @@ def sanitize(image: np.ndarray,
              act_colored_min_sigma: float = _ACT_COLORED_MIN_SIGMA,
              verbose: bool = False) -> SanitationResult:
 
-
     if profile != 'auto':
         raise ValueError(f"profile={profile!r} not supported; use 'auto'.")
 
     log: List[str] = []
     img = _to_grayscale_norm(image)
-
 
     chen_pre = float(estimate_noise_level(img))
     if chen_pre < noise_floor:
@@ -160,7 +142,6 @@ def sanitize(image: np.ndarray,
             raw={'log': log, 'reason': 'below_noise_floor'},
         )
 
-
     imp_info = detect_impulse_noise(img)
     imp_density = float(imp_info.get('density', 0.0))
     if imp_info.get('has_impulse', False) and imp_density > _MIN_IMPULSE_DENSITY:
@@ -171,7 +152,6 @@ def sanitize(image: np.ndarray,
     elif imp_density > 0:
         log.append(f"[1] impulse density={imp_density:.4f} "
                    f"(≤ {_MIN_IMPULSE_DENSITY}) → skip")
-
 
     psd = analyze_noise_psd(img, peak_threshold=_DEFAULT_PEAK_THRESHOLD)
     lag1_max = max(abs(psd.get('lag1_h', 0.0)), abs(psd.get('lag1_v', 0.0)))
@@ -187,14 +167,12 @@ def sanitize(image: np.ndarray,
         lag1_max = max(abs(psd.get('lag1_h', 0.0)),
                        abs(psd.get('lag1_v', 0.0)))
 
-
     pca = estimate_noise_params(img)
     chen_sigma = float(estimate_noise_level(img))
     a_norm = float(pca.get('a', 0.0)) / 255.0
     b_norm = float(pca.get('b', 0.0)) / (255.0 ** 2)
     sigma_pca_norm = float(pca.get('sigma_norm', 0.0))
     pca_type = pca.get('noise_type', 'unknown')
-
 
     if sigma_pca_norm > 0 and chen_sigma > 0 and\
        0.5 * sigma_pca_norm <= chen_sigma <= 2.0 * sigma_pca_norm:
@@ -209,7 +187,6 @@ def sanitize(image: np.ndarray,
         f"{psd.get('lag1_v', 0):.3f})")
     if verbose:
         print(log[-1])
-
 
     poisson_path = (pca_type in ('poisson', 'poisson_gaussian')
                     and a_norm > _MIN_A_FOR_VST)
@@ -258,7 +235,6 @@ def sanitize(image: np.ndarray,
 
     if verbose:
         print(log[-1])
-
 
     residual_sigma = float(estimate_noise_level(img))
     residual_type = {

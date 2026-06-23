@@ -1,26 +1,10 @@
 """
 rcs.py
 
-Removing Camera Shake — Variational Bayesian Blind Deconvolution.
-
-Ported from MATLAB distribution code v1.2.
-
-Reference:
+Источник:
     R. Fergus, B. Singh, A. Hertzmann, S. T. Roweis, W. T. Freeman:
     "Removing Camera Shake from a Single Photograph",
     ACM Trans. Graphics (SIGGRAPH), 2006.
-
-Pipeline (mirrors MATLAB deblur.m → fiddle_lucy3.m):
-    1. Normalise input, convert to grayscale, apply gamma correction.
-    2. Compute image gradients (Haar wavelet).
-    3. Build multi-scale pyramid (image gradients + blur kernels).
-    4. At each scale: initialise parameters → run variational inference
-       (train_ensemble_main6) → extract kernel / gradient estimates →
-       upsample to next scale.
-    5. Reconstruct intensity patch from gradients (Poisson solver).
-    6. Apply Richardson-Lucy deconvolution on the full image using the
-       estimated kernel.
-    7. Return restored image (int16 [0,255]) and kernel.
 """
 
 import numpy as np
@@ -30,10 +14,8 @@ from typing import Tuple, List, Any, Dict
 from scipy.signal import convolve2d
 from numpy.fft import fft2, ifft2
 
-# ── Framework base class import (DO NOT MODIFY) ─────────────────────────────
 import sys
 from pathlib import Path
-
 
 def _find_project_root(start: Path) -> Path:
     path = start.resolve()
@@ -42,7 +24,6 @@ def _find_project_root(start: Path) -> Path:
             raise RuntimeError("Cannot locate project root")
         path = path.parent
     return path
-
 
 _CURRENT_FILE = Path(__file__).resolve()
 _PROJECT_ROOT = _find_project_root(_CURRENT_FILE)
@@ -54,7 +35,6 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
         sys.path.insert(0, _path)
 
 from blinddeconv.algorithms.base import DeconvolutionAlgorithm
-# ─────────────────────────────────────────────────────────────────────────────
 
 from .solvers import (
     train_ensemble_main6,
@@ -75,73 +55,7 @@ from .utils import (
     load_matlab_priors,
 )
 
-
 class RCS_BD(DeconvolutionAlgorithm):
-    """
-    Removing Camera Shake via Variational Bayesian Blind Deconvolution.
-
-    Parameters
-    ----------
-    kernel_size      : int — spatial support of the unknown PSF (square, odd).
-    num_scales       : int or None — number of coarse-to-fine pyramid levels.
-                       If None (default), computed from kernel_size using the
-                       MATLAB formula: ceil(-log(3/K)/log(sqrt(2)))+1.
-    resize_step      : float — scale factor between levels (default sqrt(2)).
-    resize_mode      : str — interpolation for pyramid building
-                       ('matlab_bilinear', 'matlab_nearest', 'matlab_bicubic').
-    gamma_correction : float — gamma exponent applied before gradient
-                       computation (default 2.2).  1.0 = no correction.
-    prescale         : float — rescale the input image before processing.
-                       1.0 = no rescale, 0 = auto.
-    convergence      : float — convergence threshold for variational
-                       inference (default 5e-4).
-    max_iterations   : int — max iterations per scale (default 50000).
-    noise_init       : float — initial noise std for inference (default 1.0).
-    blur_components  : int — number of mixture components for blur prior
-                       (default 4).
-    image_components : int — number of mixture components for image prior
-                       (default 4).
-    blur_prior       : int — prior type for blur (1=Exponential, default).
-    image_prior      : int — prior type for image (0=Gaussian, default).
-    init_prescision  : float — initial precision for parameters (default 1e4).
-    first_init_mode_image : str — image init at first scale
-                            ('variational', 'random', 'slight_blur_obs', …).
-    first_init_mode_blur  : str — blur init at first scale
-                            ('delta', 'hbar', 'vbar', 'star', …).
-    init_mode_image  : str — image init for subsequent scales ('direct').
-    init_mode_blur   : str — blur init for subsequent scales ('direct').
-    upsample_mode    : str — interpolation for upsampling between scales.
-    center_blur      : bool — centre blur kernel by its centre-of-mass
-                       between scales.
-    gradient_mode    : str — gradient filter ('haar' or 'laplace').
-    rescale_then_grad : bool — if True, rescale images then take gradients;
-                        if False, take gradients then rescale.
-    lucy_its         : int — number of Richardson-Lucy iterations
-                       (default 10).
-    kernel_threshold : float — dynamic threshold for kernel noise removal
-                       (default 7.0).
-    scale_offset     : int — use a coarser scale for final deblurring
-                       (default 0 = finest).
-    fft_mode         : bool — use FFT-based convolutions (default True).
-    blur_lock        : bool — lock blur prior parameters (default False).
-    blur_mask        : bool — use spatial mask on blur (default False).
-    blur_mask_variances : list — variances for blur spatial mask.
-    saturation_mask  : int — 0=off, 1=mask saturated in Dp, 2=precision
-                       (default 0).
-    saturation_threshold : float — pixel intensity threshold for saturation
-                       (default 250.0).
-    automatic_patch  : bool — automatically select best patch (default False).
-    automatic_patch_center_weight : float — centre bias for auto patch
-                       (default 1.0).
-    patch_size       : tuple — (rows, cols) of patch to use.  None = full img.
-    patch_location   : tuple — (x, y) 0-based top-left corner of patch.
-                       None = auto or use automatic_patch.
-    priors           : list or None — pre-computed MoG priors.
-                       If None, built-in pre-trained priors (from Fergus et al.
-                       MATLAB distribution, trained on natural images) are used.
-                       Can also pass result of load_matlab_priors() or
-                       estimate_priors_from_images().
-    """
 
     def __init__(
         self,
@@ -185,7 +99,7 @@ class RCS_BD(DeconvolutionAlgorithm):
         super().__init__(name='RCS-BD')
 
         self.kernel_size = kernel_size
-        # MATLAB formula: NUM_SCALES = ceil(-log(3/K)/log(sqrt(2)))+1
+
         if num_scales is None:
             self.num_scales = int(np.ceil(-np.log(3.0 / kernel_size)
                                           / np.log(np.sqrt(2)))) + 1
@@ -233,46 +147,37 @@ class RCS_BD(DeconvolutionAlgorithm):
         }
         self.hyperparams: Dict[str, Any] = {}
 
-    # ── Main entry point ─────────────────────────────────────────────────
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         start_time = time.time()
 
-        COLOR = False  # Colour pipeline not supported (MATLAB: COLOR=0)
+        COLOR = False
         DEFAULT_GAMMA = 2.2
 
-        # ─────────────────────────────────────────────────────────────────
-        # 1.  Preprocess observed image
-        # ─────────────────────────────────────────────────────────────────
         obs_im_orig = np.asarray(image, dtype=np.float64).copy()
 
-        # Convert to grayscale
         if obs_im_orig.ndim == 3 and obs_im_orig.shape[2] >= 3:
             obs_im = rgb2gray_rob(obs_im_orig)
         else:
-            obs_im = obs_im_orig.copy() if obs_im_orig.ndim == 2 \
+            obs_im = obs_im_orig.copy() if obs_im_orig.ndim == 2\
                 else obs_im_orig[:, :, 0].copy()
 
-        obs_imz = 1  # number of colour planes for inference
+        obs_imz = 1
 
-        # Prescale
         if self.prescale and self.prescale != 1.0:
             obs_im = imresize(obs_im, self.prescale, 'bilinear')
             obs_im_orig = imresize(obs_im_orig, self.prescale, 'bilinear')
 
-        # Save raw grayscale image for prior estimation (before gamma)
         obs_im_raw = obs_im.copy()
 
-        # Gamma correction
         if self.gamma_correction != 1.0:
-            obs_im = (obs_im.astype(np.float64) ** self.gamma_correction) / \
+            obs_im = (obs_im.astype(np.float64) ** self.gamma_correction) /\
                       (256.0 ** (self.gamma_correction - 1.0))
         else:
             obs_im = obs_im.astype(np.float64)
 
-        # Saturation mask
         if self.saturation_mask:
             sat = obs_im > self.saturation_threshold
-            # Build an initial blur kernel for convolution sizing
+
             bk_init = delta_kernel(self.kernel_size)
             q = convolve2d(sat.astype(np.float64),
                            np.ones_like(bk_init), mode='same',
@@ -281,19 +186,14 @@ class RCS_BD(DeconvolutionAlgorithm):
         else:
             mask_all = np.zeros(obs_im.shape[:2], dtype=np.float64)
 
-        # Automatic patch selection
         if self.automatic_patch:
             obs_im_disp = obs_im ** (1.0 / DEFAULT_GAMMA)
             _, self.patch_location = automatic_patch_selector(
                 obs_im_disp, max(self.patch_size or (obs_im.shape[0],)),
                 self.automatic_patch_center_weight, mask_all)
 
-        # Full image for later RL deconvolution
         obs_im_all = obs_im.copy()
 
-        # ─────────────────────────────────────────────────────────────────
-        # 2.  Compute image gradients
-        # ─────────────────────────────────────────────────────────────────
         if self.gradient_mode == 'haar':
             kx = np.array([[1, -1]], dtype=np.float64)
             ky = np.array([[1], [-1]], dtype=np.float64)
@@ -303,13 +203,10 @@ class RCS_BD(DeconvolutionAlgorithm):
         else:
             raise ValueError(f"Unknown gradient mode: {self.gradient_mode}")
 
-        # ─────────────────────────────────────────────────────────────────
-        # 3.  Extract patch
-        # ─────────────────────────────────────────────────────────────────
         if self.patch_location is not None and self.patch_size is not None:
             py, px = 0, 0
-            pl = self.patch_location  # (x, y) 0-based
-            ps = self.patch_size      # (rows, cols) or single int
+            pl = self.patch_location
+            ps = self.patch_size
             if isinstance(ps, int):
                 ps = (ps, ps)
             obs_im = obs_im_all[
@@ -323,24 +220,19 @@ class RCS_BD(DeconvolutionAlgorithm):
         else:
             mask_all_patch = mask_all
 
-        # ─────────────────────────────────────────────────────────────────
-        # 4.  Build multi-scale pyramid
-        # ─────────────────────────────────────────────────────────────────
         NUM_SCALES = self.num_scales
         RESIZE_STEP = self.resize_step
 
-        # --- Initial blur kernel (delta or user-supplied) ---
         blur_kernel = delta_kernel(self.kernel_size)
 
-        # --- Build kernel pyramid ---
         blur_kernel_scale = [None] * NUM_SCALES
         blur_kernel_scale[NUM_SCALES - 1] = blur_kernel.copy()
 
         for s_rev in range(1, NUM_SCALES):
-            s_idx = NUM_SCALES - 1 - s_rev  # counting down from finest
+            s_idx = NUM_SCALES - 1 - s_rev
             dims = np.array(blur_kernel.shape) * (1.0 / RESIZE_STEP) ** s_rev
             dims = dims.astype(int)
-            dims = dims + (1 - dims % 2)  # make odd
+            dims = dims + (1 - dims % 2)
             dims = np.maximum(dims, 3)
 
             if min(dims) < 4:
@@ -358,13 +250,12 @@ class RCS_BD(DeconvolutionAlgorithm):
             if bk_sum > 0:
                 blur_kernel_scale[s_idx] /= bk_sum
 
-        # --- Build gradient / observation pyramid ---
         if self.rescale_then_grad:
-            # Rescale images then take gradients
+
             obs_im_scale = [None] * NUM_SCALES
             obs_im_scale[NUM_SCALES - 1] = obs_im.copy()
             mask_scale = [None] * NUM_SCALES
-            mask_scale[NUM_SCALES - 1] = mask_all_patch[1:-1, 1:-1] \
+            mask_scale[NUM_SCALES - 1] = mask_all_patch[1:-1, 1:-1]\
                 if mask_all_patch.shape[0] > 2 else mask_all_patch.copy()
 
             for s_rev in range(1, NUM_SCALES):
@@ -373,13 +264,12 @@ class RCS_BD(DeconvolutionAlgorithm):
                 obs_im_scale[s_idx] = imresize(obs_im, sf, 'bilinear')
                 raw_mask = np.ceil(np.abs(imresize(
                     mask_all_patch, sf, 'nearest')))
-                # Trim borders (MATLAB: mask_scale = mask(2:end-1,2:end-1))
+
                 if raw_mask.shape[0] > 2 and raw_mask.shape[1] > 2:
                     mask_scale[s_idx] = raw_mask[1:-1, 1:-1]
                 else:
                     mask_scale[s_idx] = raw_mask
 
-            # Gradient filters for rescale-then-grad mode
             if self.gradient_mode == 'haar':
                 kxg = np.array([[0, 1, -1]], dtype=np.float64)
                 kyg = np.array([[0], [1], [-1]], dtype=np.float64)
@@ -396,17 +286,13 @@ class RCS_BD(DeconvolutionAlgorithm):
                 obs_grad_scale_y[s_idx] = convolve2d(
                     obs_im_scale[s_idx], kyg, mode='valid', boundary='fill')
 
-            # Concatenate gradients — MATLAB trims:
-            #   gx(2:end-1, :)  → remove first and last ROW
-            #   gy(:, 2:end-1)  → remove first and last COLUMN
-            # Both become (H-2, W-2) and can be horizontally concatenated.
             for s_idx in range(NUM_SCALES):
-                trimmed_gx = obs_grad_scale_x[s_idx][1:-1, :]  # (H-2, W-2)
-                trimmed_gy = obs_grad_scale_y[s_idx][:, 1:-1]  # (H-2, W-2)
+                trimmed_gx = obs_grad_scale_x[s_idx][1:-1, :]
+                trimmed_gy = obs_grad_scale_y[s_idx][:, 1:-1]
                 obs_grad_scale[s_idx] = np.concatenate([
                     trimmed_gx, trimmed_gy,
                 ], axis=1)
-                # Resize mask to match gradient size
+
                 gh, gw_half = trimmed_gx.shape
                 if mask_scale[s_idx].shape != (gh, gw_half):
                     mask_scale[s_idx] = imresize(
@@ -414,13 +300,12 @@ class RCS_BD(DeconvolutionAlgorithm):
                         (gh, gw_half), 'nearest')
 
         else:
-            # Gradients then rescale (MATLAB: RESCALE_THEN_GRAD = 0)
+
             obs_grad_all_x = convolve2d(obs_im, kx, mode='valid',
                                         boundary='fill')
             obs_grad_all_y = convolve2d(obs_im, ky, mode='valid',
                                         boundary='fill')
 
-            # Trim both to minimum dimensions (MATLAB deblur.m lines 199-202)
             yy = min(obs_grad_all_x.shape[0], obs_grad_all_y.shape[0])
             xx = min(obs_grad_all_x.shape[1], obs_grad_all_y.shape[1])
             obs_grad_all_x = obs_grad_all_x[:yy, :xx]
@@ -450,9 +335,6 @@ class RCS_BD(DeconvolutionAlgorithm):
                 gy = obs_grad_scale_y[s_idx]
                 obs_grad_scale[s_idx] = np.concatenate([gx, gy], axis=1)
 
-        # ─────────────────────────────────────────────────────────────────
-        # 4b.  Apply FFT-mode delta-kernel shift to gradients (non-synthetic)
-        # ─────────────────────────────────────────────────────────────────
         if self.fft_mode:
             for s_idx in range(NUM_SCALES):
                 dk = delta_kernel(blur_kernel_scale[s_idx].shape[0])
@@ -460,14 +342,11 @@ class RCS_BD(DeconvolutionAlgorithm):
                 gs_shifted = np.real(
                     ifft2(fft2(gs) * fft2(dk, s=gs.shape)))
                 obs_grad_scale[s_idx] = gs_shifted
-                # Shift mask too
+
                 mask_scale[s_idx] = convolve2d(
                     mask_scale[s_idx].astype(np.float64), dk,
                     mode='same', boundary='fill')
 
-        # ─────────────────────────────────────────────────────────────────
-        # 4c.  Compute sizes and build masks
-        # ─────────────────────────────────────────────────────────────────
         K_arr = np.zeros(NUM_SCALES, dtype=int)
         L_arr = np.zeros(NUM_SCALES, dtype=int)
         M_arr = np.zeros(NUM_SCALES, dtype=int)
@@ -510,7 +389,7 @@ class RCS_BD(DeconvolutionAlgorithm):
                     (self.blur_components, Ks * Ls))
 
             if self.saturation_mask == 2:
-                sat_p = self.init_prescision * 10.0  # SATURATION_PRESCISION
+                sat_p = self.init_prescision * 10.0
                 sim = np.concatenate([
                     mask_scale[s_idx] * sat_p,
                     mask_scale[s_idx] * sat_p,
@@ -524,14 +403,13 @@ class RCS_BD(DeconvolutionAlgorithm):
                 Is = 2 * Ms
                 Js = 2 * Ns
                 Dp = np.zeros((Is, Js), dtype=np.float64)
-                # MATLAB 1-based: Dp(K:M, L:N/2)=1  →  0-based: [K-1:M, L-1:N//2]
-                Dp[Ks - 1:Ms, Ls - 1:Ns // 2] = 1.0      # x-plane
-                Dp[Ks - 1:Ms, Ls - 1 + Ns // 2:Ns] = 1.0  # y-plane
+
+                Dp[Ks - 1:Ms, Ls - 1:Ns // 2] = 1.0
+                Dp[Ks - 1:Ms, Ls - 1 + Ns // 2:Ns] = 1.0
 
                 D_data = np.pad(obs_grad_scale[s_idx],
                                 ((0, Ms), (0, Ns)), mode='constant')
 
-                # Saturation mask in Dp
                 if self.saturation_mask == 1:
                     mask_concat = np.concatenate([
                         mask_scale[s_idx], mask_scale[s_idx]], axis=1)
@@ -557,21 +435,13 @@ class RCS_BD(DeconvolutionAlgorithm):
             D_list[s_idx] = D_data
             Dp_list[s_idx] = Dp
 
-        # ─────────────────────────────────────────────────────────────────
-        # 5.  Build / validate MoG priors
-        # ─────────────────────────────────────────────────────────────────
         if self.priors is not None:
             priors_list = self.priors
         else:
-            # Use built-in pre-trained MoG priors from Fergus et al.
-            # These were trained on sharp natural images and capture the
-            # heavy-tailed gradient distribution essential for the algorithm.
+
             priors_list = get_default_priors(
                 'street', self.image_components)
 
-        # ─────────────────────────────────────────────────────────────────
-        # 6.  MAIN MULTI-SCALE LOOP  (deblur.m main loop)
-        # ─────────────────────────────────────────────────────────────────
         me_est = [None] * NUM_SCALES
         mx_est = [None] * NUM_SCALES
         new_grad = [None] * NUM_SCALES
@@ -586,7 +456,6 @@ class RCS_BD(DeconvolutionAlgorithm):
             Is = int(I_arr[s_idx])
             Js = int(J_arr[s_idx])
 
-            # Prior index: coarsest scale uses priors[NUM_SCALES-1], etc.
             prior_idx = NUM_SCALES - s_idx - 1
             if prior_idx >= len(priors_list):
                 prior_idx = len(priors_list) - 1
@@ -594,8 +463,6 @@ class RCS_BD(DeconvolutionAlgorithm):
                 prior_idx = 7
             cur_priors = priors_list[prior_idx]
 
-            # Dimensions matrix
-            # [nDims, size_per_dim, #components, prior_type, lock_prior, update]
             dimensions = np.array([
                 [1,      1,          1,
                  0, 0, 1],
@@ -605,9 +472,8 @@ class RCS_BD(DeconvolutionAlgorithm):
                  self.image_prior, 1, 1],
             ], dtype=np.float64)
 
-            # --- Initialisation ---
             if s_idx == 0:
-                # First scale
+
                 x1, x2 = initialize_parameters2(
                     obs_grad_scale[s_idx],
                     blur_kernel_scale[s_idx],
@@ -628,7 +494,7 @@ class RCS_BD(DeconvolutionAlgorithm):
                     1,
                 )
             else:
-                # Subsequent scales
+
                 x1, x2 = initialize_parameters2(
                     obs_grad_scale[s_idx],
                     new_blur[s_idx - 1],
@@ -652,7 +518,6 @@ class RCS_BD(DeconvolutionAlgorithm):
             print(f"Scale={s_idx + 1}/{NUM_SCALES}  "
                   f"K={Ks}x{Ls}  M={Ms}x{Ns}")
 
-            # --- Variational inference ---
             options = [
                 self.convergence, 0, self.noise_init,
                 0, 0, self.max_iterations, 0,
@@ -671,7 +536,6 @@ class RCS_BD(DeconvolutionAlgorithm):
 
             D_log_all.append(D_log_s)
 
-            # --- Extract estimates ---
             me_est[s_idx] = train_ensemble_get(
                 2, dimensions, ensemble['mx']).reshape(Ks, Ls)
             mx_est[s_idx] = train_ensemble_get(
@@ -682,7 +546,6 @@ class RCS_BD(DeconvolutionAlgorithm):
                   f"sum={me_est[s_idx].sum():.6g}, "
                   f"shape={me_est[s_idx].shape}")
 
-            # --- Upsample to next scale ---
             if s_idx < NUM_SCALES - 1:
                 Kn = int(K_arr[s_idx + 1])
                 Ln = int(L_arr[s_idx + 1])
@@ -696,17 +559,12 @@ class RCS_BD(DeconvolutionAlgorithm):
                     self.center_blur,
                 )
 
-        # Store history
         self.history['D_log'] = D_log_all
 
-        # ─────────────────────────────────────────────────────────────────
-        # 7.  Reconstruct intensity patch from gradients (Poisson solver)
-        # ─────────────────────────────────────────────────────────────────
         final_N = int(N_arr[NUM_SCALES - 1])
         final_dx = mx_est[NUM_SCALES - 1][:, :final_N // 2].copy()
         final_dy = mx_est[NUM_SCALES - 1][:, final_N // 2:final_N].copy()
 
-        # Zero out borders
         final_dx[0, :] = 0;  final_dx[-1, :] = 0
         final_dx[:, 0] = 0;  final_dx[:, -1] = 0
         final_dy[0, :] = 0;  final_dy[-1, :] = 0
@@ -714,23 +572,17 @@ class RCS_BD(DeconvolutionAlgorithm):
 
         obs_im_recon, _ = reconsEdge3(final_dx, final_dy)
 
-        # ─────────────────────────────────────────────────────────────────
-        # 8.  Richardson-Lucy deblurring on full image
-        # ─────────────────────────────────────────────────────────────────
         deblurred, kernel_out = richardson_lucy(
             obs_im_orig,
             me_est,
             gamma_correction=self.gamma_correction,
-            prescale=1.0,  # obs_im_orig already prescaled in step 1
+            prescale=1.0,
             lucy_its=self.lucy_its,
             threshold=self.kernel_threshold,
             scale_offset=self.scale_offset,
             resize_step=RESIZE_STEP,
         )
 
-        # ─────────────────────────────────────────────────────────────────
-        # 9.  Output
-        # ─────────────────────────────────────────────────────────────────
         self.hyperparams = {
             'kernel_size': self.kernel_size,
             'num_scales': self.num_scales,
@@ -751,7 +603,6 @@ class RCS_BD(DeconvolutionAlgorithm):
 
         return x_final, kernel_out
 
-    # ── Interface methods ────────────────────────────────────────────────
     def get_param(self) -> List[Tuple[str, Any]]:
         return [
             ('kernel_size', self.kernel_size),
@@ -803,23 +654,7 @@ class RCS_BD(DeconvolutionAlgorithm):
     def train_priors(image_paths: list,
                      num_components: int = 4,
                      num_scales: int = 8) -> list:
-        """
-        Train MoG priors from a set of sharp natural images.
 
-        This runs the EM algorithm (GaussianMixtures1D) on image gradients
-        at multiple scales, producing the pi/gamma parameters needed by the
-        variational inference.
-
-        Parameters
-        ----------
-        image_paths : list of str — paths to sharp (unblurred) images
-        num_components : int — number of Gaussian components (default 4)
-        num_scales : int — number of scale levels (default 8)
-
-        Returns
-        -------
-        priors : list of dicts with 'pi' (1, C) and 'gamma' (1, C)
-        """
         import cv2 as cv
         images = []
         for p in image_paths:

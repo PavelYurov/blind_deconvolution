@@ -7,16 +7,13 @@ from scipy.fft import dstn, idstn
 
 __all__ = ['adaptive_lp_deconv', 'ringing_artifacts_removal', 'firls_deconv']
 
-
 _LUT_RANGE = 10
 _LUT_STEP = 0.0001
 _XX = np.arange(-_LUT_RANGE, _LUT_RANGE + _LUT_STEP, _LUT_STEP)
 
-
 def _compute_w1(v, beta):
 
     return np.sign(v) * np.maximum(np.abs(v) - 1.0 / beta, 0.0)
-
 
 def _compute_w23(v, beta):
 
@@ -48,7 +45,6 @@ def _compute_w23(v, beta):
     root[~c1] = 0
     return np.max(np.real(root), axis=1)
 
-
 def _compute_w12(v, beta):
 
     eps = 1e-6
@@ -78,7 +74,6 @@ def _compute_w12(v, beta):
     root[~c1] = 0
     return np.max(np.real(root), axis=1)
 
-
 def _newton_w(v, beta, alpha):
 
     w = v.copy().astype(np.float64)
@@ -91,7 +86,6 @@ def _newton_w(v, beta, alpha):
     costw = np.abs(w) ** alpha + (beta / 2.0) * (w - v) ** 2
     return np.where(costw < cost0, w, 0)
 
-
 def _compute_w(v, beta, alpha):
     eps = 1e-9
     if abs(alpha - 1.0) < eps:
@@ -102,9 +96,7 @@ def _compute_w(v, beta, alpha):
         return _compute_w12(v, beta)
     return _newton_w(v, beta, alpha)
 
-
 _lut_cache = {}
-
 
 def _solve_img(v, beta, alpha):
 
@@ -114,10 +106,8 @@ def _solve_img(v, beta, alpha):
     lut = _lut_cache[key]
     return np.interp(v.ravel(), _XX, lut).reshape(v.shape)
 
-
 def _clear_lut_cache():
     _lut_cache.clear()
-
 
 def _psf2otf(psf, shape):
 
@@ -130,9 +120,7 @@ def _psf2otf(psf, shape):
     padded = np.roll(padded, -(pw // 2), axis=1)
     return fft2(padded)
 
-
 def _fast_deconv_adaptive(yin, kernel, alpha, alpha_n, lam):
-
 
     M, N = yin.shape
 
@@ -149,11 +137,9 @@ def _fast_deconv_adaptive(yin, kernel, alpha, alpha_n, lam):
 
     yout = yin.copy()
 
-
     youtx = np.roll(yout, -1, axis=1) - yout
     youty = np.roll(yout, -1, axis=0) - yout
     youtn = yin - np.real(ifft2(fft2(yout) * K))
-
 
     betas = np.geomspace(1, 2 ** 8, num=9)
     gamma = 1.0 / 50.0
@@ -166,7 +152,6 @@ def _fast_deconv_adaptive(yin, kernel, alpha, alpha_n, lam):
         Wx = _solve_img(youtx, beta_g[i], alpha)
         Wy = _solve_img(youty, beta_g[i], alpha)
 
-
         Wxx = np.roll(Wx, 1, axis=1) - Wx
         Wyy = np.roll(Wy, 1, axis=0) - Wy
         Wnn = np.real(ifft2(fft2(Wn) * np.conj(K)))
@@ -177,20 +162,17 @@ def _fast_deconv_adaptive(yin, kernel, alpha, alpha_n, lam):
         yout = np.real(ifft2(Fyout))
         yout = np.clip(yout, 0, 1)
 
-
         youtx = np.roll(yout, -1, axis=1) - yout
         youty = np.roll(yout, -1, axis=0) - yout
         youtn = yin - np.real(ifft2(fft2(yout) * K))
 
     return yout
 
-
 def _dwt_hh(img):
 
     import pywt
     _, (_, _, HH) = pywt.dwt2(img, 'db2')
     return HH
-
 
 def _local_std(grad_map, L=10):
 
@@ -199,16 +181,13 @@ def _local_std(grad_map, L=10):
     ms_local = convolve2d(grad_map ** 2, k, mode='same', boundary='symm')
     return np.sqrt(ms_local)
 
-
 def _x_grad(img):
     gx = np.array([[1, 0, -1]], dtype=np.float64)
     return convolve2d(img, gx, mode='same', boundary='symm')
 
-
 def _y_grad(img):
     gy = np.array([[1, 0, -1]], dtype=np.float64).reshape(3, 1)
     return convolve2d(img, gy, mode='same', boundary='symm')
-
 
 def _find_turning_point(sorted_std, M, N):
 
@@ -226,9 +205,7 @@ def _find_turning_point(sorted_std, M, N):
         ind = i - 1
     return original[ind]
 
-
 def _estimate_noise_std(image):
-
 
     M, N = image.shape
     HH = _dwt_hh(image)
@@ -242,13 +219,10 @@ def _estimate_noise_std(image):
     sigma_n = np.sqrt((sgx_n ** 2 + sgy_n ** 2 + 1e-8) / Eg)
     return sigma_n
 
-
 def _compute_lambda_map(image, sigma_n, alpha):
-
 
     eps = 1e-8
     M, N = image.shape
-
 
     HH = _dwt_hh(image)
     Bgx_hh, Bgy_hh = _x_grad(HH), _y_grad(HH)
@@ -256,10 +230,8 @@ def _compute_lambda_map(image, sigma_n, alpha):
     sgx_n = _find_turning_point(np.sort(sgx_hh.ravel()), M, N)
     sgy_n = _find_turning_point(np.sort(sgy_hh.ravel()), M, N)
 
-
     Bgx, Bgy = _x_grad(image), _y_grad(image)
     sgx, sgy = _local_std(Bgx, 10), _local_std(Bgy, 10)
-
 
     sigma_gsx_sq = sgx ** 2 - sgx_n ** 2
     sigma_gsx_sq[sigma_gsx_sq < eps] = eps
@@ -269,14 +241,11 @@ def _compute_lambda_map(image, sigma_n, alpha):
     sigma_gsy_sq[sigma_gsy_sq < eps] = eps
     sigma_gsy = np.sqrt(sigma_gsy_sq)
 
-
     lam_map = (np.sqrt(2 * sigma_n ** 2 / (
         sigma_gsx ** 2 + sigma_gsy ** 2 + eps))) ** alpha
     return lam_map
 
-
 def _estimate_alpha_n(blurred, restored, kernel, sigma_n):
-
 
     import math
 
@@ -288,7 +257,6 @@ def _estimate_alpha_n(blurred, restored, kernel, sigma_n):
     for i in range(1, 10):
         alpha_n = round(0.1 * i, 2)
 
-
         rng = np.random.default_rng(0)
         beta_hl = sigma_n * np.sqrt(
             math.gamma(1.0 / alpha_n) / math.gamma(3.0 / alpha_n))
@@ -296,14 +264,12 @@ def _estimate_alpha_n(blurred, restored, kernel, sigma_n):
         S = rng.choice([-1.0, 1.0], size=blurred.shape)
         noise_ref = beta_hl * S * (T ** (1.0 / alpha_n))
 
-
         mask = (restored >= threshold) & (restored <= 1.0 - threshold)
         noise_sample = noise_observed[mask]
         noise_ref_masked = noise_ref[mask]
 
         if noise_sample.size < 100:
             continue
-
 
         dx = 0.01
         bins = np.arange(-threshold, threshold + dx, dx)
@@ -318,18 +284,14 @@ def _estimate_alpha_n(blurred, restored, kernel, sigma_n):
 
     return best_alpha
 
-
 def _build_lambda_library(alpha, C, lam_N):
 
     i = np.arange(lam_N, dtype=np.float64)
     return C * (2 ** ((alpha / 3.0) * i))
 
-
 def _interpolate_library(blurred, kernel, alpha, alpha_n, lam_map, lam_library):
 
-
     C = lam_library[0]
-
 
     I_library = {}
     sat = False
@@ -344,7 +306,6 @@ def _interpolate_library(blurred, kernel, alpha, alpha_n, lam_map, lam_library):
         if prev_I is not None and np.array_equal(I_library[idx], prev_I):
             sat = True
         prev_I = I_library[idx].copy()
-
 
     M, N = lam_map.shape
     raw_idx = np.ceil((3.0 / alpha) * np.log2(
@@ -374,19 +335,15 @@ def _interpolate_library(blurred, kernel, alpha, alpha_n, lam_map, lam_library):
 
     return np.clip(I_opt, 0, 1)
 
-
 def _mirror_pad(image, pad):
 
     return np.pad(image, pad, mode='reflect')
-
 
 def _mirror_unpad(image, pad, orig_shape):
 
     return image[pad:pad + orig_shape[0], pad:pad + orig_shape[1]]
 
-
 def _deconv_with_padding(blurimg, kernel, alpha, alpha_n, lam):
-
 
     M, N = blurimg.shape
     k_size = kernel.shape[0]
@@ -394,10 +351,8 @@ def _deconv_with_padding(blurimg, kernel, alpha, alpha_n, lam):
     result = _fast_deconv_adaptive(padded, kernel, alpha, alpha_n, lam)
     return result[k_size:k_size + M, k_size:k_size + N]
 
-
 def adaptive_lp_deconv(blurred, kernel, alpha=0.8, sigma_n=None,
                        two_stage=True):
-
 
     kernel = kernel.astype(np.float64)
     kernel = np.maximum(kernel, 1e-10)
@@ -409,14 +364,11 @@ def adaptive_lp_deconv(blurred, kernel, alpha=0.8, sigma_n=None,
 
     M, N = blurred.shape
 
-
     if sigma_n is None:
         sigma_n = _estimate_noise_std(blurred)
     sigma_n = max(sigma_n, 1e-8)
 
-
     lam_map = _compute_lambda_map(blurred, sigma_n, alpha)
-
 
     C = max(lam_map.min(), 1e-12)
     lam_N = int(np.ceil(3.0 / alpha * np.log2(
@@ -424,16 +376,13 @@ def adaptive_lp_deconv(blurred, kernel, alpha=0.8, sigma_n=None,
     lam_N = max(lam_N, 3)
     lam_library = _build_lambda_library(alpha, C, lam_N)
 
-
     alpha_n = alpha
     _clear_lut_cache()
     I_opt = _interpolate_library(
         blurred, kernel, alpha, alpha_n, lam_map, lam_library)
 
-
     if two_stage:
         alpha_n = _estimate_alpha_n(blurred, I_opt, kernel, sigma_n)
-
 
         if sigma_n > 0.025 or alpha_n == 0.5:
             alpha_n = max(alpha_n, 0.6)
@@ -441,20 +390,16 @@ def adaptive_lp_deconv(blurred, kernel, alpha=0.8, sigma_n=None,
         if center_val < 1e-4:
             alpha_n = 0.8
 
-
         _clear_lut_cache()
         I_opt = _interpolate_library(
             blurred, kernel, alpha, alpha_n, lam_map, lam_library)
 
     return np.clip(I_opt, 0, 1)
 
-
 def _firls_deb_core(y, h, lam, alpha, beta_a, epsilon_min,
                     out_iter, inner_iter):
 
-
     n1, n2 = y.shape
-
 
     H = _psf2otf(h, (n1, n2))
     Hx = _psf2otf(np.array([[1.0, -1.0]]), (n1, n2))
@@ -468,12 +413,10 @@ def _firls_deb_core(y, h, lam, alpha, beta_a, epsilon_min,
     RR = HHx + HHy
     invA = HH + beta_a * RR
 
-
     c = alpha * lam
     beta = alpha * lam / (epsilon_min ** (2.0 - alpha))
 
     x = y.copy()
-
 
     dx = np.concatenate([np.diff(x, n=1, axis=1),
                          x[:, 0:1] - x[:, -1:]], axis=1)
@@ -492,20 +435,16 @@ def _firls_deb_core(y, h, lam, alpha, beta_a, epsilon_min,
         Wx = np.minimum(beta, c * np.maximum(adx, eps_pow) ** (alpha - 2.0))
         Wy = np.minimum(beta, c * np.maximum(ady, eps_pow) ** (alpha - 2.0))
 
-
         for _ in range(inner_iter):
 
             vx = beta_a * (dx + dvx) / (Wx + beta_a)
             vy = beta_a * (dy + dvy) / (Wy + beta_a)
 
-
             dvx = dvx - vx + dx
             dvy = dvy - vy + dy
 
-
             tempx = vx - dvx
             tempy = vy - dvy
-
 
             adj_x = np.concatenate(
                 [tempx[:, -1:] - tempx[:, 0:1],
@@ -518,7 +457,6 @@ def _firls_deb_core(y, h, lam, alpha, beta_a, epsilon_min,
             X = X / invA
             x = np.real(ifft2(X))
 
-
             dx = np.concatenate([np.diff(x, n=1, axis=1),
                                  x[:, 0:1] - x[:, -1:]], axis=1)
             dy = np.concatenate([np.diff(x, n=1, axis=0),
@@ -528,12 +466,10 @@ def _firls_deb_core(y, h, lam, alpha, beta_a, epsilon_min,
 
     return x
 
-
 def firls_deconv(blurred, kernel, lam=2e-5, alpha=0.8,
                  epsilon_min=2.0 / 255.0, epsilon_max=20.0 / 255.0,
                  beta_a=None, out_iter=5, inner_iter=3,
                  boundary='wrap', clip=True, use_edgetaper=None):
-
 
     kernel = kernel.astype(np.float64)
     kernel = np.maximum(kernel, 0.0)
@@ -549,7 +485,6 @@ def firls_deconv(blurred, kernel, lam=2e-5, alpha=0.8,
     if beta_a is None:
         beta_a = lam * alpha * (epsilon_max ** (alpha - 2.0))
 
-
     if use_edgetaper is True:
         boundary = 'reflect'
     elif use_edgetaper is False:
@@ -559,7 +494,6 @@ def firls_deconv(blurred, kernel, lam=2e-5, alpha=0.8,
     kh, kw = kernel.shape
 
     if boundary == 'wrap':
-
 
         target_size = _opt_fft_size(
             np.array([H_orig, W_orig]) + np.array([kh, kw]) - 1)
@@ -591,9 +525,7 @@ def firls_deconv(blurred, kernel, lam=2e-5, alpha=0.8,
         x = np.clip(x, 0.0, 1.0)
     return x
 
-
 _OPT_FFT_LUT = None
-
 
 def _build_opt_fft_lut(lut_size=4096):
     lut = np.zeros(lut_size + 1, dtype=np.int64)
@@ -623,7 +555,6 @@ def _build_opt_fft_lut(lut_size=4096):
             lut[i] = nn
     return lut
 
-
 def _opt_fft_size(n):
     global _OPT_FFT_LUT
     if _OPT_FFT_LUT is None:
@@ -642,7 +573,6 @@ def _opt_fft_size(n):
     if scalar_input:
         return int(m.flat[0])
     return m
-
 
 def _solve_min_laplacian(boundary_image):
     H, W = boundary_image.shape
@@ -669,7 +599,6 @@ def _solve_min_laplacian(boundary_image):
     img_direct = boundary_image.copy()
     img_direct[1:H-1, 1:W-1] = img_tt
     return img_direct
-
 
 def _wrap_boundary_liu(img, img_size):
     if img.ndim == 2:
@@ -730,7 +659,6 @@ def _wrap_boundary_liu(img, img_size):
         return ret[:, :, 0]
     return ret
 
-
 def _rr_psf2otf(psf, shape):
     if np.all(psf == 0):
         return np.zeros(shape, dtype=np.complex128)
@@ -741,7 +669,6 @@ def _rr_psf2otf(psf, shape):
     padded = np.roll(padded, -(in_w // 2), axis=1)
     return fft2(padded)
 
-
 def _computeDenominator(y, k):
     sizey = y.shape[:2]
     otfk = _rr_psf2otf(k, sizey)
@@ -750,7 +677,6 @@ def _computeDenominator(y, k):
     Denom2 = (np.abs(_rr_psf2otf(np.array([[1, -1]], dtype=np.float64), sizey)) ** 2
               + np.abs(_rr_psf2otf(np.array([[1], [-1]], dtype=np.float64), sizey)) ** 2)
     return Nomin1, Denom1, Denom2
-
 
 def _deblurring_adm_aniso(B, k, lambda_tv, alpha):
     beta = 1.0 / lambda_tv
@@ -783,7 +709,6 @@ def _deblurring_adm_aniso(B, k, lambda_tv, alpha):
                              I[0:1, :] - I[-1:, :]], axis=0)
         beta = beta / 2.0
     return I
-
 
 def _L0Restoration(Im, kernel, lambda_grad, kappa=2.0):
     H_orig, W_orig = Im.shape[0], Im.shape[1]
@@ -823,13 +748,11 @@ def _L0Restoration(Im, kernel, lambda_grad, kappa=2.0):
     S = S[:H_orig, :W_orig]
     return S
 
-
 def _fspecial_gaussian(size, sigma):
     radius = (size - 1) / 2.0
     y, x = np.mgrid[-radius:radius + 1, -radius:radius + 1]
     g = np.exp(-(x * x + y * y) / (2.0 * sigma * sigma))
     return g / g.sum()
-
 
 def _bilateral_filter(img, sigma_s, sigma):
     if img.ndim == 2:
@@ -862,10 +785,8 @@ def _bilateral_filter(img, sigma_s, sigma):
         return r_img[:, :, 0]
     return r_img
 
-
 def ringing_artifacts_removal(y, kernel, lambda_tv=4e-3, lambda_l0=2e-3,
                               weight_ring=0.5):
-
 
     H, W = y.shape[:2]
     target_size = _opt_fft_size(

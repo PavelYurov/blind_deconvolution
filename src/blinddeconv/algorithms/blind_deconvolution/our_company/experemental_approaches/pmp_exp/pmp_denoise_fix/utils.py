@@ -3,9 +3,7 @@ from scipy.signal import convolve2d
 from scipy.ndimage import map_coordinates, uniform_filter
 from scipy.fft import dstn, idstn
 
-
 def psf2otf(psf: np.ndarray, shape: tuple) -> np.ndarray:
-
 
     if np.all(psf == 0):
         return np.zeros(shape, dtype=np.complex128)
@@ -14,14 +12,11 @@ def psf2otf(psf: np.ndarray, shape: tuple) -> np.ndarray:
     padded = np.zeros(shape, dtype=np.float64)
     padded[:in_h, :in_w] = psf
 
-
     padded = np.roll(padded, -(in_h // 2), axis=0)
     padded = np.roll(padded, -(in_w // 2), axis=1)
     return np.fft.fft2(padded)
 
-
 def otf2psf(otf: np.ndarray, psf_size: tuple) -> np.ndarray:
-
 
     full = np.real(np.fft.ifft2(otf))
     ph, pw = psf_size
@@ -29,12 +24,9 @@ def otf2psf(otf: np.ndarray, psf_size: tuple) -> np.ndarray:
     full = np.roll(full, pw // 2, axis=1)
     return full[:ph, :pw]
 
-
 _OPT_FFT_LUT = None
 
-
 def _build_opt_fft_lut(lut_size: int = 4096) -> np.ndarray:
-
 
     lut = np.zeros(lut_size + 1, dtype=np.int64)
 
@@ -57,7 +49,6 @@ def _build_opt_fft_lut(lut_size: int = 4096) -> np.ndarray:
             e3 *= 3
         e2 *= 2
 
-
     nn = 0
     for i in range(lut_size, 0, -1):
         if lut[i] != 0:
@@ -66,9 +57,7 @@ def _build_opt_fft_lut(lut_size: int = 4096) -> np.ndarray:
             lut[i] = nn
     return lut
 
-
 def opt_fft_size(n) -> np.ndarray:
-
 
     global _OPT_FFT_LUT
     if _OPT_FFT_LUT is None:
@@ -91,16 +80,12 @@ def opt_fft_size(n) -> np.ndarray:
         return int(m.flat[0])
     return m
 
-
 def _solve_min_laplacian(boundary_image: np.ndarray) -> np.ndarray:
-
 
     H, W = boundary_image.shape
     boundary_image = boundary_image.copy()
 
-
     boundary_image[1:-1, 1:-1] = 0.0
-
 
     f_bp = np.zeros((H, W), dtype=np.float64)
     f_bp[1:H - 1, 1:W - 1] = (
@@ -111,15 +96,11 @@ def _solve_min_laplacian(boundary_image: np.ndarray) -> np.ndarray:
         + boundary_image[2:H,     1:W - 1]
     )
 
-
     f1 = -f_bp
-
 
     f2 = f1[1:H - 1, 1:W - 1]
 
-
     f2sin = dstn(f2, type=1)
-
 
     x = np.arange(1, W - 1)
     y = np.arange(1, H - 1)
@@ -127,21 +108,16 @@ def _solve_min_laplacian(boundary_image: np.ndarray) -> np.ndarray:
     denom = (2.0 * np.cos(np.pi * xx / (W - 1)) - 2.0) +\
             (2.0 * np.cos(np.pi * yy / (H - 1)) - 2.0)
 
-
     f3 = f2sin / denom
 
-
     img_tt = idstn(f3, type=1)
-
 
     img_direct = boundary_image.copy()
     img_direct[1:H - 1, 1:W - 1] = img_tt
 
     return img_direct
 
-
 def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
-
 
     if img.ndim == 2:
         img = img[:, :, np.newaxis]
@@ -157,19 +133,16 @@ def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
         alpha = 1
         HG = img[:, :, ch]
 
-
         r_A = np.zeros((alpha * 2 + H_w, W), dtype=np.float64)
 
         r_A[:alpha, :] = HG[-alpha:, :]
 
         r_A[-alpha:, :] = HG[:alpha, :]
 
-
         if H_w > 1:
             a = np.arange(H_w, dtype=np.float64) / (H_w - 1)
         else:
             a = np.array([0.0])
-
 
         r_A[alpha:alpha + H_w, 0] = (
             (1 - a) * r_A[alpha - 1, 0] + a * r_A[-alpha, 0]
@@ -178,11 +151,9 @@ def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
             (1 - a) * r_A[alpha - 1, -1] + a * r_A[-alpha, -1]
         )
 
-
         A2 = _solve_min_laplacian(r_A)
         r_A = A2
         A = r_A
-
 
         r_B = np.zeros((H, alpha * 2 + W_w), dtype=np.float64)
         r_B[:, :alpha] = HG[:, -alpha:]
@@ -203,7 +174,6 @@ def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
         r_B = B2
         B = r_B
 
-
         r_C = np.zeros((alpha * 2 + H_w, alpha * 2 + W_w), dtype=np.float64)
         r_C[:alpha, :] = B[-alpha:, :]
         r_C[-alpha:, :] = B[:alpha, :]
@@ -214,15 +184,11 @@ def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
         r_C = C2
         C = r_C
 
-
         A = A[:H_w, :]
-
 
         B = B[:, 1:W_w + 1]
 
-
         C = C[1:H_w + 1, 1:W_w + 1]
-
 
         ret[:, :, ch] = np.block([[HG, B], [A, C]])
 
@@ -230,9 +196,7 @@ def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
         return ret[:, :, 0]
     return ret
 
-
 def find_min_pixels(I: np.ndarray, patch_size: int, quantile: float = 0.0):
-
 
     M, N = I.shape
     Mp = int(np.ceil(M / patch_size))
@@ -243,7 +207,6 @@ def find_min_pixels(I: np.ndarray, patch_size: int, quantile: float = 0.0):
     for m in range(Mp):
         for n in range(Np):
 
-
             r_start = m * patch_size
             r_end = min((m + 1) * patch_size, M)
             c_start = n * patch_size
@@ -251,11 +214,9 @@ def find_min_pixels(I: np.ndarray, patch_size: int, quantile: float = 0.0):
 
             patch = I[r_start:r_end, c_start:c_end]
 
-
             flat = patch.flatten(order='F')
 
             if quantile > 0 and flat.size > 1:
-
 
                 q_val = np.quantile(flat, quantile)
                 lin_idx = np.argmin(np.abs(flat - q_val))
@@ -265,21 +226,16 @@ def find_min_pixels(I: np.ndarray, patch_size: int, quantile: float = 0.0):
                 lin_idx = np.argmin(flat)
                 val = flat[lin_idx]
 
-
             pr, pc = np.unravel_index(lin_idx, patch.shape, order='F')
 
-
             J[r_start + pr, c_start + pc] = val
-
 
             Mask[r_start + pr, c_start + pc] = 1.0
 
     return J, Mask
 
-
 def conjgrad(x: np.ndarray, b: np.ndarray, max_it: int, tol: float,
              ax_func, func_param) -> np.ndarray:
-
 
     x = x.copy()
     r = b - ax_func(x, func_param)
@@ -302,12 +258,9 @@ def conjgrad(x: np.ndarray, b: np.ndarray, max_it: int, tol: float,
 
     return x
 
-
 def adjust_psf_center(psf: np.ndarray) -> np.ndarray:
 
-
     rows, cols = psf.shape
-
 
     X, Y = np.meshgrid(np.arange(1, cols + 1, dtype=np.float64),
                         np.arange(1, rows + 1, dtype=np.float64))
@@ -325,21 +278,17 @@ def adjust_psf_center(psf: np.ndarray) -> np.ndarray:
     xshift = round(xc2 - xc1)
     yshift = round(yc2 - yc1)
 
-
     out_rows, out_cols = np.meshgrid(np.arange(rows, dtype=np.float64),
                                       np.arange(cols, dtype=np.float64),
                                       indexing='ij')
     in_rows = out_rows - yshift
     in_cols = out_cols - xshift
 
-
     result = map_coordinates(psf, [in_rows.ravel(), in_cols.ravel()],
                              order=1, mode='constant', cval=0.0)
     return result.reshape(rows, cols)
 
-
 def _histc(data: np.ndarray, edges: np.ndarray) -> np.ndarray:
-
 
     indices = np.searchsorted(edges, data, side='right') - 1
 
@@ -351,10 +300,8 @@ def _histc(data: np.ndarray, edges: np.ndarray) -> np.ndarray:
     counts = np.bincount(indices, minlength=len(edges) + 1)
     return counts[:len(edges)]
 
-
 def guided_filter(I: np.ndarray, p: np.ndarray,
                   radius: int, eps: float) -> np.ndarray:
-
 
     ksize = 2 * radius + 1
     mean_I = uniform_filter(I.astype(np.float64), size=ksize, mode='reflect')
@@ -374,12 +321,10 @@ def guided_filter(I: np.ndarray, p: np.ndarray,
     q = mean_a * I + mean_b
     return q
 
-
 def threshold_pxpy_v1(latent: np.ndarray, psf_size,
                       threshold=None,
                       denoise_eps=None, denoise_radius=2,
                       ensemble_denoise=False):
-
 
     b_estimate_threshold = threshold is None
 
@@ -402,7 +347,6 @@ def threshold_pxpy_v1(latent: np.ndarray, psf_size,
     dx = np.array([[-1, 1], [0, 0]], dtype=np.float64)
     dy = np.array([[-1, 0], [1, 0]], dtype=np.float64)
 
-
     px = convolve2d(denoised, dx, mode='valid')
     py = convolve2d(denoised, dy, mode='valid')
     pm = px ** 2 + py ** 2
@@ -412,16 +356,13 @@ def threshold_pxpy_v1(latent: np.ndarray, psf_size,
         with np.errstate(divide='ignore', invalid='ignore'):
             pd = np.arctan(py / px)
 
-
         pm_steps = np.arange(0, 2 + 0.00006, 0.00006)
         pm_steps = pm_steps[pm_steps <= 2.0 + 1e-12]
-
 
         mask1 = (pd >= 0) & (pd < np.pi / 4)
         mask2 = (pd >= np.pi / 4) & (pd < np.pi / 2)
         mask3 = (pd >= -np.pi / 4) & (pd < 0)
         mask4 = (pd >= -np.pi / 2) & (pd < -np.pi / 4)
-
 
         H1 = np.cumsum(_histc(pm[mask1], pm_steps)[::-1])
         H2 = np.cumsum(_histc(pm[mask2], pm_steps)[::-1])
@@ -432,13 +373,11 @@ def threshold_pxpy_v1(latent: np.ndarray, psf_size,
                         else psf_size)
         th = max(psf_size_val * 20, 10)
 
-
         for t in range(len(pm_steps)):
             min_h = min(H1[t], H2[t], H3[t], H4[t])
             if min_h >= th:
                 threshold = pm_steps[len(pm_steps) - 1 - t]
                 break
-
 
     m = pm < threshold
     while np.all(m):
@@ -448,25 +387,20 @@ def threshold_pxpy_v1(latent: np.ndarray, psf_size,
     px[m] = 0.0
     py[m] = 0.0
 
-
     if not b_estimate_threshold:
         threshold = threshold / 1.1
 
     return px, py, threshold
 
-
 def _fspecial_gaussian(size: int, sigma: float) -> np.ndarray:
-
 
     radius = (size - 1) / 2.0
     y, x = np.mgrid[-radius:radius + 1, -radius:radius + 1]
     g = np.exp(-(x * x + y * y) / (2.0 * sigma * sigma))
     return g / g.sum()
 
-
 def bilateral_filter(img: np.ndarray, sigma_s: float,
                      sigma: float) -> np.ndarray:
-
 
     if img.ndim == 2:
         img = img[:, :, np.newaxis]
@@ -475,12 +409,10 @@ def bilateral_filter(img: np.ndarray, sigma_s: float,
     h, w, d = img.shape
     img = img.astype(np.float32)
 
-
     lab = img.copy()
     sigma = sigma * np.sqrt(d)
 
     fr = int(np.ceil(sigma_s * 3))
-
 
     p_img = np.pad(img, ((fr, fr), (fr, fr), (0, 0)), mode='edge')
     p_lab = np.pad(lab, ((fr, fr), (fr, fr), (0, 0)), mode='edge')

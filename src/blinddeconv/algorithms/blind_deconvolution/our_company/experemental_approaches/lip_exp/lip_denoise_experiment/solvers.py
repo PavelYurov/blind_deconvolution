@@ -9,17 +9,14 @@ from .utils import (
     psf2otf,
 )
 
-
 def grad_tv_em(u: np.ndarray, ut: np.ndarray,
                epsilon: float = 1e-3, tau: float = 1e-1) -> np.ndarray:
-
 
     deltas = [(1, 1), (-1, 1), (1, -1), (-1, -1)]
 
     grad = np.zeros_like(u)
 
     for dx, dy in deltas:
-
 
         ux1 = shft(u, dx, 0) - shft(u, 0, 0)
         uy1 = shft(u, 0, dy) - shft(u, 0, 0)
@@ -30,7 +27,6 @@ def grad_tv_em(u: np.ndarray, ut: np.ndarray,
         uty1 = shft(ut, 0, dy) - shft(ut, 0, 0)
         TVt1 = np.sqrt(epsilon + utx1 ** 2 + uty1 ** 2)
 
-
         ux2 = shft(u, 0, 0) - shft(u, -dx, 0)
         uy2 = shft(u, -dx, dy) - shft(u, -dx, 0)
         TV2 = np.sqrt(epsilon + ux2 ** 2 + uy2 ** 2)
@@ -39,7 +35,6 @@ def grad_tv_em(u: np.ndarray, ut: np.ndarray,
         utx2 = shft(ut, 0, 0) - shft(ut, -dx, 0)
         uty2 = shft(ut, -dx, dy) - shft(ut, -dx, 0)
         TVt2 = np.sqrt(epsilon + utx2 ** 2 + uty2 ** 2)
-
 
         ux3 = shft(u, dx, -dy) - shft(u, 0, -dy)
         uy3 = shft(u, 0, 0) - shft(u, 0, -dy)
@@ -50,15 +45,12 @@ def grad_tv_em(u: np.ndarray, ut: np.ndarray,
         uty3 = shft(ut, 0, 0) - shft(ut, 0, -dy)
         TVt3 = np.sqrt(epsilon + utx3 ** 2 + uty3 ** 2)
 
-
         grad += du1 / TV1 / (tau + TVt1)
         grad += du2 / TV2 / (tau + TVt2)
         grad += du3 / TV3 / (tau + TVt3)
 
-
     grad /= 4.0
     return grad
-
 
 def blind(f: np.ndarray, MK: int, NK: int, beta: float,
           u: np.ndarray, k: np.ndarray,
@@ -69,7 +61,6 @@ def blind(f: np.ndarray, MK: int, NK: int, beta: float,
           u_step: float = 1e-3,
           blind_denoise_fn=None) -> tuple:
 
-
     epsilon = 1e-3
 
     for it in range(outer_iters):
@@ -79,13 +70,11 @@ def blind(f: np.ndarray, MK: int, NK: int, beta: float,
             synth = convn_valid(u, k)
             err = synth - f
 
-
             gradu = (beta * convn_full(err, np.rot90(k, 2))
                      + grad_tv_em(u, ut, epsilon, tau))
 
             dt = u_step * (u.max() + 1.0 / u.size) / (np.abs(gradu).max() + 1e-30)
             u = u - dt * gradu
-
 
             synth = convn_valid(u, k)
             err = synth - f
@@ -102,7 +91,6 @@ def blind(f: np.ndarray, MK: int, NK: int, beta: float,
 
     return u, k
 
-
 def blind_cv(f: np.ndarray, MK: int, NK: int, beta: float,
              u: np.ndarray, k: np.ndarray,
              outer_iters: int = 140,
@@ -111,13 +99,10 @@ def blind_cv(f: np.ndarray, MK: int, NK: int, beta: float,
              k_step: float = 1e-3,
              blind_denoise_fn=None) -> tuple:
 
-
     epsilon = 1e-3
     Mu, Nu = u.shape
 
-
     p = np.zeros((2, Mu, Nu))
-
 
     ys, xs = np.mgrid[0:MK, 0:NK]
     cy_target = (MK - 1) / 2.0
@@ -133,9 +118,7 @@ def blind_cv(f: np.ndarray, MK: int, NK: int, beta: float,
 
         u_bar = u.copy()
 
-
         L_f = beta
-
 
         sigma_pd = 0.99 * L_f / 16.0
         tau_pd = 0.99 / L_f
@@ -149,15 +132,12 @@ def blind_cv(f: np.ndarray, MK: int, NK: int, beta: float,
             ptx = p[0] + sigma_pd * grad_x
             pty = p[1] + sigma_pd * grad_y
 
-
             norm_pt = np.sqrt(ptx ** 2 + pty ** 2 + 1e-30)
             proj_scale = np.minimum(1.0, radius / norm_pt)
             p[0] = ptx * proj_scale
             p[1] = pty * proj_scale
 
-
             u_old = u.copy()
-
 
             synth = convn_valid(u, k)
             err = synth - f
@@ -170,9 +150,7 @@ def blind_cv(f: np.ndarray, MK: int, NK: int, beta: float,
 
             u = np.maximum(u, 0.0)
 
-
             u_bar = u + theta * (u - u_old)
-
 
         u_dk = blind_denoise_fn(u) if blind_denoise_fn is not None else u
         synth = convn_valid(u_dk, k)
@@ -185,7 +163,6 @@ def blind_cv(f: np.ndarray, MK: int, NK: int, beta: float,
         k_sum = k.sum()
         if k_sum > 0:
             k /= k_sum
-
 
         k_sum_c = k.sum()
         if k_sum_c > 0:
@@ -206,7 +183,6 @@ def blind_cv(f: np.ndarray, MK: int, NK: int, beta: float,
 
     return u, k
 
-
 def _grad_neumann(u: np.ndarray):
 
     gx = np.zeros_like(u)
@@ -215,9 +191,7 @@ def _grad_neumann(u: np.ndarray):
     gy[:-1, :] = u[1:, :] - u[:-1, :]
     return gx, gy
 
-
 def _div_neumann(px: np.ndarray, py: np.ndarray) -> np.ndarray:
-
 
     dx = np.zeros_like(px)
     dx[:, 1:-1] = px[:, 1:-1] - px[:, :-2]
@@ -230,16 +204,13 @@ def _div_neumann(px: np.ndarray, py: np.ndarray) -> np.ndarray:
     dy[-1, :]   = -py[-2, :]
     return dx + dy
 
-
 def _h_function(xi: np.ndarray, mu: float, eps: float,
                 sigma: float) -> np.ndarray:
-
 
     xi = np.asarray(xi, dtype=np.float64)
     eps2 = eps * eps
 
     rho = np.zeros_like(xi)
-
 
     safe = xi > 1e-12
     if not np.any(safe):
@@ -251,10 +222,8 @@ def _h_function(xi: np.ndarray, mu: float, eps: float,
     c = eps2 / xi2 + 2.0 * sigma / (mu * xi2)
     d = -eps2 / xi2
 
-
     p = c - 1.0 / 3.0
     q = -2.0 / 27.0 + c / 3.0 + d
-
 
     disc = q * q / 4.0 + (p ** 3) / 27.0
 
@@ -267,7 +236,6 @@ def _h_function(xi: np.ndarray, mu: float, eps: float,
         q_t = q[three_real]
         xi2_t = xi2[three_real]
 
-
         r = 2.0 * np.sqrt(-p_t / 3.0)
         arg = (3.0 * q_t) / (2.0 * p_t) * np.sqrt(-3.0 / p_t)
         arg = np.clip(arg, -1.0, 1.0)
@@ -278,7 +246,6 @@ def _h_function(xi: np.ndarray, mu: float, eps: float,
         r0 = t0 + 1.0 / 3.0
         r1 = t1 + 1.0 / 3.0
         r2 = t2 + 1.0 / 3.0
-
 
         def _obj(rr):
             return (mu / (2.0 * sigma)) * (rr - 1.0) ** 2 * xi2_t\
@@ -303,27 +270,22 @@ def _h_function(xi: np.ndarray, mu: float, eps: float,
         t = np.cbrt(u3) + np.cbrt(v3)
         rho_s[one_real] = t + 1.0 / 3.0
 
-
     rho_s = np.clip(rho_s, 0.0, 1.0)
     rho[safe] = rho_s
     return rho
 
-
 def _build_h_lut(mu: float, eps: float, sigma: float,
                  xi_max: float = 2.0, n_grid: int = 4096) -> tuple:
-
 
     xi_grid = np.linspace(0.0, xi_max, n_grid, dtype=np.float64)
     h_grid = _h_function(xi_grid, mu=mu, eps=eps, sigma=sigma)
     return xi_grid, h_grid
-
 
 def _h_lut_apply(xi: np.ndarray, xi_grid: np.ndarray,
                  h_grid: np.ndarray) -> np.ndarray:
 
     return np.interp(xi, xi_grid, h_grid,
                      left=h_grid[0], right=h_grid[-1])
-
 
 def blind_pd(f: np.ndarray, MK: int, NK: int, beta: float,
              u: np.ndarray, k: np.ndarray,
@@ -339,17 +301,14 @@ def blind_pd(f: np.ndarray, MK: int, NK: int, beta: float,
              h_lut_xi_max: float = 4.0,
              blind_denoise_fn=None) -> tuple:
 
-
     epsilon = float(tau_param)
 
     mu = float(beta)
-
 
     K_norm2 = 9.0
     default_step = 0.99 / np.sqrt(K_norm2)
     tau_pd = float(pd_tau) if pd_tau is not None else default_step
     sigma_pd = float(pd_sigma) if pd_sigma is not None else tau_pd
-
 
     h_mode_l = str(h_mode).lower()
     if h_mode_l == 'lut':
@@ -364,14 +323,12 @@ def blind_pd(f: np.ndarray, MK: int, NK: int, beta: float,
     else:
         raise ValueError(f"h_mode must be 'closed' or 'lut', got {h_mode!r}")
 
-
     Mu, Nu = u.shape
     z1 = np.zeros_like(f)
     z2x = np.zeros((Mu, Nu))
     z2y = np.zeros((Mu, Nu))
     u_tilde = u.copy()
     u_bar = u.copy()
-
 
     ys, xs = np.mgrid[0:MK, 0:NK]
     cy_target = (MK - 1) / 2.0
@@ -380,10 +337,8 @@ def blind_pd(f: np.ndarray, MK: int, NK: int, beta: float,
     for it in range(outer_iters):
         for itt in range(inner_iters):
 
-
             Kub = convn_valid(u_bar, k)
             z1 = (z1 + sigma_pd * (Kub - f)) / (1.0 + sigma_pd)
-
 
             gx, gy = _grad_neumann(u_bar)
             zx = z2x + sigma_pd * gx
@@ -395,17 +350,14 @@ def blind_pd(f: np.ndarray, MK: int, NK: int, beta: float,
             z2x = scale * zx
             z2y = scale * zy
 
-
             Kstar_z1 = convn_full(z1, np.rot90(k, 2))
             div_z2 = _div_neumann(z2x, z2y)
             u_new = u_tilde - tau_pd * (Kstar_z1 - div_z2)
-
 
             u_bar = u_new + theta * (u_new - u_tilde)
             u_tilde = u_new
 
         u = u_tilde
-
 
         u_dk = blind_denoise_fn(u) if blind_denoise_fn is not None else u
         synth = convn_valid(u_dk, k)
@@ -418,7 +370,6 @@ def blind_pd(f: np.ndarray, MK: int, NK: int, beta: float,
         k_sum = k.sum()
         if k_sum > 0:
             k /= k_sum
-
 
         k_sum_c = k.sum()
         if k_sum_c > 0:
@@ -436,16 +387,13 @@ def blind_pd(f: np.ndarray, MK: int, NK: int, beta: float,
 
     return u, k
 
-
 def _make_odd(val: int) -> int:
 
     return val - 1 if val % 2 == 0 else val
 
-
 def build_pyramid(f: np.ndarray, MK: int, NK: int,
                   lam: float, lambda_mult: float,
                   scale_mult: float = 1.4142135623730951):
-
 
     M, N = f.shape[:2]
     smallest_scale = 3
@@ -462,28 +410,23 @@ def build_pyramid(f: np.ndarray, MK: int, NK: int,
     while MKp[num_scales - 1] > smallest_scale and NKp[num_scales - 1] > smallest_scale:
         prev = num_scales - 1
 
-
         lambdas.append(lambdas[prev] / lambda_mult)
-
 
         new_mk = round(MKp[prev] / scale_mult)
         new_nk = round(NKp[prev] / scale_mult)
         new_mk = _make_odd(new_mk)
         new_nk = _make_odd(new_nk)
 
-
         if new_nk == NKp[prev]:
             new_nk -= 2
         if new_mk == MKp[prev]:
             new_mk -= 2
-
 
         new_mk = max(new_mk, smallest_scale)
         new_nk = max(new_nk, smallest_scale)
 
         MKp.append(new_mk)
         NKp.append(new_nk)
-
 
         factor_m = MKp[prev] / new_mk
         factor_n = NKp[prev] / new_nk
@@ -497,32 +440,26 @@ def build_pyramid(f: np.ndarray, MK: int, NK: int,
         Mp.append(new_m)
         Np.append(new_n)
 
-
         fp.append(imresize_matlab(f, (new_m, new_n)))
 
         num_scales += 1
 
     return fp, Mp, Np, MKp, NKp, lambdas, num_scales
 
-
 def coarse_to_fine(f: np.ndarray, MK: int, NK: int,
                    blind_params: dict, ctf_params: dict,
                    verbose: bool = False, method: str = 'mm',
                    blind_denoise_fn=None):
 
-
     final_lambda = ctf_params.get('final_lambda')
     lambda_mult = ctf_params.get('lambda_mult', 2.1)
     scale_mult = ctf_params.get('scale_mult', np.sqrt(2))
 
-
     fp, Mp, Np, MKp, NKp, lambdas, num_scales = build_pyramid(
         f, MK, NK, final_lambda, lambda_mult, scale_mult)
 
-
     u = pad_replicate(f, MK // 2, NK // 2)
     k = np.ones((MK, NK), dtype=np.float64) / (MK * NK)
-
 
     k_steps = blind_params.get('k_step', np.array([1e-3]))
     u_steps = blind_params.get('u_step', np.array([1e-3]))
@@ -535,13 +472,11 @@ def coarse_to_fine(f: np.ndarray, MK: int, NK: int,
     inner_iters = blind_params.get('inner_iters', 5)
     tau = blind_params.get('tau', 1e-3)
 
-
     for scale_idx in range(num_scales - 1, -1, -1):
         Ms = Mp[scale_idx]
         Ns = Np[scale_idx]
         MKs = MKp[scale_idx]
         NKs = NKp[scale_idx]
-
 
         u = imresize_matlab(u, (Ms + MKs - 1, Ns + NKs - 1))
         k = imresize_matlab(k, (MKs, NKs))
@@ -557,7 +492,6 @@ def coarse_to_fine(f: np.ndarray, MK: int, NK: int,
         if verbose:
             print(f"scale: {scale_idx}  lambda: {lam:.4f}  "
                   f"MKs: {MKs}  NKs: {NKs}  outer_iters: {outer_iters}")
-
 
         for phase in range(len(k_steps)):
             if method == 'mm':
@@ -602,12 +536,10 @@ def coarse_to_fine(f: np.ndarray, MK: int, NK: int,
 
     return u, k
 
-
 from numpy.fft import fft2, ifft2
 from scipy.fft import dstn, idstn
 
 _OPT_FFT_LUT = None
-
 
 def _build_opt_fft_lut(max_n=4096):
 
@@ -634,7 +566,6 @@ def _build_opt_fft_lut(max_n=4096):
         lut[n_] = eff_sorted[idx] if idx < len(eff_sorted) else n_
     return lut
 
-
 def opt_fft_size(n) -> np.ndarray:
 
     global _OPT_FFT_LUT
@@ -654,7 +585,6 @@ def opt_fft_size(n) -> np.ndarray:
     if scalar_input:
         return int(m.flat[0])
     return m
-
 
 def _solve_min_laplacian(boundary_image: np.ndarray) -> np.ndarray:
 
@@ -684,7 +614,6 @@ def _solve_min_laplacian(boundary_image: np.ndarray) -> np.ndarray:
     result = bi.copy()
     result[1:H-1, 1:W-1] = img_tt
     return result
-
 
 def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
 
@@ -752,7 +681,6 @@ def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
         return ret[:, :, 0]
     return ret
 
-
 def _computeDenominator(B, k):
 
     m, n = B.shape
@@ -765,7 +693,6 @@ def _computeDenominator(B, k):
     Denom2 = (np.abs(psf2otf(dx, (m, n))) ** 2 +
               np.abs(psf2otf(dy, (m, n))) ** 2)
     return Nomin1, Denom1, Denom2
-
 
 def deblurring_adm_aniso(B, k, lambda_tv, alpha):
 
@@ -802,7 +729,6 @@ def deblurring_adm_aniso(B, k, lambda_tv, alpha):
         beta = beta / 2.0
 
     return I
-
 
 def L0Restoration(Im, kernel, lambda_grad, kappa=2.0):
 
@@ -861,14 +787,12 @@ def L0Restoration(Im, kernel, lambda_grad, kappa=2.0):
         S = S[:, :, 0]
     return S
 
-
 def _fspecial_gaussian(size, sigma):
 
     x = np.arange(size) - size // 2
     g = np.exp(-x ** 2 / (2 * sigma ** 2))
     h = np.outer(g, g)
     return h / h.sum()
-
 
 def bilateral_filter(img, sigma_s, sigma):
 
@@ -906,10 +830,8 @@ def bilateral_filter(img, sigma_s, sigma):
         return r_img[:, :, 0]
     return r_img
 
-
 def ringing_artifacts_removal(y, kernel, lambda_tv=1e-3,
                               lambda_l0=2e-3, weight_ring=1.0):
-
 
     H, W = y.shape[:2]
     target_size = opt_fft_size(

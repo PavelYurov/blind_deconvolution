@@ -1,27 +1,3 @@
-"""
-screenot.py
-
-Image denoising via ScreeNOT (optimal adaptive SVD thresholding).
-
-Based on:
-    Donoho, Gavish, Romanov:
-    "ScreeNOT: Exact MSE-optimal singular value thresholding in correlated noise."
-    Annals of Statistics (2023).
-
-ScreeNOT finds the MSE-optimal hard threshold for singular values of a matrix
-Y = X + Z, where X is low-rank signal and Z is additive noise with arbitrary
-(unknown) correlation structure.  The threshold is computed adaptively from
-the observed singular values — no knowledge of noise statistics is needed.
-
-Two modes:
-    'full'  — treat the entire image as a matrix Y (H×W) and apply
-              ScreeNOT directly.  Simple, fast, no artifacts.
-    'patch' — extract overlapping patches into a matrix, apply ScreeNOT,
-              aggregate back.  Better for high-texture images but slower.
-
-Dependencies: numpy (only).
-"""
-
 import numpy as np
 from numpy.linalg import svd
 
@@ -30,51 +6,34 @@ __all__ = [
     'screenot_denoise',
 ]
 
-
-# ═════════════════════════════════════════════════════════════════════════════
-# 1. Core ScreeNOT algorithm (from Donoho, Gavish, Romanov 2023)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def _Phi(y, fZ):
-    """Functional Phi(y; fZ)."""
+
     return np.mean(y / (y ** 2 - fZ ** 2))
 
-
 def _Phid(y, fZ):
-    """Derivative of Phi w.r.t. y."""
+
     return np.mean(-(y ** 2 + fZ ** 2) / (y ** 2 - fZ ** 2) ** 2)
 
-
 def _D(y, fZ, gamma):
-    """Functional D_gamma(y; fZ)."""
+
     phi = _Phi(y, fZ)
     return phi * (gamma * phi + (1 - gamma) / y)
 
-
 def _Dd(y, fZ, gamma):
-    """Derivative of D_gamma w.r.t. y."""
+
     phi = _Phi(y, fZ)
     phid = _Phid(y, fZ)
     return (phid * (gamma * phi + (1 - gamma) / y)
             + phi * (gamma * phid - (1 - gamma) / y ** 2))
 
-
 def _F(y, fZ, gamma):
-    """Functional Psi_gamma(y; fZ).  Optimal threshold satisfies F = -4."""
+
     d = _D(y, fZ, gamma)
     dd = _Dd(y, fZ, gamma)
     return y * dd / d
 
-
 def _create_pseudo_noise(fY, k, strategy='i'):
-    """Estimate noise singular-value distribution from observed SVs.
 
-    Parameters
-    ----------
-    fY : 1-d array — observed singular values (any order).
-    k : int — upper bound on signal rank.
-    strategy : str — 'i' (imputation), 'w' (winsorization), '0' (zero).
-    """
     fZ = np.sort(fY)
     p = fZ.size
     if k >= p:
@@ -98,9 +57,8 @@ def _create_pseudo_noise(fY, k, strategy='i'):
                 f"Unknown strategy '{strategy}', use 'i', 'w', or '0'")
     return fZ
 
-
 def _compute_opt_threshold(fZ, gamma):
-    """Binary search for optimal threshold t* where F(t*; fZ) = -4."""
+
     low = np.max(fZ)
     high = low + 2.0
     while _F(high, fZ, gamma) < -4:
@@ -116,23 +74,8 @@ def _compute_opt_threshold(fZ, gamma):
             high = mid
     return (high + low) / 2
 
-
 def adaptive_hard_thresholding(Y, k, strategy='i'):
-    """ScreeNOT: optimal adaptive hard thresholding of a matrix.
 
-    Parameters
-    ----------
-    Y : ndarray, shape (n, p) — observed matrix (signal + noise).
-    k : int — upper bound on signal rank (can be loose).
-    strategy : str — noise bulk estimation: 'i' (imputation, default),
-               'w' (winsorization), '0' (transport to zero).
-
-    Returns
-    -------
-    Xest : ndarray, same shape as Y — denoised (low-rank) estimate.
-    Topt : float — the hard threshold used.
-    r : int — estimated signal rank (number of kept components).
-    """
     U, fY, Vt = svd(Y, full_matrices=False)
     gamma = min(Y.shape[0] / Y.shape[1], Y.shape[1] / Y.shape[0])
 
@@ -145,46 +88,9 @@ def adaptive_hard_thresholding(Y, k, strategy='i'):
 
     return Xest, Topt, r
 
-
-# ═════════════════════════════════════════════════════════════════════════════
-# 2. Image denoising via ScreeNOT
-# ═════════════════════════════════════════════════════════════════════════════
-
 def screenot_denoise(image, k=10, strategy='i', mode='full',
                      patch_size=8, stride=3):
-    """Denoise a 2D image using ScreeNOT SVD thresholding.
 
-    Parameters
-    ----------
-    image : ndarray, H×W, float64 [0, 1]
-        Grayscale image to denoise.
-    k : int
-        Upper bound on the signal rank.
-        For mode='full': rank of the image matrix (typ. 10–50).
-        For mode='patch': rank of the patch matrix (typ. 5–20).
-    strategy : str
-        ScreeNOT noise bulk estimation: 'i' (default), 'w', or '0'.
-    mode : str
-        'full'  — apply ScreeNOT to the image matrix directly (default).
-                  No patch artifacts. Fast.
-        'patch' — patch-based: extract overlapping patches, apply
-                  ScreeNOT to patch matrix, aggregate with averaging.
-
-    Patch-mode only parameters
-    --------------------------
-    patch_size : int
-        Side length of square patches (default 8).
-    stride : int
-        Step between patches (default 3).
-
-    Returns
-    -------
-    denoised : ndarray, same shape as image, float64 [0, 1]
-    info : dict
-        'Topt'  — optimal threshold used
-        'rank'  — estimated signal rank
-        'mode'  — 'full' or 'patch'
-    """
     if image.ndim != 2:
         raise ValueError(f'Expected 2D image, got shape {image.shape}')
 
@@ -195,13 +101,11 @@ def screenot_denoise(image, k=10, strategy='i', mode='full',
     else:
         raise ValueError(f"Unknown mode '{mode}', use 'full' or 'patch'")
 
-
 def _denoise_full(image, k, strategy):
-    """Apply ScreeNOT directly to the image matrix H×W."""
+
     H, W = image.shape
     min_dim = min(H, W)
 
-    # Clamp k to valid range for imputation
     max_k = min_dim // 2 - 1
     if k > max_k:
         k = max(1, max_k)
@@ -223,9 +127,8 @@ def _denoise_full(image, k, strategy):
         'skipped': False,
     }
 
-
 def _extract_patches(image, patch_size, stride):
-    """Extract overlapping patches as rows of a matrix."""
+
     H, W = image.shape
     positions = []
     rows = []
@@ -236,9 +139,8 @@ def _extract_patches(image, patch_size, stride):
             positions.append((y0, x0))
     return np.array(rows, dtype=np.float64), positions
 
-
 def _aggregate_patches(patches, positions, patch_size, image_shape):
-    """Reconstruct image from patches with overlap averaging."""
+
     H, W = image_shape
     accum = np.zeros((H, W), dtype=np.float64)
     count = np.zeros((H, W), dtype=np.float64)
@@ -249,9 +151,8 @@ def _aggregate_patches(patches, positions, patch_size, image_shape):
     count = np.maximum(count, 1.0)
     return accum / count
 
-
 def _denoise_patch(image, k, strategy, patch_size, stride):
-    """Apply ScreeNOT to the matrix of overlapping patches."""
+
     H, W = image.shape
     if H < patch_size or W < patch_size:
         return image.copy(), {

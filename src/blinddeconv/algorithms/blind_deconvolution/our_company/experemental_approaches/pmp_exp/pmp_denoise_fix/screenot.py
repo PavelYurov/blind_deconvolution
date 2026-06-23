@@ -6,22 +6,18 @@ __all__ = [
     'screenot_denoise',
 ]
 
-
 def _Phi(y, fZ):
 
     return np.mean(y / (y ** 2 - fZ ** 2))
-
 
 def _Phid(y, fZ):
 
     return np.mean(-(y ** 2 + fZ ** 2) / (y ** 2 - fZ ** 2) ** 2)
 
-
 def _D(y, fZ, gamma):
 
     phi = _Phi(y, fZ)
     return phi * (gamma * phi + (1 - gamma) / y)
-
 
 def _Dd(y, fZ, gamma):
 
@@ -30,16 +26,13 @@ def _Dd(y, fZ, gamma):
     return (phid * (gamma * phi + (1 - gamma) / y)
             + phi * (gamma * phid - (1 - gamma) / y ** 2))
 
-
 def _F(y, fZ, gamma):
 
     d = _D(y, fZ, gamma)
     dd = _Dd(y, fZ, gamma)
     return y * dd / d
 
-
 def _create_pseudo_noise(fY, k, strategy='i'):
-
 
     fZ = np.sort(fY)
     p = fZ.size
@@ -64,7 +57,6 @@ def _create_pseudo_noise(fY, k, strategy='i'):
                 f"Unknown strategy '{strategy}', use 'i', 'w', or '0'")
     return fZ
 
-
 def _compute_opt_threshold(fZ, gamma):
 
     low = np.max(fZ)
@@ -82,9 +74,7 @@ def _compute_opt_threshold(fZ, gamma):
             high = mid
     return (high + low) / 2
 
-
 def adaptive_hard_thresholding(Y, k, strategy='i'):
-
 
     U, fY, Vt = svd(Y, full_matrices=False)
     gamma = min(Y.shape[0] / Y.shape[1], Y.shape[1] / Y.shape[0])
@@ -98,10 +88,8 @@ def adaptive_hard_thresholding(Y, k, strategy='i'):
 
     return Xest, Topt, r
 
-
 def screenot_denoise(image, k=10, strategy='i', mode='full',
                      patch_size=8, stride=3):
-
 
     if image.ndim != 2:
         raise ValueError(f'Expected 2D image, got shape {image.shape}')
@@ -113,12 +101,10 @@ def screenot_denoise(image, k=10, strategy='i', mode='full',
     else:
         raise ValueError(f"Unknown mode '{mode}', use 'full' or 'patch'")
 
-
 def _denoise_full(image, k, strategy):
 
     H, W = image.shape
     min_dim = min(H, W)
-
 
     max_k = min_dim // 2 - 1
     if k > max_k:
@@ -141,7 +127,6 @@ def _denoise_full(image, k, strategy):
         'skipped': False,
     }
 
-
 def _extract_patches(image, patch_size, stride):
 
     H, W = image.shape
@@ -154,7 +139,6 @@ def _extract_patches(image, patch_size, stride):
             positions.append((y0, x0))
     return np.array(rows, dtype=np.float64), positions
 
-
 def _aggregate_patches(patches, positions, patch_size, image_shape):
 
     H, W = image_shape
@@ -166,7 +150,6 @@ def _aggregate_patches(patches, positions, patch_size, image_shape):
         count[y0:y0 + patch_size, x0:x0 + patch_size] += 1.0
     count = np.maximum(count, 1.0)
     return accum / count
-
 
 def _denoise_patch(image, k, strategy, patch_size, stride):
 

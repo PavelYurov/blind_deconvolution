@@ -1,17 +1,9 @@
-"""
-aeer.py
-
-Blind Image Deconvolution Based on Adaptive Euler’s Elastica Regularization.
-Реализация класса алгоритма для фреймворка.
-"""
-
 import numpy as np
 import time
 import os
 import matplotlib.pyplot as plt
 from typing import Tuple, List, Any, Dict
 import scipy.ndimage
-
 
 import sys
 from pathlib import Path
@@ -51,7 +43,6 @@ class AEER_BD(DeconvolutionAlgorithm):
         iota: float = 5.0,
         delta: float = 1.0,
 
-
         r1: float = 50.0,
         r2: float = 50.0,
         r3: float = 200.0,
@@ -60,10 +51,8 @@ class AEER_BD(DeconvolutionAlgorithm):
         max_iter: int = 50,
         tol: float = 1e-5,
 
-
         clean_kernel: bool = False,
         grad_threshold: float = 0.0,
-
 
         final_deconv: str = 'tikhonov',
         nb_iter: int = 100,
@@ -119,12 +108,10 @@ class AEER_BD(DeconvolutionAlgorithm):
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         start_time = time.time()
 
-
         f_orig = image.astype(np.float64)
         if f_orig.max() > 1.0: f_orig /= 255.0
         H_orig, W_orig = f_orig.shape
         kh, kw = self.kernel_shape
-
 
         f_loop = edgetaper(f_orig, (kh, kw))
         H, W = f_loop.shape
@@ -133,7 +120,6 @@ class AEER_BD(DeconvolutionAlgorithm):
         t1, t2 = compute_adaptive_matrix_T(f_loop, self.iota, self.delta)
 
         u = f_loop.copy()
-
 
         k = np.zeros((H, W))
         ks_init = max(kh, kw) // 2
@@ -156,25 +142,20 @@ class AEER_BD(DeconvolutionAlgorithm):
         if self.debug:
             self._save_debug_image(f_loop, "loop_input_edgetaper", 0)
 
-
         for n in range(self.max_iter):
             k_prev = k.copy()
             u_prev = u.copy()
-
 
             k_raw = solve_k_subproblem(u, f_loop, w, lambda3, self.r3, self.lambda_val, OTF_dx, OTF_dy)
             k = np.fft.fftshift(k_raw)
             k = np.maximum(k, 0)
 
-
             max_idx = np.unravel_index(np.argmax(k, axis=None), k.shape)
             shift_y, shift_x = H // 2 - max_idx[0], W // 2 - max_idx[1]
             k = np.roll(k, (shift_y, shift_x), axis=(0, 1))
 
-
             if self.clean_kernel and n > 5:
                 k = self._clean_kernel_func(k)
-
 
             mask = np.zeros_like(k)
             sy, sx = H // 2 - kh // 2, W // 2 - kw // 2
@@ -186,7 +167,6 @@ class AEER_BD(DeconvolutionAlgorithm):
             if s > 1e-12: k /= s
             else: k[H//2, W//2] = 1.0
 
-
             u = solve_u_subproblem(k, f_loop, p, lambda1, self.r1, self.lambda_val, OTF_dx, OTF_dy)
             u = np.maximum(u, 0.0)
             u = np.minimum(u, 1.0)
@@ -196,7 +176,6 @@ class AEER_BD(DeconvolutionAlgorithm):
                 vis_size = max(kh, kw) + 20
                 vis_k = k[H//2-vis_size:H//2+vis_size, W//2-vis_size:W//2+vis_size]
                 self._save_debug_image(vis_k, "k", n+1)
-
 
             p = solve_p_subproblem(u, q, lambda1, lambda2, t1, t2, self.r1, self.r2)
             q = solve_q_subproblem(p, u_prev, lambda2, t1, t2, self.alpha, self.r2)
@@ -228,7 +207,6 @@ class AEER_BD(DeconvolutionAlgorithm):
                 print(f"Kernel converged at iter {n}")
                 break
 
-
         cy, cx = H // 2, W // 2
         sy, sx = cy - kh // 2, cx - kw // 2
         kernel_small = k[sy : sy + kh, sx : sx + kw]
@@ -247,7 +225,6 @@ class AEER_BD(DeconvolutionAlgorithm):
             u_final_pad = wiener_filter(f_pad, k_final_pad, noise_snr=0.01)
 
         elif self.final_deconv == 'tikhonov':
-
 
             u_final_pad = tikhonov_filter(f_pad, k_final_pad, alpha=0.01)
 

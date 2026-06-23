@@ -52,8 +52,6 @@ def imresize(img: np.ndarray, output_size, method: str = 'bilinear') -> np.ndarr
     zoom_h = oh / h
     zoom_w = ow / w
 
-    # Anti-aliasing prefilter for downscaling (matches MATLAB imresize Antialiasing=true).
-    # sigma = (1/scale - 1)/pi  (gentle, matches the tent-kernel cut-off).
     src = img
     if zoom_h < 1.0 or zoom_w < 1.0:
         sigma_h = max(0.0, (1.0 / zoom_h - 1.0) / np.pi) if zoom_h < 1.0 else 0.0
@@ -125,7 +123,7 @@ def ycbcr2rgb(img: np.ndarray) -> np.ndarray:
 def comp_upto_shift(I1: np.ndarray, I2: np.ndarray):
     maxshift = 5
     shifts = np.arange(-5.0, 5.0 + 0.25, 0.25)
-    
+
     I2c = I2[15:-15, 15:-15].copy()
     I1c = I1[10:-10, 10:-10].copy()
 

@@ -24,9 +24,7 @@ from .utils import (
     bilateral_filter,
 )
 
-
 def TV_denoising(I, weight, max_it):
-
 
     h = np.full((3, 3), 1e-10, dtype=np.float64)
     h[1, 1] = 1.0
@@ -37,21 +35,17 @@ def TV_denoising(I, weight, max_it):
 
     s_h, s_w = h.shape
 
-
     I_sym, border = Copy_Enlarge_h(I, (s_h * 3, s_w * 3))
     I_sym = edgetaper(I_sym, h)
     I_h, I_w = I_sym.shape
 
-
     B = h
     Bt = h[::-1, ::-1]
-
 
     from scipy.signal import fftconvolve
     BtB = fftconvolve(Bt, B)
     S_h = 2 * s_h - 1
     S_w = 2 * s_w - 1
-
 
     vtv_w = np.array([0, -1, 2, -1, 0], dtype=np.float64)
     vtv_h = vtv_w.copy()
@@ -70,7 +64,6 @@ def TV_denoising(I, weight, max_it):
     hw = (s_w - 1) // 2
     Bt_tmp[s_h - 1 - hh:s_h + hh, s_w - 1 - hw:s_w + hw] = Bt
 
-
     vt_w = np.array([0, -1, 1], dtype=np.float64)
     vt_h = vt_w.copy()
 
@@ -82,16 +75,13 @@ def TV_denoising(I, weight, max_it):
 
     Vt_h[s_h - 2:s_h + 1, s_w - 1] = vt_h
 
-
     v_w = np.array([[1, -1, 0]], dtype=np.float64)
     v_h = v_w.T
-
 
     z_h = np.zeros((I_h, I_w), dtype=np.float64)
     z_w = np.zeros((I_h, I_w), dtype=np.float64)
     y_h = np.zeros((I_h, I_w), dtype=np.float64)
     y_w = np.zeros((I_h, I_w), dtype=np.float64)
-
 
     fft_shape = (S_h + I_h - 1, S_w + I_w - 1)
 
@@ -107,16 +97,13 @@ def TV_denoising(I, weight, max_it):
     FVt_w = _embed_fft(Vt_w, (S_h, S_w), fft_shape)
     FVt_h = _embed_fft(Vt_h, (S_h, S_w), fft_shape)
 
-
     Fb = _embed_fft(I_sym, (I_h, I_w), fft_shape)
-
 
     for _ in range(max_it):
         Fz_h = _embed_fft(z_h, (I_h, I_w), fft_shape)
         Fz_w = _embed_fft(z_w, (I_h, I_w), fft_shape)
         Fy_h = _embed_fft(y_h, (I_h, I_w), fft_shape)
         Fy_w = _embed_fft(y_w, (I_h, I_w), fft_shape)
-
 
         x = ifft2(
             (Fb * FBt
@@ -126,12 +113,10 @@ def TV_denoising(I, weight, max_it):
         )
         x = np.real(x[:I_h, :I_w])
 
-
         Vx_h = ndimage_convolve(x, v_h, mode='nearest')
         Vx_h[-1, :] = 0.0
         Vx_w = ndimage_convolve(x, v_w, mode='nearest')
         Vx_w[:, -1] = 0.0
-
 
         thr = mu / gamma
 
@@ -149,14 +134,11 @@ def TV_denoising(I, weight, max_it):
         z_w[mask_pos] = diff_w[mask_pos] - thr
         z_w[mask_neg] = diff_w[mask_neg] + thr
 
-
         y_h = y_h - (Vx_h - z_h)
         y_w = y_w - (Vx_w - z_w)
 
-
     x = x[border[0]:I_h - border[0], border[1]:I_w - border[1]]
     return x
-
 
 def _guided_filter(I, p, radius, eps):
 
@@ -172,9 +154,7 @@ def _guided_filter(I, p, radius, eps):
     mean_b = uniform_filter(b, size)
     return mean_a * I + mean_b
 
-
 def apply_denoiser(img, method, **params):
-
 
     if method is None or method == 'none':
         return img.copy()
@@ -224,7 +204,6 @@ def apply_denoiser(img, method, **params):
 
     elif method == 'act':
 
-
         from .act_denoise import act_denoise
         nv = params.get('noise_var', None)
         ts = params.get('threshold_setting', 's')
@@ -234,9 +213,7 @@ def apply_denoiser(img, method, **params):
     else:
         raise ValueError(f"Unknown denoiser method: {method}")
 
-
 def Deblur_GL_CG_4(Y_b, k, W, we, max_iter):
-
 
     d1 = np.array([[1, -1, 0]], dtype=np.float64)
     d1_c = np.array([[0, -1, 1]], dtype=np.float64)
@@ -287,12 +264,10 @@ def Deblur_GL_CG_4(Y_b, k, W, we, max_iter):
             d4_c, mode='nearest')
         return out
 
-
     if use_fft:
         b = fftconv(Y_b_padding, k_flipped, 'same')
     else:
         b = ndimage_convolve(Y_b_padding, k_flipped, mode='nearest')
-
 
     Ax = _apply_blur(x) + _apply_graph(x)
 
@@ -308,7 +283,6 @@ def Deblur_GL_CG_4(Y_b, k, W, we, max_iter):
         else:
             p = r.copy()
 
-
         Ap = _apply_blur(p) + _apply_graph(p)
 
         q = Ap
@@ -321,23 +295,18 @@ def Deblur_GL_CG_4(Y_b, k, W, we, max_iter):
 
         rho_1 = rho
 
-
         x = np.clip(x, 0.0, 1.0)
 
     return x
 
-
 def _compute_Ax_kernel(x, p):
-
 
     x_f = psf2otf(x, p['img_size'])
     y = otf2psf(p['m'] * x_f, p['psf_size'])
     y = y + p['lambda'] * x
     return y
 
-
 def kernel_solver_L2(Y, b, k_size, M, lambda_val):
-
 
     dx = np.array([[1, -1, 0]], dtype=np.float64)
     dy = dx.T
@@ -345,14 +314,11 @@ def kernel_solver_L2(Y, b, k_size, M, lambda_val):
     if M is None:
         M = np.ones_like(Y)
 
-
     Yx = ndimage_convolve(Y, dx, mode='nearest') * M
     Yy = ndimage_convolve(Y, dy, mode='nearest') * M
 
-
     bx = ndimage_convolve(b, dx, mode='nearest')
     by = ndimage_convolve(b, dy, mode='nearest')
-
 
     pad_time = 3
     pad_size = int(np.floor(k_size * pad_time))
@@ -371,10 +337,8 @@ def kernel_solver_L2(Y, b, k_size, M, lambda_val):
     wy = 25.0
     psf_size = (k_size, k_size)
 
-
     b_rhs_f = wx * np.conj(Yx_f) * bx_f + wy * np.conj(Yy_f) * by_f
     b_rhs = np.real(otf2psf(b_rhs_f, psf_size))
-
 
     p = {
         'm': wx * np.conj(Yx_f) * Yx_f + wy * np.conj(Yy_f) * Yy_f,
@@ -383,10 +347,8 @@ def kernel_solver_L2(Y, b, k_size, M, lambda_val):
         'lambda': lambda_val,
     }
 
-
     psf = np.ones(psf_size, dtype=np.float64) / (k_size * k_size)
     psf = conjgrad(psf, b_rhs, 20, 1e-5, _compute_Ax_kernel, p)
-
 
     psf[psf < psf.max() * 0.05] = 0.0
     psf_sum = psf.sum()
@@ -395,21 +357,17 @@ def kernel_solver_L2(Y, b, k_size, M, lambda_val):
 
     return psf
 
-
 def bid_rgtv_c2f_cg(Y_b, k_estimate_size, show_intermediate=False,
                      preprocess='tv', preprocess_params=None,
                      pre_kernel='none', pre_kernel_params=None,
                      iteration_callback=None):
 
-
     scale_factor = np.log2(3)
     level_num = int(np.ceil(np.log(k_estimate_size / 7) / np.log(scale_factor))) + 1
-
 
     image_pyramid = [None] * level_num
     k_size = np.zeros(level_num, dtype=int)
     image_size = np.zeros((level_num, 2), dtype=int)
-
 
     image_pyramid[0] = apply_denoiser(Y_b, preprocess, **(preprocess_params or {}))
 
@@ -428,11 +386,9 @@ def bid_rgtv_c2f_cg(Y_b, k_estimate_size, show_intermediate=False,
         k_size[i] = int(np.floor(k_size[i - 1] / np.log2(3)))
         k_size[i] = k_size[i] + (1 - k_size[i] % 2)
 
-
     frame = 1
     Level = 1
     D, R = GenerateFrameletFilter(frame)
-
 
     k_estimate = None
     Y_r_rgtv_cg = None
@@ -459,7 +415,6 @@ def bid_rgtv_c2f_cg(Y_b, k_estimate_size, show_intermediate=False,
             if k_sum > 0:
                 k_estimate = k_estimate / k_sum
 
-
         Y_b_padding, padsize = G_padding(image_pyramid[level], k_estimate, 1)
         Y_r_rgtv_cg = Y_b_padding.copy()
         h, w = Y_r_rgtv_cg.shape
@@ -477,12 +432,10 @@ def bid_rgtv_c2f_cg(Y_b, k_estimate_size, show_intermediate=False,
                 W1 = weights_computation(Y_r_rgtv_cg, sigma, 4, 1)
                 W = W1 * weights_computation(Y_r_rgtv_cg, None, 4, 2)
 
-
             Y_r_rgtv_cg = Y_r_rgtv_cg[
                 padsize[0]:h - padsize[0],
                 padsize[1]:w - padsize[1]
             ]
-
 
             if pre_kernel is not None and pre_kernel != 'none':
                 Y_for_kernel = apply_denoiser(
@@ -490,14 +443,12 @@ def bid_rgtv_c2f_cg(Y_b, k_estimate_size, show_intermediate=False,
             else:
                 Y_for_kernel = Y_r_rgtv_cg
 
-
             t_s = 0.1
             t_r = 0.3
             M = informative_edge_mask_adaptive_mine(Y_for_kernel, t_s, t_r, 5)
             k_estimate = kernel_solver_L2(
                 Y_for_kernel, image_pyramid[level],
                 int(k_size[level]), M, lambda_val)
-
 
             if level <= 1:
                 Cf = FraDecMultiLevel2D(k_estimate, D, Level)
@@ -509,7 +460,6 @@ def bid_rgtv_c2f_cg(Y_b, k_estimate_size, show_intermediate=False,
                 k_estimate = kernel_centralize(k_estimate, 0.1)
 
             lambda_val = lambda_val / 1.2
-
 
             if iteration_callback is not None:
                 iteration_callback({
@@ -526,9 +476,7 @@ def bid_rgtv_c2f_cg(Y_b, k_estimate_size, show_intermediate=False,
 
     return k_estimate, Y_r_rgtv_cg
 
-
 def _computeDenominator(y, k):
-
 
     sizey = y.shape
     otfk = psf2otf(k, sizey)
@@ -538,9 +486,7 @@ def _computeDenominator(y, k):
               + np.abs(psf2otf(np.array([[1], [-1]]), sizey)) ** 2)
     return Nomin1, Denom1, Denom2
 
-
 def fast_deconv(yin, k, lambda_val, alpha, yout0=None):
-
 
     beta = 1.0
     beta_rate = 2.0 * np.sqrt(2)
@@ -555,17 +501,13 @@ def fast_deconv(yin, k, lambda_val, alpha, yout0=None):
     else:
         yout = yin.copy()
 
-
     if k.shape[0] % 2 != 1 or k.shape[1] % 2 != 1:
         raise ValueError("Blur kernel k must be odd-sized.")
 
-
     Nomin1, Denom1, Denom2 = _computeDenominator(yin, k)
-
 
     youtx = np.concatenate([np.diff(yout, 1, axis=1), yout[:, 0:1] - yout[:, -1:]], axis=1)
     youty = np.concatenate([np.diff(yout, 1, axis=0), yout[0:1, :] - yout[-1:, :]], axis=0)
-
 
     while beta < beta_max:
         gamma = beta / lambda_val
@@ -576,14 +518,12 @@ def fast_deconv(yin, k, lambda_val, alpha, yout0=None):
             Wx = solve_image(youtx, beta, alpha)
             Wy = solve_image(youty, beta, alpha)
 
-
             Wxx = np.concatenate([Wx[:, -1:] - Wx[:, 0:1], -np.diff(Wx, 1, axis=1)], axis=1)
 
             Wxx = Wxx + np.concatenate([Wy[-1:, :] - Wy[0:1, :], -np.diff(Wy, 1, axis=0)], axis=0)
 
             Fyout = (Nomin1 + gamma * fft2(Wxx)) / Denom
             yout = np.real(ifft2(Fyout))
-
 
             youtx = np.concatenate([np.diff(yout, 1, axis=1), yout[:, 0:1] - yout[:, -1:]], axis=1)
             youty = np.concatenate([np.diff(yout, 1, axis=0), yout[0:1, :] - yout[-1:, :]], axis=0)
@@ -592,10 +532,8 @@ def fast_deconv(yin, k, lambda_val, alpha, yout0=None):
 
     return yout
 
-
 def Deconvolution_FHLP(y, kernel, lambda_val=2e3, alpha=0.5,
                        edgetaper_iters=4):
-
 
     kernel = kernel.copy().astype(np.float64)
     kernel[kernel == 0] = 1e-10
@@ -603,27 +541,20 @@ def Deconvolution_FHLP(y, kernel, lambda_val=2e3, alpha=0.5,
 
     ks = (kernel.shape[0] - 1) // 2
 
-
     y_padded = np.pad(y, ks, mode='edge')
-
 
     for _ in range(edgetaper_iters):
         y_padded = edgetaper(y_padded, kernel)
 
-
     clear_solve_image_cache()
 
-
     x = fast_deconv(y_padded, kernel, lambda_val, alpha)
-
 
     x = x[ks:x.shape[0] - ks, ks:x.shape[1] - ks]
 
     return x
 
-
 def deblurring_adm_aniso(B, k, lambda_tv, alpha=1):
-
 
     beta = 1.0 / lambda_tv
     beta_min = 0.001
@@ -668,9 +599,7 @@ def deblurring_adm_aniso(B, k, lambda_tv, alpha=1):
 
     return I
 
-
 def L0Restoration(Im, kernel, lambda_grad, kappa=2.0):
-
 
     H_orig, W_orig = Im.shape[0], Im.shape[1]
 
@@ -724,10 +653,8 @@ def L0Restoration(Im, kernel, lambda_grad, kappa=2.0):
     S = S[:H_orig, :W_orig]
     return S
 
-
 def ringing_artifacts_removal(y, kernel, lambda_tv=2e-3, lambda_l0=2e-3,
                               weight_ring=0.5):
-
 
     H, W = y.shape[:2]
 
@@ -736,17 +663,14 @@ def ringing_artifacts_removal(y, kernel, lambda_tv=2e-3, lambda_l0=2e-3,
     )
     y_pad = wrap_boundary_liu(y, tuple(target_size))
 
-
     Latent_tv = deblurring_adm_aniso(y_pad, kernel, lambda_tv, 1)
     Latent_tv = Latent_tv[:H, :W]
 
     if weight_ring == 0:
         return Latent_tv
 
-
     Latent_l0 = L0Restoration(y_pad, kernel, lambda_l0, 2)
     Latent_l0 = Latent_l0[:H, :W]
-
 
     diff_img = Latent_tv - Latent_l0
     bf_diff = bilateral_filter(diff_img, 3, 0.1)

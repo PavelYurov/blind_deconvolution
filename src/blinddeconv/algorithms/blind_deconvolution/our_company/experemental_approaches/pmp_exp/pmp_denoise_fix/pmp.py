@@ -11,10 +11,8 @@ import numpy as np
 import time
 from typing import Tuple, List, Any, Dict, Optional
 
-
 import sys
 from pathlib import Path
-
 
 def _find_project_root(start: Path) -> Path:
     path = start.resolve()
@@ -23,7 +21,6 @@ def _find_project_root(start: Path) -> Path:
             raise RuntimeError("Cannot locate project root")
         path = path.parent
     return path
-
 
 _CURRENT_FILE = Path(__file__).resolve()
 _PROJECT_ROOT = _find_project_root(_CURRENT_FILE)
@@ -36,13 +33,10 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
 
 from blinddeconv.algorithms.base import DeconvolutionAlgorithm
 
-
 from .solvers import blind_deconv, ringing_artifacts_removal
 from .impulse_noise_estimation import detect_impulse_noise, adaptive_median_filter
 
-
 class PMP_BD(DeconvolutionAlgorithm):
-
 
     def __init__(
         self,
@@ -92,7 +86,6 @@ class PMP_BD(DeconvolutionAlgorithm):
     ):
         super().__init__(name='PMP-BD')
 
-
         self.kernel_size = kernel_size
         self.lambda_pmp = lambda_pmp
         self.lambda_grad = lambda_grad
@@ -110,7 +103,6 @@ class PMP_BD(DeconvolutionAlgorithm):
         self.ensemble_denoise = ensemble_denoise
         self.estimate_noise_internal = estimate_noise_internal
         self.noise_sigma_mult = noise_sigma_mult
-
 
         self.impulse_preprocess = impulse_preprocess
         self.impulse_params = impulse_params
@@ -131,15 +123,12 @@ class PMP_BD(DeconvolutionAlgorithm):
         self.pre_nonblind = pre_nonblind
         self.pre_nonblind_params = pre_nonblind_params
 
-
         self.final_deconv = final_deconv.lower()
         self.nb_params = nb_params
         self.verbose = verbose
 
-
         self.auto_mode = (auto_mode or 'off').lower()
         self.auto_mode_params = auto_mode_params
-
 
         self._heavy_snapshot = {
             'lambda_pmp': float(lambda_pmp),
@@ -163,7 +152,6 @@ class PMP_BD(DeconvolutionAlgorithm):
             'final_deconv': self.final_deconv,
             'nb_params': nb_params,
         }
-
 
         self._clean_preset_default = {
             'lambda_pmp': 4e-3,
@@ -191,15 +179,12 @@ class PMP_BD(DeconvolutionAlgorithm):
         self.history: Dict[str, list] = {'kernel_diff': []}
         self.hyperparams: Dict[str, Any] = {}
 
-
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         start_time = time.time()
-
 
         y = image.astype(np.float64)
         if y.max() > 1.0:
             y /= 255.0
-
 
         if y.ndim == 3 and y.shape[2] == 3:
             yg = 0.2989 * y[:, :, 0] + 0.5870 * y[:, :, 1] + 0.1140 * y[:, :, 2]
@@ -207,7 +192,6 @@ class PMP_BD(DeconvolutionAlgorithm):
             yg = y[:, :, 0]
         else:
             yg = y.copy() if y.ndim == 2 else y[:, :, 0]
-
 
         impulse_info = None
         if self.impulse_preprocess == 'auto':
@@ -227,7 +211,6 @@ class PMP_BD(DeconvolutionAlgorithm):
                     yg, impulse_info['impulse_mask'],
                     max_window=ip.get('max_window', 7))
 
-
         noise_info = None
         if self.noise_estimation != 'none':
             noise_info = self._estimate_noise(yg)
@@ -244,11 +227,9 @@ class PMP_BD(DeconvolutionAlgorithm):
                 print(f"[PMP-BD] auto_mode='robust' → PCA noise est.: "
                       f"σ={sigma:.5f} (σ_255={sigma * 255:.2f})")
 
-
         orchestrator_info = None
         if self.auto_mode == 'robust':
             orchestrator_info = self._orchestrate_robust(noise_info)
-
 
         if (self.auto_mode != 'robust'
                 and self.auto_params is not None
@@ -274,7 +255,6 @@ class PMP_BD(DeconvolutionAlgorithm):
                           f"λ_tv={self.lambda_tv:.5f}, "
                           f"λ_l0={self.lambda_l0:.6f}")
 
-
         screenot_info = None
         if self.screenot_preprocess == 'auto':
             if self.act_preprocess == 'auto':
@@ -295,7 +275,6 @@ class PMP_BD(DeconvolutionAlgorithm):
                 print(f"[PMP-BD] ScreeNOT applied "
                       f"(rank={screenot_info.get('rank', '?')})")
 
-
         act_info = None
         if self.act_preprocess == 'auto':
             from .act_denoise import act_denoise
@@ -311,13 +290,11 @@ class PMP_BD(DeconvolutionAlgorithm):
             if self.verbose:
                 print("[PMP-BD] ACT curvelet denoising applied")
 
-
         if self.preprocess not in (None, 'none'):
             yg = self._apply_denoise(
                 yg, self.preprocess, self.preprocess_params, noise_info)
             if self.verbose:
                 print(f"[PMP-BD] Pre-blind denoise: {self.preprocess}")
-
 
         psd_info = None
         if self.noise_preprocess != 'none':
@@ -325,19 +302,16 @@ class PMP_BD(DeconvolutionAlgorithm):
             if self.verbose:
                 print(f"[PMP-BD] PSD noise preprocess: {self.noise_preprocess}")
 
-
         yg_for_restore = yg
         if self.histogram_eq not in (None, 'none'):
             yg = self._apply_histogram_eq(yg)
             if self.verbose:
                 print(f"[PMP-BD] Histogram equalization: {self.histogram_eq}")
 
-
         blind_denoise_fn = None
         if self.blind_denoise not in (None, 'none'):
             def blind_denoise_fn(s_arr):
                 return self._apply_blind_denoise(s_arr, noise_info)
-
 
         opts = {
             'kernel_size': self.kernel_size,
@@ -360,14 +334,12 @@ class PMP_BD(DeconvolutionAlgorithm):
             iteration_callback=self._callback,
         )
 
-
         y_nb = yg_for_restore
         if self.pre_nonblind not in (None, 'none'):
             y_nb = self._apply_denoise(
                 y_nb, self.pre_nonblind, self.pre_nonblind_params, noise_info)
             if self.verbose:
                 print(f"[PMP-BD] Pre-nonblind denoise: {self.pre_nonblind}")
-
 
         if self.final_deconv == 'ringing_removal':
             Latent = ringing_artifacts_removal(
@@ -399,7 +371,6 @@ class PMP_BD(DeconvolutionAlgorithm):
                 "'wiener', or 'tikhonov'.")
 
         Latent = np.clip(Latent, 0.0, 1.0)
-
 
         self.hyperparams = {
             'kernel_size': self.kernel_size,
@@ -437,7 +408,6 @@ class PMP_BD(DeconvolutionAlgorithm):
         x_final = np.clip(x_final, 0, 255).astype(np.int16)
         return x_final, kernel
 
-
     @staticmethod
     def _guided_filter(I, p, r, eps):
         from scipy.ndimage import uniform_filter
@@ -452,7 +422,6 @@ class PMP_BD(DeconvolutionAlgorithm):
         a = cov_Ip / (var_I + eps)
         b = mean_p - a * mean_I
         return box(a) * I + box(b)
-
 
     def _apply_denoise(self, img, method, params, noise_info):
 
@@ -515,7 +484,6 @@ class PMP_BD(DeconvolutionAlgorithm):
                 f"'tv', 'nlm', 'bilateral', 'guided', 'bm3d', "
                 f"'act', 'none'")
 
-
     def _estimate_noise(self, yg):
         if self.noise_estimation == 'chen':
             from .chen_noise_estimate import estimate_noise_level
@@ -528,7 +496,6 @@ class PMP_BD(DeconvolutionAlgorithm):
             result['method'] = 'pca'
             return result
         return None
-
 
     def _apply_noise_preprocess(self, yg):
         from .noise_psd_analysis import (
@@ -576,7 +543,6 @@ class PMP_BD(DeconvolutionAlgorithm):
 
         return yg_out, psd_info
 
-
     def _apply_histogram_eq(self, img):
 
         from skimage.exposure import equalize_adapthist, equalize_hist
@@ -597,16 +563,13 @@ class PMP_BD(DeconvolutionAlgorithm):
                 f"Unknown histogram_eq='{method}'. "
                 f"Choose from: 'clahe', 'global', 'none'")
 
-
     def _apply_blind_denoise(self, s, noise_info):
         p = dict(self.blind_denoise_params or {})
         if self.blind_denoise == 'guided':
             p.setdefault('radius', 2)
         return self._apply_denoise(s, self.blind_denoise, p, noise_info)
 
-
     def _orchestrate_robust(self, noise_info):
-
 
         heavy = self._heavy_snapshot
         clean = dict(self._clean_preset_default)
@@ -614,10 +577,8 @@ class PMP_BD(DeconvolutionAlgorithm):
         if isinstance(amp.get('clean_preset'), dict):
             clean.update(amp['clean_preset'])
 
-
         for k, v in heavy.items():
             setattr(self, k, v)
-
 
         sigma = 0.0
         if noise_info is not None:
@@ -631,7 +592,6 @@ class PMP_BD(DeconvolutionAlgorithm):
         force_heavy_sigma = float(amp.get('force_heavy_sigma', 0.01))
         if nt in ('poisson', 'poisson_gaussian') and sigma >= force_heavy_sigma:
             force_heavy = True
-
 
         _numeric_keys = (
             'lambda_pmp', 'lambda_grad', 'pmp_quantile',
@@ -647,7 +607,6 @@ class PMP_BD(DeconvolutionAlgorithm):
             'pre_nonblind', 'pre_nonblind_params',
             'final_deconv', 'nb_params',
         )
-
 
         if sigma <= sigma_clean and not force_heavy:
             for k in _numeric_keys + _discrete_keys:
@@ -681,7 +640,6 @@ class PMP_BD(DeconvolutionAlgorithm):
                       f"pre={self.preprocess}, pre_nb={self.pre_nonblind}")
             return info
 
-
         if sigma >= sigma_heavy or force_heavy:
             w = 1.0
             regime = 'heavy'
@@ -690,12 +648,10 @@ class PMP_BD(DeconvolutionAlgorithm):
             w = float(np.clip(w, 0.0, 1.0))
             regime = 'medium' if w < 0.95 else 'heavy'
 
-
         for k in _numeric_keys:
             c_val = float(clean.get(k, heavy[k]))
             h_val = float(heavy[k])
             setattr(self, k, (1.0 - w) * c_val + w * h_val)
-
 
         use_heavy_discrete = w >= 0.5
         for k in _discrete_keys:
@@ -703,10 +659,8 @@ class PMP_BD(DeconvolutionAlgorithm):
             if k in src:
                 setattr(self, k, src[k])
 
-
         if use_heavy_discrete and isinstance(heavy.get('denoise_eps'), (int, float)):
             self.denoise_eps = float(heavy['denoise_eps']) * float(w)
-
 
         if use_heavy_discrete and isinstance(heavy.get('grad_smooth_sigma'),
                                               (int, float)):
@@ -742,7 +696,6 @@ class PMP_BD(DeconvolutionAlgorithm):
                   f"pre={self.preprocess}, pre_nb={self.pre_nonblind}, "
                   f"final={self.final_deconv}")
         return info
-
 
     @staticmethod
     def _psf2otf(psf, shape):
@@ -781,7 +734,6 @@ class PMP_BD(DeconvolutionAlgorithm):
         denom = np.abs(H_otf) ** 2 + alpha * reg
         result = np.real(np.fft.ifft2(H_conj * G / denom))
         return result
-
 
     def get_param(self) -> List[Tuple[str, Any]]:
         return [

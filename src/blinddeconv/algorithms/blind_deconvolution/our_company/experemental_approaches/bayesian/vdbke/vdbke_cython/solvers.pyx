@@ -12,8 +12,6 @@ from scipy.fft import dstn, idstn
 
 from .utils import psf2otf, valid_conv_by_fft
 
-# --- C-ОПТИМИЗАЦИИ ВНУТРЕННИХ ЦИКЛОВ ---
-
 @cython.boundscheck(False)
 @cython.wraparound(False)
 cdef void _compute_Ad_core(double[:, :] Ad, double[:, :] xx, int m1, int m2, int M1, int M2):
@@ -44,7 +42,7 @@ cdef void _update_v(double[:, :] temp, double[:, :] v, double[:, :] s, double la
             for c in range(N):
                 G += v[r, c]
         G /= total_pixels
-        
+
         for r in range(M):
             for c in range(N):
                 val = v[r, c]
@@ -53,7 +51,7 @@ cdef void _update_v(double[:, :] temp, double[:, :] v, double[:, :] s, double la
                 if val < 0.0:
                     val = 0.0
                 v[r, c] = val
-    
+
     for r in range(M):
         for c in range(N):
             v[r, c] = s[r, c] * v[r, c]
@@ -73,21 +71,19 @@ cdef void _bilateral_filter_core(float[:, :, :] p_img_v, float[:, :, :] r_img_v,
                     for ch in range(d):
                         f_diff = p_img_v[r + fr, c + fr, ch] - p_img_v[r + fr + yy, c + fr + xx, ch]
                         f_dist += f_diff * f_diff
-                    
+
                     w_f = exp(-0.5 * f_dist / ss)
                     w_t = w_s * w_f
-                    
+
                     for ch in range(d):
                         r_img_v[r, c, ch] += p_img_v[r + fr + yy, c + fr + xx, ch] * w_t
-                    
+
                     w_sum_v[r, c] += w_t
-                    
+
     for r in range(h):
         for c in range(w):
             for ch in range(d):
                 r_img_v[r, c, ch] /= w_sum_v[r, c]
-
-# ----------------------------------------
 
 def center_kernel_img_space(x, k, verbose=False):
     rows = np.arange(1, k.shape[0] + 1, dtype=np.float64)
@@ -236,7 +232,7 @@ def kernel_estimation_filter_space_fft(k, x_list, y_list, opt, verbose=False):
     return alpha, fx, stepsize
 
 def nbid_ngm_ubc_admm(B, k, pars):
-    # В CYTHON ВСЕ cdef ДОЛЖНЫ БЫТЬ В САМОМ НАЧАЛЕ ФУНКЦИИ
+
     cdef cnp.ndarray[cnp.float64_t, ndim=2] temp1
     cdef cnp.ndarray[cnp.float64_t, ndim=2] temp2
     cdef cnp.ndarray[cnp.float64_t, ndim=2] v1
@@ -248,9 +244,9 @@ def nbid_ngm_ubc_admm(B, k, pars):
     lambda_min = pars.get('lambda_min', lambda1 * 5)
     lambda_max = pars.get('lambda_max', 1.0)
     cost_display = pars.get('cost_display', 0)
-    
+
     IF_val = pars.get('IF', np.sqrt(2))
-    
+
     N2 = pars.get('N2', 2)
     N1 = pars.get('N1', 20)
     lambda_u = pars.get('lambda_u', 0.1)
@@ -304,20 +300,20 @@ def nbid_ngm_ubc_admm(B, k, pars):
         lam = lambda1 / lambda_v
 
         for _xv in range(xv_iter):
-            # Внутри цикла только присваиваем значения
+
             temp1 = np.abs(x1)
             temp2 = np.abs(x2)
             v1 = temp1.copy()
             v2 = temp2.copy()
             s1 = np.sign(x1)
             s2 = np.sign(x2)
-            
+
             _update_v(temp1, v1, s1, lam, N2)
             _update_v(temp2, v2, s2, lam, N2)
 
         temp1 = -np.concatenate([v1[:, 0:1] - v1[:, -1:], np.diff(v1, axis=1)], axis=1)
         temp2 = -np.concatenate([v2[0:1, :] - v2[-1:, :], np.diff(v2, axis=0)], axis=0)
-        
+
         X = Ktu + lambda_v / lambda_u * fft2(temp1 + temp2)
         X = invA * X
         x = np.real(ifft2(X))
@@ -360,7 +356,7 @@ def ss_ngm_dirichlet_ubc_img(y, x, k, alpha0, pars, blind_denoise_fn=None, verbo
         y_crop = y[:, khs2:-khs2]
     else:
         y_crop = y
-        
+
     y2 =[np.diff(y_crop, axis=0), np.diff(y_crop, axis=1)]
 
     alpha = alpha0.copy()
@@ -370,7 +366,7 @@ def ss_ngm_dirichlet_ubc_img(y, x, k, alpha0, pars, blind_denoise_fn=None, verbo
 
     delta_lambda = 0.00005 if lambda1 < 0.0005 else 0.0
     k_old = None
-    
+
     for i in range(xk_iter):
         img_pars['lambda1'] = lambda1 + delta_lambda * max(6 - (i + 1), 0)
         img_pars['lambda_min'] = lambda_min / max(lambda1, 1e-30) * img_pars['lambda1']
@@ -610,7 +606,7 @@ def _solve_min_laplacian(boundary_image: np.ndarray) -> np.ndarray:
     x = np.arange(1, W - 1)
     y = np.arange(1, H - 1)
     xx, yy = np.meshgrid(x, y)
-    denom = (2.0 * np.cos(np.pi * xx / (W - 1)) - 2.0) + \
+    denom = (2.0 * np.cos(np.pi * xx / (W - 1)) - 2.0) +\
             (2.0 * np.cos(np.pi * yy / (H - 1)) - 2.0)
 
     f3 = f2sin / denom
@@ -780,24 +776,24 @@ def bilateral_filter(img, sigma_s, sigma):
     was_2d = img.ndim == 2
     if was_2d:
         img = img[:, :, np.newaxis]
-    
+
     h = img.shape[0]
     w = img.shape[1]
     d = img.shape[2]
-    
+
     img = img.astype(np.float32)
     fr = int(np.ceil(sigma_s * 3))
-    
+
     p_img = np.pad(img, ((fr, fr), (fr, fr), (0, 0)), mode='edge')
     r_img = np.zeros((h, w, d), dtype=np.float32)
     w_sum = np.zeros((h, w), dtype=np.float32)
-    
+
     sw = _fspecial_gaussian(2 * fr + 1, sigma_s)
     ss = sigma * np.sqrt(d)
     ss = ss * ss
-    
+
     _bilateral_filter_core(p_img, r_img, w_sum, sw, ss, h, w, d, fr)
-    
+
     if was_2d:
         return r_img[:, :, 0]
     return r_img

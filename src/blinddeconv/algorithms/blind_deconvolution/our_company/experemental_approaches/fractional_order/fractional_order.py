@@ -1,7 +1,3 @@
-"""
-Blind Image Deconvolution framework wrapper.
-"""
-
 import numpy as np
 import time
 from typing import Tuple, List, Any, Dict, Optional
@@ -28,9 +24,7 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
 
 from blinddeconv.algorithms.base import DeconvolutionAlgorithm
 
-
 class FractionalOrderPMPDeconv(DeconvolutionAlgorithm):
-
 
     def __init__(
         self,

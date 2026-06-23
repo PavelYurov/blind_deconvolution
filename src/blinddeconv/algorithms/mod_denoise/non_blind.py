@@ -7,14 +7,6 @@ non_blind.py
 Основано на методах из следующих работ:
 1. Qingsong Wang et al., "Adaptive Non-Blind Image Deblurring with 
    Space-Variant Gradient and Noise Modelling".
-   Основные идеи:
-   - Lp-регуляризация градиентов изображения (гиперлапласиан, alpha в (0, 2]).
-   - Lp-метрика для члена верности данных (оценка alpha_n через дивергенцию 
-     Кульбака-Лейблера).
-   - Пространственно-зависимый вес регуляризации lambda(x,y) для каждого пикселя, 
-     вычисляемый на основе локальной статистики градиентов и уровня шума.
-   - Двухэтапный конвейер: первый проход с alpha_n = alpha, второй проход с 
-     оцененным значением alpha_n.
 
 2. X. Zhou, M. Vega, F. Zhou, R. Molina, A. K. Katsaggelos, "Fast Bayesian 
    Blind Deconvolution with Huber Super Gaussian Priors", Digital Signal 

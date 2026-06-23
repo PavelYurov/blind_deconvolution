@@ -5,7 +5,6 @@ from scipy.optimize import fminbound
 
 __all__ = ['estimate_noise_params']
 
-
 def _im2col(image, m1, m2):
 
     rows, cols = image.shape
@@ -15,7 +14,6 @@ def _im2col(image, m1, m2):
     out = np.lib.stride_tricks.as_strided(
         image, shape=(m1, m2, n_rows, n_cols), strides=(s0, s1, s0, s1))
     return out.reshape(m1 * m2, -1)
-
 
 def _get_valid_block_index(image, m1, m2):
 
@@ -32,9 +30,7 @@ def _get_valid_block_index(image, m1, m2):
     valid_block_index = np.where(blocks_ok)
     return np.array(valid_block_index).T
 
-
 def _vst(image, phi):
-
 
     a = np.cos(phi)
     b = np.sin(phi)
@@ -42,13 +38,11 @@ def _vst(image, phi):
         return (2.0 / a) * np.sqrt(np.maximum(a * image + b, 0.0))
     return image / np.sqrt(max(b, np.finfo(float).eps))
 
-
 def _get_blocks(image, phi, row_parity, valid_block_index, m1, m2):
 
     block = _im2col(_vst(image, phi), m1, m2)
     block = block[row_parity - 1::2, valid_block_index]
     return np.squeeze(block).T
-
 
 def _pca_svd_score(data):
 
@@ -57,14 +51,12 @@ def _pca_svd_score(data):
                                 check_finite=False)
     return U * s
 
-
 def _pca_svd_latent(data):
 
     centered = data - np.mean(data, axis=0)
     s = scipy.linalg.svd(centered, full_matrices=False,
                           compute_uv=False, check_finite=False)
     return (s ** 2) / (data.shape[0] - 1)
-
 
 def _sort_blocks(image, phi, valid_block_index, m1, m2):
 
@@ -76,14 +68,12 @@ def _sort_blocks(image, phi, valid_block_index, m1, m2):
     t = t[np.argsort(t[:, 1])]
     return t[:, 0]
 
-
 def _compute_kurtosis(phi, image, tau, block_count, m1, m2):
 
     block = _get_blocks(image, phi, 1, tau[:block_count], m1, m2)
     scores = _pca_svd_score(block)
     g = (kurtosis(scores[:, -1], fisher=False) - 3) * np.sqrt(block_count / 24)
     return g
-
 
 def _compute_kurtosis_and_block(phi, image, tau, block_count, m1, m2):
 
@@ -92,12 +82,9 @@ def _compute_kurtosis_and_block(phi, image, tau, block_count, m1, m2):
     g = (kurtosis(scores[:, -1], fisher=False) - 3) * np.sqrt(block_count / 24)
     return g, block
 
-
 def estimate_noise_params(image, blocksize=7):
 
-
     img = np.asarray(image, dtype=np.float64)
-
 
     if img.ndim == 3:
         if img.shape[2] == 3:
@@ -110,7 +97,6 @@ def estimate_noise_params(image, blocksize=7):
 
     if img.ndim != 2:
         raise ValueError(f"Expected 2D image after conversion, got ndim={img.ndim}")
-
 
     if img.max() <= 1.0:
         img = img * 255.0
@@ -153,7 +139,6 @@ def estimate_noise_params(image, blocksize=7):
     a = curr_sigma ** 2 * np.cos(curr_phi)
     b = curr_sigma ** 2 * np.sin(curr_phi)
 
-
     if a < 1e-6 and b < 1e-6:
         noise_type = 'unknown'
     elif a < 1e-6:
@@ -164,7 +149,6 @@ def estimate_noise_params(image, blocksize=7):
         noise_type = 'poisson'
     else:
         noise_type = 'poisson_gaussian'
-
 
     mean_brightness = float(np.mean(img))
     sigma_255 = float(np.sqrt(max(a * mean_brightness + b, 0.0)))

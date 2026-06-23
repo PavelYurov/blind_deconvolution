@@ -36,54 +36,7 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
         sys.path.insert(0, _path)
 from blinddeconv.algorithms.base import DeconvolutionAlgorithm
 
-
 class LowRankBD(DeconvolutionAlgorithm):
-    """
-    Low-Rank Blind Image Deconvolution.
-
-    Parameters:
-    kernel_size : int
-        Expected maximum PSF size (must be odd, ≥ 3).
-    lambda_ : float
-        Base edge-regularisation weight α₀ for the image step.
-        Scaled per pyramid level:
-        α = λ · ``alpha_multiplier`` ^ (level − 0.5).
-    sigma : float
-        Low-rank regularisation flag/weight.  Set > 0 to enable,
-        0 to disable.
-    tau : float
-        Proximal parameter for nuclear-norm thresholding (IRNN).
-    delta : float
-        Smoothing for the ``log det`` rank surrogate.
-    kernel_beta : float
-        Tikhonov regularisation weight β for the kernel CG step.
-    max_iter : int
-        Outer alternating-minimisation iterations per scale.
-    max_irls : int
-        IRLS outer iterations for the image step.
-    max_cg : int
-        CG inner iterations for the image step.
-    max_iter_k : int
-        CG iterations for the kernel step.
-    max_iter_rank : int
-        IRNN iterations for the low-rank step.
-    iter_k_rank : int
-        Inner kernel–rank alternation count per outer iteration.
-    exp_a : float
-        Hyper-Laplacian exponent *p* (0 < p ≤ 2; typical 0.5–0.8).
-    thr_e : float
-        IRLS smoothing parameter ε (avoids division by zero).
-    alpha_multiplier : float
-        Factor for scaling α across pyramid levels.
-    threshold : float
-        Kernel thresholding fraction (relative to max element).
-    nb_lambda : float
-        Regularisation weight for non-blind deconvolution.
-    nb_alpha : float
-        Hyper-Laplacian exponent for non-blind deconvolution.
-    verbose : bool
-        Print progress messages.
-    """
 
     def __init__(
         self,
@@ -109,7 +62,7 @@ class LowRankBD(DeconvolutionAlgorithm):
     ):
         super().__init__(name='LowRank-BD')
 
-        assert kernel_size >= 3 and kernel_size % 2 == 1, \
+        assert kernel_size >= 3 and kernel_size % 2 == 1,\
             "kernel_size must be odd and >= 3"
 
         self.kernel_size      = kernel_size
@@ -136,9 +89,7 @@ class LowRankBD(DeconvolutionAlgorithm):
         self.hyperparams: Dict[str, Any] = {}
 
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Perform blind deconvolution on the input blurred image.
-        """
+
         start_time = time.time()
 
         y = image.astype(np.float64)
@@ -198,7 +149,6 @@ class LowRankBD(DeconvolutionAlgorithm):
             )
 
             tau_scale = self.tau * (si + 1) / num_scales
-
 
             for it in range(self.max_iter):
                 k_prev = k.copy()
@@ -300,7 +250,7 @@ class LowRankBD(DeconvolutionAlgorithm):
         return result, k
 
     def get_param(self) -> List[Tuple[str, Any]]:
-        """Return current hyper-parameter list."""
+
         return [
             ('kernel_size',      self.kernel_size),
             ('lambda',           self.lambda_),
@@ -324,7 +274,7 @@ class LowRankBD(DeconvolutionAlgorithm):
         ]
 
     def change_param(self, params: Dict[str, Any]) -> None:
-        """Update hyper-parameters from a dictionary."""
+
         for key, value in params.items():
             if key == 'lambda':
                 self.lambda_ = value
@@ -332,9 +282,9 @@ class LowRankBD(DeconvolutionAlgorithm):
                 setattr(self, key, value)
 
     def get_history(self) -> dict:
-        """Convergence history (per-iteration kernel changes)."""
+
         return self.history
 
     def get_hyperparams(self) -> dict:
-        """Hyper-parameters and run-time statistics after process()."""
+
         return self.hyperparams

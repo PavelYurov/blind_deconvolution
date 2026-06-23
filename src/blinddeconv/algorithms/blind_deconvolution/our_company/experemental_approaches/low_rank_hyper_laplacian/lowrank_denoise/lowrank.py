@@ -38,169 +38,7 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
         sys.path.insert(0, _path)
 from blinddeconv.algorithms.base import DeconvolutionAlgorithm
 
-
 class LowRankBD(DeconvolutionAlgorithm):
-    """
-    Low-Rank Blind Image Deconvolution.
-
-    Parameters:
-    kernel_size : int
-        Expected maximum PSF size (must be odd, ≥ 3).
-    lambda_ : float
-        Base edge-regularisation weight α₀ for the image step.
-        Scaled per pyramid level:
-        α = λ · ``alpha_multiplier`` ^ (level − 0.5).
-    sigma : float
-        Low-rank regularisation flag/weight.  Set > 0 to enable,
-        0 to disable.
-    tau : float
-        Proximal parameter for nuclear-norm thresholding (IRNN).
-    delta : float
-        Smoothing for the ``log det`` rank surrogate.
-    kernel_beta : float
-        Tikhonov regularisation weight β for the kernel CG step.
-    max_iter : int
-        Outer alternating-minimisation iterations per scale.
-    max_irls : int
-        IRLS outer iterations for the image step.
-    max_cg : int
-        CG inner iterations for the image step.
-    max_iter_k : int
-        CG iterations for the kernel step.
-    max_iter_rank : int
-        IRNN iterations for the low-rank step.
-    iter_k_rank : int
-        Inner kernel–rank alternation count per outer iteration.
-    exp_a : float
-        Hyper-Laplacian exponent *p* (0 < p ≤ 2; typical 0.5–0.8).
-    thr_e : float
-        IRLS smoothing parameter ε (avoids division by zero).
-    alpha_multiplier : float
-        Factor for scaling α across pyramid levels.
-    threshold : float
-        Kernel thresholding fraction (relative to max element).
-    nb_lambda : float
-        Regularisation weight for non-blind deconvolution.
-    nb_alpha : float
-        Hyper-Laplacian exponent for non-blind deconvolution.
-    verbose : bool
-        Print progress messages.
-
-    Noise pipeline (all disabled by default — existing behaviour unchanged):
-    impulse_preprocess : str — 'auto' | 'none'.  Default 'none'.
-    impulse_params : dict or None — settings for impulse noise detection/removal.
-        density_threshold : float — min fraction of outlier pixels to trigger
-                           filtering (default 0.0005). Lower = more sensitive.
-        outlier_threshold : float — pixel deviation from local median to flag
-                           as impulse (default 0.08, normalised [0,1] range).
-        max_window : int — maximum adaptive median window size (default 7).
-                     Must be odd.  Larger = heavier smoothing.
-        All keys optional; omitted keys use defaults above.
-    noise_estimation : str — 'chen' | 'pca' | 'none'.  Default 'none'.
-        'chen'  — Chen et al. wavelet-based σ estimator (fast, single value).
-        'pca'   — Pyatykh PCA-based reconstruction (returns sigma + more).
-        Result stored in noise_info dict, accessible via get_hyperparams().
-    screenot_preprocess : str — 'auto' | 'none'.  Default 'none'.
-    screenot_params : dict or None — settings for ScreeNOT SVD denoising.
-        k          : int — number of singular values to keep (default 10).
-        strategy   : str — 'i' (improved) | 'c' (classic) (default 'i').
-        mode       : str — 'full' | 'patch' (default 'full').
-        patch_size : int — patch side if mode='patch' (default 8).
-        stride     : int — patch stride (default 3).
-        All keys optional; omitted keys use defaults above.
-    act_preprocess : str — 'auto' | 'none'.  Default 'none'.
-                     Mutually exclusive with screenot_preprocess.
-    act_params : dict or None — settings for ACT curvelet denoising.
-        noise_var          : float or None — noise variance in [0,1] scale.
-                             Auto-filled from σ² when noise_estimation enabled
-                             and not explicitly set.
-        threshold_setting  : str — 's' (soft) | 'h' (hard) (default 's').
-        All keys optional; omitted keys / None auto-inferred from noise_info.
-    preprocess : str — 'bm3d' | 'nlm' | 'bilateral' | 'guided' | 'tv'
-                 | 'none'.  Default 'none'.
-    preprocess_params : dict or None — settings for the chosen spatial denoiser.
-        For 'tv':
-            weight : float — TV weight (default auto ~2σ or 0.1).
-        For 'nlm':
-            sigma          : float — noise σ (default from noise_info).
-            h              : float — filter strength (default 0.8×σ).
-            patch_size     : int — default 5.
-            patch_distance : int — search window (default 6).
-        For 'bilateral':
-            d           : int — pixel neighbourhood diameter (default 5).
-            sigma_color : float — colour range σ (default from noise_info).
-            sigma_space : float — spatial σ (default 5.0).
-        For 'guided':
-            radius : int — box filter radius (default 4).
-            eps    : float — regularisation (default 4σ² or 0.01).
-        For 'bm3d':
-            sigma : float — noise σ (default from noise_info or 0.05).
-        All keys optional; omitted keys auto-inferred from noise_info.
-    noise_preprocess : str — 'auto' | 'notch' | 'bandstop' | 'none'.
-                       Default 'none'.
-    noise_preprocess_params : dict or None — settings for PSD-based filtering.
-        pch_size       : int — PSD patch size (default 32).
-        n_smooth       : int — PSD smoothing iterations (default 100).
-        peak_threshold : float — periodic peak detection threshold
-                         (default 100.0).
-        notch_radius   : int — notch filter radius (default 3).
-                         Used when mode='auto' or 'notch'.
-        freq_low       : float — bandstop low cutoff (default 0.3).
-        freq_high      : float — bandstop high cutoff (default 0.5).
-        order          : int — Butterworth order (default 2).
-        All keys optional; omitted keys use defaults above.
-    blind_denoise : str — 'guided' | 'bilateral' | 'bm3d' | 'nlm'
-                    | 'none'.  Default 'none'.
-                    Applied to x BEFORE passing to optimize_kernel
-                    at each blind iteration.
-    blind_denoise_params : dict or None — same keys as preprocess_params
-        for the chosen method.  Differences from preprocess defaults:
-        For 'guided': radius default 2 (smaller for iterative use).
-        All keys optional; omitted keys use defaults.
-    pre_nonblind : str — 'bm3d' | 'nlm' | 'bilateral' | 'guided' | 'tv'
-                   | 'act' | 'none'.  Default 'none'.
-    pre_nonblind_params : dict or None — same keys as preprocess_params
-        for the chosen method (see preprocess_params above).
-        For 'act': same keys as act_params.
-        All keys optional; omitted keys auto-inferred from noise_info.
-    auto_params : dict or None — σ-dependent tuning of λ, ε, nb_λ.
-                  Default None (disabled — all values fully manual).
-                  Requires noise_estimation != 'none' to have σ.
-                  When set, the following formula is applied:
-                    λ       = k_lambda  × σ
-                    ε       = k_thr_e   × σ²
-                    nb_λ    = k_nb      / σ
-                  Dict keys (all optional, defaults shown):
-                    k_lambda : float — λ multiplier  (default 0.2).
-                    k_thr_e  : float — ε multiplier  (default 4.0).
-                    k_nb     : float — nb_λ numerator (default 30.0).
-                  Example: auto_params={'k_lambda': 0.1, 'k_nb': 50.0}
-                  Tips: increase k_lambda for noisier images (stronger prior),
-                  decrease k_nb to trust the prior more in non-blind step.
-    nb_method : str — non-blind deconvolution solver. Default 'hyper_laplacian'.
-        'hyper_laplacian' — ADMM hyper-Laplacian prior (Krishnan & Fergus).
-            Uses edge-replicate padding + edgetaper + FFT circular deconv.
-            Fast, preserves sharp edges, but may produce ringing artefacts
-            (especially with large kernels or strong noise).
-            Controlled by nb_lambda and nb_alpha.
-        'ringing_removal' — TV + L0 + bilateral (Pan et al. CVPR 2014).
-            Uses wrap_boundary_liu for FFT-compatible periodic boundaries
-            (eliminates the main source of ringing).  Then subtracts
-            the bilateral-filtered difference between TV and L0 deconv
-            to further suppress ringing.  Slower but better quality.
-            Controlled by nb_params.
-    nb_params : dict or None — extra parameters for the non-blind solver.
-        For nb_method='hyper_laplacian': None (uses nb_lambda, nb_alpha).
-        For nb_method='ringing_removal':
-            lambda_tv   : float — TV weight (default 1e-3, range ~[5e-4, 1e-2]).
-                          Higher → smoother result, less texture.
-            lambda_l0   : float — L0 gradient weight (default 2e-3,
-                          range ~[5e-4, 5e-3]). Higher → piecewise constant.
-            weight_ring : float — ringing suppression (default 1.0).
-                          0.0 = pure TV deconv, no ringing post-processing.
-                          1.0 = full subtraction.  >1.0 aggressive removal.
-        All keys optional; omitted keys use defaults above.
-    """
 
     def __init__(
         self,
@@ -223,7 +61,7 @@ class LowRankBD(DeconvolutionAlgorithm):
         nb_lambda: float = 3000.0,
         nb_alpha: float = 0.5,
         verbose: bool = False,
-        # ── Noise pipeline (all disabled by default) ────────────────────
+
         impulse_preprocess: str = 'none',
         impulse_params: dict = None,
         noise_estimation: str = 'none',
@@ -245,7 +83,7 @@ class LowRankBD(DeconvolutionAlgorithm):
     ):
         super().__init__(name='LowRank-BD')
 
-        assert kernel_size >= 3 and kernel_size % 2 == 1, \
+        assert kernel_size >= 3 and kernel_size % 2 == 1,\
             "kernel_size must be odd and >= 3"
 
         self.kernel_size      = kernel_size
@@ -290,9 +128,7 @@ class LowRankBD(DeconvolutionAlgorithm):
         self.hyperparams: Dict[str, Any] = {}
 
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Perform blind deconvolution on the input blurred image.
-        """
+
         start_time = time.time()
 
         y = image.astype(np.float64)
@@ -307,7 +143,6 @@ class LowRankBD(DeconvolutionAlgorithm):
         else:
             y_gray = y.copy()
 
-        # ── 2a. Impulse noise detection & removal ──────────────────────
         impulse_info = None
         if self.impulse_preprocess == 'auto':
             ip = self.impulse_params or {}
@@ -334,12 +169,10 @@ class LowRankBD(DeconvolutionAlgorithm):
                                 ycbcr[:, :, ch], ch_info['impulse_mask'],
                                 max_window=ip.get('max_window', 7))
 
-        # ── 2b. Noise estimation ─────────────────────────────────────
         noise_info = None
         if self.noise_estimation != 'none':
             noise_info = self._estimate_noise(y_gray)
 
-        # ── 2b½. Auto-params (α, ε, nb_λ) from σ ────────────────────
         if self.auto_params is not None and noise_info is not None:
             sigma_n = noise_info.get('sigma_norm', None)
             if sigma_n is not None and sigma_n > 0:
@@ -356,7 +189,6 @@ class LowRankBD(DeconvolutionAlgorithm):
                           f"ε={self.thr_e:.6f}, "
                           f"nb_λ={self.nb_lambda:.0f}")
 
-        # ── 2c. ScreeNOT SVD denoising ───────────────────────────────
         screenot_info = None
         if self.screenot_preprocess == 'auto':
             from .screenot import screenot_denoise
@@ -370,7 +202,6 @@ class LowRankBD(DeconvolutionAlgorithm):
                 stride=sp.get('stride', 3),
             )
 
-        # ── 2d. ACT curvelet denoising ───────────────────────────────
         act_info = None
         if self.act_preprocess == 'auto':
             if self.screenot_preprocess == 'auto':
@@ -388,18 +219,15 @@ class LowRankBD(DeconvolutionAlgorithm):
                 threshold_setting=ap.get('threshold_setting', 's'),
             )
 
-        # ── 2e. Pre-pyramid denoising ───────────────────────────────
         if self.preprocess not in (None, 'none'):
             y_gray = self._apply_denoise(
                 y_gray, self.preprocess, self.preprocess_params,
                 noise_info)
 
-        # ── 2f. PSD-based noise preprocessing ───────────────────────
         psd_info = None
         if self.noise_preprocess != 'none':
             y_gray, psd_info = self._apply_noise_preprocess(y_gray)
 
-        # Sync preprocessed Y channel back to ycbcr for non-blind step
         if is_color:
             ycbcr[:, :, 0] = y_gray
 
@@ -449,7 +277,6 @@ class LowRankBD(DeconvolutionAlgorithm):
 
             tau_scale = self.tau * (si + 1) / num_scales
 
-
             for it in range(self.max_iter):
                 k_prev = k.copy()
 
@@ -459,7 +286,6 @@ class LowRankBD(DeconvolutionAlgorithm):
                     self.exp_a, self.thr_e,
                 )
 
-                # Denoise x before kernel estimation
                 if self.blind_denoise not in (None, 'none'):
                     x_dk = self._apply_blind_denoise(x, noise_info)
                 else:
@@ -502,7 +328,6 @@ class LowRankBD(DeconvolutionAlgorithm):
             print(f"[{self.name}] Kernel estimated in "
                   f"{time.time() - start_time:.1f} s")
 
-        # ── 3½. Pre-nonblind denoising ────────────────────────────────
         if self.pre_nonblind not in (None, 'none'):
             if is_color:
                 ycbcr[:, :, 0] = self._apply_pre_nonblind(
@@ -516,7 +341,7 @@ class LowRankBD(DeconvolutionAlgorithm):
                   f"λ={self.nb_lambda}, α={self.nb_alpha}) ...")
 
         if self.nb_method == 'ringing_removal':
-            # ── Pan et al. 2014: TV + L0 + bilateral ──────────────
+
             nbp = self.nb_params or {}
             y_nb = ycbcr[:, :, 0] if is_color else y_gray
             restored_ch = ringing_artifacts_removal(
@@ -533,7 +358,7 @@ class LowRankBD(DeconvolutionAlgorithm):
             else:
                 result = np.clip(restored_ch, 0.0, 1.0)
         else:
-            # ── Default: hyper-Laplacian ADMM ─────────────────────
+
             bhs = K // 2
             if is_color:
                 y_pad = np.pad(ycbcr[:, :, 0], bhs, mode='edge')
@@ -599,7 +424,6 @@ class LowRankBD(DeconvolutionAlgorithm):
         result = np.round(result * 255.0).astype(np.int16)
         return result, k
 
-    # ── Guided filter (box-filter variant, He et al. 2013) ─────────────
     @staticmethod
     def _guided_filter(I, p, r, eps):
         from scipy.ndimage import uniform_filter
@@ -615,9 +439,8 @@ class LowRankBD(DeconvolutionAlgorithm):
         b = mean_p - a * mean_I
         return box(a) * I + box(b)
 
-    # ── Universal denoiser dispatch ───────────────────────────────────
     def _apply_denoise(self, img, method, params, noise_info):
-        """Apply a spatial denoiser to a single-channel image [0, 1]."""
+
         if method is None or method == 'none':
             return img
         p = dict(params or {})
@@ -677,7 +500,6 @@ class LowRankBD(DeconvolutionAlgorithm):
                 f"'tv', 'nlm', 'bilateral', 'guided', 'bm3d', "
                 f"'act', 'none'")
 
-    # ── Noise estimation ─────────────────────────────────────────────
     def _estimate_noise(self, yg):
         if self.noise_estimation == 'chen':
             from .chen_noise_estimate import estimate_noise_level
@@ -691,7 +513,6 @@ class LowRankBD(DeconvolutionAlgorithm):
             return result
         return None
 
-    # ── PSD-based noise preprocessing ────────────────────────────────
     def _apply_noise_preprocess(self, yg):
         from .noise_psd_analysis import (
             analyze_noise_psd, noise_preprocess,
@@ -738,21 +559,18 @@ class LowRankBD(DeconvolutionAlgorithm):
 
         return yg_out, psd_info
 
-    # ── Blind-loop denoiser (x before kernel step) ───────────────────
     def _apply_blind_denoise(self, x, noise_info):
         p = dict(self.blind_denoise_params or {})
         if self.blind_denoise == 'guided':
-            p.setdefault('radius', 2)   # smaller for iterative use
+            p.setdefault('radius', 2)
         return self._apply_denoise(x, self.blind_denoise, p, noise_info)
 
-    # ── Pre-nonblind denoiser ───────────────────────────────────────
     def _apply_pre_nonblind(self, img, noise_info):
         return self._apply_denoise(
             img, self.pre_nonblind, self.pre_nonblind_params, noise_info)
 
-    # ── Interface methods ───────────────────────────────────────────
     def get_param(self) -> List[Tuple[str, Any]]:
-        """Return current hyper-parameter list."""
+
         return [
             ('kernel_size',      self.kernel_size),
             ('lambda',           self.lambda_),
@@ -794,7 +612,7 @@ class LowRankBD(DeconvolutionAlgorithm):
         ]
 
     def change_param(self, params: Dict[str, Any]) -> None:
-        """Update hyper-parameters from a dictionary."""
+
         for key, value in params.items():
             if key == 'lambda':
                 self.lambda_ = value
@@ -802,9 +620,9 @@ class LowRankBD(DeconvolutionAlgorithm):
                 setattr(self, key, value)
 
     def get_history(self) -> dict:
-        """Convergence history (per-iteration kernel changes)."""
+
         return self.history
 
     def get_hyperparams(self) -> dict:
-        """Hyper-parameters and run-time statistics after process()."""
+
         return self.hyperparams

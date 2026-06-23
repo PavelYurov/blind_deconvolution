@@ -1,9 +1,3 @@
-"""
-utils.py
-Вспомогательные функции.
-Добавлен Tikhonov filter.
-"""
-
 import numpy as np
 from scipy.ndimage import gaussian_filter
 
@@ -80,14 +74,11 @@ def wiener_filter(img: np.ndarray, kernel: np.ndarray, noise_snr: float = 0.01) 
 
 def tikhonov_filter(img: np.ndarray, kernel: np.ndarray, alpha: float = 0.01) -> np.ndarray:
 
-
     H, W = img.shape
     otf = psf2otf(kernel, (H, W))
     otf_conj = np.conj(otf)
 
-
     OTF_dx, OTF_dy, _, _ = get_gradient_operators((H, W))
-
 
     reg_term = np.abs(OTF_dx)**2 + np.abs(OTF_dy)**2
 

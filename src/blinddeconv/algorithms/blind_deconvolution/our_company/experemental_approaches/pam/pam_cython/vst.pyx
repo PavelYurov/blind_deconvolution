@@ -1,52 +1,11 @@
-"""
-vst.py — Generalized Anscombe VST + BM3D for Poisson–Gaussian noise.
-
-Self-contained module.  Copy this file unchanged into another algorithm's
-package directory; depends only on numpy and the `bm3d` PyPI package.
-
-Noise model
------------
-        y  =  a · z  +  n,    z ~ Poisson(λ),    n ~ N(0, b)
-        ⇒   Var[y] = a · E[y] + b
-
-Forward generalized Anscombe transform (Mäkitalo–Foi 2013)
-----------------------------------------------------------
-        D(y) = (2 / a) · √( max( a · y + (3/8) · a² + b, 0 ) )
-
-After GAT the residual is ≈ N(0, 1) regardless of intensity, so we denoise
-with BM3D at ``sigma_psd = 1.0`` (no rescaling).
-
-Asymptotically unbiased inverse
--------------------------------
-        ŷ = a · ((D/2)² − 3/8 − b/a²)
-          = a · D² / 4 − 3a/8 − b/a
-
-Public API
-----------
-vst_bm3d_denoise(img, noise_info=None, a=None, b=None, sigma=None, ...)
-    → (denoised, info)
-
-Reference
----------
-M. Mäkitalo and A. Foi, "Optimal inversion of the generalized Anscombe
-transformation for Poisson–Gaussian noise", IEEE TIP 22(1):91–103, 2013.
-"""
-
 from __future__ import annotations
 
 import numpy as np
 
 __all__ = ['gat_forward', 'gat_inverse_asymptotic', 'vst_bm3d_denoise']
 
-
-# ──────────────────────────────────────────────────────────────────────
-# 1. Generalized Anscombe forward / inverse
-# ──────────────────────────────────────────────────────────────────────
-
 def gat_forward(image: np.ndarray, a: float, b: float) -> np.ndarray:
-    """Forward generalized Anscombe transform.  ``a`` and ``b`` must be
-    in the same intensity scale as ``image``.  ``a`` must be > 0.
-    """
+
     if a <= 0:
         raise ValueError(
             f"gat_forward: a must be positive, got {a}. "
@@ -56,22 +15,14 @@ def gat_forward(image: np.ndarray, a: float, b: float) -> np.ndarray:
     arg = a * image + 3.0 * a * a / 8.0 + b
     return (2.0 / a) * np.sqrt(np.maximum(arg, 0.0))
 
-
 def gat_inverse_asymptotic(z: np.ndarray, a: float, b: float) -> np.ndarray:
-    """Asymptotically unbiased inverse of :func:`gat_forward`:
-    ŷ = a · D²/4 − 3a/8 − b/a.
-    """
+
     if a <= 0:
         raise ValueError(
             f"gat_inverse_asymptotic: a must be positive, got {a}.")
     a = float(a)
     b = float(b)
     return a * ((z / 2.0) ** 2 - 3.0 / 8.0 - b / (a * a))
-
-
-# ──────────────────────────────────────────────────────────────────────
-# 2. End-to-end VST + BM3D denoising
-# ──────────────────────────────────────────────────────────────────────
 
 def vst_bm3d_denoise(img,
                      noise_info=None,
@@ -81,29 +32,7 @@ def vst_bm3d_denoise(img,
                      sigma: float | None = None,
                      stage_arg: str | None = None,
                      verbose: bool = False):
-    """Denoise Poisson–Gaussian noise via GAT → BM3D → asymptotic inverse.
 
-    Parameters
-    ----------
-    img : ndarray (H, W), float
-        Input image, expected in [0, 1].
-    noise_info : dict, optional
-        Output of the PCA estimator; recognized keys (in [0, 255] scale):
-          'a', 'b'        — Poisson–Gaussian parameters
-          'sigma_norm'    — Gaussian σ in [0, 1] scale (Gaussian fallback)
-    a, b : float, optional
-        Explicit (a, b) in [0, 255] scale; override ``noise_info``.
-    sigma : float, optional
-        Fallback Gaussian σ in [0, 1] (pure-Gaussian path only).
-    stage_arg : {'all', 'hard'} or None
-        BM3D stage selector; None → library default (both stages).
-    verbose : bool
-
-    Returns
-    -------
-    denoised : ndarray (H, W), float64, clipped to [0, 1]
-    info : dict
-    """
     try:
         import bm3d as _bm3d
     except ImportError as e:
@@ -115,7 +44,6 @@ def vst_bm3d_denoise(img,
     if img.ndim != 2:
         raise ValueError(f"Expected 2D image, got shape {img.shape}")
 
-    # ── Resolve (a, b, sigma) — explicit args > noise_info > defaults ──
     ni = noise_info or {}
     a_raw = float(ni.get('a', 0.0)) if a is None else float(a)
     b_raw = float(ni.get('b', 0.0)) if b is None else float(b)
@@ -123,12 +51,9 @@ def vst_bm3d_denoise(img,
     if sigma_eff is None:
         sigma_eff = ni.get('sigma_norm', None)
 
-    # PCA reports (a, b) in [0, 255] scale.  Convert to [0, 1] scale to
-    # match ``img``: Var[y_01] = (a/255)·E[y_01] + b/255².
     A = a_raw / 255.0
     B = b_raw / (255.0 ** 2)
 
-    # ── BM3D stage selector ─────────────────────────────────────────
     stage_kw = {}
     stage_label = 'all'
     if stage_arg is not None:
@@ -146,7 +71,6 @@ def vst_bm3d_denoise(img,
             'A_norm': float(A), 'B_norm': float(B),
             'stage': stage_label, 'sigma_psd': 1.0}
 
-    # ── Pure-Gaussian fallback (no Poisson component) ───────────────
     if A <= 1e-8:
         if sigma_eff is not None and sigma_eff > 0:
             sig = float(sigma_eff)
@@ -162,7 +86,6 @@ def vst_bm3d_denoise(img,
         info.update({'mode': 'gaussian_fallback', 'sigma_used': sig})
         return np.clip(denoised, 0.0, 1.0), info
 
-    # ── 1. Forward GAT ──────────────────────────────────────────────
     z = gat_forward(img, a=A, b=B)
 
     if verbose:
@@ -170,10 +93,8 @@ def vst_bm3d_denoise(img,
               f"z∈[{z.min():.4f},{z.max():.4f}], "
               f"BM3D sigma_psd=1.0, stage={stage_label}")
 
-    # ── 2. BM3D at unit Gaussian variance (no rescaling!) ───────────
     z_hat = _bm3d.bm3d(z, sigma_psd=1.0, **stage_kw)
 
-    # ── 3. Asymptotic unbiased inverse ──────────────────────────────
     y_hat = gat_inverse_asymptotic(z_hat, a=A, b=B)
 
     info.update({

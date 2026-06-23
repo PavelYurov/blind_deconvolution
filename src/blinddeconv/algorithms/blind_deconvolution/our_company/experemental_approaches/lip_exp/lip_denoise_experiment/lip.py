@@ -13,10 +13,8 @@ import numpy as np
 import time
 from typing import Tuple, List, Any, Dict
 
-
 import sys
 from pathlib import Path
-
 
 def _find_project_root(start: Path) -> Path:
     path = start.resolve()
@@ -25,7 +23,6 @@ def _find_project_root(start: Path) -> Path:
             raise RuntimeError("Cannot locate project root")
         path = path.parent
     return path
-
 
 _CURRENT_FILE = Path(__file__).resolve()
 _PROJECT_ROOT = _find_project_root(_CURRENT_FILE)
@@ -37,7 +34,6 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
         sys.path.insert(0, _path)
 
 from blinddeconv.algorithms.base import DeconvolutionAlgorithm
-
 
 from .solvers import coarse_to_fine, ringing_artifacts_removal
 from .utils import (
@@ -51,9 +47,7 @@ from .utils import (
 )
 from .impulse_noise_estimation import detect_impulse_noise, adaptive_median_filter
 
-
 class LIP_BD(DeconvolutionAlgorithm):
-
 
     def __init__(
         self,
@@ -107,7 +101,6 @@ class LIP_BD(DeconvolutionAlgorithm):
         self.outer_iters = outer_iters
         self.inner_iters = inner_iters
 
-
         if k_step is None:
             self.k_step = np.array([1e-2, 5e-3, 1e-3, 5e-4])
         else:
@@ -116,7 +109,6 @@ class LIP_BD(DeconvolutionAlgorithm):
             self.u_step = np.array([1e-2, 5e-3, 1e-3, 1e-3])
         else:
             self.u_step = np.atleast_1d(np.asarray(u_step, dtype=np.float64))
-
 
         self.pd_tau = pd_tau
         self.pd_sigma = pd_sigma
@@ -133,7 +125,6 @@ class LIP_BD(DeconvolutionAlgorithm):
         self.final_deconv = final_deconv.lower()
         self.final_alpha = final_alpha
         self.verbose = verbose
-
 
         self.impulse_preprocess = impulse_preprocess
         self.impulse_params = impulse_params
@@ -155,7 +146,6 @@ class LIP_BD(DeconvolutionAlgorithm):
         self.auto_mode = (auto_mode or 'off').lower()
         self.auto_mode_params = auto_mode_params
 
-
         self._defaults_snapshot = {
             'lambda_val': float(lambda_val),
             'tau': float(tau),
@@ -172,12 +162,10 @@ class LIP_BD(DeconvolutionAlgorithm):
         self.history: Dict[str, list] = {'kernel_diff': []}
         self.hyperparams: Dict[str, Any] = {}
 
-
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         start_time = time.time()
 
         MK, NK = self.kernel_shape
-
 
         f = image.astype(np.float64)
         if f.max() > 1.0:
@@ -185,13 +173,10 @@ class LIP_BD(DeconvolutionAlgorithm):
 
         M_orig, N_orig = f.shape
 
-
         f = make_size_odd(f)
-
 
         if self.gamma_corr:
             f = gamma_correction(f, self.gamma)
-
 
         sanitation_result = None
         impulse_info = None
@@ -223,19 +208,15 @@ class LIP_BD(DeconvolutionAlgorithm):
                         f, impulse_info['impulse_mask'],
                         max_window=ip.get('max_window', 7))
 
-
             if self.noise_estimation != 'none':
                 noise_info = self._estimate_noise(f)
             elif self.auto_mode == 'robust':
 
-
                 self.noise_estimation = 'pca'
                 noise_info = self._estimate_noise(f)
 
-
             if self.auto_mode == 'robust':
                 orchestrator_info = self._orchestrate_robust(noise_info)
-
 
         if self.auto_params is not None and noise_info is not None:
             sigma_n = noise_info.get('sigma_norm', None)
@@ -245,10 +226,8 @@ class LIP_BD(DeconvolutionAlgorithm):
                 k_tau = ap.get('k_tau', 10.0)
                 k_alpha = ap.get('k_alpha', 0.1)
 
-
                 sigma_floor = ap.get('sigma_floor', 0.002)
                 if sigma_n >= sigma_floor:
-
 
                     lambda_cap = ap.get('lambda_cap', None)
                     lam_new = k_lambda / max(sigma_n, 1e-6)
@@ -266,7 +245,6 @@ class LIP_BD(DeconvolutionAlgorithm):
                     print(f"[{self.name}] auto_params skipped "
                           f"(σ={sigma_n:.5f} < floor={sigma_floor})")
 
-
         screenot_info = None
         if self.screenot_preprocess == 'auto' and self.auto_mode != 'sanitation':
             from .screenot import screenot_denoise
@@ -279,7 +257,6 @@ class LIP_BD(DeconvolutionAlgorithm):
                 patch_size=sp.get('patch_size', 8),
                 stride=sp.get('stride', 3),
             )
-
 
         act_info = None
         if self.act_preprocess == 'auto' and self.auto_mode != 'sanitation':
@@ -298,23 +275,19 @@ class LIP_BD(DeconvolutionAlgorithm):
                 threshold_setting=ap.get('threshold_setting', 's'),
             )
 
-
         if self.preprocess not in (None, 'none') and self.auto_mode != 'sanitation':
             f = self._apply_denoise(
                 f, self.preprocess, self.preprocess_params, noise_info)
 
-
         psd_info = None
         if self.noise_preprocess != 'none' and self.auto_mode != 'sanitation':
             f, psd_info = self._apply_noise_preprocess(f)
-
 
         blind_denoise_fn = None
         if (self.blind_denoise not in (None, 'none')
                 and self.auto_mode != 'sanitation'):
             def blind_denoise_fn(u_arr):
                 return self._apply_blind_denoise(u_arr, noise_info)
-
 
         if self.method in ('mm', 'pd', 'cv'):
             blind_params = {
@@ -342,17 +315,14 @@ class LIP_BD(DeconvolutionAlgorithm):
             raise ValueError(
                 f"Unknown method '{self.method}'. Choose 'mm', 'pd', or 'cv'.")
 
-
         k[k < self.kernel_threshold * k.max()] = 0.0
         k_sum = k.sum()
         if k_sum > 0:
             k /= k_sum
 
-
         if (self.pre_nonblind not in (None, 'none')
                 and self.auto_mode != 'sanitation'):
             f = self._apply_pre_nonblind(f, noise_info)
-
 
         if self.final_deconv == 'ringing_removal':
             from .solvers import ringing_artifacts_removal
@@ -364,7 +334,6 @@ class LIP_BD(DeconvolutionAlgorithm):
                 weight_ring=nbp.get('weight_ring', 1.0),
             )
         elif self.final_deconv == 'blend':
-
 
             from .solvers import ringing_artifacts_removal
             nbp = self.nb_params or {}
@@ -381,7 +350,6 @@ class LIP_BD(DeconvolutionAlgorithm):
                 lambda_l0=nbp.get('lambda_l0', 2e-3),
                 weight_ring=nbp.get('weight_ring', 1.0),
             )
-
 
             h = min(u_tik.shape[0], u_rr.shape[0])
             w = min(u_tik.shape[1], u_rr.shape[1])
@@ -416,7 +384,6 @@ class LIP_BD(DeconvolutionAlgorithm):
                 "'adaptive_lp', or 'blend'."
             )
 
-
         rh, rw = u_restored.shape[:2]
         if rh < M_orig or rw < N_orig:
             u_restored = np.pad(
@@ -426,7 +393,6 @@ class LIP_BD(DeconvolutionAlgorithm):
         u_restored = u_restored[:M_orig, :N_orig]
 
         u_final = np.clip(u_restored, 0.0, 1.0)
-
 
         self.hyperparams = {
             'lambda': self.lambda_val,
@@ -468,7 +434,6 @@ class LIP_BD(DeconvolutionAlgorithm):
         x_final = np.clip(x_final, 0, 255).astype(np.int16)
         return x_final, k
 
-
     @staticmethod
     def _guided_filter(I, p, r, eps):
         from scipy.ndimage import uniform_filter
@@ -484,15 +449,12 @@ class LIP_BD(DeconvolutionAlgorithm):
         b = mean_p - a * mean_I
         return box(a) * I + box(b)
 
-
     def _apply_denoise(self, img, method, params, noise_info):
-
 
         if method is None or method == 'none':
             return img
         p = dict(params or {})
         sigma = noise_info.get('sigma_norm', None) if noise_info else None
-
 
         if p.pop('use_vst', False) and noise_info is not None:
             return self._apply_denoise_vst(img, method, p, noise_info)
@@ -547,7 +509,6 @@ class LIP_BD(DeconvolutionAlgorithm):
 
         elif method == 'ensemble':
 
-
             sig = p.get('sigma', sigma if sigma else 0.05)
             members = p.get('members', ('bm3d', 'nlm', 'bilateral'))
             weights = p.get('weights', None)
@@ -574,15 +535,12 @@ class LIP_BD(DeconvolutionAlgorithm):
                 f"'tv', 'nlm', 'bilateral', 'guided', 'bm3d', "
                 f"'act', 'ensemble', 'none'")
 
-
     def _apply_denoise_vst(self, img, method, params, noise_info):
-
 
         a = float(noise_info.get('a', 0.0) or 0.0) if noise_info else 0.0
         b = float(noise_info.get('b', 0.0) or 0.0) if noise_info else 0.0
         A = a / 255.0
         B = b / (255.0 ** 2)
-
 
         if A < 1e-8:
             sub = dict(params)
@@ -590,10 +548,8 @@ class LIP_BD(DeconvolutionAlgorithm):
                            if noise_info else None)
             return self._apply_denoise(img, method, sub, noise_info)
 
-
         inner = np.maximum(A * img + (3.0 / 8.0) * A * A + B, 0.0)
         z = (2.0 / np.sqrt(A)) * np.sqrt(inner)
-
 
         zmax = float(max(z.max(), 1e-6))
         z_scaled = z / zmax
@@ -604,17 +560,14 @@ class LIP_BD(DeconvolutionAlgorithm):
         sub['weight'] = max(0.005, 2.0 * sigma_scaled)
         sub['sigma_color'] = sigma_scaled
 
-
         inner_info = {'sigma_norm': sigma_scaled, 'method': 'vst'}
         denoised_scaled = self._apply_denoise(
             z_scaled, method, sub, inner_info)
 
         z_clean = denoised_scaled * zmax
 
-
         x_rec = (z_clean / 2.0) ** 2 - (3.0 / 8.0) * A - B / max(A, 1e-8)
         return np.clip(x_rec, 0.0, 1.0)
-
 
     def _estimate_noise(self, yg):
         if self.noise_estimation == 'chen':
@@ -629,13 +582,10 @@ class LIP_BD(DeconvolutionAlgorithm):
             return result
         return None
 
-
     def _orchestrate_robust(self, noise_info):
-
 
         snap = self._defaults_snapshot
         amp = dict(self.auto_mode_params or {})
-
 
         self.lambda_val = snap['lambda_val']
         self.tau = snap['tau']
@@ -647,7 +597,6 @@ class LIP_BD(DeconvolutionAlgorithm):
         self.pre_nonblind = snap['pre_nonblind']
         self.pre_nonblind_params = snap['pre_nonblind_params']
 
-
         sigma = 0.0
         if noise_info is not None:
             sigma = float(noise_info.get('sigma_norm', 0.0) or 0.0)
@@ -656,13 +605,11 @@ class LIP_BD(DeconvolutionAlgorithm):
         sigma_heavy = float(amp.get('sigma_heavy', 0.05))
         blend_weight_clean = float(amp.get('blend_weight', 0.5))
 
-
         force_heavy = False
         nt = (noise_info or {}).get('noise_type', None)
         force_heavy_sigma = float(amp.get('force_heavy_sigma', 0.01))
         if nt in ('poisson', 'poisson_gaussian') and sigma >= force_heavy_sigma:
             force_heavy = True
-
 
         if sigma <= sigma_clean and not force_heavy:
             w = 0.0
@@ -689,16 +636,13 @@ class LIP_BD(DeconvolutionAlgorithm):
                 'final_alpha': float(self.final_alpha),
             }
 
-
         w = 1.0 if sigma >= sigma_heavy else (
             (sigma - sigma_clean) / (sigma_heavy - sigma_clean))
         regime = 'heavy' if w > 0.95 else 'medium'
 
-
         noise_type = (noise_info or {}).get('noise_type', 'gaussian')
         poisson_like = noise_type in ('poisson', 'poisson_gaussian',
                                       'unknown')
-
 
         k_lambda = float(amp.get('k_lambda', 5000.0))
         k_tau = float(amp.get('k_tau', 10.0))
@@ -717,7 +661,6 @@ class LIP_BD(DeconvolutionAlgorithm):
                                (1.0 - w) * snap['final_alpha']
                                + w * alpha_noisy)
 
-
         if w < 0.5:
             self.blind_denoise = 'bilateral'
             self.blind_denoise_params = {
@@ -730,7 +673,6 @@ class LIP_BD(DeconvolutionAlgorithm):
                 'sigma_color': float(max(2.0 * sigma, 0.02)),
                 'sigma_space': 7.0,
             }
-
 
         if poisson_like:
             self.preprocess = 'act'
@@ -745,7 +687,6 @@ class LIP_BD(DeconvolutionAlgorithm):
             self.preprocess = 'bm3d'
             self.preprocess_params = {'sigma': float(sigma)}
 
-
         if poisson_like:
             self.pre_nonblind = 'act'
             self.pre_nonblind_params = {'threshold_setting': 's'}
@@ -759,7 +700,6 @@ class LIP_BD(DeconvolutionAlgorithm):
                 'members': amp.get('ensemble_members',
                                    ('bm3d', 'nlm', 'bilateral')),
             }
-
 
         if snap['final_deconv'] == 'auto':
             self.final_deconv = 'ringing_removal'
@@ -785,7 +725,6 @@ class LIP_BD(DeconvolutionAlgorithm):
                   f"pre_nb={self.pre_nonblind}, "
                   f"final={self.final_deconv}")
         return info
-
 
     def _apply_noise_preprocess(self, yg):
         from .noise_psd_analysis import (
@@ -833,18 +772,15 @@ class LIP_BD(DeconvolutionAlgorithm):
 
         return yg_out, psd_info
 
-
     def _apply_blind_denoise(self, x, noise_info):
         p = dict(self.blind_denoise_params or {})
         if self.blind_denoise == 'guided':
             p.setdefault('radius', 2)
         return self._apply_denoise(x, self.blind_denoise, p, noise_info)
 
-
     def _apply_pre_nonblind(self, img, noise_info):
         return self._apply_denoise(
             img, self.pre_nonblind, self.pre_nonblind_params, noise_info)
-
 
     def get_param(self) -> List[Tuple[str, Any]]:
         return [
@@ -891,7 +827,6 @@ class LIP_BD(DeconvolutionAlgorithm):
                         np.asarray(value, dtype=np.float64)))
                 else:
                     setattr(self, key, value)
-
 
                 if key in self._defaults_snapshot:
                     self._defaults_snapshot[key] = (

@@ -1,15 +1,3 @@
-"""
-solvers.py
-
-Core solver functions for VDBKE (Variational Dirichlet Blur Kernel Estimation).
-
-Ported from MATLAB code by X. Zhou et al.
-Reference:
-    X. Zhou, J. Mateos, F. Zhou, R. Molina, A.K. Katsaggelos:
-    "Variational Dirichlet Blur Kernel Estimation",
-    IEEE TIP, vol. 24, no. 12, pp. 5127-5139, 2015.
-"""
-
 import numpy as np
 from numpy.fft import fft2, ifft2
 from scipy.signal import convolve2d
@@ -17,120 +5,40 @@ from scipy.special import digamma, polygamma, gammaln
 
 from .utils import psf2otf, valid_conv_by_fft
 
-
-# ═════════════════════════════════════════════════════════════════════════════
-# center_kernel_img_space  ←  center_kernel_img_space.m
-# ═════════════════════════════════════════════════════════════════════════════
-
 def center_kernel_img_space(x, k):
-    """
-    Centre the kernel by translation so that boundary issues are mitigated.
-    If the kernel is shifted, the image must also be shifted in the opposite
-    direction.
 
-    Ported from ``center_kernel_img_space.m``.
+    rows = np.arange(1, k.shape[0] + 1, dtype=np.float64)
+    cols = np.arange(1, k.shape[1] + 1, dtype=np.float64)
 
-    MATLAB (key lines)::
-
-        mu_y = sum([1:size(k,1)] .* sum(k,2)');
-        mu_x = sum([1:size(k,2)] .* sum(k,1));
-        offset_x = round(floor(size(k,2)/2) + 1 - mu_x);
-        offset_y = round(floor(size(k,1)/2) + 1 - mu_y);
-        shift_kernel = zeros(abs(offset_y*2)+1, abs(offset_x*2)+1);
-        shift_kernel(abs(offset_y)+1+offset_y, abs(offset_x)+1+offset_x) = 1;
-        kshift = conv2(k, shift_kernel, 'same');
-        xshift = conv2(x, rot90(shift_kernel,2), 'same');
-
-    Parameters
-    ----------
-    x : 2-D ndarray — latent image estimate.
-    k : 2-D ndarray — blur kernel.
-
-    Returns
-    -------
-    xshift       : 2-D ndarray — shifted image.
-    k            : 2-D ndarray — centred kernel.
-    shift_kernel : 2-D ndarray — the translation kernel used.
-    """
-    # Centre of mass (MATLAB uses 1-based indices [1:size(k,1)])
-    rows = np.arange(1, k.shape[0] + 1, dtype=np.float64)  # [1, 2, ..., k1]
-    cols = np.arange(1, k.shape[1] + 1, dtype=np.float64)  # [1, 2, ..., k2]
-
-    # MATLAB: mu_y = sum([1:size(k,1)] .* sum(k,2)')
-    #   sum(k,2) is column-vector of row-sums → .' makes it row-vector
     mu_y = np.sum(rows * np.sum(k, axis=1))
-    # MATLAB: mu_x = sum([1:size(k,2)] .* sum(k,1))
-    #   sum(k,1) is row-vector of column-sums
+
     mu_x = np.sum(cols * np.sum(k, axis=0))
 
-    # MATLAB: offset_x = round(floor(size(k,2)/2) + 1 - mu_x)
     offset_x = int(np.round(k.shape[1] // 2 + 1 - mu_x))
     offset_y = int(np.round(k.shape[0] // 2 + 1 - mu_y))
 
     print(f'CenterKernel: weightedMean[{mu_x - 1:.6f} {mu_y - 1:.6f}] '
           f'offset[{offset_x} {offset_y}]')
 
-    # Build shift kernel (delta at the offset position)
     shift_kernel = np.zeros((abs(offset_y) * 2 + 1, abs(offset_x) * 2 + 1),
                             dtype=np.float64)
-    # MATLAB 1-indexed: shift_kernel(abs(offset_y)+1+offset_y, abs(offset_x)+1+offset_x) = 1
-    # Python 0-indexed: row = abs(offset_y)+offset_y, col = abs(offset_x)+offset_x
+
     shift_kernel[abs(offset_y) + offset_y, abs(offset_x) + offset_x] = 1.0
 
-    # Shift both kernel and image
     k = convolve2d(k, shift_kernel, 'same')
     xshift = convolve2d(x, np.rot90(shift_kernel, 2), 'same')
 
     return xshift, k, shift_kernel
 
-
-# ═════════════════════════════════════════════════════════════════════════════
-# dirichlet_Adbc_fft  ←  dirichlet_Adbc_fft.m
-# ═════════════════════════════════════════════════════════════════════════════
-
 def dirichlet_Adbc_fft(x_list, y_list, m1, m2, lambda_C=0, C=None):
-    """
-    Pre-compute Ad, b, and function handles (closures) for X'X products
-    needed by the Dirichlet kernel estimation.
 
-    Ported from ``dirichlet_Adbc_fft.m``.
-
-    MATLAB (main loop)::
-
-        for t = 1:length(x)
-            X{t}  = fft2(x{t});
-            Xr{t} = fft2(rot90(x{t},2));
-            b = b - 2*valid_conv_by_fft(Xr{t}, y{t});
-            xx = x{t}.^2;
-            for i = m1:-1:1
-                for j = m2:-1:1
-                    Ad(m1+1-i, m2+1-j) += sum(sum(xx(i:i+M1-m1, j:j+M2-m2)));
-                end
-            end
-        end
-
-    Parameters
-    ----------
-    x_list   : list of 2-D ndarrays — derivative images of the latent estimate.
-    y_list   : list of 2-D ndarrays — derivative images of the blurred observation.
-    m1, m2   : int — kernel size (rows, cols).
-    lambda_C : float — weight on the Laplacian regulariser (default 0).
-    C        : 2-D ndarray or None — Laplacian filter (e.g. [[0,-1,0],[-1,4,-1],[0,-1,0]]).
-
-    Returns
-    -------
-    Ad       : (m1, m2) ndarray
-    b        : (m1, m2) ndarray
-    xtAx_func: callable(alpha) → (scalar, list_of_Xalpha)
-    Ax_func  : callable(Xalpha_list) → ndarray
-    """
     L = len(x_list)
     Ad = np.zeros((m1, m2), dtype=np.float64)
     b = np.zeros((m1, m2), dtype=np.float64)
 
-    X_fft = []      # fft2 of each x
-    Xr_fft = []     # fft2 of rot180(x)
-    x_spatial = []   # keep spatial copies for conv fallback
+    X_fft = []
+    Xr_fft = []
+    x_spatial = []
 
     for t in range(L):
         xt = x_list[t]
@@ -141,32 +49,23 @@ def dirichlet_Adbc_fft(x_list, y_list, m1, m2, lambda_C=0, C=None):
         Xr_fft.append(fft2(flipxt))
         x_spatial.append(xt)
 
-        # b = b - 2*valid_conv_by_fft(Xr{t}, y{t})
         b -= 2.0 * valid_conv_by_fft(Xr_fft[t], y_list[t])
 
-        # Build Ad via sliding-window sums of x^2
-        # MATLAB (1-indexed): Ad(m1+1-i, m2+1-j) += sum(sum(xx(i:i+M1-m1, j:j+M2-m2)))
-        # Python (0-indexed): for i in [1..m1], j in [1..m2]:
-        #   Ad[m1-i, m2-j] += xx[i-1 : i-1+M1-m1+1, j-1 : j-1+M2-m2+1].sum()
         xx = xt ** 2
-        rows_len = M1 - m1 + 1  # number of rows in the valid window
-        cols_len = M2 - m2 + 1  # number of cols in the valid window
-        for i in range(m1):      # i = 0..m1-1  (corresponds to MATLAB i=m1..1)
-            for j in range(m2):  # j = 0..m2-1
-                # MATLAB: Ad(m1+1-i, m2+1-j) += ... with i from m1 downto 1
-                # Python: map i→m1-1-i, j→m2-1-j to match the reversed indexing
+        rows_len = M1 - m1 + 1
+        cols_len = M2 - m2 + 1
+        for i in range(m1):
+            for j in range(m2):
+
                 Ad[m1 - 1 - i, m2 - 1 - j] += np.sum(xx[i:i + rows_len, j:j + cols_len])
 
     print(f'Ad_min={Ad.min():.6f},Ad_max={Ad.max():.6f}')
 
-    # Optional Laplacian regularisation
     if lambda_C > 0 and C is not None:
         CtC = convolve2d(C, C, 'same')
-        Cd = CtC[CtC.shape[0] // 2, CtC.shape[1] // 2]  # MATLAB: CtC(2,2) for 3x3
+        Cd = CtC[CtC.shape[0] // 2, CtC.shape[1] // 2]
         Ad = Ad + lambda_C * Cd
 
-    # ── closure: xtAx(alpha) ──
-    # MATLAB: function [y, Xalpha] = xtAx(alpha, X, x, L, lambda_C, C)
     def xtAx_func(alpha):
         y_val = 0.0
         Xalpha = [None] * (L + 1)
@@ -182,8 +81,6 @@ def dirichlet_Adbc_fft(x_list, y_list, m1, m2, lambda_C=0, C=None):
             y_val += lambda_C * np.sum(Xalpha[L] ** 2)
         return y_val, Xalpha
 
-    # ── closure: Ax(Xalpha_list) ──
-    # MATLAB: function y = Ax(Xalpha, Xr, L, lambda_C, C)
     def Ax_func(Xalpha_list):
         y_val = np.zeros((m1, m2), dtype=np.float64)
         for i in range(L):
@@ -194,30 +91,8 @@ def dirichlet_Adbc_fft(x_list, y_list, m1, m2, lambda_C=0, C=None):
 
     return Ad, b, xtAx_func, Ax_func
 
-
-# ═════════════════════════════════════════════════════════════════════════════
-# dirichlet_cost_by_fft  ←  inner function of kernel_estimation_filter_space_fft.m
-# ═════════════════════════════════════════════════════════════════════════════
-
 def _dirichlet_cost_by_fft(alpha, lam, xtAx_func, Ad, b):
-    """
-    Compute the Dirichlet cost and auxiliary quantities.
 
-    MATLAB::
-
-        Sa   = sum(alpha(:));
-        den1 = 2*Sa*(Sa+1);
-        [atAa, Xalpha] = xtAx(alpha);
-        Adta = sum(sum(Ad.*alpha));
-        bta  = sum(sum(b.*alpha));
-        temp = (alpha-1).*(psi(alpha)-psi(Sa));
-        f = lambda*(sum(temp(:)) + gammaln(Sa) - sum(gammaln(alpha(:))))
-            + (atAa+Adta)/den1 + bta/(2*Sa);
-
-    Returns
-    -------
-    f, atAa, Adta, bta, Sa, den1, Xalpha
-    """
     Sa = np.sum(alpha)
     den1 = 2.0 * Sa * (Sa + 1.0)
     atAa, Xalpha = xtAx_func(alpha)
@@ -228,33 +103,8 @@ def _dirichlet_cost_by_fft(alpha, lam, xtAx_func, Ad, b):
          + (atAa + Adta) / den1 + bta / (2.0 * Sa))
     return f, atAa, Adta, bta, Sa, den1, Xalpha
 
-
-# ═════════════════════════════════════════════════════════════════════════════
-# kernel_estimation_filter_space_fft  ←  kernel_estimation_filter_space_fft.m
-# ═════════════════════════════════════════════════════════════════════════════
-
 def kernel_estimation_filter_space_fft(k, x_list, y_list, opt):
-    """
-    Gradient projection method for Dirichlet minimisation (FFT version).
 
-    Ported from ``kernel_estimation_filter_space_fft.m``.
-
-    Parameters
-    ----------
-    k      : (ks1, ks2) ndarray — current kernel estimate.
-    x_list : list of 2-D ndarrays — gradient images of the latent estimate.
-    y_list : list of 2-D ndarrays — gradient images of the blurred observation.
-    opt    : dict with keys:
-        'lambda', 'lambda_C', 'Laplacian_filter', 'max_iter',
-        'back_alpha', 'back_beta', 'lower_bound', 'ng_min',
-        'cost_display', 'alpha0'
-
-    Returns
-    -------
-    alpha  : (ks1, ks2) ndarray — Dirichlet parameters.
-    fx     : list of float — cost at each iteration.
-    stepsize : float — last step size used.
-    """
     lam = opt['lambda']
     lambda_C = opt.get('lambda_C', 0)
     C = opt.get('Laplacian_filter', None)
@@ -268,11 +118,9 @@ def kernel_estimation_filter_space_fft(k, x_list, y_list, opt):
     ks1, ks2 = k.shape
     alpha = opt['alpha0'].copy()
 
-    # Compute A, Ad and b
     Ad, b, xtAx_func, Ax_func = dirichlet_Adbc_fft(
         x_list, y_list, ks1, ks2, lambda_C, C)
 
-    # Initial cost
     f0, atAa, Adta, bta, Sa, den1, Xalpha = _dirichlet_cost_by_fft(
         alpha, lam, xtAx_func, Ad, b)
     fx = [f0]
@@ -284,14 +132,13 @@ def kernel_estimation_filter_space_fft(k, x_list, y_list, opt):
     itr = 0
 
     while itr < max_iter:
-        # Compute gradient
+
         den2 = den1 ** 2 / (4.0 * Sa + 2.0)
         g = lam * (alpha - 1.0) * (polygamma(1, alpha) - polygamma(1, Sa))
         Aa = Ax_func(Xalpha)
         g = (g + (2.0 * Aa + Ad) / den1 + b / (2.0 * Sa)
              - (atAa + Adta) / den2 - bta / (2.0 * Sa ** 2))
 
-        # Backtracking line search
         d = -g
         tmax = min(Sa, stepsize * 1.2)
         t = tmax
@@ -329,40 +176,8 @@ def kernel_estimation_filter_space_fft(k, x_list, y_list, opt):
 
     return alpha, fx, stepsize
 
-
-# ═════════════════════════════════════════════════════════════════════════════
-# nbid_ngm_ubc_admm  ←  nbid_ngm_ubc_admm.m  (Algorithm 1)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def nbid_ngm_ubc_admm(B, k, pars):
-    """
-    Non-blind image deconvolution using NGM prior and undetermined boundary
-    conditions (Algorithm 1 of the paper).
 
-    Ported from ``nbid_ngm_ubc_admm.m``.
-
-    Parameters
-    ----------
-    B    : (m, n) ndarray — blurred image.
-    k    : 2-D ndarray — blur kernel.
-    pars : dict with keys:
-        'lambda1'     — weight on the NGM term
-        'x0'          — initial latent image
-      optional:
-        'lambda_min'  (default lambda1*5)
-        'lambda_max'  (default 1)
-        'cost_display'(default 0)
-        'IF'          (default sqrt(2))
-        'N2'          (default 2)
-        'N1'          (default 20)
-        'lambda_u'    (default 0.1)
-        'xv_iter'     (default 1)
-
-    Returns
-    -------
-    x_fov : (m, n) ndarray — deblurred image (field of view).
-    x     : (M, N) ndarray — full deblurred image (with border).
-    """
     lambda1 = pars['lambda1']
     lambda_min = pars.get('lambda_min', lambda1 * 5)
     lambda_max = pars.get('lambda_max', 1.0)
@@ -396,42 +211,35 @@ def nbid_ngm_ubc_admm(B, k, pars):
 
     x = pars['x0'].copy()
     if x.shape == B.shape:
-        # MATLAB: padarray(x,[hks1 hks2],'replicate','both')
+
         x = np.pad(x, ((hks1, hks1), (hks2, hks2)), mode='edge')
 
-    # MATLAB: MtB = padarray(B,[hks1 hks2],0,'both')
     MtB = np.pad(B, ((hks1, hks1), (hks2, hks2)), mode='constant', constant_values=0)
     MtM = np.pad(np.ones((m, n), dtype=np.float64),
                  ((hks1, hks1), (hks2, hks2)), mode='constant', constant_values=0)
 
-    # Circular gradients
-    # MATLAB: x1 = [diff(x,1,2), x(:,1)-x(:,end)]
     x1 = np.concatenate([np.diff(x, axis=1), x[:, 0:1] - x[:, -1:]], axis=1)
-    # MATLAB: x2 = [diff(x,1,1); x(1,:)-x(end,:)]
+
     x2 = np.concatenate([np.diff(x, axis=0), x[0:1, :] - x[-1:, :]], axis=0)
 
-    # MATLAB: u = padarray(B,[hks1 hks2],'replicate','both')
     u = np.pad(B, ((hks1, hks1), (hks2, hks2)), mode='edge')
-    du = np.zeros_like(u)  # dual variable
+    du = np.zeros_like(u)
 
     X = fft2(x)
     i = 1
 
     while i <= N1:
-        # Update u
+
         Ax = np.real(ifft2(X * K))
         u = (MtB + lambda_u * (Ax + du)) / (MtM + lambda_u)
 
-        # Update dual variable
         du = du + Ax - u
 
-        # Ktu = fft2(u-du) .* Kt
         Ktu = fft2(u - du) * Kt
 
         invA = 1.0 / (KtK + lambda_v / lambda_u * DtD)
         lam = lambda1 / lambda_v
 
-        # Update v
         for _xv in range(xv_iter):
             temp1 = np.abs(x1)
             temp2 = np.abs(x2)
@@ -449,18 +257,15 @@ def nbid_ngm_ubc_admm(B, k, pars):
             v1 = s1 * v1
             v2 = s2 * v2
 
-        # Update x
-        # MATLAB: temp1 = -[v1(:,1)-v1(:,end), diff(v1,1,2)]
         temp1 = -np.concatenate([v1[:, 0:1] - v1[:, -1:],
                                  np.diff(v1, axis=1)], axis=1)
-        # MATLAB: temp2 = -[v2(1,:)-v2(end,:); diff(v2,1,1)]
+
         temp2 = -np.concatenate([v2[0:1, :] - v2[-1:, :],
                                  np.diff(v2, axis=0)], axis=0)
         X = Ktu + lambda_v / lambda_u * fft2(temp1 + temp2)
         X = invA * X
         x = np.real(ifft2(X))
 
-        # Recompute circular gradients
         x1 = np.concatenate([np.diff(x, axis=1), x[:, 0:1] - x[:, -1:]], axis=1)
         x2 = np.concatenate([np.diff(x, axis=0), x[0:1, :] - x[-1:, :]], axis=0)
 
@@ -477,9 +282,6 @@ def nbid_ngm_ubc_admm(B, k, pars):
         lambda_v = min(lambda_v * IF, lambda_max)
         i += 1
 
-    # Crop to field of view
-    # MATLAB 1-indexed: x(hks1+1:m+hks1, hks2+1:n+hks2)
-    # Python 0-indexed: x[hks1:hks1+m, hks2:hks2+n]
     if hks1 == 0 and hks2 == 0:
         x_fov = x.copy()
     elif hks1 == 0:
@@ -491,36 +293,8 @@ def nbid_ngm_ubc_admm(B, k, pars):
 
     return x_fov, x
 
-
-# ═════════════════════════════════════════════════════════════════════════════
-# ss_ngm_dirichlet_ubc_img  ←  ss_ngm_dirichlet_ubc_img.m
-# ═════════════════════════════════════════════════════════════════════════════
-
 def ss_ngm_dirichlet_ubc_img(y, x, k, alpha0, pars):
-    """
-    Single-scale blind deconvolution: alternating latent-image (x) and
-    kernel (k) estimation.
 
-    Ported from ``ss_ngm_dirichlet_ubc_img.m``.
-
-    Parameters
-    ----------
-    y      : (m, n) ndarray — blurred image at current scale.
-    x      : (m, n) ndarray — initial latent image estimate.
-    k      : (k1, k2) ndarray — initial kernel estimate.
-    alpha0 : (k1, k2) ndarray — initial Dirichlet parameters.
-    pars   : dict with keys:
-        'xk_iter'     — number of alternating iterations
-        'img_pars'    — dict of parameters for nbid_ngm_ubc_admm
-        'kernel_pars' — dict of parameters for kernel_estimation_filter_space_fft
-        'k_tol'       — convergence tolerance on kernel change
-
-    Returns
-    -------
-    x      : (m, n) ndarray — estimated latent image (FOV).
-    k      : (k1, k2) ndarray — estimated kernel.
-    alpha0 : (k1, k2) ndarray — final Dirichlet parameters.
-    """
     m, n = y.shape
     k1, k2 = k.shape
     khs1 = k1 // 2
@@ -530,9 +304,6 @@ def ss_ngm_dirichlet_ubc_img(y, x, k, alpha0, pars):
     img_pars = pars['img_pars'].copy()
     img_pars['x0'] = x.copy()
 
-    # Gradient images of y for kernel estimation
-    # MATLAB: y2{1} = diff(y(khs1+1:end-khs1, khs2+1:end-khs2), 1, 1)
-    # Python: crop y then diff
     if khs1 > 0 and khs2 > 0:
         y_crop = y[khs1:-khs1, khs2:-khs2]
     elif khs1 > 0:
@@ -555,35 +326,30 @@ def ss_ngm_dirichlet_ubc_img(y, x, k, alpha0, pars):
 
     k_old = None
     for i in range(xk_iter):
-        # Adjust lambda with schedule
+
         img_pars['lambda1'] = lambda1 + delta_lambda * max(6 - (i + 1), 0)
         img_pars['lambda_min'] = lambda_min / lambda1 * img_pars['lambda1']
 
-        # Latent image estimation (Alg. 1)
         x_fov, x_full = nbid_ngm_ubc_admm(y, k, img_pars)
-        img_pars['x0'] = x_full  # use full x as init for next iteration
+        img_pars['x0'] = x_full
 
-        # Gradient images of x for kernel estimation
         x1 = [np.diff(x_fov, axis=0), np.diff(x_fov, axis=1)]
 
-        # Kernel estimation
         ker_opts['alpha0'] = alpha.copy()
         alpha, fcost, _ = kernel_estimation_filter_space_fft(k, x1, y2, ker_opts)
         alpha0 = alpha.reshape(k1, k2)
 
-        # Update kernel from Dirichlet parameters
         if ker_opts.get('mode', 0):
-            # mode estimator
+
             k = (alpha0 - 1.0) / (np.sum(alpha) - k1 * k2)
         else:
-            # expectation estimator (default)
+
             k = alpha0 / np.sum(alpha)
 
         print(f'Iteration={i + 1}')
 
-        # Convergence check (starts at iteration 5, MATLAB i>=5 is 1-indexed)
         if i >= 4 and k_old is not None:
-            r_k = np.max(np.abs(k - k_old)) / 1.0  # max_k = 1
+            r_k = np.max(np.abs(k - k_old)) / 1.0
             if len(fcost) <= 2 or r_k <= pars.get('k_tol', 1e-4):
                 break
 
@@ -591,41 +357,8 @@ def ss_ngm_dirichlet_ubc_img(y, x, k, alpha0, pars):
 
     return x_fov, k, alpha0
 
-
-# ═════════════════════════════════════════════════════════════════════════════
-# firls_deb_ubc  ←  firls_deb_ubc.m
-# ═════════════════════════════════════════════════════════════════════════════
-
 def firls_deb_ubc(y, h, opt):
-    """
-    Fast IRLS for image deblurring with undetermined boundary conditions.
-    Uses 1st and 2nd order derivative filters + ADMM.
 
-    Ported from ``firls_deb_ubc.m``.
-
-    Parameters
-    ----------
-    y   : (M1, M2) ndarray — blurred image.
-    h   : (m1, m2) ndarray — blur kernel (odd size).
-    opt : dict with keys:
-        'lambda'       — regularisation weight
-      optional:
-        'alpha'        (default 2/3)
-        'beta_a'       (default lambda*alpha*(20/255)^(alpha-2))
-        'lambda_u'     (default min(0.1, 5000*lambda))
-        'inner_iter'   (default 4)
-        'out_iter'     (default 5)
-        'epsilon'      (default 0.01)
-        'cost_display' (default 0)
-        'isnr_display' (default 0)
-        'groundtruth'  — needed if isnr_display==1
-
-    Returns
-    -------
-    x_fov : (M1, M2) ndarray — deblurred image (field of view).
-    x     : (n1, n2) ndarray — full deblurred image.
-    opt   : dict — updated with cost/isnr if requested.
-    """
     M1, M2 = y.shape
     m1, m2 = h.shape
     hks1 = m1 // 2
@@ -635,7 +368,6 @@ def firls_deb_ubc(y, h, opt):
 
     x = np.pad(y, ((hks1, hks1), (hks2, hks2)), mode='edge')
 
-    # 1st and 2nd order derivative filters (3x3)
     dxf  = np.array([[ 0, 0, 0], [ 0, 1,-1], [ 0, 0, 0]], dtype=np.float64)
     dyf  = np.array([[ 0, 0, 0], [ 0, 1, 0], [ 0,-1, 0]], dtype=np.float64)
     dyyf = np.array([[ 0,-1, 0], [ 0, 2, 0], [ 0,-1, 0]], dtype=np.float64)
@@ -683,7 +415,6 @@ def firls_deb_ubc(y, h, opt):
     c = alpha_p * lam
     beta = alpha_p * lam / epsilon ** (2 - alpha_p)
 
-    # Initial derivatives via circular-padded convolution
     xpad = np.pad(x, ((1, 1), (1, 1)), mode='wrap')
     dx_  = convolve2d(xpad, dxf, 'valid')
     dy_  = convolve2d(xpad, dyf, 'valid')
@@ -697,7 +428,6 @@ def firls_deb_ubc(y, h, opt):
     adyy = np.abs(dyy_)
     adxy = np.abs(dxy_)
 
-    # Dual variables (initialised to zero)
     du   = np.zeros((n1, n2), dtype=np.float64)
     dvx  = np.zeros_like(du)
     dvy  = np.zeros_like(du)
@@ -709,19 +439,12 @@ def firls_deb_ubc(y, h, opt):
     Ax_ = np.real(ifft2(H * X_))
     invA = HH + beta_a / lambda_u * RR
 
-    # Output containers
     opt_out = dict(opt)
 
     outer = 0
     while outer < N1:
         outer += 1
 
-        # ── W_* update (eq. 8 of Zhou et al., ICIP 2014).  The clamp
-        # ``min(beta, c * a^(alpha-2))`` is mathematically valid when
-        # a==0 (returns beta) but produces RuntimeWarnings in numpy
-        # because of the negative exponent.  Floor by a tiny epsilon to
-        # silence them while preserving the result (a^(alpha-2) becomes
-        # huge and is clipped by ``beta`` anyway).
         eps_w = 1e-12
         exp_w = alpha_p - 2.0
         with np.errstate(divide='ignore', invalid='ignore'):
@@ -731,26 +454,22 @@ def firls_deb_ubc(y, h, opt):
             Wyy = np.minimum(beta, c * np.maximum(adyy, eps_w) ** exp_w) * w0
             Wxy = np.minimum(beta, c * np.maximum(adxy, eps_w) ** exp_w) * w0
 
-        # Inner ADMM loop
         inner = 0
         while inner < N2:
             inner += 1
 
-            # u sub-problem
             u = Ax_ + du
             u[hks1:hks1 + M1, hks2:hks2 + M2] = (
                 (y + lambda_u * u[hks1:hks1 + M1, hks2:hks2 + M2])
                 / (1.0 + lambda_u)
             )
 
-            # v sub-problems
             vx  = beta_a * (dx_  + dvx)  / (Wx  + beta_a)
             vy  = beta_a * (dy_  + dvy)  / (Wy  + beta_a)
             vxx = beta_a * (dxx_ + dvxx) / (Wxx + beta_a)
             vyy = beta_a * (dyy_ + dvyy) / (Wyy + beta_a)
             vxy = beta_a * (dxy_ + dvxy) / (Wxy + beta_a)
 
-            # Update dual variables
             du   = du   - u   + Ax_
             dvx  = dvx  - vx  + dx_
             dvy  = dvy  - vy  + dy_
@@ -758,7 +477,6 @@ def firls_deb_ubc(y, h, opt):
             dvyy = dvyy - vyy + dyy_
             dvxy = dvxy - vxy + dxy_
 
-            # x sub-problem
             Y_ = fft2(u - du) * Ht
 
             tempx  = convolve2d(np.pad(vx  - dvx,  ((1,1),(1,1)), mode='wrap'), dxfr,  'valid')
@@ -772,7 +490,6 @@ def firls_deb_ubc(y, h, opt):
             Ax_ = np.real(ifft2(H * X_))
             x = np.real(ifft2(X_))
 
-            # Recompute derivatives
             xpad = np.pad(x, ((1, 1), (1, 1)), mode='wrap')
             dx_  = convolve2d(xpad, dxf, 'valid')
             dy_  = convolve2d(xpad, dyf, 'valid')

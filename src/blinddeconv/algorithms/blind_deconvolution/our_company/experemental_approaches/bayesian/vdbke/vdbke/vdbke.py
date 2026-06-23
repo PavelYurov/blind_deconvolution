@@ -1,10 +1,7 @@
 """
-vdbke.py — Variational Dirichlet Blur Kernel Estimation.
+vdbke.py
 
-Multi-scale blind deconvolution framework wrapper.
-
-Ported from ``ms_ngm_dirichlet_ubc_img.m`` by X. Zhou et al.
-Reference:
+Источник:
     X. Zhou, J. Mateos, F. Zhou, R. Molina, A.K. Katsaggelos:
     "Variational Dirichlet Blur Kernel Estimation",
     IEEE TIP, vol. 24, no. 12, pp. 5127-5139, 2015.
@@ -17,7 +14,6 @@ from typing import Tuple, List, Any, Dict
 import sys
 from pathlib import Path
 
-
 def _find_project_root(start: Path) -> Path:
     path = start.resolve()
     while not (path / "pyproject.toml").exists():
@@ -25,7 +21,6 @@ def _find_project_root(start: Path) -> Path:
             raise RuntimeError("Cannot locate project root")
         path = path.parent
     return path
-
 
 _CURRENT_FILE = Path(__file__).resolve()
 _PROJECT_ROOT = _find_project_root(_CURRENT_FILE)
@@ -43,14 +38,7 @@ from .solvers import (center_kernel_img_space, ss_ngm_dirichlet_ubc_img,
                       firls_deb_ubc)
 from scipy.signal import convolve2d
 
-
 class VDBKE(DeconvolutionAlgorithm):
-    """
-    Variational Dirichlet Blur Kernel Estimation (VDBKE).
-
-    Multi-scale blind deconvolution followed by non-blind deconvolution.
-    Ported from ``ms_ngm_dirichlet_ubc_img.m``.
-    """
 
     def __init__(
         self,
@@ -58,7 +46,7 @@ class VDBKE(DeconvolutionAlgorithm):
         gamma_correct: float = 1.0,
         use_ycbcr: bool = True,
         kernel_est_win=None,
-        # ── kernel estimation parameters ──
+
         kernel_lambda: float = 1e-6,
         kernel_max_iter: int = 20,
         kernel_back_alpha: float = 0.01,
@@ -68,24 +56,9 @@ class VDBKE(DeconvolutionAlgorithm):
         kernel_cost_display: int = 0,
         kernel_mode: int = 0,
         kernel_Laplacian_filter=None,
-        # NOTE on ``kernel_lambda_C``.
-        # Originally I set this to 100.0 to match Sun-dataset/real-data
-        # tests in the paper, but those tests use real-world 640×640
-        # blurred photos with motion kernels of 13–27 px.  The user's
-        # pipeline applies *synthetic* motion/defocus blur on much
-        # smaller images, where ``lambda_C=100`` over-regularises the
-        # kernel and introduces a sub-pixel shift bias («ступеньки» /
-        # «звон» in the deblurred image).  Default 0 = pure Dirichlet
-        # prior; advanced users can set 0.01 (Levin-style) or 100
-        # (Sun-style) explicitly.
+
         kernel_lambda_C: float = 0.0,
-        # ── image estimation parameters ──
-        # NOTE on ``img_lambda1``.
-        # Lowering this to 0.0002 (Sun default) on the user's pipeline
-        # under-regularises the latent image so the kernel absorbs
-        # noise-driven gradients and develops a faint halo («тень»).
-        # 0.002 is a calibrated middle ground that works well for the
-        # synthetic-blur scenarios used here.
+
         img_lambda1: float = 0.002,
         img_lambda_min: float = 0.01,
         img_lambda_max: float = 1.0,
@@ -95,16 +68,10 @@ class VDBKE(DeconvolutionAlgorithm):
         img_lambda_u: float = 0.1,
         img_xv_iter: int = 1,
         img_cost_display: int = 0,
-        # ── alternating iteration parameters ──
+
         xk_iter: int = 20,
         k_tol: float = 5e-4,
-        # ── non-blind deconvolution (FIRLS) parameters ──
-        # NOTE on ``firls_lambda``.
-        # 0.0002 (Sun) under-regularises the inversion on the user's
-        # pipeline and produces visible ringing / staircase artefacts
-        # near edges.  0.002 keeps the inversion stable while still
-        # leaving high-frequency detail thanks to the hyper-Laplacian
-        # prior (alpha = 2/3).
+
         firls_lambda: float = 0.002,
         firls_alpha: float = 2.0 / 3.0,
         firls_out_iter: int = 5,
@@ -117,7 +84,6 @@ class VDBKE(DeconvolutionAlgorithm):
         self.use_ycbcr = use_ycbcr
         self.kernel_est_win = kernel_est_win
 
-        # Kernel estimation
         self.kernel_lambda = kernel_lambda
         self.kernel_max_iter = kernel_max_iter
         self.kernel_back_alpha = kernel_back_alpha
@@ -126,7 +92,7 @@ class VDBKE(DeconvolutionAlgorithm):
         self.kernel_ng_min = kernel_ng_min
         self.kernel_cost_display = kernel_cost_display
         self.kernel_mode = kernel_mode
-        # Default Laplacian filter: identity (Gaussian prior on kernel)
+
         if kernel_Laplacian_filter is None:
             self.kernel_Laplacian_filter = np.array(
                 [[0, 0, 0], [0, 1, 0], [0, 0, 0]], dtype=np.float64)
@@ -134,7 +100,6 @@ class VDBKE(DeconvolutionAlgorithm):
             self.kernel_Laplacian_filter = np.asarray(kernel_Laplacian_filter, dtype=np.float64)
         self.kernel_lambda_C = kernel_lambda_C
 
-        # Image estimation
         self.img_lambda1 = img_lambda1
         self.img_lambda_min = img_lambda_min
         self.img_lambda_max = img_lambda_max
@@ -145,11 +110,9 @@ class VDBKE(DeconvolutionAlgorithm):
         self.img_xv_iter = img_xv_iter
         self.img_cost_display = img_cost_display
 
-        # Alternating
         self.xk_iter = xk_iter
         self.k_tol = k_tol
 
-        # FIRLS
         self.firls_lambda = firls_lambda
         self.firls_alpha = firls_alpha
         self.firls_out_iter = firls_out_iter
@@ -158,25 +121,19 @@ class VDBKE(DeconvolutionAlgorithm):
         self.history: Dict[str, list] = {'kernel_diff': []}
         self.hyperparams: Dict[str, Any] = {}
 
-    # ─────────────────────────────────────────────────────────────────────
-    # process — main entry point  (← ms_ngm_dirichlet_ubc_img.m)
-    # ─────────────────────────────────────────────────────────────────────
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         start_time = time.time()
 
-        # Convert to float64 [0, 1]
         y = image.astype(np.float64)
         if y.max() > 1.0:
             y /= 255.0
 
         yorig = y.copy()
 
-        # Gamma correction
         y = y ** self.gamma_correct
 
-        # Convert to grayscale for kernel estimation
         if self.kernel_est_win is not None:
-            w = self.kernel_est_win  # (r1, c1, r2, c2) 0-indexed
+            w = self.kernel_est_win
             if y.ndim == 3 and y.shape[2] == 3:
                 y = rgb2gray(y[w[0]:w[2], w[1]:w[3], :])
             else:
@@ -185,10 +142,8 @@ class VDBKE(DeconvolutionAlgorithm):
             if y.ndim == 3 and y.shape[2] == 3:
                 y = rgb2gray(y)
 
-        blur_size = self.kernel_size  # (ks1, ks2)
+        blur_size = self.kernel_size
 
-        # ── Determine kernel sizes at each scale ──
-        # MATLAB: [max_ks, ind1] = max(opts.kernel_size)
         max_ks = max(blur_size)
         ind1 = 0 if blur_size[0] >= blur_size[1] else 1
         ind2 = 1 - ind1
@@ -203,7 +158,7 @@ class VDBKE(DeconvolutionAlgorithm):
         print(f'Kernel size at coarsest level is [{minsize[0]}, {minsize[1]}]')
 
         resize_step = np.sqrt(2)
-        # Build ksize list for each scale
+
         ksize = []
         tmp = minsize[ind1]
         while tmp < max_ks:
@@ -222,24 +177,22 @@ class VDBKE(DeconvolutionAlgorithm):
         ksize.append(tuple(blur_size))
         num_scales = len(ksize)
 
-        # Storage per scale
         ks = [None] * num_scales
         alphas = [None] * num_scales
         ls = [None] * num_scales
 
         lambda_C = self.kernel_lambda_C
 
-        # ── Multi-scale loop ──
         for s in range(num_scales):
             k1, k2 = ksize[s]
 
             if s == 0:
-                # Coarsest level: initialise kernel as Gaussian
+
                 Gsigma = 1.0 if max_ks > 50 else 0.5
                 ks[s] = fspecial_gaussian((k1, k2), Gsigma)
                 alphas[s] = ks[s] + self.kernel_lower_bound
             else:
-                # Up-sample kernel from previous level
+
                 tmp_k = ks[s - 1].copy()
                 tmp_k[tmp_k < 0] = 0
                 tmp_k /= tmp_k.sum()
@@ -248,7 +201,6 @@ class VDBKE(DeconvolutionAlgorithm):
                 ks[s][ks[s] < 0] = 0
                 ks[s] /= ks[s].sum()
 
-            # Image size at this level
             r = int(np.floor(y.shape[0] * k1 / blur_size[0]))
             c = int(np.floor(y.shape[1] * k2 / blur_size[1]))
             if s == num_scales - 1:
@@ -257,7 +209,6 @@ class VDBKE(DeconvolutionAlgorithm):
             print(f'Processing scale {s + 1}/{num_scales}; '
                   f'kernel size {k1}x{k2}; image size {r}x{c}')
 
-            # Resize y to current scale
             ys = imresize(y, (r, c), 'bilinear')
 
             if s == 0:
@@ -265,20 +216,17 @@ class VDBKE(DeconvolutionAlgorithm):
             else:
                 ls[s] = imresize(ls[s - 1], (r, c), 'bilinear')
 
-            # Lambda_C schedule
             if s == num_scales - 1:
                 cur_lambda_C = lambda_C
             else:
                 cur_lambda_C = (lambda_C * ksize[s][0] * ksize[s][1]
                                 / (ksize[-1][0] * ksize[-1][1]))
 
-            # Centre the kernel
             ls[s], ks[s], shift_kernel = center_kernel_img_space(ls[s], ks[s])
             alphas[s] = np.maximum(
                 convolve2d(alphas[s], shift_kernel, 'same'),
                 self.kernel_lower_bound)
 
-            # Build parameter dicts for this scale
             kernel_pars = {
                 'lambda': self.kernel_lambda,
                 'max_iter': self.kernel_max_iter,
@@ -313,16 +261,13 @@ class VDBKE(DeconvolutionAlgorithm):
                 'k_tol': self.k_tol,
             }
 
-            # Single-scale alternating estimation
             ls[s], ks[s], alphas[s] = ss_ngm_dirichlet_ubc_img(
                 ys, ls[s], ks[s], alphas[s], pars)
 
-            # At finest scale, extract final kernel
             if s == num_scales - 1:
                 kernel = alphas[s] - self.kernel_lower_bound
                 kernel = kernel / kernel.sum()
 
-        # ── Non-blind deconvolution ──
         firls_opts = {
             'lambda': self.firls_lambda,
             'alpha': self.firls_alpha,
@@ -366,13 +311,9 @@ class VDBKE(DeconvolutionAlgorithm):
             'time': time.time() - start_time,
         }
 
-        # Output: int16 [0, 255], kernel
         x_final = np.clip(deblur * 255.0, 0, 255).astype(np.int16)
         return x_final, kernel
 
-    # ─────────────────────────────────────────────────────────────────────
-    # Framework interface methods
-    # ─────────────────────────────────────────────────────────────────────
     def get_param(self) -> List[Tuple[str, Any]]:
         return [
             ('kernel_size', self.kernel_size),

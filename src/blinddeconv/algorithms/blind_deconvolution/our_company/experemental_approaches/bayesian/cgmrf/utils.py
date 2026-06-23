@@ -1,83 +1,44 @@
-"""
-Utility functions for VB-TV-BID, Checkpoint 5 (Edgetaper added).
-"""
-
 import numpy as np
 from scipy.special import digamma, polygamma
 from scipy.ndimage import center_of_mass, shift
 from scipy.signal.windows import tukey
 
-
-# =============================================================================
-# Edgetapering (Boundary Artifact Removal)
-# =============================================================================
-
 def edgetaper(image: np.ndarray, kernel: np.ndarray) -> np.ndarray:
-    """
-    Smooth the edges of the image to reduce ringing artifacts in FFT.
-    Mimics Matlab's edgetaper.
-    
-    It blends the image edges with a blurred version of the image, 
-    forcing the boundary discontinuity to approach zero in the frequency domain.
-    """
+
     h, w = image.shape
     kh, kw = kernel.shape
 
-    # 1. Blur the image with the kernel (circular convolution is fine here 
-    # because we only care about the edges matching the kernel's frequency response)
-    # Using existing fft_convolve from this module
     blurred = fft_convolve(image, kernel)
 
-    # 2. Create the weighting mask (alpha)
-    # We use a Tukey window (cosine-tapered window).
-    # The taper width should roughly match the kernel half-size.
-    
     alpha_h = tukey(h, alpha=min(1.0, (kh * 2.0) / h))
     alpha_w = tukey(w, alpha=min(1.0, (kw * 2.0) / w))
-    
-    # Outer product to create 2D mask
+
     mask = np.outer(alpha_h, alpha_w)
 
-    # 3. Blend
-    # Center is original image (mask ~ 1), edges are blurred image (mask ~ 0).
     return image * mask + blurred * (1.0 - mask)
-
-
-# =============================================================================
-# FFT-Based Convolution Utilities
-# =============================================================================
 
 def psf_to_otf(kernel: np.ndarray, shape: tuple) -> np.ndarray:
     kh, kw = kernel.shape
     padded = np.zeros(shape, dtype=np.float64)
     padded[:kh, :kw] = kernel
-    
+
     padded = np.roll(padded, shift=-(kh // 2), axis=0)
     padded = np.roll(padded, shift=-(kw // 2), axis=1)
     return np.fft.fft2(padded)
-
 
 def fft_convolve(image: np.ndarray, kernel: np.ndarray) -> np.ndarray:
     otf = psf_to_otf(kernel, image.shape)
     return np.real(np.fft.ifft2(otf * np.fft.fft2(image)))
 
-
 def fft_correlate(image: np.ndarray, kernel: np.ndarray) -> np.ndarray:
     otf = psf_to_otf(kernel, image.shape)
     return np.real(np.fft.ifft2(np.conj(otf) * np.fft.fft2(image)))
 
-
-# =============================================================================
-# First-Order Difference Operators
-# =============================================================================
-
 def forward_diff_h(f: np.ndarray) -> np.ndarray:
     return np.roll(f, -1, axis=1) - f
 
-
 def forward_diff_v(f: np.ndarray) -> np.ndarray:
     return np.roll(f, -1, axis=0) - f
-
 
 def gradient_power_spectrum(shape: tuple) -> tuple:
     d_h = np.zeros(shape, dtype=np.float64)
@@ -90,23 +51,16 @@ def gradient_power_spectrum(shape: tuple) -> tuple:
 
     return Dh_sq, Dv_sq
 
-
-# =============================================================================
-# Isotropic Total Variation and MM Weights
-# =============================================================================
-
 def compute_tv(f: np.ndarray, epsilon: float = 1e-4) -> float:
     dh = forward_diff_h(f)
     dv = forward_diff_v(f)
     return float(np.sum(np.sqrt(dh**2 + dv**2 + epsilon)))
-
 
 def compute_mm_weights(f: np.ndarray, epsilon: float = 1e-4) -> np.ndarray:
     dh = forward_diff_h(f)
     dv = forward_diff_v(f)
     grad_mag = np.sqrt(dh**2 + dv**2 + epsilon)
     return 1.0 / (2.0 * np.maximum(grad_mag, 1e-12))
-
 
 def apply_tv_precision_operator(f: np.ndarray, w: np.ndarray) -> np.ndarray:
     dh = forward_diff_h(f)
@@ -120,23 +74,16 @@ def apply_tv_precision_operator(f: np.ndarray, w: np.ndarray) -> np.ndarray:
 
     return Qf_h + Qf_v
 
-
 def tv_quadratic_form(f: np.ndarray, w: np.ndarray) -> float:
     dh = forward_diff_h(f)
     dv = forward_diff_v(f)
     return float(np.sum(w * (dh**2 + dv**2)))
-
-
-# =============================================================================
-# Kernel Utilities
-# =============================================================================
 
 def extract_centered_kernel(h_full: np.ndarray, h_shape: tuple) -> np.ndarray:
     kh, kw = h_shape
     h_rolled = np.roll(h_full, kh // 2, axis=0)
     h_rolled = np.roll(h_rolled, kw // 2, axis=1)
     return h_rolled[:kh, :kw].copy()
-
 
 def project_kernel(h: np.ndarray) -> np.ndarray:
     h_proj = np.maximum(h, 1e-12)
@@ -145,7 +92,6 @@ def project_kernel(h: np.ndarray) -> np.ndarray:
         return h_proj / total
     return np.ones_like(h) / h.size
 
-
 def center_kernel_mass(h: np.ndarray) -> np.ndarray:
     kh, kw = h.shape
     cy, cx = center_of_mass(h)
@@ -153,11 +99,6 @@ def center_kernel_mass(h: np.ndarray) -> np.ndarray:
     dx = (kw // 2) - cx
     h_shifted = shift(h, (dy, dx), order=1, mode='constant', cval=0.0, prefilter=False)
     return project_kernel(h_shifted)
-
-
-# =============================================================================
-# Trace Estimation
-# =============================================================================
 
 def hutchinson_trace_estimate(
     matvec_Ainv: callable,
@@ -183,7 +124,6 @@ def hutchinson_trace_estimate(
 
     return total / n_probes
 
-
 def spectral_trace(H_otf_sq: np.ndarray,
                    Q_spec: np.ndarray,
                    alpha: float,
@@ -201,10 +141,6 @@ def spectral_log_det(H_otf_sq: np.ndarray,
     A_spec = np.maximum(A_spec, 1e-30)
     return float(np.sum(np.log(A_spec)))
 
-# =============================================================================
-# ELBO Computation
-# =============================================================================
-
 def compute_elbo(y: np.ndarray,
                  f: np.ndarray,
                  h: np.ndarray,
@@ -216,7 +152,7 @@ def compute_elbo(y: np.ndarray,
                  tr_Sigma_f_HtH: float,
                  log_det_Sigma_f: float,
                  h_cov_trace: float = 0.0) -> float:
-    
+
     N = float(y.size)
     K = float(h.size)
 
@@ -232,8 +168,8 @@ def compute_elbo(y: np.ndarray,
     entropy_f = 0.5 * log_det_Sigma_f
     entropy_h = 0.5 * K * np.log(2.0 * np.pi * np.e)
 
-    logZ = 0.5 * N * np.log(max(beta, 1e-30)) \
-         + 0.5 * N * np.log(max(alpha, 1e-30)) \
+    logZ = 0.5 * N * np.log(max(beta, 1e-30))\
+         + 0.5 * N * np.log(max(alpha, 1e-30))\
          + 0.5 * K * np.log(max(delta_h, 1e-30))
 
     return data_term + prior_f + prior_h + entropy_f + entropy_h + logZ

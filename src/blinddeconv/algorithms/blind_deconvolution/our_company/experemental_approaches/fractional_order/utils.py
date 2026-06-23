@@ -64,19 +64,14 @@ def hard_threshold(z: np.ndarray, tau: float) -> np.ndarray:
 
 def apply_hysteresis_threshold(mag: np.ndarray, low: float, high: float) -> np.ndarray:
 
-
     strong_mask = mag >= high
     weak_mask = (mag >= low) & (mag < high)
 
-
     struct = generate_binary_structure(2, 2)
-
 
     total_mask = strong_mask | weak_mask
 
-
     connected_mask = strong_mask.copy()
-
 
     for _ in range(100):
         new_mask = binary_dilation(connected_mask, structure=struct) & total_mask

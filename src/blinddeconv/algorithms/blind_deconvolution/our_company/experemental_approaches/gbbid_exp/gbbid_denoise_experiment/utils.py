@@ -6,9 +6,7 @@ from scipy.ndimage import correlate as ndimage_correlate
 from scipy.interpolate import interp1d
 from scipy.fft import dstn, idstn
 
-
 def psf2otf(psf, shape):
-
 
     if psf.size == 0 or np.all(psf == 0):
         return np.zeros(shape, dtype=np.complex128)
@@ -21,9 +19,7 @@ def psf2otf(psf, shape):
     padded = np.roll(padded, -(pw // 2), axis=1)
     return fft2(padded)
 
-
 def otf2psf(otf, psf_size):
-
 
     full = np.real(ifft2(otf))
     ph, pw = psf_size
@@ -31,9 +27,7 @@ def otf2psf(otf, psf_size):
     full = np.roll(full, pw // 2, axis=1)
     return full[:ph, :pw]
 
-
 def G_padding(x, k, factor):
-
 
     padsize = (k.shape[0] * factor, k.shape[1] * factor)
     x_padding = np.pad(x,
@@ -41,9 +35,7 @@ def G_padding(x, k, factor):
                        mode='edge')
     return x_padding, padsize
 
-
 def Copy_Enlarge_h(I, H_size):
-
 
     s_h, s_w = int(H_size[0]), int(H_size[1])
     if s_h % 2 == 0:
@@ -53,11 +45,9 @@ def Copy_Enlarge_h(I, H_size):
     border = (s_h - 1, s_w - 1)
     h, w = I.shape
 
-
     left = np.tile(I[:, 0:1], (1, border[1]))
     right = np.tile(I[:, -1:], (1, border[1]))
     I2 = np.concatenate([left, I, right], axis=1)
-
 
     top = np.tile(I2[0:1, :], (border[0], 1))
     bottom = np.tile(I2[-1:, :], (border[0], 1))
@@ -65,9 +55,7 @@ def Copy_Enlarge_h(I, H_size):
 
     return I2, border
 
-
 def fftconv(I, filt, method):
-
 
     k1, k2 = filt.shape
 
@@ -104,16 +92,12 @@ def fftconv(I, filt, method):
 
     return cI
 
-
 def edgetaper(img, psf):
-
 
     n, m = img.shape
 
-
     proj_row = psf.sum(axis=0)
     proj_col = psf.sum(axis=1)
-
 
     acf_row = np.real(np.fft.ifft(np.abs(np.fft.fft(proj_row, m)) ** 2))
     acf_row = acf_row / acf_row[0]
@@ -121,27 +105,21 @@ def edgetaper(img, psf):
     acf_col = np.real(np.fft.ifft(np.abs(np.fft.fft(proj_col, n)) ** 2))
     acf_col = acf_col / acf_col[0]
 
-
     beta = acf_col[:, np.newaxis] * acf_row[np.newaxis, :]
-
 
     otf = psf2otf(psf, (n, m))
     blurred = np.real(ifft2(fft2(img) * otf))
 
     return img * (1.0 - beta) + blurred * beta
 
-
 def weight_function_l1(d):
-
 
     epsilon = 0.01
     d_abs = np.abs(d)
     d_abs = np.maximum(d_abs, epsilon)
     return 1.0 / d_abs
 
-
 def weights_computation(x, sigma, nei_num, wtype):
-
 
     h, w = x.shape
 
@@ -186,9 +164,7 @@ def weights_computation(x, sigma, nei_num, wtype):
 
     return W
 
-
 def _adaptive_threshold(M, ratio, max_iter):
-
 
     n = M.size
     lower_bound = 0.0
@@ -212,21 +188,16 @@ def _adaptive_threshold(M, ratio, max_iter):
     M_threshold[M > threshold] = 1.0
     return M_threshold, r
 
-
 def informative_edge_mask_adaptive_mine(Y_s, t_s, t_r, h):
-
 
     Dx = np.array([[1, -1, 0]], dtype=np.float64)
     Dy = Dx.T
-
 
     Mx = ndimage_convolve(Y_s, Dx, mode='nearest')
     My = ndimage_convolve(Y_s, Dy, mode='nearest')
     M_mag = np.sqrt(Mx ** 2 + My ** 2)
 
-
     M3, _ = _adaptive_threshold(M_mag, t_s, 100)
-
 
     k_tmp = np.ones((h, h), dtype=np.float64)
     Mx2 = ndimage_convolve(Mx, k_tmp, mode='nearest')
@@ -240,13 +211,10 @@ def informative_edge_mask_adaptive_mine(Y_s, t_s, t_r, h):
 
     return M3 * M4_bin
 
-
 def _shift_kernel(k, hw):
-
 
     h, w = k.shape
     dh, dw = int(hw[0]), int(hw[1])
-
 
     k_tmp = np.zeros_like(k)
     if dh >= 0:
@@ -255,7 +223,6 @@ def _shift_kernel(k, hw):
     else:
         if -dh < h:
             k_tmp[:h + dh, :] = k[-dh:, :]
-
 
     k_s = np.zeros_like(k)
     if dw >= 0:
@@ -267,13 +234,10 @@ def _shift_kernel(k, hw):
 
     return k_s
 
-
 def kernel_centralize(k, threshold):
-
 
     h, w = k.shape
     thresh_val = k.max() * threshold
-
 
     h_begin = 0
     for i in range(h):
@@ -299,10 +263,8 @@ def kernel_centralize(k, threshold):
             w_end = i
             break
 
-
     h_center = int(np.floor(h_begin + (h_end - h_begin) / 2.0))
     w_center = int(np.floor(w_begin + (w_end - w_begin) / 2.0))
-
 
     kh_center = (h - 1) // 2
     kw_center = (w - 1) // 2
@@ -316,9 +278,7 @@ def kernel_centralize(k, threshold):
         k_c = k_c / k_c_sum
     return k_c
 
-
 def k_rescale(k):
-
 
     k_max = k.max()
     k_min = k.min()
@@ -326,9 +286,7 @@ def k_rescale(k):
         return np.zeros_like(k)
     return (k - k_min) / (k_max - k_min)
 
-
 def conjgrad(x, b, max_it, tol, Ax_func, func_param):
-
 
     r = b - Ax_func(x, func_param)
     p = r.copy()
@@ -350,9 +308,7 @@ def conjgrad(x, b, max_it, tol, Ax_func, func_param):
 
     return x
 
-
 def GenerateFrameletFilter(frame):
-
 
     if frame == 0:
         D = [
@@ -400,20 +356,16 @@ def GenerateFrameletFilter(frame):
 
     return D, R
 
-
 def ConvSymAsym2D(A, M, b, L):
-
 
     m, n = A.shape
     nM = len(M)
     step = 2 ** (L - 1)
 
-
     ker_len = step * (nM - 1) + 1
     ker = np.zeros(ker_len, dtype=np.float64)
     ker[::step] = M
     lker = ker_len // 2
-
 
     ker_2d = ker.reshape(-1, 1)
 
@@ -421,7 +373,6 @@ def ConvSymAsym2D(A, M, b, L):
 
         C = ndimage_correlate(A, ker_2d, mode='wrap')
     else:
-
 
         Ae = np.pad(A,
                     ((lker, lker), (0, 0)),
@@ -431,15 +382,12 @@ def ConvSymAsym2D(A, M, b, L):
             Ae[:lker, :] = -Ae[:lker, :]
             Ae[m + lker:m + 2 * lker, :] = -Ae[m + lker:m + 2 * lker, :]
 
-
         from scipy.signal import convolve2d
         C = convolve2d(Ae, ker_2d, mode='valid')
 
     return C
 
-
 def FraDec2D(A, D, L):
-
 
     nD = len(D)
     SorAS = D[-1]
@@ -455,9 +403,7 @@ def FraDec2D(A, D, L):
             Dec[i][j] = tempj.T.copy()
     return Dec
 
-
 def FraDecMultiLevel2D(A, D, L):
-
 
     Dec = []
     kDec = A.copy()
@@ -467,9 +413,7 @@ def FraDecMultiLevel2D(A, D, L):
         kDec = dec_k[0][0].copy()
     return Dec
 
-
 def FraRec2D(C, R, L):
-
 
     nR = len(R)
     SorAS = R[-1]
@@ -488,13 +432,10 @@ def FraRec2D(C, R, L):
 
     return Rec
 
-
 def sort_filter(Cf, level, f_n, ratio):
-
 
     h, w = Cf[level][0][0].shape
     num = h * w
-
 
     v_cf = np.zeros(num * f_n * f_n, dtype=np.float64)
     n = 0
@@ -503,11 +444,9 @@ def sort_filter(Cf, level, f_n, ratio):
             v_cf[n:n + num] = Cf[level][k][t].ravel()
             n += num
 
-
     indices = np.argsort(np.abs(v_cf))
     n_zero = int(np.floor(num * f_n * f_n * (1 - ratio)))
     v_cf[indices[:n_zero]] = 0.0
-
 
     n = 0
     for k in range(f_n):
@@ -517,9 +456,7 @@ def sort_filter(Cf, level, f_n, ratio):
 
     return Cf
 
-
 def kernel_filter(C, R, L, ratio):
-
 
     f_n = len(R) - 1
 
@@ -532,22 +469,17 @@ def kernel_filter(C, R, L, ratio):
     Rec = FraRec2D(C[0], R, 1)
     return Rec
 
-
 _SOLVE_IMAGE_LUT = {}
-
 
 def clear_solve_image_cache():
 
     _SOLVE_IMAGE_LUT.clear()
 
-
 def _compute_w1(v, beta):
 
     return np.maximum(np.abs(v) - 1.0 / beta, 0.0) * np.sign(v)
 
-
 def _compute_w23(v, beta):
-
 
     epsilon = 1e-6
 
@@ -567,7 +499,6 @@ def _compute_w23(v, beta):
     disc = -m3 / 27.0 + (m2 * v4) / 256.0
     r1 = -q / 2.0 + np.sqrt(disc.astype(np.complex128))
 
-
     with np.errstate(divide='ignore', invalid='ignore'):
         u = np.exp(np.log(r1) / 3.0)
         y = 2.0 * (-5.0 / 18.0 * alpha_q + u + (m.astype(np.complex128) / (3.0 * u)))
@@ -576,7 +507,6 @@ def _compute_w23(v, beta):
 
     alpha_c = alpha_q.astype(np.complex128)
     beta2_c = beta2.astype(np.complex128)
-
 
     root = np.zeros((v.size, 4), dtype=np.complex128)
     v_flat = v.ravel()
@@ -589,7 +519,6 @@ def _compute_w23(v, beta):
     root[:, 2] = 0.75 * v_flat + 0.5 * (-W_val + sqrt_minus)
     root[:, 3] = 0.75 * v_flat + 0.5 * (-W_val - sqrt_minus)
 
-
     v_rep = np.repeat(v_flat[:, np.newaxis], 4, axis=1)
     sv2 = np.sign(v_rep)
     rsv2 = np.real(root) * sv2
@@ -598,16 +527,13 @@ def _compute_w23(v, beta):
             (rsv2 > np.abs(v_rep) / 2.0) &
             (rsv2 < np.abs(v_rep)))
 
-
     filtered = mask * rsv2
     sorted_vals = np.sort(filtered, axis=1)[:, ::-1]
     w = sorted_vals[:, 0] * np.sign(v_flat)
 
     return np.real(w).reshape(v.shape)
 
-
 def _compute_w12(v, beta):
-
 
     epsilon = 1e-6
 
@@ -642,10 +568,8 @@ def _compute_w12(v, beta):
                       - ((1.0 - 1j * sqrt3) / (3.0 * 2.0 ** (2.0 / 3.0))) * t3
                       - ((1.0 + 1j * sqrt3) / (6.0 * cbrt2)) * t2)
 
-
     bad = np.isnan(root) | np.isinf(root)
     root[bad] = 0.0
-
 
     v_rep = np.repeat(v_flat[:, np.newaxis], 3, axis=1)
     sv2 = np.sign(v_rep)
@@ -661,9 +585,7 @@ def _compute_w12(v, beta):
 
     return np.real(w).reshape(v.shape)
 
-
 def _newton_w(v, beta, alpha):
-
 
     iterations = 4
     x = v.copy()
@@ -676,12 +598,10 @@ def _newton_w(v, beta, alpha):
 
     x[np.isnan(x)] = 0.0
 
-
     z = beta / 2.0 * v ** 2
     f = np.abs(x) ** alpha + beta / 2.0 * (x - v) ** 2
     w = np.where(f < z, x, 0.0)
     return w
-
 
 def _compute_w(v, beta, alpha):
 
@@ -694,9 +614,7 @@ def _compute_w(v, beta, alpha):
     else:
         return _newton_w(v, beta, alpha)
 
-
 def solve_image(v, beta, alpha):
-
 
     key = (beta, alpha)
 
@@ -715,12 +633,9 @@ def solve_image(v, beta, alpha):
     w = interp_func(v.ravel())
     return w.reshape(orig_shape)
 
-
 _OPT_FFT_LUT = None
 
-
 def _build_opt_fft_lut(lut_size: int = 4096) -> np.ndarray:
-
 
     lut = np.zeros(lut_size + 1, dtype=np.int64)
 
@@ -751,9 +666,7 @@ def _build_opt_fft_lut(lut_size: int = 4096) -> np.ndarray:
             lut[i] = nn
     return lut
 
-
 def opt_fft_size(n) -> np.ndarray:
-
 
     global _OPT_FFT_LUT
     if _OPT_FFT_LUT is None:
@@ -776,9 +689,7 @@ def opt_fft_size(n) -> np.ndarray:
         return int(m.flat[0])
     return m
 
-
 def _solve_min_laplacian(boundary_image: np.ndarray) -> np.ndarray:
-
 
     H, W = boundary_image.shape
     boundary_image = boundary_image.copy()
@@ -814,9 +725,7 @@ def _solve_min_laplacian(boundary_image: np.ndarray) -> np.ndarray:
 
     return img_direct
 
-
 def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
-
 
     if img.ndim == 2:
         img = img[:, :, np.newaxis]
@@ -887,7 +796,6 @@ def wrap_boundary_liu(img: np.ndarray, img_size: tuple) -> np.ndarray:
         return ret[:, :, 0]
     return ret
 
-
 def _fspecial_gaussian(size: int, sigma: float) -> np.ndarray:
 
     radius = (size - 1) / 2.0
@@ -895,10 +803,8 @@ def _fspecial_gaussian(size: int, sigma: float) -> np.ndarray:
     g = np.exp(-(x * x + y * y) / (2.0 * sigma * sigma))
     return g / g.sum()
 
-
 def bilateral_filter(img: np.ndarray, sigma_s: float,
                      sigma: float) -> np.ndarray:
-
 
     if img.ndim == 2:
         img = img[:, :, np.newaxis]

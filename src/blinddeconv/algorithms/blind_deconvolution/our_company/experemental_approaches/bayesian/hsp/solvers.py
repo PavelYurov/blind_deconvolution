@@ -1,40 +1,3 @@
-"""
-solvers.py
-
-Variational solvers for the HSP (Hyperbolic-Secant Prior) blind
-deconvolution algorithm.
-
-Ported from MATLAB files in the original toolbox of
-    Castro-Macias et al., "Bayesian Blind Image Deconvolution using a
-    Hyperbolic-Secant Prior" (2024).
-
-Mapping:
-    update_xf_alpha.m              -> update_xf_alpha
-    update_kden.m                  -> update_kden
-    single_stage_deconv_alphaden.m -> single_stage_deconv
-    multi_stage_deconv_alphaden.m  -> multi_stage_deconv
-    frils_deb_ubc.m                -> frils_deb_ubc (FIRLS+ADMM non-blind)
-
-Only the 'Hysec' (hyperbolic-secant) prior branch is implemented; the
-remaining priors (log, lp, exp, MoG, ECCV31) and the extra filter modes
-(Bilateral / Mean / rmap / NLM) are deliberately omitted because the HSP
-pipeline never invokes them.
-
-Faithfulness notes (MATLAB vs Python):
-    * MATLAB `eps` (== machine epsilon for double, 2.2204e-16) is used
-      inside `tanh(eps + a*sqrt(g))/(eps + a*sqrt(g))` for numerical
-      stability.  We replicate this exactly with `np.finfo(float).eps`.
-    * `1/sigma2^2` appears literally throughout the MATLAB code
-      (i.e. the inverse-square of the noise variance, *not* the usual
-      `1/sigma2`).  This is preserved verbatim because the entire
-      toolbox is calibrated to this convention.
-    * `gammaf = alpha^2 * w^2` — likewise reproduces the MATLAB
-      expression literally (not w directly as one might infer from
-      eq. (26) of the paper).
-    * Kernel reshape uses Fortran/column-major order because MATLAB
-      `reshape` is column-major.
-"""
-
 from __future__ import annotations
 
 from typing import Dict, Sequence, Tuple
@@ -58,33 +21,10 @@ from .utils import (
     quadprog_nonneg,
 )
 
-
 _EPS = float(np.finfo(np.float64).eps)
 
-
-# ═══════════════════════════════════════════════════════════════════════════
-# update_xf_alpha.m  →  update_xf_alpha
-# ═══════════════════════════════════════════════════════════════════════════
-
 def update_xf_alpha(vars_: Dict, alpha: Sequence[float]) -> Dict:
-    """
-    E-step for the filtered image coefficients ``x_f`` (HS prior).
 
-    Parameters
-    ----------
-    vars_ : dict
-        Must contain: ``yf`` (list of 2-D arrays — filtered blurred image),
-        ``k`` (current kernel), ``sigma2`` (noise variance), ``prior``
-        (dict with ``name='Hysec'``).  May optionally provide
-        ``MAX_INNER_ITER`` (default 5).
-    alpha : sequence of float
-        Per-filter prior shape parameter ``alpha[i]``.
-
-    Returns
-    -------
-    vars_ : dict (modified)
-        With updated ``xf``, ``gammaf``, ``xf_cov``.
-    """
     yf_in = vars_['yf']
     k = vars_['k']
     sigma2 = float(vars_['sigma2'])
@@ -99,16 +39,14 @@ def update_xf_alpha(vars_: Dict, alpha: Sequence[float]) -> Dict:
     max_inner_iter = int(vars_.get('MAX_INNER_ITER', 5))
 
     nofilters = len(yf_in)
-    kN, kM = k.shape  # MATLAB: [kN, kM] = size(k)   (rows, cols)
+    kN, kM = k.shape
     ph, pw = (kN - 1) // 2, (kM - 1) // 2
 
-    # Pad each yf with replicate boundary and build the FOV mask
     yf_pad = [pad_replicate(y, ph, pw) for y in yf_in]
     N, M = yf_pad[0].shape
     mask = np.zeros((N, M), dtype=np.float64)
     mask[ph:N - ph, pw:M - pw] = 1.0
 
-    # Initialisation (PROP_IMG_WITHIN_STAGES is always 0 in HSP defaults)
     xf = [y.copy() for y in yf_pad]
 
     rhs = [conv2_same(yf_pad[i] * mask, flipprev(k)) for i in range(nofilters)]
@@ -119,9 +57,8 @@ def update_xf_alpha(vars_: Dict, alpha: Sequence[float]) -> Dict:
     inv_sigma2_sq = 1.0 / sigma2 ** 2
     flip_k = flipprev(k)
 
-    xf_cov: list = [None] * nofilters  # type: ignore
+    xf_cov: list = [None] * nofilters
 
-    # CG parameters
     CG_TOL = 1e-5
     CG_MAX_ITER = 15
 
@@ -142,17 +79,14 @@ def update_xf_alpha(vars_: Dict, alpha: Sequence[float]) -> Dict:
                 max_iter=CG_MAX_ITER, tol=CG_TOL,
             )
 
-            # Covariance
             xf_cov[i] = 1.0 / (x_cov_k + gammaf[i])
 
-            # Variational weight update (HS prior)
             sq = np.abs(xf[i]) ** 2 + xf_cov[i]
             sqr_gamma = np.sqrt(sq)
             val = alpha[i] * sqr_gamma
             w = np.tanh(_EPS + val) / (_EPS + val)
             gammaf[i] = (alpha[i] ** 2) * (w ** 2)
 
-            # Convergence (relative change within FOV)
             denom = np.linalg.norm(xf_old * mask)
             if denom > 0:
                 x_conv[i] = np.linalg.norm((xf[i] - xf_old) * mask) / denom
@@ -162,7 +96,6 @@ def update_xf_alpha(vars_: Dict, alpha: Sequence[float]) -> Dict:
         if float(x_conv.mean()) < tol:
             break
 
-    # Strip padding from xf, gammaf, xf_cov
     xf_out = [a[ph:N - ph, pw:M - pw] for a in xf]
     gammaf_out = [a[ph:N - ph, pw:M - pw] for a in gammaf]
     xf_cov_out = [a[ph:N - ph, pw:M - pw] for a in xf_cov]
@@ -172,28 +105,12 @@ def update_xf_alpha(vars_: Dict, alpha: Sequence[float]) -> Dict:
     vars_['xf_cov'] = xf_cov_out
     return vars_
 
-
-# ═══════════════════════════════════════════════════════════════════════════
-# update_kden.m  →  update_kden
-# ═══════════════════════════════════════════════════════════════════════════
-
 def update_kden(vars_: Dict, enforce_sparsity: bool = True) -> Dict:
-    """
-    M-step for the blur kernel (positivity-constrained QP + IRLS).
 
-    Builds the cumulative covariance system
-        Ck =  Σ_i  (Tx_i Tx_i' + diag(Tcovx_i))
-        bk =  Σ_i  (sum over patches of  Ty_i .* Tx_i)
-    then solves min_h  0.5 h' Ck h - bk' h  s.t.  h ≥ 0.
-
-    Optionally performs 2 IRLS reweighting iterations enforcing
-    sparsity on the kernel with weight ``λ · max(|k|, thr0)^(-2)``,
-    ``λ = 0.001``, ``thr0 = 1e-4``.
-    """
     xf = vars_['xf']
     yf = vars_['yf']
     xf_cov = vars_['xf_cov']
-    k_size = tuple(vars_['k_size'])           # (kN, kM)
+    k_size = tuple(vars_['k_size'])
     nofilters = int(vars_['nofilters'])
 
     kN, kM = int(k_size[0]), int(k_size[1])
@@ -203,21 +120,17 @@ def update_kden(vars_: Dict, enforce_sparsity: bool = True) -> Dict:
     bk = np.zeros(total_elem, dtype=np.float64)
 
     for i in range(nofilters):
-        Tcovx = im2col_sliding(xf_cov[i], (kN, kM)).sum(axis=1)   # (kN*kM,)
-        Tx = im2col_sliding(xf[i], (kN, kM))                       # (kN*kM, P)
+        Tcovx = im2col_sliding(xf_cov[i], (kN, kM)).sum(axis=1)
+        Tx = im2col_sliding(xf[i], (kN, kM))
         Ck += Tx @ Tx.T
         Ck[np.arange(total_elem), np.arange(total_elem)] += Tcovx
 
-        # MATLAB: Ty = yf{i}((kN+1)/2 : end-(kN-1)/2, (kM+1)/2 : end-(kM-1)/2)
-        # That is the valid centre region of yf with the same number of
-        # patches as Tx.  (kN+1)/2 - 1 = (kN-1)//2 (0-based).
         ph, pw = (kN - 1) // 2, (kM - 1) // 2
         Ty = yf[i][ph:yf[i].shape[0] - ph, pw:yf[i].shape[1] - pw]
-        # MATLAB-style column-major flatten — must match im2col patch order
+
         ty = Ty.flatten(order='F')
         bk += Tx @ ty
 
-    # Solve positivity-constrained QP
     h = quadprog_nonneg(Ck, -bk)
 
     if enforce_sparsity:
@@ -229,7 +142,6 @@ def update_kden(vars_: Dict, enforce_sparsity: bool = True) -> Dict:
             Ck_w[np.arange(total_elem), np.arange(total_elem)] += diag_w
             h = quadprog_nonneg(Ck_w, -bk, x0=h)
 
-    # MATLAB column-major reshape
     k = np.reshape(h, (kN, kM), order='F')
     k = flipprev(k)
     k[k < 0] = 0.0
@@ -240,24 +152,11 @@ def update_kden(vars_: Dict, enforce_sparsity: bool = True) -> Dict:
     vars_['k'] = k
     return vars_
 
-
-# ═══════════════════════════════════════════════════════════════════════════
-# single_stage_deconv_alphaden.m  →  single_stage_deconv
-# ═══════════════════════════════════════════════════════════════════════════
-
 def single_stage_deconv(vars_: Dict,
                         alpha: Sequence[float],
                         options: Dict | None = None,
                         ) -> Tuple[Dict, np.ndarray]:
-    """
-    Alternate ``update_xf_alpha`` and ``update_kden`` for one pyramid
-    stage, looping over ``vars_['sigma2_vec']``.
 
-    Returns
-    -------
-    vars_   : updated state dict
-    k_hist  : 3-D ndarray of shape (kN, kM, MAX_ITER) — kernel history
-    """
     if options is None:
         options = {}
     verbose = bool(options.get('verbose', False))
@@ -278,15 +177,9 @@ def single_stage_deconv(vars_: Dict,
 
     return vars_, k_hist
 
-
-# ═══════════════════════════════════════════════════════════════════════════
-# multi_stage_deconv_alphaden.m  →  multi_stage_deconv
-# ═══════════════════════════════════════════════════════════════════════════
-
 def _mat_round(x: float) -> int:
-    """MATLAB-style round (half away from zero)."""
-    return int(np.floor(x + 0.5)) if x >= 0 else -int(np.floor(-x + 0.5))
 
+    return int(np.floor(x + 0.5)) if x >= 0 else -int(np.floor(-x + 0.5))
 
 def multi_stage_deconv(y: np.ndarray,
                        k_size: Tuple[int, int],
@@ -296,26 +189,7 @@ def multi_stage_deconv(y: np.ndarray,
                        alpha: Sequence[float],
                        options: Dict | None = None,
                        ) -> Tuple[Dict, list]:
-    """
-    Coarse-to-fine pyramid blind deconvolution (BDGSP/HSP).
 
-    Parameters
-    ----------
-    y : 2-D ndarray of float in [0, 1] — blurred grayscale image.
-    k_size : (kN, kM)  — final kernel support, expected odd.
-    prior  : {'name': 'Hysec', 'filter_name': 'None'}.
-    filters : list of 2-D high-pass filters F_n.
-    noise_var : initial noise variance (σ²).
-    alpha : per-filter HS shape parameter, e.g. ``[10**2.4, 10**2.15]``.
-    options : optional dict — supports
-        ``verbose``, ``MAX_ITER`` (default 10), ``MAX_INNER_ITER`` (5),
-        ``no_stages`` (None => auto), ``init_k``.
-
-    Returns
-    -------
-    vars_     : final state dict (contains 'k', 'xf', ...).
-    k_history : list of per-stage ``k_hist`` 3-D arrays.
-    """
     if options is None:
         options = {}
     opt = {
@@ -349,7 +223,6 @@ def multi_stage_deconv(y: np.ndarray,
     vars_['nofilters'] = len(filters)
     vars_['prior'] = prior
 
-    # Kernel sizes at each pyramid level (rounded up, forced odd)
     all_kernel_sizes = np.zeros((NOSTAGES, 2), dtype=np.int64)
     for dim in range(2):
         for s in range(NOSTAGES):
@@ -358,15 +231,14 @@ def multi_stage_deconv(y: np.ndarray,
                 sz += 1
             all_kernel_sizes[s, dim] = sz
 
-    # Initial kernel — 2×2 block of ones in (approximately) the centre
     if 'init_k' in opt and opt['init_k'] is not None:
         k_init = np.asarray(opt['init_k'], dtype=np.float64)
         k_init = k_init / k_init.sum()
     else:
         k_init = np.zeros(tuple(all_kernel_sizes[0]), dtype=np.float64)
-        c1 = _mat_round(all_kernel_sizes[0, 0] / 2.0)  # 1-based MATLAB index
+        c1 = _mat_round(all_kernel_sizes[0, 0] / 2.0)
         c2 = _mat_round(all_kernel_sizes[0, 1] / 2.0)
-        # Convert to 0-based and place a 2×2 block at (c-1, c-1)..(c, c)
+
         a, b = c1 - 1, c2 - 1
         k_init[a, b] = 1.0
         k_init[a, b + 1] = 1.0
@@ -377,7 +249,6 @@ def multi_stage_deconv(y: np.ndarray,
     vars_['k'] = k_init
     vars_['k_size'] = tuple(all_kernel_sizes[0])
 
-    # Annealed noise-variance schedule (decreasing across inner iters)
     MAX_ITER = int(opt['MAX_ITER'])
     vars_['sigma2_vec'] = noise_var * (1.15 ** np.arange(MAX_ITER, 0, -1))
 
@@ -387,10 +258,8 @@ def multi_stage_deconv(y: np.ndarray,
         if opt['verbose']:
             print(f'Stage {it + 1}/{NOSTAGES}')
 
-        # Downsample observation to current scale.
         ys = imresize_bilinear(y, upfac ** (it - (NOSTAGES - 1)))
 
-        # Filtered blurred image yf{i}: replicate-pad then valid conv.
         yf = []
         for f in vars_['filters']:
             fN, fM = f.shape
@@ -400,8 +269,7 @@ def multi_stage_deconv(y: np.ndarray,
         vars_['yf'] = yf
 
         if it > 0:
-            # Upsample kernel to next-stage size, clip negatives, normalise.
-            # MATLAB calls `imresize(k, sz)` without method => default bicubic.
+
             k_up = imresize_bicubic(vars_['k'], tuple(all_kernel_sizes[it]))
             k_up[k_up < 0] = 0.0
             s = k_up.sum()
@@ -410,8 +278,6 @@ def multi_stage_deconv(y: np.ndarray,
             vars_['k'] = k_up
             vars_['k_size'] = tuple(all_kernel_sizes[it])
 
-            # Centre the kernel.  PROP_IMG_BET_STAGES is False by default,
-            # so we don't propagate xf between stages.
             vars_['k'], _ = center_kernel(vars_['k'])
 
         vars_, k_hist = single_stage_deconv(vars_, alpha, opt)
@@ -419,40 +285,21 @@ def multi_stage_deconv(y: np.ndarray,
 
     return vars_, k_history
 
-
-# ═══════════════════════════════════════════════════════════════════════════
-# frils_deb_ubc.m  →  frils_deb_ubc
-# ═══════════════════════════════════════════════════════════════════════════
-
-# First- and second-order derivative filters used by FIRLS.
 _DXF = np.array([[0, 0, 0], [0, 1, -1], [0, 0, 0]], dtype=np.float64)
 _DYF = np.array([[0, 0, 0], [0, 1, 0], [0, -1, 0]], dtype=np.float64)
 _DXXF = np.array([[0, 0, 0], [-1, 2, -1], [0, 0, 0]], dtype=np.float64)
 _DYYF = np.array([[0, -1, 0], [0, 2, 0], [0, -1, 0]], dtype=np.float64)
 _DXYF = np.array([[0, 0, 0], [0, 1, -1], [0, -1, 1]], dtype=np.float64)
 
-
 def _conv2_valid_circ(x: np.ndarray, f: np.ndarray) -> np.ndarray:
-    """Equivalent to MATLAB conv2(padarray(x,[1 1],'circular'), f, 'valid')."""
+
     xp = pad_circular(x, 1, 1)
     return conv2_valid(xp, f)
-
 
 def frils_deb_ubc(y: np.ndarray,
                   h: np.ndarray,
                   opt: Dict) -> Tuple[np.ndarray, np.ndarray, Dict]:
-    """
-    Fast IRLS + ADMM non-blind deconvolution with undetermined boundary.
 
-    Direct port of ``frils_deb_ubc.m``.  Kernel must have odd dimensions.
-
-    Required ``opt`` keys:
-        lambda, alpha, beta_a, lambda_u,
-        epsilon_min, epsilon_max,
-        out_iter, inner_iter, IF.
-    Optional keys: ``isnr_display``, ``cost_display`` (booleans;
-    diagnostic-only — ignored here for speed).
-    """
     M1, M2 = y.shape
     m1, m2 = h.shape
     hks1, hks2 = m1 // 2, m2 // 2
@@ -517,7 +364,7 @@ def frils_deb_ubc(y: np.ndarray,
     Ax = np.real(np.fft.ifft2(H * X))
     invA = HH + (beta_a / lambda_u) * RR
 
-    eps_small = 1e-12  # guard against pure-zero adx^(α-2) → ∞
+    eps_small = 1e-12
 
     for _ in range(N1):
         Wx = np.minimum(beta, c * np.maximum(adx, eps_small) ** (alpha - 2.0))
@@ -527,21 +374,19 @@ def frils_deb_ubc(y: np.ndarray,
         Wxy = np.minimum(beta, c * np.maximum(adxy, eps_small) ** (alpha - 2.0)) * w0
 
         for _i in range(N2):
-            # u sub-problem
+
             u = Ax + du
             u[hks1:n1 - hks1, hks2:n2 - hks2] = (
                 (y + lambda_u * u[hks1:n1 - hks1, hks2:n2 - hks2])
                 / (1.0 + lambda_u)
             )
 
-            # v sub-problems
             vx = beta_a * (dx + dvx) / (Wx + beta_a)
             vy = beta_a * (dy + dvy) / (Wy + beta_a)
             vxx = beta_a * (dxx + dvxx) / (Wxx + beta_a)
             vyy = beta_a * (dyy + dvyy) / (Wyy + beta_a)
             vxy = beta_a * (dxy + dvxy) / (Wxy + beta_a)
 
-            # Dual updates
             du = du - u + Ax
             dvx = dvx - vx + dx
             dvy = dvy - vy + dy
@@ -549,7 +394,6 @@ def frils_deb_ubc(y: np.ndarray,
             dvyy = dvyy - vyy + dyy
             dvxy = dvxy - vxy + dxy
 
-            # x sub-problem
             Y = np.fft.fft2(u - du) * Ht
 
             tempx = _conv2_valid_circ(vx - dvx, dxfr)
@@ -577,7 +421,6 @@ def frils_deb_ubc(y: np.ndarray,
 
     x_fov = x[hks1:n1 - hks1, hks2:n2 - hks2]
     return x_fov, x, opt
-
 
 __all__ = [
     'update_xf_alpha',

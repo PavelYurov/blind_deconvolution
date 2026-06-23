@@ -1,7 +1,3 @@
-"""
-Solver functions for VB-TV-BID, Checkpoint 3 (Gradient Domain Kernel + Thresholding).
-"""
-
 import numpy as np
 from .utils import (
     psf_to_otf,
@@ -15,21 +11,12 @@ from .utils import (
     hutchinson_trace_estimate,
     spectral_trace,
     spectral_log_det,
-    forward_diff_h, # Imported from utils to compute gradients
+    forward_diff_h,
     forward_diff_v,
 )
 
-# =============================================================================
-# 1. MM Weight Computation
-# =============================================================================
-
 def compute_tv_weights(f: np.ndarray, epsilon: float = 1e-4) -> np.ndarray:
     return compute_mm_weights(f, epsilon)
-
-
-# =============================================================================
-# 2. VB Image Estimation
-# =============================================================================
 
 def solve_image_vb(y: np.ndarray,
                    h: np.ndarray,
@@ -42,17 +29,16 @@ def solve_image_vb(y: np.ndarray,
                    n_trace_probes: int = 5,
                    rng: np.random.Generator = None,
                    ) -> tuple:
-    
+
     shape = y.shape
     H_otf = psf_to_otf(h, shape)
     H_otf_sq = np.abs(H_otf)**2
 
     Dh_sq, Dv_sq = gradient_power_spectrum(shape)
-    
+
     w_mean = np.mean(w)
     Q_spec = w_mean * (Dh_sq + Dv_sq)
 
-    # Preconditioner M
     M_diag = beta * H_otf_sq + alpha * Q_spec
     M_inv = 1.0 / np.maximum(M_diag, 1e-12)
 
@@ -68,7 +54,6 @@ def solve_image_vb(y: np.ndarray,
     F_y = np.fft.fft2(y)
     b = beta * np.real(np.fft.ifft2(np.conj(H_otf) * F_y))
 
-    # PCG Solver
     f = f_init.copy()
     r = b - matvec_A(f)
     z = precondition(r)
@@ -80,11 +65,11 @@ def solve_image_vb(y: np.ndarray,
         pAp = np.sum(p * Ap)
         if pAp <= 1e-30:
             break
-        
+
         step = rz / pAp
         f = f + step * p
         r = r - step * Ap
-        
+
         if np.sqrt(np.sum(r**2)) < cg_tol:
             break
 
@@ -92,18 +77,18 @@ def solve_image_vb(y: np.ndarray,
         rz_new = np.sum(r * z)
         if rz_new <= 1e-30:
             break
-            
+
         beta_cg = rz_new / rz
         p = z + beta_cg * p
         rz = rz_new
-    
+
     f = np.clip(f, 0.0, 1.0)
 
     if n_trace_probes > 0:
         def spectral_Ainv(v): return precondition(v)
         def matvec_Q(v): return apply_tv_precision_operator(v, w)
         def matvec_HtH(v): return np.real(np.fft.ifft2(H_otf_sq * np.fft.fft2(v)))
-        
+
         tr_Sigma_Q = hutchinson_trace_estimate(spectral_Ainv, shape, matvec_Q, n_trace_probes, rng)
         tr_Sigma_HtH = hutchinson_trace_estimate(spectral_Ainv, shape, matvec_HtH, n_trace_probes, rng)
     else:
@@ -120,68 +105,46 @@ def solve_image_vb(y: np.ndarray,
 
     return f, info
 
-
-# =============================================================================
-# 3. VB Kernel Estimation (GRADIENT DOMAIN + THRESHOLDING)
-# =============================================================================
-
 def solve_kernel_vb(y: np.ndarray,
                     f: np.ndarray,
                     h_shape: tuple,
                     delta_h: float,
                     beta: float,
                     threshold_ratio: float = 0.05) -> tuple:
-    """
-    Solves for kernel using Gradients (more robust to size/noise) and applies Hard Thresholding.
-    """
+
     shape = y.shape
     kh, kw = h_shape
     N_pixels = float(shape[0] * shape[1])
     K_pixels = float(kh * kw)
 
-    # --- Gradient Domain Transformation ---
-    # Working on gradients (dx, dy) removes the DC component and focuses 
-    # the kernel estimation on edges, which drastically improves shape prediction.
     dy_h = forward_diff_h(y)
     dy_v = forward_diff_v(y)
     df_h = forward_diff_h(f)
     df_v = forward_diff_v(f)
 
-    # Convert to frequency domain
     F_df_h = np.fft.fft2(df_h)
     F_df_v = np.fft.fft2(df_v)
     F_dy_h = np.fft.fft2(dy_h)
     F_dy_v = np.fft.fft2(dy_v)
 
-    # Combined power spectrum of image gradients
     F_df_sq = np.abs(F_df_h)**2 + np.abs(F_df_v)**2
-    
-    # Cross-correlation in gradient domain
-    # numerator = conj(F_df_x)*F_dy_x + conj(F_df_y)*F_dy_y
+
     numer = np.conj(F_df_h) * F_dy_h + np.conj(F_df_v) * F_dy_v
 
-    # Denominator (Wiener filter structure)
-    # We essentially solve: min || grad_y - h * grad_f ||^2 + delta ||h||^2
     denom = beta * F_df_sq + delta_h
-    
-    # Posterior mean in frequency domain
+
     H_est_freq = beta * numer / np.maximum(denom, 1e-12)
     h_full = np.real(np.fft.ifft2(H_est_freq))
 
-    # Extract kernel
     h_raw = extract_centered_kernel(h_full, h_shape)
-    
-    # --- HARD THRESHOLDING (Pruning) ---
-    # This removes the "spots" and noise.
+
     max_val = np.max(h_raw)
     if max_val > 0:
-        # Zero out small values relative to the peak
+
         h_raw[h_raw < threshold_ratio * max_val] = 0.0
 
     h_energy = float(np.sum(h_raw**2))
 
-    # Trace scaling (same fix as before)
-    # Note: denom is based on gradients, but trace logic holds approx.
     full_grid_trace = np.sum(1.0 / np.maximum(denom, 1e-12))
     h_cov_trace = float(full_grid_trace) * (K_pixels / N_pixels)
 
@@ -194,11 +157,6 @@ def solve_kernel_vb(y: np.ndarray,
 
     return h_proj, info
 
-
-# =============================================================================
-# 4. VB Hyperparameter Updates
-# =============================================================================
-
 def update_hyperparameters_vb(y: np.ndarray,
                               f: np.ndarray,
                               h: np.ndarray,
@@ -210,22 +168,19 @@ def update_hyperparameters_vb(y: np.ndarray,
                               tr_Sigma_HtH: float,
                               h_energy: float,
                               h_cov_trace: float) -> tuple:
-    
+
     N = float(y.size)
     K = float(h.size)
 
-    # Update alpha
     fQf = tv_quadratic_form(f, w)
     denom_alpha = fQf + tr_Sigma_Q
     alpha_new = N / max(denom_alpha, 1e-10)
 
-    # Update beta
     residual = y - fft_convolve(f, h)
     res_sq = float(np.sum(residual**2))
     denom_beta = res_sq + tr_Sigma_HtH
     beta_new = N / max(denom_beta, 1e-10)
 
-    # Update delta_h
     denom_delta = h_energy + h_cov_trace
     delta_h_new = K / max(denom_delta, 1e-10)
 
