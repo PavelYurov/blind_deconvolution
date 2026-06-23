@@ -17,8 +17,8 @@
 | [`dcp`](blind_deconvolution/our_company/dark_channel_prior) | Blind Image Deblurring Using Dark Channel Prior | 2016 | [Источники](<../../../references/dcp>) |
 | [`ecp`](blind_deconvolution/our_company/ecp) | Image Deblurring via Extreme Channels Prior | 2017 | [Источник](<../../../references/ecp/(2017) Image Deblurring via Extreme Channels Prior>) |
 | [`gbbid`](blind_deconvolution/our_company/graph) | Blind Image Deblurring Via Reweighted Graph Total Variation | 2017 | [Источники](<../../../references/graph>) |
-| [`lmgp`](blind_deconvolution/our_company/lmgp) | Blind Image Deblurring with Local Maximum Gradient Prior | 2019 | [Источник](<../../../references/lmgp/(2019) Blind Image Deblurring with Local Maximum Gradient Prior.pdf>) |
 | [`fbdhsgp`](blind_deconvolution/our_company/bayesian/fbdhsgp) | Fast Bayesian blind deconvolution with Huber super Gaussian priors | 2017 | [Источники](../../../references/fbdhsgp) |
+| [`lmgp`](blind_deconvolution/our_company/lmgp) | Blind Image Deblurring with Local Maximum Gradient Prior | 2019 | [Источник](<../../../references/lmgp/(2019) Blind Image Deblurring with Local Maximum Gradient Prior.pdf>) |
 | [`pmp`](blind_deconvolution/our_company/patch_wise_minimum_pixels_prior) | Blind Deblurring via Patch-wise Minimal Pixels Prior | 2020 | [Источник](<../../../references/pmp/(2020) A Simple Local Minimal Intensity Prior and An Improved Algorithm for Blind Image Deblurring.pdf>) |
 | [`esm`](blind_deconvolution/our_company/esm) | Enhanced Sparse Model for Blind Deblurring | 2020 | [Источник](<../../../references/esm/(2020) Enhanced Sparse Model for Blind Deblurring.pdf>) |
 | [`bid_hbsp`](blind_deconvolution/our_company/bayesian/bid_hbsp) | Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior | 2024 | [Источник](<../../../references/bid_hbsp/(2024) Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior.pdf>) |
@@ -37,12 +37,17 @@
 | [`vdbke`](blind_deconvolution/our_company/experimental_approaches/bayesian/vdbke) |  Variational Dirichlet Blur Kernel Estimation | 2015 | [Источник](<../../../references/vdbke/(2015) Variational Dirichlet Blur Kernel Estimation.pdf>) |
 | [`bdgsp`](blind_deconvolution/our_company/experimental_approaches/bayesian/bdgsp) | Bayesian Blind Deconvolution with General Sparse Image Priors | 2012 | [Источник](<../../../references/bdgsp/(2012) Bayesian Blind Deconvolution with General Sparse Image Priors.pdf>) |
 | [`fractional_order`](blind_deconvolution/our_company/experimental_approaches/fractional_order) | Blind Image Deconvolution - When Patch-wise Minimal Pixels Prior Meets Fractional-Order Method | 2025 | [Источник](<../../../references/fractional_order/(2025) Blind Image Deconvolution - When Patch-wise Minimal Pixels Prior Meets Fractional-Order Method.pdf>) |
-
-
-
-
-
-
+| [`aeer`](blind_deconvolution/our_company/experimental_approaches/adaptive_euler_elastica/aeer) | Blind image deconvolution based on adaptive Euler's elastica regularization | 2024 | [Источник](<../../../references/aeer/(2024) Blind image deconvolution based on adaptive Euler's elastica regularization.pdf>) |
+| [`aeer_poisson`](blind_deconvolution/our_company/experimental_approaches/adaptive_euler_elastica/aeer_poisson) | Blind image deconvolution based on adaptive Euler's elastica regularization | 2024 | [Источник](<../../../references/aeer_poisson/(2024) Blind Restoration of Poisson Images Using Adaptive Euler's Elastica Regularization.pdf>) |
+| [`amape_htp`](blind_deconvolution/our_company/experimental_approaches/amape_htp) | Blind Deconvolution Using Alternating Maximum a Posteriori Estimation with Heavy-Tailed Priors | 2013 | [Источник](<../../../references/amape_htp/(2013) Blind Deconvolution Using Alternating Maximum a Posteriori Estimation with Heavy-Tailed Priors.pdf>) |
+| [`lowrank`](blind_deconvolution/our_company/experimental_approaches/lowrank) | Blind Deconvolution Using Low-Rank Prior | 2019 | [Источники](<../../../references/lowrank>) |
+| [`mhdm`](blind_deconvolution/our_company/experimental_approaches/mhdm) | Applications of multiscale hierarchical decomposition to blind deconvolution | 2025 | [Источники](<../../../references/mhdm>) |
+| [`mrf`](blind_deconvolution/our_company/experimental_approaches/mrf) | MRF-based Blind Image Deconvolution | 2012 | [Источник](<../../../references/mrf/(2012) MRF-based Blind Image Deconvolution.pdf>) |
+| [`nscp`](blind_deconvolution/our_company/experimental_approaches/nscp) | Blind Image Deblurring via a Novel Sparse Channel Prior | 2022 | [Источник](<../../../references/nscp/(2022) Blind Image Deblurring via a Novel Sparse Channel Prior.pdf>) |
+| [`nsm`](blind_deconvolution/our_company/experimental_approaches/nsm) | Blind Deconvolution Using a Normalized Sparsity Measure | 2011 | [Источник](<../../../references/nsm/(2011) Blind Deconvolution Using a Normalized Sparsity Measure.pdf>) |
+| [`oid`](blind_deconvolution/our_company/experimental_approaches/oid) | Outlier Identifying and Discarding in Blind Image Deblurring | 2020 | [Источник](<../../../references/oid/(2020) Outlier Identifying and Discarding in Blind Image Deblurring.pdf>) |
+| [`pam`](blind_deconvolution/our_company/experimental_approaches/pam) | Total Variation-Projected Alternating Minimization | 2014 | [Источники](<../../../references/pam>) |
+| [`prida`](blind_deconvolution/our_company/experimental_approaches/prida) | Robust Blind Deconvolution via Mirror Descent | 2018 | [Источник](<../../../references/prida/>) |
 
 ### Внешние обёртки и источники (`blind_deconvolution/third_party_company/`)
 
