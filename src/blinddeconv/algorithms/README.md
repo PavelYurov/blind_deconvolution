@@ -16,6 +16,7 @@
 
 - [`bid_hbsp`](blind_deconvolution/our_company/bayesian/bid_hbsp) — Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior [читать](<../../../references/bid_hbsp/(2024) Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior.pdf>)
 - [`fbdhsgp`](blind_deconvolution/our_company/bayesian/fbdhsgp) — Fast Bayesian blind deconvolution with Huber super Gaussian priors [читать](<../../../references/fbdhsgp>)
+- [`htp`](blind_deconvolution/our_company/bayesian/htp) — Blind Deconvolution Using Alternating Maximum a Posteriori Estimation with Heavy-Tailed Priors [читать](<../../../references/bid_hbsp/(2013) Blind Deconvolution Using Alternating Maximum a Posteriori Estimation with Heavy-Tailed Priors.pdf>)
 - [`vbbid_tv.py`](blind_deconvolution/implementations/bayesian/vbbid_tv.py) — Variational Bayesian blind deconvolution с TV prior [10]
 - [`bbd_deip.py`](blind_deconvolution/implementations/bayesian/bbd_deip.py) — Bayesian blind deconvolution по паре изображений с разной экспозицией [11]
 - [`sb_bid_pe.py`](blind_deconvolution/implementations/bayesian/sb_bid_pe.py) — Sparse Bayesian blind deconvolution с оценкой параметров [12]
