@@ -8,7 +8,7 @@ pyatykh_noise_reconstruction.py
 Основано на методе:
     Pyatykh S., Hesser J., Zheng L.:
     "Image Noise Level Estimation by Principal Component Analysis",
-    IEEE Transactions on Image Processing, vol. 22, no. 2, 2013.
+    IEEE Transactions on Image Processing, vol. 22, no. 2, 2014.
 
 Модель шума: y = Poisson(x / a) * a + N(0, b), где
     a - параметр пуассоновского (зависящего от сигнала) шума;
