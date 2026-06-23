@@ -20,7 +20,7 @@
 **Разработчик (оптимизация и архитектура)**
 
 Юров П.И., КМБО-01-22, pavel.yurov0425@gmail.com  
-- Low-Rank, Sparse и Robust Optimization методы  
+- Low-Rank, Primal-Dual, Majorization-Minimization методы  
 - Noise Estimation, Denoising алгоритмы
 - Модели всех видов искажений изображений (noise & blur)
 - Проектирование и создание архитектуры фреймворка
@@ -29,7 +29,7 @@
 **Разработчик (теоретик)**
 
 Куропатов К.Л., КМБО-01-22, konstantinkuropatov@gmail.com  
-- Higher-Order, Geometric и Multiscale методы 
+- Higher-Order, Multiscale методы 
 - Теоретическое обоснование методов фреймворка
 - Формирование наборов данных разных категорий изображений для экспериментов
 - Углубленное исследование имплементированных методов
