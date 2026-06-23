@@ -1,15 +1,19 @@
 # cython: boundscheck=False, wraparound=False, cdivision=True, language_level=3
 """
-solvers_cy.pyx — Cython-accelerated solvers for BID-HBSP.
+solvers_cy.pyx
 
-Key optimizations vs pure Python:
-- CG matvec: fused gradient + weighted divergence in one pass (2x less allocation)
-- QP kernel: tight loops for autocorrelation indexing (avoids fancy-indexing overhead)
-- IRLS step: fused gradient/weight/divergence matvec
+Ускоренные с помощью Cython функции-решатели для алгоритма BID-HBSP.
 
-FFT calls (fft2/ifft2) remain in NumPy — they dominate wall time at large sizes,
-but the surrounding Python overhead (gradient ops, weight multiply, reshape)
-adds up at typical deconvolution sizes (256×256 to 1024×1024).
+Ключевые оптимизации по сравнению с чистым Python:
+- Умножение матрицы на вектор для CG: объединено вычисление градиента 
+  и взвешенной дивергенции за один проход (в 2 раза меньше аллокаций памяти).
+- Оценка ядра QP: плотные циклы для индексации автокорреляции 
+  (избегает накладных расходов сложной индексации NumPy).
+- Шаг IRLS: объединенное умножение градиента/весов/дивергенции.
+
+Вызовы FFT (fft2/ifft2) остаются в NumPy, так как они занимают основное 
+время при больших размерах (256x256 до 1024x1024), но устраняются 
+накладные расходы Python вокруг них.
 """
 
 import numpy as np
@@ -38,9 +42,7 @@ from .utils import (
 DEF EPSILON = 1e-12
 
 
-# ═══════════════════════════════════════════════════════════════
-#  Fused matvec helpers  (module-level for use from closures)
-# ═══════════════════════════════════════════════════════════════
+# --- Вспомогательные функции для объединенных матрично-векторных операций (fused matvec) ---
 
 def _fused_add_grad_prior(
     double[:, :] out not None,
@@ -48,7 +50,7 @@ def _fused_add_grad_prior(
     double[:, :] gamma_x not None,
     double[:, :] gamma_y not None,
 ):
-    """Add D_x^T(Γ_x D_x v) + D_y^T(Γ_y D_y v) to out, in-place."""
+    """Добавляет D_x^T(Gamma_x * D_x * v) + D_y^T(Gamma_y * D_y * v) к out, на месте."""
     cdef Py_ssize_t H = v.shape[0]
     cdef Py_ssize_t W = v.shape[1]
     cdef Py_ssize_t i, j
@@ -57,7 +59,7 @@ def _fused_add_grad_prior(
     cdef double[:, :] tmp_dy = np.empty((H, W), dtype=np.float64)
 
     with nogil:
-        # Weighted forward differences
+        # Взвешенные прямые разности
         for i in range(H):
             for j in range(W - 1):
                 tmp_dx[i, j] = gamma_x[i, j] * (v[i, j + 1] - v[i, j])
@@ -69,7 +71,7 @@ def _fused_add_grad_prior(
         for j in range(W):
             tmp_dy[H - 1, j] = gamma_y[H - 1, j] * (v[0, j] - v[H - 1, j])
 
-        # Adjoint of forward difference, added to out
+        # Сопряженный оператор прямой разности, добавляется к out
         for i in range(H):
             out[i, 0] += tmp_dx[i, W - 1] - tmp_dx[i, 0]
             for j in range(1, W):
@@ -87,7 +89,7 @@ def _fused_add_diag_prior(
     double[:, :] v not None,
     double[:, :] theta not None,
 ):
-    """Add diag(θ) v to out, in-place."""
+    """Добавляет diag(theta) * v к out, на месте."""
     cdef Py_ssize_t H = v.shape[0]
     cdef Py_ssize_t W = v.shape[1]
     cdef Py_ssize_t i, j
@@ -110,7 +112,7 @@ def _qp_accumulate(
     double sigma_sum,
     int K,
 ):
-    """Accumulate one filter's contribution to C_h and b_h."""
+    """Накапливает вклад одного фильтра в C_h и b_h."""
     cdef Py_ssize_t ii, jj
 
     with nogil:
@@ -121,9 +123,7 @@ def _qp_accumulate(
             b_h[ii] += ryx[a_off[ii], b_off[ii]]
 
 
-# ═══════════════════════════════════════════════════════════════
-#  Image-space CG solver
-# ═══════════════════════════════════════════════════════════════
+# --- Решатель CG в пространстве изображений ---
 
 def solve_image_cg(
     y, h, x_init,
@@ -133,9 +133,9 @@ def solve_image_cg(
     double cg_tol=1e-6,
     str jacobi_mode="scalar",
 ):
-    """Image-space CG solver with fused matvec.
+    """Решатель CG в пространстве изображений с объединенным matvec.
 
-    (β H^T H + D_x^T Γ_x D_x + D_y^T Γ_y D_y) x = β H^T y
+    (beta * H^T * H + D_x^T * Gamma_x * D_x + D_y^T * Gamma_y * D_y) * x = beta * H^T * y
     """
     cdef int H_img = y.shape[0]
     cdef int W_img = y.shape[1]
@@ -164,7 +164,7 @@ def solve_image_cg(
                               maxiter=max_cg_iter, atol=cg_tol)
     x_out = x_flat.reshape((H_img, W_img))
 
-    # Jacobi variance approximation
+    # Аппроксимация дисперсии Якоби
     reg_strength = (np.asarray(gx) + np.roll(np.asarray(gx), 1, axis=1) +
                     np.asarray(gy) + np.roll(np.asarray(gy), 1, axis=0))
 
@@ -178,9 +178,7 @@ def solve_image_cg(
     return np.maximum(x_out, 0.0), sigma_sq
 
 
-# ═══════════════════════════════════════════════════════════════
-#  Filter-space CG solver
-# ═══════════════════════════════════════════════════════════════
+# --- Решатель CG в пространстве фильтров ---
 
 def solve_filtered_image_cg(
     y_n, h, x_n_init,
@@ -189,7 +187,7 @@ def solve_filtered_image_cg(
     int max_cg_iter=50,
     double cg_tol=1e-6,
 ):
-    """Filter-space CG solver for one filtered image."""
+    """Решатель CG в пространстве фильтров для одного отфильтрованного изображения."""
     cdef int H_img = y_n.shape[0]
     cdef int W_img = y_n.shape[1]
     cdef int N = H_img * W_img
@@ -222,9 +220,7 @@ def solve_filtered_image_cg(
     return x_n, sigma_sq_n
 
 
-# ═══════════════════════════════════════════════════════════════
-#  QP kernel solver  (filter-space)
-# ═══════════════════════════════════════════════════════════════
+# --- Решатель ядра QP (пространство фильтров) ---
 
 def solve_kernel_qp_filterspace(
     list filtered_data,
@@ -233,7 +229,7 @@ def solve_kernel_qp_filterspace(
     bint do_threshold=True,
     double threshold_ratio=0.05,
 ):
-    """QP kernel estimation on the probability simplex."""
+    """Оценка ядра QP на вероятностном симплексе."""
     cdef int kh = kernel_shape[0]
     cdef int kw = kernel_shape[1]
     cdef int K = kh * kw
@@ -244,14 +240,14 @@ def solve_kernel_qp_filterspace(
     H_img = filtered_data[0][0].shape[0]
     W_img = filtered_data[0][0].shape[1]
 
-    # Kernel coordinate arrays
+    # Массивы координат ядра
     idx = np.arange(K, dtype=np.int64)
     a_coords_np = idx // kw
     b_coords_np = idx % kw
     cdef long long[:] a_coords = a_coords_np
     cdef long long[:] b_coords = b_coords_np
 
-    # Precompute modular difference matrices
+    # Предварительное вычисление матриц модульных разностей
     da_mat_np = np.empty((K, K), dtype=np.int64)
     db_mat_np = np.empty((K, K), dtype=np.int64)
     cdef long long[:, :] da_mat = da_mat_np
@@ -263,7 +259,7 @@ def solve_kernel_qp_filterspace(
                 da_mat[ii, jj] = ((a_coords[ii] - a_coords[jj]) % H_img + H_img) % H_img
                 db_mat[ii, jj] = ((b_coords[ii] - b_coords[jj]) % W_img + W_img) % W_img
 
-    # b_h offsets
+    # Смещения b_h
     a_off_np = np.empty(K, dtype=np.int64)
     b_off_np = np.empty(K, dtype=np.int64)
     cdef long long[:] a_off = a_off_np
@@ -279,7 +275,7 @@ def solve_kernel_qp_filterspace(
     cdef double[:, :] C_h = C_h_np
     cdef double[:] b_h = b_h_np
 
-    # Iterate over filtered data — no cdef inside loop!
+    # Итерация по отфильтрованным данным
     for item in filtered_data:
         y_n, m_xn, sigma_sq_n = item
         F_xn = fft2(m_xn)
@@ -296,7 +292,7 @@ def solve_kernel_qp_filterspace(
                         da_mat, db_mat, a_off, b_off,
                         sigma_sum, K)
 
-    # Tikhonov regularisation + numerical ridge
+    # Регуляризация Тихонова + добавка для стабильности
     if lambda_h > 0.0:
         with nogil:
             for ii in range(K):
@@ -305,13 +301,13 @@ def solve_kernel_qp_filterspace(
         for ii in range(K):
             C_h[ii, ii] += 1e-10
 
-    # Solve
+    # Решение
     try:
         h_flat = np.linalg.solve(C_h_np, b_h_np)
     except np.linalg.LinAlgError:
         h_flat, _, _, _ = np.linalg.lstsq(C_h_np, b_h_np, rcond=None)
 
-    # Project onto simplex
+    # Проекция на симплекс
     h_flat = np.maximum(h_flat, 0.0)
     if do_threshold:
         peak = np.max(h_flat)
@@ -327,16 +323,14 @@ def solve_kernel_qp_filterspace(
     return h_flat.reshape(kh, kw)
 
 
-# ═══════════════════════════════════════════════════════════════
-#  Legacy image-space kernel solver (Fourier)
-# ═══════════════════════════════════════════════════════════════
+# --- Устаревший решатель ядра в пространстве изображений (Фурье) ---
 
 def solve_kernel_fourier(
     y, x, sigma_sq, kernel_shape,
     double beta, double lambda_h,
     bint do_threshold=True,
 ):
-    """Image-space kernel estimation (gradient-domain Wiener)."""
+    """Оценка ядра в пространстве изображений (Винер в области градиентов)."""
     cdef int H_img = y.shape[0]
     cdef int W_img = y.shape[1]
 
@@ -380,15 +374,13 @@ def solve_kernel_fourier(
     return np.asarray(h)
 
 
-# ═══════════════════════════════════════════════════════════════
-#  Noise precision update
-# ═══════════════════════════════════════════════════════════════
+# --- Обновление точности шума ---
 
 def update_noise_precision(
     y, h, x,
     double beta_prev, double damping=0.5,
 ):
-    """Update β = N / RSS with damping."""
+    """Обновление beta = N / RSS с демпфированием."""
     cdef int H_img = y.shape[0]
     cdef int W_img = y.shape[1]
     cdef double N_px = <double>(H_img * W_img)
@@ -406,9 +398,7 @@ def update_noise_precision(
     return beta_out
 
 
-# ═══════════════════════════════════════════════════════════════
-#  Final deconvolution (IRLS with padding)
-# ═══════════════════════════════════════════════════════════════
+# --- Финальная деконволюция (IRLS с паддингом) ---
 
 def _solve_image_irls_step(
     rhs, F_h_sq,
@@ -417,7 +407,7 @@ def _solve_image_irls_step(
     double beta,
     int cg_iter=20,
 ):
-    """One IRLS CG step with fused matvec."""
+    """Один шаг IRLS CG с объединенным matvec."""
     cdef int H_img = x_init.shape[0]
     cdef int W_img = x_init.shape[1]
     cdef int N = H_img * W_img
@@ -439,7 +429,7 @@ def _solve_image_irls_step(
 
 
 def final_deconvolution(y, h, double beta, double lambda_reg):
-    """Non-blind IRLS deconvolution with edge padding."""
+    """Неслепая деконволюция IRLS с дополнением краев (паддингом)."""
     cdef int kh = h.shape[0]
     cdef int kw = h.shape[1]
     cdef int pad_h = kh
@@ -483,7 +473,7 @@ def final_deconvolution(y, h, double beta, double lambda_reg):
 
 
 def update_hs_weights(x, sigma_sq, double b):
-    """Convenience wrapper matching pure-Python API."""
+    """Удобная обертка для соответствия API на чистом Python."""
     dx = forward_diff_x(x)
     dy = forward_diff_y(x)
     return compute_hs_weights(dx, dy, sigma_sq, b)
@@ -491,5 +481,5 @@ def update_hs_weights(x, sigma_sq, double b):
 
 def solve_image_irw(*args, **kwargs):
     raise NotImplementedError(
-        "IRW solver is not adapted for variance tracking. Use 'cg'."
+        "Решатель IRW не адаптирован для отслеживания дисперсии. Используйте 'cg'."
     )

@@ -2,12 +2,7 @@
 """
 non_blind.pyx
 
-Non-blind image deconvolution with space-variant regularization
-and adaptive noise modelling.
-
-Reference:
-    "Adaptive Non-Blind Image Deblurring with Space-Variant Gradient
-     and Noise Modelling" — Qingsong Wang et al.
+Методы неслепой деконволюции изображений.
 """
 
 import numpy as np
@@ -20,9 +15,7 @@ from scipy.fft import dstn, idstn
 __all__ = ['adaptive_lp_deconv', 'ringing_artifacts_removal', 'firls_deconv']
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Proximal operators (LUT-based, Krishnan & Fergus NIPS 2009)
-# ═════════════════════════════════════════════════════════════════════════════
+# --- Проксимальные операторы (на основе LUT, Krishnan & Fergus NIPS 2009) ---
 
 _LUT_RANGE = 10
 _LUT_STEP = 0.0001
@@ -130,9 +123,7 @@ def _clear_lut_cache():
     _lut_cache.clear()
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# FFT helpers
-# ═════════════════════════════════════════════════════════════════════════════
+# --- Вспомогательные функции FFT ---
 
 def _psf2otf(psf, shape):
     if psf.size == 0 or np.all(psf == 0):
@@ -145,9 +136,7 @@ def _psf2otf(psf, shape):
     return fft2(padded)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Core ADMM deconvolution
-# ═════════════════════════════════════════════════════════════════════════════
+# --- Основная деконволюция ADMM ---
 
 def _fast_deconv_adaptive(yin, kernel, alpha, alpha_n, lam):
     M, N = yin.shape
@@ -194,9 +183,7 @@ def _fast_deconv_adaptive(yin, kernel, alpha, alpha_n, lam):
     return yout
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Noise std estimation
-# ═════════════════════════════════════════════════════════════════════════════
+# --- Оценка стандартного отклонения шума ---
 
 def _dwt_hh(img):
     import pywt
@@ -250,9 +237,7 @@ def _estimate_noise_std(image):
     return sigma_n
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Space-variant λ map
-# ═════════════════════════════════════════════════════════════════════════════
+# --- Пространственно-вариативная карта lambda ---
 
 def _compute_lambda_map(image, sigma_n, alpha):
     eps = 1e-8
@@ -279,9 +264,7 @@ def _compute_lambda_map(image, sigma_n, alpha):
     return lam_map
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# α_n estimation via KL divergence
-# ═════════════════════════════════════════════════════════════════════════════
+# --- Оценка alpha_n через KL-дивергенцию ---
 
 def _estimate_alpha_n(blurred, restored, kernel, sigma_n):
     import math
@@ -318,9 +301,7 @@ def _estimate_alpha_n(blurred, restored, kernel, sigma_n):
     return best_alpha
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Lambda library + 1D interpolation
-# ═════════════════════════════════════════════════════════════════════════════
+# --- Библиотека lambda + 1D интерполяция ---
 
 def _build_lambda_library(alpha, C, lam_N):
     i = np.arange(lam_N, dtype=np.float64)
@@ -372,9 +353,7 @@ def _interpolate_library(blurred, kernel, alpha, alpha_n, lam_map, lam_library):
     return np.clip(I_opt, 0, 1)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Mirror padding
-# ═════════════════════════════════════════════════════════════════════════════
+# --- Зеркальный паддинг ---
 
 def _mirror_pad(image, pad):
     return np.pad(image, pad, mode='reflect')
@@ -392,9 +371,7 @@ def _deconv_with_padding(blurimg, kernel, alpha, alpha_n, lam):
     return result[k_size:k_size + M, k_size:k_size + N]
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Public API
-# ═════════════════════════════════════════════════════════════════════════════
+# --- Публичный API ---
 
 def adaptive_lp_deconv(blurred, kernel, alpha=0.8, sigma_n=None,
                        two_stage=True):
@@ -441,20 +418,12 @@ def adaptive_lp_deconv(blurred, kernel, alpha=0.8, sigma_n=None,
     return np.clip(I_opt, 0, 1)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# FIRLS-UBC — frils_deb_ubc (undetermined boundary conditions)
-# Reference:
-#   X. Zhou, M. Vega, F. Zhou, R. Molina, A. K. Katsaggelos,
-#   "Fast Bayesian Blind Deconvolution with Huber Super Gaussian Priors",
-#   Digital Signal Processing, 2016.
-#
-# Ported from fbdhsgp/fbdhsgp_denoise/solvers.py  (frils_deb_ubc).
-# ═════════════════════════════════════════════════════════════════════════════
+# --- FIRLS-UBC ---
 
 def _frils_deb_ubc_core(y, h, lam, alpha, beta_a, lambda_u,
                         epsilon_min, epsilon_max, out_iter, inner_iter, beta_if):
     """
-    Core FIRLS-UBC routine.  Ported from ``frils_deb_ubc.m`` / fbdhsgp solvers.
+    Основная функция алгоритма FIRLS-UBC. Портировано из MATLAB (frils_deb_ubc.m) / fbdhsgp.
     """
     M1, M2 = y.shape
     m1, m2 = h.shape
@@ -594,22 +563,19 @@ def firls_deconv(blurred, kernel, lam=2e-4, alpha=2.0 / 3.0,
                  beta_if=None, clip=True,
                  boundary=None, use_edgetaper=None):
     """
-    Non-blind deconvolution via FIRLS-UBC (Zhou et al., DSP 2016).
+    Неслепая деконволюция с помощью FIRLS-UBC (Zhou et al., DSP 2016).
 
-    Ported from ``frils_deb_ubc`` in the FBDHSGP algorithm — uses
-    undetermined boundary conditions (replicate-pad + FOV u-constraint),
-    first- and second-order gradient regularization, and an IRLS schedule
-    with exponentially increasing beta.
-
-    Parameters mirror the pure-Python twin in non_blind.py.
-    ``boundary`` and ``use_edgetaper`` are accepted but ignored (kept for
-    backward compatibility).
+    Портировано из алгоритма FBDHSGP. Использует неопределенные граничные условия
+    (расширение границ копированием), регуляризацию градиентов первого и второго порядка,
+    а также расписание IRLS с экспоненциально возрастающим параметром beta.
+    
+    boundary и use_edgetaper принимаются, но игнорируются (оставлено для обратной совместимости).
     """
     kernel = kernel.astype(np.float64)
     kernel = np.maximum(kernel, 0.0)
     s = kernel.sum()
     if s <= 0:
-        raise ValueError("firls_deconv: kernel has zero sum.")
+        raise ValueError("firls_deconv: ядро имеет нулевую сумму.")
     kernel = kernel / s
 
     y = blurred.astype(np.float64)
@@ -639,8 +605,7 @@ def firls_deconv(blurred, kernel, lam=2e-4, alpha=2.0 / 3.0,
     return x
 
 
-# ══════════════════════════════════════════════════════════════════════════# Ringing artifacts removal  (from Pan's codebase, self-contained)
-# ═════════════════════════════════════════════════════════════════════════════
+# --- Удаление артефактов звона (из кодовой базы Pan, автономное) ---
 
 _OPT_FFT_LUT = None
 
@@ -820,7 +785,7 @@ def _deblurring_adm_aniso(B, k, lambda_tv, alpha):
             Wy = np.maximum(np.abs(Iy) - beta * lambda_tv, 0.0) * np.sign(Iy)
         else:
             raise NotImplementedError(
-                f"deblurring_adm_aniso: alpha={alpha} not implemented")
+                f"deblurring_adm_aniso: alpha={alpha} не реализовано")
         Wxx = np.concatenate([Wx[:, -1:] - Wx[:, 0:1],
                               -np.diff(Wx, n=1, axis=1)], axis=1)
         Wxx = Wxx + np.concatenate([Wy[-1:, :] - Wy[0:1, :],

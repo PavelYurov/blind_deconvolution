@@ -1,43 +1,27 @@
 """
-denoisers.py
+denoisers.pyx
 
-Self-contained denoiser dispatcher for the HTP blind deconvolution
-pipeline.  Used by the configurable hooks in ``htp.HTP_BD``:
+Модуль применения алгоритмов шумоподавления для конвейера слепой деконволюции HTP.
 
-    pre_pyramid    — once on the full normalised image, before the ROI
-                     pyramid is built (most impactful single hook).
-    pre_kernel     — inside the alternating loop, on the latent image
-                     fed to the H-step (must be MILD).
-    pre_nonblind   — once before the final non-blind FFT-CG-SR-AL step.
+Алгоритмы вызываются на разных стадиях работы:
+    pre_pyramid  - обработка полного нормализованного изображения до построения пирамиды.
+    pre_kernel   - промежуточная обработка скрытого изображения перед обновлением ядра.
+    pre_nonblind - финальная обработка перед неслепой деконволюцией.
 
-All defaults in ``HTP_BD`` are ``None`` so the pipeline reproduces the
-original Kotera–Šroubek–Milanfar (CAIP 2013) algorithm bit-for-bit
-unless a user explicitly opts in.
+Доступные методы:
+    none            - без фильтрации.
+    tv              - полная вариация.
+    nlm             - нелокальные средние.
+    bilateral       - двусторонняя фильтрация.
+    guided          - направляемый фильтр.
+    bm3d            - блочная фильтрация 3D.
+    act             - адаптивная пороговая обработка курвлетов.
+    vst_bm3d        - преобразование Энскомба в связке с BM3D.
+    screenot        - сжатие сингулярных значений.
+    adaptive_median - адаптивный медианный фильтр.
 
-Available methods
------------------
-    'none' / None
-    'tv'                  — scikit-image Chambolle TV
-    'nlm'                 — scikit-image Non-Local Means
-    'bilateral'           — scikit-image bilateral
-    'guided'              — He et al. guided filter (self-guided)
-    'bm3d'                — bm3d package (state-of-art AWGN denoiser)
-    'act'                 — Eslahi & Aghagolzadeh curvelet thresholding
-                            (good for coloured / 1-over-f noise)
-    'vst_bm3d'            — Anscombe VST + BM3D for Poisson / Poisson-
-                            Gaussian noise (Mäkitalo–Foi 2013)
-    'screenot'            — ScreeNOT SVD shrinkage (low-rank residual)
-    'adaptive_median'     — impulse-noise removal via AMF
-
-Notes
------
-* Methods that need a noise std (``nlm``, ``bilateral``, ``bm3d``) try
-  the keyword first, otherwise call ``skimage.restoration.estimate_sigma``
-  on the input.  When the caller already has σ from Chen / Pyatykh, it
-  should pass it explicitly via ``sigma`` / ``sigma_color`` /
-  ``sigma_psd`` / ``noise_var`` to avoid double estimation.
-* This file deliberately has no dependency on the gbbid pipeline; only
-  on modules already present next to it under ``htp_denoise/``.
+Если алгоритму требуется оценка дисперсии шума и она не передана явно, 
+значение вычисляется автоматически по входному изображению.
 """
 
 from __future__ import annotations
@@ -68,9 +52,7 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
-# ────────────────────────────────────────────────────────────────────────────
-# Self-guided filter (He et al., ECCV 2010) — small enough to keep inline
-# ────────────────────────────────────────────────────────────────────────────
+# --- Направляемый фильтр ---
 def _guided_filter(I: np.ndarray, p: np.ndarray, radius: int, eps: float) -> np.ndarray:
     size = 2 * int(radius) + 1
     mean_I = uniform_filter(I, size)
@@ -84,36 +66,23 @@ def _guided_filter(I: np.ndarray, p: np.ndarray, radius: int, eps: float) -> np.
     return mean_a * I + mean_b
 
 
-# ────────────────────────────────────────────────────────────────────────────
-# Public dispatcher
-# ────────────────────────────────────────────────────────────────────────────
+# --- Диспетчер методов шумоподавления ---
 def apply_denoiser(img: np.ndarray, method, **params) -> np.ndarray:
     """
-    Apply a denoiser to a 2-D float image.
-
-    Parameters
-    ----------
-    img : ndarray (H, W) — input image, expected in [0, 1] (float64).
-    method : str or None
-        One of the keys listed in the module docstring.  ``None`` /
-        ``'none'`` returns ``img.copy()``.
-    **params : method-specific keyword arguments (see below).
-
-    Returns
-    -------
-    denoised : ndarray (H, W) — denoised image, same dtype as input.
+    Применяет выбранный метод шумоподавления к двумерному изображению.
+    Изображение ожидается в формате float64 со значениями в диапазоне [0, 1].
     """
     if method is None or method == 'none':
         return img.copy()
 
-    # ── tv ──────────────────────────────────────────────────────────────
+    # --- Полная вариация ---
     if method == 'tv':
         from skimage.restoration import denoise_tv_chambolle
         weight = float(params.get('weight', 0.05))
         max_num_iter = int(params.get('max_num_iter', 100))
         return denoise_tv_chambolle(img, weight=weight, max_num_iter=max_num_iter)
 
-    # ── nlm ─────────────────────────────────────────────────────────────
+    # --- Нелокальные средние ---
     if method == 'nlm':
         from skimage.restoration import denoise_nl_means, estimate_sigma
         sigma = params.get('sigma', None)
@@ -128,7 +97,7 @@ def apply_denoiser(img: np.ndarray, method, **params) -> np.ndarray:
             sigma=sigma,
         )
 
-    # ── bilateral ──────────────────────────────────────────────────────
+    # --- Двусторонняя фильтрация ---
     if method == 'bilateral':
         from skimage.restoration import denoise_bilateral, estimate_sigma
         sigma_color = params.get('sigma_color', None)
@@ -138,27 +107,25 @@ def apply_denoiser(img: np.ndarray, method, **params) -> np.ndarray:
         return denoise_bilateral(
             img, sigma_color=sigma_color, sigma_spatial=sigma_spatial)
 
-    # ── guided ──────────────────────────────────────────────────────────
+    # --- Направляемый фильтр ---
     if method == 'guided':
         radius = int(params.get('radius', 5))
         eps = float(params.get('eps', 0.01))
         return _guided_filter(img, img, radius, eps)
 
-    # ── bm3d ────────────────────────────────────────────────────────────
+    # --- BM3D ---
     if method == 'bm3d':
         try:
             import bm3d as bm3d_lib
         except ImportError as e:
-            raise ImportError(
-                "bm3d package required for method='bm3d': pip install bm3d"
-            ) from e
+            raise ImportError("Требуется пакет bm3d") from e
         from skimage.restoration import estimate_sigma
         sigma_psd = params.get('sigma_psd', None)
         if sigma_psd is None:
             sigma_psd = float(estimate_sigma(img))
         return bm3d_lib.bm3d(img, sigma_psd=sigma_psd)
 
-    # ── act (Adaptive Curvelet Thresholding) ───────────────────────────
+    # --- Адаптивная курвлет-фильтрация ---
     if method == 'act':
         from blinddeconv.algorithms.mod_cython._build_pyd.act_denoise import act_denoise
         nv = params.get('noise_var', None)
@@ -166,7 +133,7 @@ def apply_denoiser(img: np.ndarray, method, **params) -> np.ndarray:
         result, _ = act_denoise(img, noise_var=nv, threshold_setting=ts)
         return result
 
-    # ── vst_bm3d (Generalized Anscombe VST + BM3D) ─────────────────────
+    # --- Преобразование Энскомба с BM3D ---
     if method == 'vst_bm3d':
         from blinddeconv.algorithms.mod_cython._build_pyd.vst import vst_bm3d_denoise
         result, _ = vst_bm3d_denoise(
@@ -180,7 +147,7 @@ def apply_denoiser(img: np.ndarray, method, **params) -> np.ndarray:
         )
         return result
 
-    # ── screenot (SVD shrinkage) ───────────────────────────────────────
+    # --- Сжатие сингулярных значений ---
     if method == 'screenot':
         from blinddeconv.algorithms.mod_cython._build_pyd.screenot import screenot_denoise
         return screenot_denoise(
@@ -192,7 +159,7 @@ def apply_denoiser(img: np.ndarray, method, **params) -> np.ndarray:
             stride=params.get('stride', None),
         )
 
-    # ── adaptive_median (impulse-noise removal) ────────────────────────
+    # --- Удаление импульсного шума ---
     if method == 'adaptive_median':
         from blinddeconv.algorithms.mod_cython._build_pyd.impulse_noise_estimation import (
             detect_impulse_noise, adaptive_median_filter,
@@ -207,4 +174,4 @@ def apply_denoiser(img: np.ndarray, method, **params) -> np.ndarray:
             )
         return adaptive_median_filter(img, mask, max_window=max_window)
 
-    raise ValueError(f"Unknown denoiser method: {method!r}")
+    raise ValueError(f"Неизвестный метод шумоподавления: {method}")

@@ -1,40 +1,37 @@
 """
-fbdhsgp.py
+fbdhsgp.pyx
 
-Framework wrapper for FBDHSGP — Fast Bayesian Blind Deconvolution with
-Huber Super Gaussian Priors (Zhou et al., DSP 2016).
+Быстрая байесовская слепая деконволюция с хуберовскими супергауссовскими 
+априорными распределениями (Fast Bayesian Blind Deconvolution with Huber Super 
+Gaussian Priors - FBDHSGP).
 
-Default behaviour (auto_mode='off' and all denoising knobs at 'none')
-reproduces the paper-pure FBDHSGP.m pipeline byte-equivalently.
+Поведение по умолчанию (auto_mode='off' и все фильтры шума в 'none') 
+в точности воспроизводит базовый конвейер, описанный в оригинальной статье.
 
-When auto_mode='robust' the wrapper applies a single, simplified noise
-adaptation policy:
+При auto_mode='robust' применяется единая упрощенная политика адаптации к шуму:
+    1. Всегда запускается обнаружение импульсного шума.
+    2. Всегда оценивается уровень шума (через метод 'pca').
+    3. Если sigma_norm < sigma_clean -> ЧИСТОЕ ИЗОБРАЖЕНИЕ: используются
+       исходные настройки из статьи, без дополнительного шумоподавления.
+    4. Иначе, если обнаружен пуассоновско-гауссовский шум и включен prefer_vst_on_poisson:
+       подавление шума через обобщенное преобразование Энскомба (VST) + BM3D 
+       перед запуском слепой деконволюции.
+    5. Иначе (сильный гауссовский шум): использование оцененной sigma в
+       вариационных параметрах деконволюции (по статье: lam = sigma**2).
+       Затем ЛИБО:
+           - если sigma >= sigma_ringing И включено apply_ringing_on_heavy:
+             финальный шаг заменяется на 'ringing_removal' (без pre_nb фильтрации).
+           - если пользовательский pre_nonblind не задан:
+             включается pre_nonblind='bm3d' перед финальной неслепой деконволюцией.
+           (Исключающее ИЛИ: 'ringing_removal' никогда не комбинируется с 'pre_nb').
 
-    1.  Always run impulse-noise detection (auto-promoted).
-    2.  Always estimate noise (auto-promoted to 'pca').
-    3.  If sigma_norm < sigma_clean -> CLEAN: restore paper defaults,
-        no denoising, no sigma injection.
-    4.  Else if Poisson-Gaussian detected and prefer_vst_on_poisson:
-        denoise the input via Generalized Anscombe VST + BM3D
-        (vst.vst_bm3d_denoise) before running BID.
-    5.  Else (heavy Gaussian): inject the estimated sigma into the
-        BID variational parameters (paper §4: lam = sigma**2).
-        Then EITHER:
-           - if sigma >= sigma_ringing AND apply_ringing_on_heavy:
-             switch final_nb -> 'ringing_removal' (no pre_nb denoise).
-           - elif user pre_nonblind is None:
-             enable pre_nonblind='bm3d' (Plug-and-Play before final NB).
-           (XOR: never combine ringing_removal with pre_nonblind denoise.)
+Остальные параметры ядра алгоритма (epsilon_min, beta_v, beta_H, K1, K2, xh_iter, 
+firls_lambda и т.д.) оркестратором не изменяются, так как они не зависят от уровня шума.
 
-NO other paper parameter (epsilon_min, beta_v, beta_H, K1, K2, xh_iter,
-firls_lambda, etc.) is touched by the orchestrator: the paper does not
-specify any noise-dependent rule for them, so we keep them as-is.
-
-Reference
----------
-    X. Zhou, M. Vega, F. Zhou, R. Molina, A. K. Katsaggelos,
+Литература:
+[1] X. Zhou, M. Vega, F. Zhou, R. Molina, A. K. Katsaggelos,
     "Fast Bayesian Blind Deconvolution with Huber Super Gaussian Priors",
-    Digital Signal Processing, 2016.
+    Digital Signal Processing, 2017.
 """
 
 from __future__ import annotations
@@ -44,7 +41,6 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 
-# -- Framework base class import (DO NOT MODIFY) ---------------------------
 import sys
 from pathlib import Path
 
@@ -68,7 +64,6 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
         sys.path.insert(0, _path)
 
 from blinddeconv.algorithms.base import DeconvolutionAlgorithm 
-# --------------------------------------------------------------------------
 
 from .solvers import frils_deb_ubc, ss_deb
 from .utils import (
@@ -78,64 +73,64 @@ from .utils import (
     shift_kernel_img_space,
 )
 
-
 CallbackType = Optional[Callable[[Dict[str, Any]], None]]
 
 
 class FBDHSGP(DeconvolutionAlgorithm):
-    """Fast Bayesian Blind Deconvolution with Huber Super Gaussian Priors.
+    """
+    Алгоритм быстрой байесовской слепой деконволюции с хуберовскими 
+    супергауссовскими априорными распределениями.
 
-    Paper-core parameters (never auto-tuned by the orchestrator, except
-    ``sigma`` which the paper explicitly ties to the noise level)
+    Базовые параметры алгоритма (не изменяются оркестратором, за исключением sigma)
     --------------------------------------------------------------------
     kernel_size, sigma, epsilon_min, beta_v, beta_H, K1, K2, xh_iter,
     h_iter, delta, delta_x, x_warm_start, gamma_correct, prior_name,
     prior_alpha, firls_*
 
-    Orthogonal noise pipeline (always available, never auto-tuned)
+    Ортогональный конвейер шумоподавления (не изменяется оркестратором)
     --------------------------------------------------------------
     impulse_preprocess  : 'none' | 'auto'
-    noise_estimation    : 'none' | 'pca' | 'chen'  (auto-promoted to
-                          'pca' under auto_mode='robust')
+    noise_estimation    : 'none' | 'pca' | 'chen' (при auto_mode='robust' 
+                          переключается на 'pca')
     screenot_preprocess : 'none' | 'auto'
     act_preprocess      : 'none' | 'auto'
     noise_preprocess    : 'none' | 'auto' | 'notch' | 'bandstop'
     histogram_eq        : 'none' | 'clahe' | 'global'
-    preprocess          : pre-blind spatial denoiser
+    preprocess          : пространственный шумоподавитель ДО слепого цикла
                           ('none' | 'tv' | 'nlm' | 'bilateral'
                            | 'guided' | 'bm3d' | 'act' | 'vst_bm3d')
 
-    Orchestrator-managed (controlled by auto_mode='robust')
+    Параметры, управляемые оркестратором (при auto_mode='robust')
     -------------------------------------------------------
-    pre_nonblind        : same options as preprocess; applied to the
-                          RAW input just before final non-blind step.
-    final_nb            : 'none' | 'frils' | 'adaptive_lp'
+    pre_nonblind        : те же опции, что и у preprocess; применяется к 
+                          ИСХОДНОМУ изображению перед финальным неслепым шагом.
+    final_nb            : метод финальной неслепой деконволюции
+                          'none' | 'frils' | 'adaptive_lp'
                           | 'ringing_removal' | 'wiener' | 'tikhonov'
-                          (default 'frils' — paper-pure post step)
-    nb_params           : dict of method-specific overrides
+                          (по умолчанию 'frils' — оригинальный шаг из статьи)
+    nb_params           : словарь параметров для выбранного метода неслепого шага
 
-    Robust orchestrator
+    Надежный оркестратор
     -------------------
-    auto_mode           : 'off' | 'robust' (default 'off')
-    auto_mode_params    : dict, default values:
+    auto_mode           : 'off' | 'robust' (по умолчанию 'off')
+    auto_mode_params    : словарь параметров оркестратора, значения по умолчанию:
         sigma_clean             = 0.005
         sigma_ringing           = 0.05
         apply_ringing_on_heavy  = False
         prefer_vst_on_poisson   = True
 
-    Callbacks
+    Функции обратного вызова (Callbacks)
     ---------
-    iter_callback   : callable(dict) | None
-                      Invoked from inside ss_deb (per outer iter) and
-                      x_admm_ubc_bi (per IRLS iter) when not None.
+    iter_callback   : функция(dict) | None
+                      Вызывается из ss_deb (внешние итерации) и x_admm_ubc_bi 
+                      (внутренние итерации IRLS).
     collect_history : bool
-                      When True, mirrors callback events into
-                      ``self.history``.
+                      Если True, сохраняет события коллбека в self.history.
     """
 
     def __init__(
         self,
-        # -- Paper core --
+        # --- Базовые параметры алгоритма ---
         kernel_size: Tuple[int, int] = (35, 35),
         sigma: float = 0.01,
         epsilon_min: float = 0.002,
@@ -159,7 +154,7 @@ class FBDHSGP(DeconvolutionAlgorithm):
         firls_epsilon_min: float = 2.55 / 255.0,
         firls_epsilon_max: float | None = None,
         firls_alpha: float = 2.0 / 3.0,
-        # -- Orthogonal noise pipeline --
+        # --- Ортогональный конвейер шумоподавления ---
         impulse_preprocess: str = "none",
         impulse_params: dict | None = None,
         noise_estimation: str = "none",
@@ -173,24 +168,23 @@ class FBDHSGP(DeconvolutionAlgorithm):
         histogram_eq_params: dict | None = None,
         preprocess: str = "none",
         preprocess_params: dict | None = None,
-        # -- Orchestrator-managed --
+        # --- Управляемые оркестратором ---
         pre_nonblind: str = "none",
         pre_nonblind_params: dict | None = None,
         final_nb: str = "frils",
         nb_params: dict | None = None,
-        # -- Robust orchestrator switch --
+        # --- Переключатель оркестратора ---
         auto_mode: str = "off",
         auto_mode_params: dict | None = None,
-        # -- Callbacks --
+        # --- Коллбеки ---
         iter_callback: CallbackType = None,
         collect_history: bool = False,
         visualize: bool = False,
-        # -- Kernel threshold --
+        # --- Порог ядра ---
         kernel_threshold: float = 0.0,
     ):
         super().__init__(name="FBDHSGP")
 
-        # -- Paper core --
         self.kernel_size = tuple(int(s) for s in kernel_size)
         self.sigma = float(sigma)
         self.epsilon_min = float(epsilon_min)
@@ -220,7 +214,6 @@ class FBDHSGP(DeconvolutionAlgorithm):
         )
         self.firls_alpha = float(firls_alpha)
 
-        # -- Orthogonal --
         self.impulse_preprocess = impulse_preprocess
         self.impulse_params = impulse_params
         self.noise_estimation = noise_estimation
@@ -235,23 +228,20 @@ class FBDHSGP(DeconvolutionAlgorithm):
         self.preprocess = preprocess
         self.preprocess_params = preprocess_params
 
-        # -- Orchestrator-managed --
         self.pre_nonblind = pre_nonblind
         self.pre_nonblind_params = pre_nonblind_params
         self.final_nb = (final_nb or "none").lower()
         self.nb_params = nb_params
 
-        # -- Robust orchestrator --
         self.auto_mode = (auto_mode or "off").lower()
         self.auto_mode_params = auto_mode_params
 
-        # -- Callbacks --
         self.iter_callback = iter_callback
         self.collect_history = bool(collect_history)
         self.visualize = bool(visualize)
         self.kernel_threshold = float(kernel_threshold)
 
-        # Snapshot for orchestrator clean-restore.
+        # Снимок для чистого восстановления состояния оркестратором.
         self._defaults_snapshot = {
             "sigma": self.sigma,
             "preprocess": preprocess,
@@ -265,13 +255,11 @@ class FBDHSGP(DeconvolutionAlgorithm):
         self.history: Dict[str, list] = {"x_admm": [], "ss_deb": []}
         self.hyperparams: Dict[str, Any] = {}
 
-    # =========================================================================
-    # Main entry
-    # =========================================================================
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """Основная точка входа алгоритма."""
         start_time = time.time()
 
-        # -- 1. Normalise to grayscale float64 [0, 1] --------------------
+        # --- 1. Нормализация в оттенки серого float64 [0, 1] ---
         y = np.asarray(image).astype(np.float64)
         if y.max() > 1.0:
             y = y / 255.0
@@ -284,19 +272,19 @@ class FBDHSGP(DeconvolutionAlgorithm):
                     + 0.5870 * y[:, :, 1]
                     + 0.1140 * y[:, :, 2]
                 )
-        f_raw = y.copy()  # untouched copy for pre_nonblind branch
+        f_raw = y.copy()  # Копия без изменений для ветви pre_nonblind
 
-        # -- 2. Gamma correction (paper) --------------------------------
+        # --- 2. Гамма-коррекция ---
         if self.gamma_correct != 1.0:
             y = np.power(y, self.gamma_correct)
 
-        # -- 3. Impulse-noise removal (always if requested or robust) ---
+        # --- 3. Обнаружение и удаление импульсного шума ---
         impulse_info = None
         impulse_method = self.impulse_preprocess
         if self.auto_mode == "robust" and impulse_method == "none":
             impulse_method = "auto"
         if impulse_method == "auto":
-            from blinddeconv.algorithms.mod_cython._build_pyd.impulse_noise_estimation import (
+            from blinddeconv.algorithms.mod_denoise.impulse_noise_estimation import (
                 detect_impulse_noise, adaptive_median_filter,
             )
             ip = self.impulse_params or {}
@@ -308,14 +296,14 @@ class FBDHSGP(DeconvolutionAlgorithm):
             )
             if impulse_info["has_impulse"]:
                 if self.visualize:
-                    print(f"[FBDHSGP] impulse density="
-                          f"{impulse_info['density']:.4f} -> median filter")
+                    print(f"[FBDHSGP] Плотность импульсного шума="
+                          f"{impulse_info['density']:.4f} -> медианный фильтр")
                 y = adaptive_median_filter(
                     y, impulse_info["impulse_mask"],
                     max_window=ip.get("max_window", 7))
                 f_raw = y.copy()
 
-        # -- 4. Noise estimation (auto-promoted in robust) --------------
+        # --- 4. Оценка шума ---
         if self.auto_mode == "robust" and self.noise_estimation == "none":
             self.noise_estimation = "pca"
             if self.visualize:
@@ -324,19 +312,19 @@ class FBDHSGP(DeconvolutionAlgorithm):
         if self.noise_estimation != "none":
             noise_info = self._estimate_noise(y)
             if self.visualize and noise_info is not None:
-                print(f"[FBDHSGP] noise: sigma_norm="
+                print(f"[FBDHSGP] шум: sigma_norm="
                       f"{noise_info.get('sigma_norm', 0):.5f} "
                       f"a={noise_info.get('a', 0):.4g} "
                       f"b={noise_info.get('b', 0):.4g}")
 
-        # -- 5. Orthogonal denoisers (user-driven, never orchestrated) --
+        # --- 5. Ортогональные шумоподавители ---
         screenot_info = None
         if self.screenot_preprocess == "auto":
             if self.act_preprocess == "auto":
                 raise ValueError(
-                    "screenot_preprocess and act_preprocess cannot both "
-                    "be 'auto'.")
-            from blinddeconv.algorithms.mod_cython._build_pyd.screenot import screenot_denoise
+                    "screenot_preprocess и act_preprocess не могут "
+                    "быть 'auto' одновременно.")
+            from blinddeconv.algorithms.mod_denoise.screenot import screenot_denoise
             sp = self.screenot_params or {}
             y, screenot_info = screenot_denoise(
                 y,
@@ -349,7 +337,7 @@ class FBDHSGP(DeconvolutionAlgorithm):
 
         act_info = None
         if self.act_preprocess == "auto":
-            from blinddeconv.algorithms.mod_cython._build_pyd.act_denoise import act_denoise
+            from blinddeconv.algorithms.mod_denoise.act_denoise import act_denoise
             ap = self.act_params or {}
             nv = ap.get("noise_var", None)
             if nv is None and noise_info is not None:
@@ -365,10 +353,9 @@ class FBDHSGP(DeconvolutionAlgorithm):
         if self.histogram_eq not in (None, "none"):
             y = self._apply_histogram_eq(y)
 
-        # -- 6. Robust orchestrator (single path, no light/heavy split) -
-        # Run a cheap PSD analysis so the orchestrator can decide
-        # between BM3D and ACT for correlated noise.  Reuse the result
-        # from noise_preprocess if it already produced one.
+        # --- 6. Надежный оркестратор ---
+        # Выполняет спектральный анализ для выбора между BM3D и ACT 
+        # при наличии коррелированного шума.
         psd_for_orch = psd_info
         if (
             self.auto_mode == "robust"
@@ -376,38 +363,38 @@ class FBDHSGP(DeconvolutionAlgorithm):
             and bool((self.auto_mode_params or {}).get("correlated_check", True))
         ):
             try:
-                from blinddeconv.algorithms.mod_cython._build_pyd.noise_psd_analysis import analyze_noise_psd
+                from blinddeconv.algorithms.mod_denoise.noise_psd_analysis import analyze_noise_psd
                 psd_for_orch = analyze_noise_psd(y)
                 if self.visualize:
-                    print(f"[FBDHSGP] PSD: class={psd_for_orch.get('noise_class')} "
-                          f"is_correlated={psd_for_orch.get('is_correlated')} "
+                    print(f"[FBDHSGP] PSD: класс={psd_for_orch.get('noise_class')} "
+                          f"скоррелирован={psd_for_orch.get('is_correlated')} "
                           f"beta={psd_for_orch.get('beta', 0):.2f}")
             except Exception as exc:
                 if self.visualize:
-                    print(f"[FBDHSGP] PSD analysis failed: {exc}")
+                    print(f"[FBDHSGP] Ошибка анализа PSD: {exc}")
                 psd_for_orch = None
         orchestrator_info = self._orchestrate_robust(noise_info, psd_for_orch)
 
-        # -- 7. VST denoising (Poisson route -> spatial denoise) --------
+        # --- 7. VST шумоподавление ---
         vst_info = None
         if orchestrator_info.get("apply_vst", False):
-            from blinddeconv.algorithms.mod_cython._build_pyd.vst import vst_bm3d_denoise
+            from blinddeconv.algorithms.mod_denoise.vst import vst_bm3d_denoise
             y, vst_info = vst_bm3d_denoise(
                 y, noise_info=noise_info, verbose=self.visualize)
             f_raw = y.copy()
             if self.visualize:
-                print(f"[FBDHSGP] VST applied: mode={vst_info.get('mode')}")
+                print(f"[FBDHSGP] Применен VST: режим={vst_info.get('mode')}")
 
-        # -- 8. Pre-blind spatial denoise (orthogonal, user-driven) -----
+        # --- 8. Пространственное шумоподавление до слепого цикла ---
         if self.preprocess not in (None, "none"):
             y = self._apply_denoise(y, self.preprocess,
                                     self.preprocess_params, noise_info)
 
-        # -- 9. Multiscale BID (paper) ----------------------------------
+        # --- 9. Многомасштабная слепая деконволюция ---
         sigma_for_bid = orchestrator_info.get("sigma_bid", self.sigma)
         kernel = self._multiscale_bid(y, sigma_override=sigma_for_bid)
 
-        # -- 10. Kernel threshold before non-blind ---------------------
+        # --- 10. Пороговая обработка ядра ---
         if self.kernel_threshold > 0.0:
             k_max = kernel.max()
             if k_max > 0:
@@ -416,11 +403,11 @@ class FBDHSGP(DeconvolutionAlgorithm):
                 if k_sum > 0:
                     kernel /= k_sum
 
-        # -- 11. Final non-blind dispatch -------------------------------
+        # --- 11. Финальный неслепой шаг ---
         x_final = self._run_final_nb(
             f_raw, y, kernel, noise_info, sigma_for_bid)
 
-        # -- 11. Output -------------------------------------------------
+        # --- 12. Сбор результатов ---
         self.hyperparams = {
             "kernel_size": self.kernel_size,
             "sigma": self.sigma,
@@ -466,14 +453,12 @@ class FBDHSGP(DeconvolutionAlgorithm):
         x_final = np.clip(x_final, 0, 255).astype(np.int16)
         return x_final, kernel
 
-    # =========================================================================
-    # Robust orchestrator (single simplified path)
-    # =========================================================================
     def _orchestrate_robust(
         self,
         noise_info: Optional[dict],
         psd_info: Optional[dict] = None,
     ) -> dict:
+        """Политика настройки оркестратора конвейера шума."""
         info: Dict[str, Any] = {
             "triggered": False,
             "mode": self.auto_mode,
@@ -512,7 +497,7 @@ class FBDHSGP(DeconvolutionAlgorithm):
             "prefer_vst_on_poisson": prefer_vst,
         })
 
-        # -- CLEAN: below threshold, restore everything --
+        # --- ЧИСТОЕ: восстанавливаем исходные настройки ---
         if sigma_n < sigma_clean:
             info["branch"] = "clean"
             self.sigma = snap["sigma"]
@@ -524,30 +509,22 @@ class FBDHSGP(DeconvolutionAlgorithm):
             self.nb_params = snap["nb_params"]
             info["sigma_bid"] = self.sigma
             if self.visualize:
-                print(f"[FBDHSGP][orch] clean (sigma={sigma_n:.5f}) "
-                      "-> paper defaults restored")
+                print(f"[FBDHSGP][orch] чистое (sigma={sigma_n:.5f}) "
+                      "-> восстановлены настройки по умолчанию")
             return info
 
-        # -- ROBUST (single path, parametric in sigma) --
+        # --- ЗАШУМЛЕННОЕ (выбор параметров на основе sigma) ---
         info["branch"] = "robust"
 
-        # Step (a): Poisson-Gaussian -> VST denoise (kills the Poisson
-        # tail; afterwards the residual is approximately Gaussian).
         poisson_like = (a_pg > 1e-6) and prefer_vst
         info["poisson_like"] = poisson_like
         if poisson_like:
             info["apply_vst"] = True
 
-        # Step (b): paper-justified knob — feed estimated sigma into the
-        # variational parameters (lam = sigma**2 in x_admm_ubc_bi).
         sigma_eff = max(sigma_n, snap["sigma"])
         self.sigma = sigma_eff
         info["sigma_bid"] = sigma_eff
 
-        # Step (c): correlated-noise detection (lag-1 autocorrelation +
-        # spectral peaks).  Curvelet shrinkage (ACT) decorrelates pink /
-        # brown / banded noise much better than BM3D, which assumes a
-        # white residual.
         is_correlated = False
         noise_class = "unknown"
         if psd_info is not None:
@@ -557,8 +534,6 @@ class FBDHSGP(DeconvolutionAlgorithm):
         info["is_correlated"] = is_correlated
         info["noise_class"] = noise_class
 
-        # Step (d): XOR — either ringing_removal as final NB, or pre_nb
-        # denoise; never both (per user spec).
         heavy = sigma_n >= sigma_ringing
         if heavy and apply_ringing:
             info["route"] = "ringing"
@@ -568,15 +543,10 @@ class FBDHSGP(DeconvolutionAlgorithm):
             self.pre_nonblind_params = None
         else:
             info["route"] = "pre_nb"
-            # Restore final_nb to the user default (typically 'frils').
             self.final_nb = snap["final_nb"]
             self.nb_params = snap["nb_params"]
-            # Only enable a default pre_nb denoiser if the user did not
-            # specify one.
             if snap["pre_nonblind"] in (None, "none"):
                 if is_correlated:
-                    # Curvelet shrinkage — handles correlated (pink/brown
-                    # /banded) residual after frils inversion.
                     self.pre_nonblind = "act"
                     self.pre_nonblind_params = {
                         "noise_var": sigma_eff ** 2,
@@ -590,8 +560,6 @@ class FBDHSGP(DeconvolutionAlgorithm):
                 self.pre_nonblind = snap["pre_nonblind"]
                 self.pre_nonblind_params = snap["pre_nonblind_params"]
 
-            # For strongly correlated noise (e.g. brown, beta≥2) the
-            # blind step also benefits from a pre-blind ACT pass.
             if (
                 is_correlated
                 and correlated_use_act_preblind
@@ -605,7 +573,7 @@ class FBDHSGP(DeconvolutionAlgorithm):
                 info["preblind_act"] = True
 
         if self.visualize:
-            print(f"[FBDHSGP][orch] robust route={info['route']} "
+            print(f"[FBDHSGP][orch] маршрут={info['route']} "
                   f"sigma_n={sigma_n:.5f} a={a_pg:.4g} "
                   f"vst={info['apply_vst']} "
                   f"final_nb={self.final_nb} "
@@ -613,14 +581,12 @@ class FBDHSGP(DeconvolutionAlgorithm):
                   f"sigma_bid={sigma_eff:.5f}")
         return info
 
-    # =========================================================================
-    # Multiscale BID (FBDHSGP.m main loop) — paper-pure mechanics
-    # =========================================================================
     def _multiscale_bid(
         self,
         y: np.ndarray,
         sigma_override: float | None = None,
     ) -> np.ndarray:
+        """Многомасштабная слепая деконволюция."""
         blur_size = self.kernel_size
         max_ks = max(self.kernel_size)
         ind1 = 0 if self.kernel_size[0] >= self.kernel_size[1] else 1
@@ -661,7 +627,6 @@ class FBDHSGP(DeconvolutionAlgorithm):
 
         xvars, hvars = self._init_vars(sigma_override=sigma_override)
 
-        # Wire the iter_callback (also installs history collection).
         cb = self._make_callback()
         if cb is not None:
             xvars["iter_callback"] = cb
@@ -723,7 +688,6 @@ class FBDHSGP(DeconvolutionAlgorithm):
         if s_sum > 0:
             kernel = kernel / s_sum
 
-        # Centroid-based final recentre (paper-port safeguard).
         ks_h, ks_w = kernel.shape
         if kernel.sum() > 0:
             ys_idx, xs_idx = np.indices(kernel.shape)
@@ -748,9 +712,6 @@ class FBDHSGP(DeconvolutionAlgorithm):
 
         return kernel
 
-    # =========================================================================
-    # Final non-blind dispatch
-    # =========================================================================
     def _run_final_nb(
         self,
         f_raw: np.ndarray,
@@ -759,16 +720,12 @@ class FBDHSGP(DeconvolutionAlgorithm):
         noise_info: Optional[dict],
         sigma_eff: float,
     ) -> np.ndarray:
+        """Диспетчеризация финального неслепого шага."""
         method = (self.final_nb or "none").lower()
 
         if method == "none":
-            # The deblurred image isn't returned by _multiscale_bid; we
-            # need a non-blind step to produce it. Fall back to frils.
             method = "frils"
 
-        # Optional pre_nonblind denoising of the RAW input (paper-pure
-        # final NB sees the original observation, not the pre-blind
-        # denoised version).
         f_in = f_raw
         if self.pre_nonblind not in (None, "none"):
             f_in = self._apply_denoise(
@@ -781,7 +738,7 @@ class FBDHSGP(DeconvolutionAlgorithm):
             return frils_deb_ubc(f_in, kernel, opts)
 
         if method == "ringing_removal":
-            from .non_blind import ringing_removal
+            from blinddeconv.algorithms.mod_denoise.non_blind import ringing_removal
             nbp = self.nb_params or {}
             return ringing_removal(
                 f_in, kernel,
@@ -791,7 +748,7 @@ class FBDHSGP(DeconvolutionAlgorithm):
             )
 
         if method == "adaptive_lp":
-            from .non_blind import adaptive_lp_deconv
+            from blinddeconv.algorithms.mod_denoise.non_blind import adaptive_lp_deconv
             nbp = self.nb_params or {}
             sigma_n = (noise_info or {}).get("sigma_norm", None)
             return adaptive_lp_deconv(
@@ -812,7 +769,7 @@ class FBDHSGP(DeconvolutionAlgorithm):
                 f_in, kernel, float(nbp.get("alpha", 0.01)))
 
         raise ValueError(
-            f"Unknown final_nb='{method}'. Choose from: 'none', 'frils', "
+            f"Неизвестный метод final_nb='{method}'. Варианты: 'none', 'frils', "
             "'ringing_removal', 'adaptive_lp', 'wiener', 'tikhonov'.")
 
     @staticmethod
@@ -835,10 +792,8 @@ class FBDHSGP(DeconvolutionAlgorithm):
             K_conj * B / (np.abs(K) ** 2 + alpha * np.abs(L) ** 2)
         ))
 
-    # =========================================================================
-    # Universal denoiser dispatch (single-channel)
-    # =========================================================================
     def _apply_denoise(self, img, method, params, noise_info):
+        """Универсальный диспетчер вызовов пространственных шумоподавителей."""
         if method is None or method == "none":
             return img
         p = dict(params or {})
@@ -882,7 +837,7 @@ class FBDHSGP(DeconvolutionAlgorithm):
             return bm3d_lib.bm3d(img, sigma_psd=sig)
 
         if method == "act":
-            from blinddeconv.algorithms.mod_cython._build_pyd.act_denoise import act_denoise
+            from blinddeconv.algorithms.mod_denoise.act_denoise import act_denoise
             nv = p.get("noise_var", None)
             if nv is None and sigma is not None:
                 nv = sigma ** 2
@@ -891,13 +846,13 @@ class FBDHSGP(DeconvolutionAlgorithm):
             return result
 
         if method == "vst_bm3d":
-            from blinddeconv.algorithms.mod_cython._build_pyd.vst import vst_bm3d_denoise
+            from blinddeconv.algorithms.mod_denoise.vst import vst_bm3d_denoise
             result, _ = vst_bm3d_denoise(
                 img, noise_info=noise_info, verbose=self.visualize)
             return result
 
         raise ValueError(
-            f"Unknown denoiser='{method}'. Choose from: "
+            f"Неизвестный шумоподавитель='{method}'. Доступные варианты: "
             "'tv', 'nlm', 'bilateral', 'guided', 'bm3d', 'act', "
             "'vst_bm3d', 'none'")
 
@@ -918,27 +873,21 @@ class FBDHSGP(DeconvolutionAlgorithm):
         b = mean_p - a * mean_I
         return box(a) * I + box(b)
 
-    # =========================================================================
-    # Noise estimation
-    # =========================================================================
     def _estimate_noise(self, yg):
         if self.noise_estimation == "chen":
-            from blinddeconv.algorithms.mod_cython._build_pyd.chen_noise_estimate import estimate_noise_level
+            from blinddeconv.algorithms.mod_denoise.chen_noise_estimate import estimate_noise_level
             sigma = estimate_noise_level(yg)
             return {"method": "chen", "sigma_norm": sigma,
                     "sigma": sigma * 255.0}
         if self.noise_estimation == "pca":
-            from blinddeconv.algorithms.mod_cython._build_pyd.pyatykh_noise_reconstruction import estimate_noise_params
+            from blinddeconv.algorithms.mod_denoise.pyatykh_noise_reconstruction import estimate_noise_params
             result = estimate_noise_params(yg)
             result["method"] = "pca"
             return result
         return None
 
-    # =========================================================================
-    # PSD-based noise preprocessing
-    # =========================================================================
     def _apply_noise_preprocess(self, yg):
-        from blinddeconv.algorithms.mod_cython._build_pyd.noise_psd_analysis import (
+        from blinddeconv.algorithms.mod_denoise.noise_psd_analysis import (
             analyze_noise_psd, noise_preprocess as _npp,
         )
         npp = self.noise_preprocess_params or {}
@@ -967,11 +916,8 @@ class FBDHSGP(DeconvolutionAlgorithm):
             from skimage.exposure import equalize_hist
             return equalize_hist(yg_clipped)
         raise ValueError(
-            f"Unknown histogram_eq='{method}'. Choose 'clahe', 'global', or 'none'.")
+            f"Неизвестный параметр histogram_eq='{method}'. Доступно: 'clahe', 'global' или 'none'.")
 
-    # =========================================================================
-    # Internal initialisation
-    # =========================================================================
     def _init_vars(
         self,
         sigma_override: float | None = None,
@@ -1027,7 +973,6 @@ class FBDHSGP(DeconvolutionAlgorithm):
 
     def _make_callback(self) -> CallbackType:
         user_cb = self.iter_callback
-        # Also respect the base-class callback set via set_callback().
         framework_cb = self._callback
         if user_cb is None and framework_cb is None and not self.collect_history:
             return None
@@ -1041,8 +986,6 @@ class FBDHSGP(DeconvolutionAlgorithm):
                 bucket.append(dict(event))
             if user_cb is not None:
                 user_cb(event)
-            # Forward ss_deb events (outer kernel loop) to the framework
-            # callback in IterationLogger-compatible format.
             if framework_cb is not None and event.get("scope") == "ss_deb":
                 try:
                     framework_cb({
@@ -1059,9 +1002,6 @@ class FBDHSGP(DeconvolutionAlgorithm):
 
         return _wrapper
 
-    # =========================================================================
-    # Framework interface methods
-    # =========================================================================
     def get_param(self) -> List[Tuple[str, Any]]:
         return [
             ("kernel_size", self.kernel_size),

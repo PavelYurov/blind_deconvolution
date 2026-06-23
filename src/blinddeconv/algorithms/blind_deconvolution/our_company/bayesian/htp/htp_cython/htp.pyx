@@ -1,31 +1,32 @@
 """
-htp.py
+htp.pyx
 
-Blind Image Deblurring Using Heavy-Tailed Priors (HTP).
+Алгоритм быстрой слепой деконволюции с использованием априорных распределений 
+с тяжелыми хвостами (Blind Image Deblurring Using Heavy-Tailed Priors).
 
-Reference:
-    J. Kotera, F. Sroubek, P. Milanfar:
+Последовательность операций:
+    1. Нормализация входного изображения в диапазон [0, 1].
+    2. Построение пирамиды изображений от грубого к точному масштабу для 
+       центральной области интереса (зеленый канал для RGB, полное изображение для градаций серого).
+    3. Многомасштабная чередующаяся MAP-оценка для скрытого изображения u 
+       и функции рассеяния точки (ФРТ) h с Lp-регуляризацией на градиенты 
+       изображения (p < 1) и L1-регуляризацией на ФРТ. Оптимизация выполняется 
+       через полуквадратичное расщепление и итерации Брегмана в частотной области.
+    4. Финальная неслепая деконволюция полного изображения с усиленным 
+       согласованием данных и TV-подобной регуляризацией (Lp_nonblind = 1).
+    5. Возврат восстановленного изображения и оцененного ядра.
+
+Литература:
+[1] J. Kotera, F. Sroubek, P. Milanfar,
     "Blind Deconvolution Using Alternating Maximum a Posteriori
      Estimation with Heavy-tailed Priors", CAIP 2013.
-
-Pipeline (mirrors MATLAB demo.m / MCrestoration.m):
-    1. Normalise input to float64 [0, 1].
-    2. Build coarse-to-fine pyramid of the central ROI
-       (green channel for RGB, full image for grayscale).
-    3. Multi-scale alternating MAP for (u, h) with heavy-tailed Lp prior
-       on image gradients (p < 1) and L1 prior on the PSF, solved via
-       half-quadratic splitting + Bregman iterations in the FFT domain
-       (psf_estim_lno_rgrad at each scale).
-    4. Final non-blind deconvolution on the full image (fft_cg_sr_al)
-       with stronger data-term and TV-like prior (Lp_nonblind = 1).
-    5. Return restored image (int16, [0, 255]) and kernel.
 """
 
 import numpy as np
 import time
 from typing import Tuple, List, Any, Dict, Optional, Callable
 
-# ── Framework base class import (DO NOT MODIFY) ─────────────────────────────
+# --- Внутренний импорт базового класса ---
 import sys
 from pathlib import Path
 
@@ -49,61 +50,55 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
         sys.path.insert(0, _path)
 
 from blinddeconv.algorithms.base import DeconvolutionAlgorithm                  
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------
 
 from .solvers import mc_restoration
 
 
 class HTP_BD(DeconvolutionAlgorithm):
     """
-    Blind deconvolution with heavy-tailed priors (Kotera et al., CAIP 2013).
+    Слепая деконволюция с априорными распределениями с тяжелыми хвостами [1].
 
-    Parameters
+    Параметры
     ----------
     kernel_size : int
-        Spatial support of the unknown PSF (square, equals MATLAB hsize).
-        Default 31 (matching demo_levin.m).
+        Пространственный размер неизвестной ФРТ (квадратная область). По умолчанию 31.
     Lp : float
-        Lp-norm exponent for the gradient prior on the latent image
-        during PSF estimation, 0 < p <= 1.  Default 0.3 (heavy-tailed).
+        Экспонента Lp-нормы для регуляризации градиентов скрытого изображения 
+        на этапе оценки ФРТ (0 < p <= 1). По умолчанию 0.3 (тяжелые хвосты).
     gamma : float
-        Data-term weight during PSF estimation.  Should be tuned to the
-        noise level (10 dB → 1e1, 20 dB → 1e2, ...).  Default 1e2.
+        Вес согласования данных при оценке ФРТ. Рекомендуется настраивать 
+        в зависимости от уровня шума. По умолчанию 1e2.
     alpha_u : float
-        Image-prior weight relative scale (multiplied by gamma).
-        Default 1e-2.
+        Относительный вес априорного распределения изображения. По умолчанию 1e-2.
     beta_u : float
-        Coupling (split-Bregman) weight relative scale (× gamma).
-        Default 1e0.
+        Относительный вес штрафа расщепления Брегмана для изображения. По умолчанию 1e0.
     alpha_h : float
-        PSF L1-prior weight relative scale (× gamma).  Default 1e1.
+        Относительный вес L1-регуляризации ФРТ. По умолчанию 1e1.
     beta_h : float
-        PSF coupling weight relative scale (× gamma).  Default 1e4.
+        Относительный вес штрафа расщепления для ФРТ. По умолчанию 1e4.
     centering_threshold : float
-        Threshold used in PSF centering between iterations.  Default
-        20/255.  <= 0 disables centering.
+        Порог для центрирования ФРТ между итерациями. По умолчанию 20/255.
     gamma_nonblind : float
-        Data-term weight for the final non-blind deconvolution
-        (relative to gamma).  Default 2e1.
+        Вес согласования данных для финальной неслепой деконволюции. По умолчанию 2e1.
     beta_u_nonblind : float
-        Coupling weight for the final non-blind step (× gamma_nonblind).
-        Default 1e-2.
+        Вес расщепления для финального неслепого шага. По умолчанию 1e-2.
     Lp_nonblind : float
-        Lp exponent for the final non-blind step.  Default 1.0 (TV-like).
+        Экспонента Lp для финального неслепого шага. По умолчанию 1.0.
     maxiter : int
-        Outer alternating iterations per pyramid level.  Default 10.
+        Внешние чередующиеся итерации на одном масштабе пирамиды. По умолчанию 10.
     maxiter_u : int
-        Inner u-step iterations.  Default 10.
+        Внутренние итерации оценки скрытого изображения. По умолчанию 10.
     maxiter_h : int
-        Inner h-step iterations.  Default 10.
+        Внутренние итерации оценки ФРТ. По умолчанию 10.
     ccreltol : float
-        Relative-change stop criterion for inner loops.  Default 1e-3.
+        Относительный критерий остановки для внутренних циклов. По умолчанию 1e-3.
     MSlevels : int
-        Number of multiscale levels (>= 1).  Default 4.
-    maxROIsize : tuple of int
-        Central ROI used for kernel estimation.  Default (1024, 1024).
+        Количество масштабов многомасштабной пирамиды (>= 1). По умолчанию 4.
+    maxROIsize : tuple[int, int]
+        Центральная область интереса, используемая для оценки ядра. По умолчанию (1024, 1024).
     verbose : int
-        0 = silent, 1 = progress messages.  Default 0.
+        Уровень детализации вывода. По умолчанию 0.
     """
 
     def __init__(
@@ -131,7 +126,6 @@ class HTP_BD(DeconvolutionAlgorithm):
         recenter_mode: str = 'centroid',
         kernel_thresh: float = 0.0,
         iterative_recenter: bool = True,
-        # ── Noise-aware extensions (all OFF by default; original behaviour) ──
         pre_pyramid: Optional[str] = None,
         pre_pyramid_params: Optional[Dict[str, Any]] = None,
         pre_kernel: Optional[str] = None,
@@ -140,35 +134,11 @@ class HTP_BD(DeconvolutionAlgorithm):
         pre_nonblind_params: Optional[Dict[str, Any]] = None,
         noise_estimation: str = 'none',
         noise_estimation_params: Optional[Dict[str, Any]] = None,
-        # ── Impulse-noise preprocessing (orthogonal to denoiser hooks) ──────
-        # 'auto' detects density via histogram + local outliers and runs
-        # an Adaptive Median Filter ONLY on detected pixels.  Runs BEFORE
-        # noise_estimation, because impulse spikes badly skew Chen/Pyatykh
-        # variance estimates.  Default 'none' → unchanged.
         impulse_preprocess: str = 'none',
         impulse_params: Optional[Dict[str, Any]] = None,
-        # ── Auto-config for denoiser hooks (denoisers ONLY) ─────────────────
-        # 'auto' AND noise_estimation != 'none' ⇒ any hook left as
-        # ``None`` is filled in based on the estimated noise (σ and, for
-        # Pyatykh, the inferred ``noise_type``).  HOOKS THE USER SET
-        # EXPLICITLY ARE NEVER OVERRIDDEN.  Algorithm parameters
-        # (gamma, Lp, alpha_*, ...) are NEVER touched by auto_mode.
-        # Naming kept consistent with the other algorithms' interface.
         auto_mode: str = 'off',
         auto_mode_overrides: Optional[Dict[str, Any]] = None,
-        # ── Iteration callback (gbbid-style) ──────────────────────────────
-        # Called once per outer iteration of psf_estim_lno_rgrad with a
-        # dict {iteration, scale, num_scales, kernel, image, metrics}.
         iteration_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
-        # ── Alternative non-blind step: ringing removal ──────────────
-        # 'fft_cg_sr_al'    — original (default, bit-exact behaviour)
-        # 'ringing_removal' — TV-ADM + L0 + bilateral-merge pipeline
-        #                     shared with gbbid / dcp / ecp / pmp / lip /
-        #                     vdbke (defined locally in non_blind.py).
-        # 'firls'           — FIRLS-UBC (Zhou et al., DSP 2016) shared
-        #                     with FBDHSGP / BID-HBSP.  Best on clean or
-        #                     mildly noisy data — produces sharper output
-        #                     than fft_cg_sr_al with no extra ringing.
         nonblind_method: str = 'fft_cg_sr_al',
         lambda_tv: float = 4e-3,
         lambda_l0: float = 2e-3,
@@ -195,23 +165,19 @@ class HTP_BD(DeconvolutionAlgorithm):
         self.MSlevels = int(MSlevels)
         self.maxROIsize = tuple(maxROIsize)
         self.verbose = int(verbose)
+
         if kernel_flip not in ('none', 'lr', 'ud', 'rot180'):
-            raise ValueError(
-                f"kernel_flip must be one of 'none','lr','ud','rot180', got {kernel_flip!r}"
-            )
+            raise ValueError(f"Недопустимое значение kernel_flip: {kernel_flip}")
         self.kernel_flip = kernel_flip
+
         if recenter_mode not in ('centroid', 'peak', 'masscentroid'):
-            raise ValueError(
-                f"recenter_mode must be 'centroid','peak' or 'masscentroid', got {recenter_mode!r}"
-            )
+            raise ValueError(f"Недопустимый recenter_mode: {recenter_mode}")
         self.auto_recenter = bool(auto_recenter)
         self.recenter_mode = recenter_mode
         self.kernel_thresh = float(kernel_thresh)
         self.iterative_recenter = bool(iterative_recenter)
 
-        # ── Denoiser hooks ───────────────────────────────────────────────────────
-        # All hooks default to None → the algorithm runs unchanged from
-        # the original Kotera–Šroubek–Milanfar (CAIP 2013) pipeline.
+        # --- Хуки фильтрации ---
         self.pre_pyramid = pre_pyramid
         self.pre_pyramid_params = dict(pre_pyramid_params or {})
         self.pre_kernel = pre_kernel
@@ -219,46 +185,33 @@ class HTP_BD(DeconvolutionAlgorithm):
         self.pre_nonblind = pre_nonblind
         self.pre_nonblind_params = dict(pre_nonblind_params or {})
 
-        # ── Noise estimator (off by default) ─────────────────────────────────
+        # --- Оценка шума ---
         if noise_estimation not in ('none', 'chen', 'pyatykh'):
-            raise ValueError(
-                f"noise_estimation must be 'none','chen' or 'pyatykh', "
-                f"got {noise_estimation!r}"
-            )
+            raise ValueError(f"Недопустимый метод оценки шума: {noise_estimation}")
         self.noise_estimation = noise_estimation
         self.noise_estimation_params = dict(noise_estimation_params or {})
-        # Populated by ``process``:
         self.noise_sigma: Optional[float] = None
         self.noise_info: Optional[Dict[str, Any]] = None
 
-        # ── Impulse / auto / callback ─────────────────────────────────────
+        # --- Предварительная обработка импульсного шума ---
         if impulse_preprocess not in ('none', 'auto'):
-            raise ValueError(
-                f"impulse_preprocess must be 'none' or 'auto', got "
-                f"{impulse_preprocess!r}"
-            )
+            raise ValueError(f"Недопустимый impulse_preprocess: {impulse_preprocess}")
         self.impulse_preprocess = impulse_preprocess
         self.impulse_params = dict(impulse_params or {})
-        # Populated by ``process`` if impulse preprocessing ran:
         self.impulse_info: Optional[Dict[str, Any]] = None
 
+        # --- Автоматическая конфигурация (auto_mode) ---
         if auto_mode not in ('off', 'auto'):
-            raise ValueError(
-                f"auto_mode must be 'off' or 'auto', got {auto_mode!r}"
-            )
+            raise ValueError(f"Недопустимый auto_mode: {auto_mode}")
         self.auto_mode = auto_mode
         self.auto_mode_overrides = dict(auto_mode_overrides or {})
-        # Populated by ``process``: snapshot of hook config actually used.
         self.auto_mode_applied: Optional[Dict[str, Any]] = None
 
         self.iteration_callback = iteration_callback
 
-        # ── Non-blind step variant ─────────────────────────────────────────
+        # --- Альтернативные методы неслепой деконволюции ---
         if nonblind_method not in ('fft_cg_sr_al', 'ringing_removal', 'firls'):
-            raise ValueError(
-                f"nonblind_method must be 'fft_cg_sr_al', 'ringing_removal' "
-                f"or 'firls', got {nonblind_method!r}"
-            )
+            raise ValueError(f"Недопустимый nonblind_method: {nonblind_method}")
         self.nonblind_method = nonblind_method
         self.lambda_tv = float(lambda_tv)
         self.lambda_l0 = float(lambda_l0)
@@ -268,43 +221,35 @@ class HTP_BD(DeconvolutionAlgorithm):
         self.history: Dict[str, list] = {'kernel_diff': []}
         self.hyperparams: Dict[str, Any] = {}
 
-    # ── Build the PAR dict expected by solvers (mirrors parameters.m) ────
     def _build_par(self) -> Dict[str, Any]:
+        """Сборка параметров для передачи в решатели."""
         gamma = self.gamma
         gamma_nb = self.gamma_nonblind * gamma
         return {
             'verbose': self.verbose,
             'gamma': gamma,
             'Lp': self.Lp,
-            # PSF prior (relative scales × gamma, exactly as in parameters.m)
             'beta_h': self.beta_h * gamma,
             'alpha_h': self.alpha_h * gamma,
             'centering_threshold': self.centering_threshold,
-            # Image prior (relative scales × gamma)
             'beta_u': self.beta_u * gamma,
             'alpha_u': self.alpha_u * gamma,
-            # Non-blind final step (× gamma_nonblind)
             'gamma_nonblind': gamma_nb,
             'beta_u_nonblind': self.beta_u_nonblind * gamma_nb,
             'Lp_nonblind': self.Lp_nonblind,
-            # Iteration limits
             'maxiter_u': self.maxiter_u,
             'maxiter_h': self.maxiter_h,
             'maxiter': self.maxiter,
             'ccreltol': self.ccreltol,
-            # Iterative-improvement knobs (HTP-internal, not in original MATLAB)
             'kernel_thresh': self.kernel_thresh,
             'iterative_recenter': self.iterative_recenter,
-            # Denoiser hooks (None ⇒ unchanged behaviour)
             'pre_pyramid': self.pre_pyramid,
             'pre_pyramid_params': self.pre_pyramid_params,
             'pre_kernel': self.pre_kernel,
             'pre_kernel_params': self.pre_kernel_params,
             'pre_nonblind': self.pre_nonblind,
             'pre_nonblind_params': self.pre_nonblind_params,
-            # Iteration callback (gbbid-style payload, see solvers.py)
             'iteration_callback': self.iteration_callback,
-            # Non-blind step variant
             'nonblind_method': self.nonblind_method,
             'lambda_tv': self.lambda_tv,
             'lambda_l0': self.lambda_l0,
@@ -312,34 +257,19 @@ class HTP_BD(DeconvolutionAlgorithm):
             'firls_params': self.firls_params,
         }
 
-    # ── Auto-config helper for denoiser hooks (denoisers ONLY) ──────────
     @staticmethod
     def _auto_denoiser_config(noise_info: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Map estimated noise statistics to a denoiser-hook configuration.
-
-        Rules (heuristic; ALGORITHM PARAMETERS UNTOUCHED):
-
-          * Pyatykh ``noise_type=='poisson'`` or ``'poisson_gaussian'``
-            with a > 0  → use Generalised-Anscombe VST + BM3D
-            (``vst_bm3d``) at Hook 1 and Hook 3.  Hook 2 = mild bilateral.
-          * Otherwise (white / coloured / unknown):
-                σ < 0.01           → nothing (default behaviour preserved)
-                0.01 ≤ σ            → ACT (Eslahi-Aghagolzadeh adaptive
-                                      curvelet thresholding) at Hook 1 &
-                                      Hook 3, bilateral at Hook 2 with
-                                      sigma_color = σ/2.  ACT outperforms
-                                      BM3D on coloured / 1-over-f and
-                                      camera-pipeline residual noise.
+        Эвристический подбор методов фильтрации на основе оценки шума.
+        Параметры самой слепой деконволюции остаются неизменными.
         """
-        sigma = float(noise_info.get('sigma_norm',
-                                     noise_info.get('sigma', 0.0)) or 0.0)
+        sigma = float(noise_info.get('sigma_norm', noise_info.get('sigma', 0.0)) or 0.0)
         ntype = str(noise_info.get('noise_type', 'gaussian')).lower()
         a = float(noise_info.get('a', 0.0) or 0.0)
 
         cfg: Dict[str, Any] = {}
 
-        # Poisson / Poisson-Gaussian path — VST does the heavy lifting
+        # Обработка пуассоновского и смешанного шума
         if 'poisson' in ntype and a > 0.0:
             ni = dict(noise_info)
             cfg['pre_pyramid'] = 'vst_bm3d'
@@ -353,10 +283,11 @@ class HTP_BD(DeconvolutionAlgorithm):
             cfg['pre_nonblind_params'] = {'noise_info': ni}
             return cfg
 
-        # Pure Gaussian / unknown — ACT (curvelet-domain shrinkage)
+        # Для слабого шума сохраняется поведение по умолчанию
         if sigma < 0.01:
-            return cfg                                  # leave defaults
+            return cfg                                  
 
+        # Для гауссовского/неизвестного шума используется адаптивная пороговая обработка
         cfg['pre_pyramid'] = 'act'
         cfg['pre_pyramid_params'] = {'noise_var': float(sigma ** 2),
                                      'threshold_setting': 's'}
@@ -370,7 +301,6 @@ class HTP_BD(DeconvolutionAlgorithm):
                                       'threshold_setting': 's'}
         return cfg
 
-    # ── Per-method default params from σ / noise_info ───────────────────
     @staticmethod
     def _default_params_for(
         method: Optional[str],
@@ -379,31 +309,18 @@ class HTP_BD(DeconvolutionAlgorithm):
         hook: str = 'pre_pyramid',
     ) -> Dict[str, Any]:
         """
-        Sensible default ``**params`` for ``apply_denoiser(img, method, ...)``
-        derived from the estimated noise σ (in [0, 1] scale) and, when
-        available, the full Pyatykh ``noise_info`` dict.
-
-        Used by ``auto_mode='auto'`` to fill EMPTY ``*_params`` for
-        methods the user picked manually, so e.g. setting
-        ``pre_pyramid='bm3d'`` without ``pre_pyramid_params`` no longer
-        falls back to ``estimate_sigma`` on the blurred input (which is
-        usually wrong) — it uses the proper Chen / Pyatykh σ instead.
-
-        ``hook`` lets the resolver tune strength per location:
-            * pre_pyramid  — full strength (slight over-smoothing OK)
-            * pre_kernel   — MILD (multiplied by 0.5) so we don't kill
-                             gradients the H-step relies on
-            * pre_nonblind — full strength
+        Формирование параметров шумоподавления на основе дисперсии шума 
+        в зависимости от точки вызова (hook).
         """
         if method in (None, 'none'):
             return {}
         sigma = float(max(sigma or 0.0, 1e-6))
-        # Strength multiplier per hook
+        
+        # Снижение интенсивности фильтрации перед оценкой ядра
         scale = 0.5 if hook == 'pre_kernel' else 1.0
         s = sigma * scale
 
         if method == 'tv':
-            # Chambolle weight ~ σ works well in [0,1] images
             return {'weight': float(max(s, 0.005))}
 
         if method == 'nlm':
@@ -427,8 +344,6 @@ class HTP_BD(DeconvolutionAlgorithm):
             }
 
         if method == 'bm3d':
-            # On strong noise (σ≥0.05) at the pyramid stage a 10% bump
-            # helps the kernel — same rule as in _auto_denoiser_config.
             if hook == 'pre_pyramid' and sigma >= 0.05:
                 return {'sigma_psd': float(1.1 * sigma)}
             return {'sigma_psd': float(s if hook == 'pre_kernel' else sigma)}
@@ -437,11 +352,9 @@ class HTP_BD(DeconvolutionAlgorithm):
             return {'noise_info': dict(noise_info)} if noise_info else {}
 
         if method == 'act':
-            # noise_var = σ² in [0,1]² scale
             return {'noise_var': float(sigma ** 2)}
 
         if method == 'screenot':
-            # leave structural defaults; ScreeNOT auto-detects rank
             return {}
 
         if method == 'adaptive_median':
@@ -449,38 +362,21 @@ class HTP_BD(DeconvolutionAlgorithm):
 
         return {}
 
-    # ── Auto-recentering helper ──────────────────────────────────────────
     def _recenter_kernel_and_image(
         self, H: np.ndarray, U: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Shift the kernel to put its centre at the window centre, and
-        shift the image by the OPPOSITE amount so g = h * u is preserved.
-
-        Centring uses the **bounding box** of the thresholded kernel
-        (mirrors FBDHSGP's ``shift_kernel_img_space``):
-
-            shift = round((gap_far - gap_near + bonus) / 2)
-
-        BBox-based centring is much more robust than a naive centroid
-        for diffuse / heavy-tailed kernels (defocus rings, dendritic
-        traces, V-shapes), because the centroid is biased by the
-        negative-tail noise floor and by long thin tails.
-
-        The image counter-shift is realised by replicate-padding on the
-        far side and cropping on the near side — NOT by ``np.roll`` —
-        so no wrap-around.
-
-        Modes:
-          * 'centroid'      – bbox of H clipped at >=20% of max  [default]
-          * 'masscentroid'  – mass-centroid of |H| (legacy)
-          * 'peak'          – argmax(H)
+        Пространственное центрирование ядра с противоположным сдвигом изображения.
+        Сохраняет свертку инвариантной, предотвращая глобальное смещение результата.
+        
+        Используется ограничивающая рамка порога ядра (bounding box) для робастного 
+        вычисления центра, так как прямой центр масс подвержен смещению из-за шума.
         """
         kh, kw = H.shape
         cy_int = kh // 2
         cx_int = kw // 2
 
-        # ---- determine target offset (sy, sx): how to move kernel ------
+        # Определение требуемого сдвига (sy, sx)
         if self.recenter_mode == 'peak':
             iy, ix = np.unravel_index(int(np.argmax(H)), H.shape)
             sy, sx = int(cy_int - iy), int(cx_int - ix)
@@ -497,18 +393,19 @@ class HTP_BD(DeconvolutionAlgorithm):
             sy = int(round((kh - 1) / 2.0 - iy))
             sx = int(round((kw - 1) / 2.0 - ix))
 
-        else:  # 'centroid' — bbox-based (FBDHSGP style)
+        else:  # 'centroid' на основе рамки
             Hp = np.maximum(H, 0.0)
             m = Hp.max()
             if m <= 0:
                 return H, U
-            # Threshold: keep pixels above max(0.03*max, small floor),
-            # exactly the same recipe FBDHSGP uses.
+            
+            # Порог отсечения шумового фона ядра
             tao = 0.03
             thr = min(m * tao, 0.002)
             mask = Hp >= thr
             if not mask.any():
                 return H, U
+            
             rows = np.where(mask.any(axis=1))[0]
             cols = np.where(mask.any(axis=0))[0]
             y_top, y_bot = int(rows[0]), int(rows[-1])
@@ -519,7 +416,7 @@ class HTP_BD(DeconvolutionAlgorithm):
             gap_top = y_top
             gap_bot = (kh - 1) - y_bot
 
-            # Tie-breaker bonus toward the heavier edge column/row
+            # Поправка в сторону более "тяжелого" края для симметрии
             s_l = Hp[:, x_left].sum()
             s_r = Hp[:, x_right].sum()
             bonus_x = 0.01 if (s_l >= s_r) else -0.01
@@ -533,7 +430,7 @@ class HTP_BD(DeconvolutionAlgorithm):
         if sy == 0 and sx == 0:
             return H, U
 
-        # ---- shift kernel with zero padding (no wrap) ------------------
+        # Выполнение сдвига ядра с дополнением нулями
         H_new = np.zeros_like(H)
         src_r0 = max(0, -sy); src_r1 = min(kh, kh - sy)
         src_c0 = max(0, -sx); src_c1 = min(kw, kw - sx)
@@ -545,10 +442,7 @@ class HTP_BD(DeconvolutionAlgorithm):
         if s_h > 0:
             H_new = H_new / s_h
 
-        # ---- counter-shift image: pad-edge on far side, crop on near ---
-        # If kernel moved by (sy, sx), image must move by (-sy, -sx).
-        # Use replicate-edge boundary so we don't introduce wrap-around
-        # or black borders.
+        # Встречный сдвиг изображения (используется edge-padding для предотвращения артефактов)
         Mh, Mw = U.shape
         py0 = max(0, sy);  py1 = max(0, -sy)
         px0 = max(0, sx);  px1 = max(0, -sx)
@@ -557,23 +451,17 @@ class HTP_BD(DeconvolutionAlgorithm):
 
         return H_new, U_new
 
-
-    # ── Main entry point ─────────────────────────────────────────────────
+    # --- Основной процесс ---
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         start_time = time.time()
 
-        # ── 1. Normalise input to float64 [0, 1] ────────────────────────
+        # 1. Нормализация к float64 [0, 1]
         y = np.asarray(image, dtype=np.float64)
         if y.max() > 1.0:
             y = y / 255.0
 
-        # ── 1a. Optional impulse-noise preprocessing (orthogonal hook) ──
-        # Runs BEFORE everything else (incl. noise estimation), because
-        # impulse spikes (salt-and-pepper, RS, hot/dead pixels) destroy
-        # any further variance-based statistics and produce a star-shaped
-        # kernel under blind deconvolution.  Detection is histogram-based;
-        # an Adaptive Median Filter is applied ONLY to detected pixels,
-        # so flat regions and edges are preserved.  Default 'none' \u21d2 NOP.
+        # 1a. Предварительная фильтрация импульсного шума
+        # Применяется до оценки дисперсии, так как импульсные выбросы искажают статистику.
         self.impulse_info = None
         if self.impulse_preprocess == 'auto':
             from blinddeconv.algorithms.mod_cython._build_pyd.impulse_noise_estimation import (
@@ -582,7 +470,7 @@ class HTP_BD(DeconvolutionAlgorithm):
             ip = dict(self.impulse_params)
             density_threshold = float(ip.pop('density_threshold', 0.005))
             max_window = int(ip.pop('max_window', 7))
-            # `ip` is forwarded to detect_impulse_noise unchanged.
+            
             def _impulse_one(arr: np.ndarray) -> Tuple[np.ndarray, Dict[str, Any]]:
                 info = detect_impulse_noise(arr, **ip)
                 if info['has_impulse'] and info['density'] >= density_threshold:
@@ -599,16 +487,12 @@ class HTP_BD(DeconvolutionAlgorithm):
                     ch_out, ch_info = _impulse_one(y[..., c])
                     cleaned[..., c] = ch_out
                     infos.append(ch_info)
-                # Stash a compact summary; per-channel masks omitted to
-                # keep the attribute small.
                 self.impulse_info = {
                     'per_channel': [
                         {k: v for k, v in d.items() if k != 'impulse_mask'}
                         for d in infos
                     ],
-                    'mean_density': float(np.mean(
-                        [d['density'] for d in infos]
-                    )),
+                    'mean_density': float(np.mean([d['density'] for d in infos])),
                 }
                 y = cleaned
             else:
@@ -618,16 +502,10 @@ class HTP_BD(DeconvolutionAlgorithm):
                 }
                 y = y_clean
             if self.verbose:
-                print(f'[HTP_BD] impulse_preprocess=auto \u2192 '
+                print(f'[HTP_BD] Предварительная очистка импульсного шума \u2192 '
                       f'{self.impulse_info}')
 
-        # ── 1b. Optional noise estimation ──────────────────────────
-        # Runs ONCE on the (luminance of) the input image; results are
-        # stored in ``self.noise_sigma`` and ``self.noise_info`` for the
-        # caller to inspect or feed into denoiser params manually.  The
-        # estimate is NOT auto-applied to any algorithm parameter — the
-        # user explicitly passes it (or anything else) into the hook
-        # ``*_params`` dicts.
+        # 1b. Оценка дисперсии шума
         self.noise_sigma = None
         self.noise_info = None
         if self.noise_estimation != 'none':
@@ -642,11 +520,6 @@ class HTP_BD(DeconvolutionAlgorithm):
                 from blinddeconv.algorithms.mod_cython._build_pyd.pyatykh_noise_reconstruction import estimate_noise_params
                 blocksize = int(self.noise_estimation_params.get('blocksize', 7))
                 result = estimate_noise_params(y_lum, blocksize=blocksize)
-                # ``estimate_noise_params`` returns a dict with keys
-                # 'a', 'b', 'sigma' (in [0,255] scale), 'sigma_norm'
-                # (in [0,1] scale) and 'noise_type'.  We expose the
-                # [0,1]-scale sigma since the rest of the pipeline works
-                # in normalised intensities.
                 self.noise_sigma = float(result.get('sigma_norm',
                                                     result.get('sigma', 0.0) / 255.0))
                 self.noise_info = {
@@ -658,53 +531,27 @@ class HTP_BD(DeconvolutionAlgorithm):
                     'noise_type': result.get('noise_type', 'unknown'),
                 }
             if self.verbose:
-                print(f'[HTP_BD] noise_estimation={self.noise_estimation} '
-                      f'→ {self.noise_info}')
+                print(f'[HTP_BD] Оценка шума ({self.noise_estimation}) \u2192 {self.noise_info}')
 
-        # ── 1c. Auto-config for denoiser hooks ──────────────────────────
-        # Two distinct things, both gated on ``auto_mode == 'auto'``:
-        #
-        #   (a) FILL METHOD     — for hooks the user left as None/'none',
-        #                         pick a method based on the noise stats
-        #                         (rules in ``_auto_denoiser_config``).
-        #   (b) FILL PARAMS     — for ANY hook whose method is set
-        #                         (whether by (a) or by the user) but
-        #                         whose ``*_params`` is None / empty,
-        #                         derive sensible defaults from σ via
-        #                         ``_default_params_for``.  This fixes
-        #                         the case "I picked pre_pyramid='bm3d'
-        #                         but didn't pass sigma_psd" — without
-        #                         it BM3D falls back to ``estimate_sigma``
-        #                         on the blurred input, which is wrong.
-        #
-        # Algorithm parameters (gamma, Lp, alpha_*, beta_*, ...) are
-        # NEVER touched here.  Manual ``*_params`` set by the user are
-        # NEVER overridden.
+        # 1c. Автоконфигурация методов шумоподавления
         self.auto_mode_applied = None
         if self.auto_mode == 'auto' and self.noise_info is not None:
             cfg = self._auto_denoiser_config(self.noise_info)
-            # Manual user overrides win over rule output:
             cfg.update(self.auto_mode_overrides or {})
             sigma = float(self.noise_sigma or 0.0)
             applied: Dict[str, Any] = {}
             for hook in ('pre_pyramid', 'pre_kernel', 'pre_nonblind'):
-                # (a) METHOD — only fill if user didn't choose one
                 user_method = getattr(self, hook)
                 if user_method in (None, 'none') and cfg.get(hook) is not None:
                     setattr(self, hook, cfg[hook])
                     applied[hook] = cfg[hook]
-                # (b) PARAMS — fill if missing/empty, regardless of who
-                #              chose the method (user or rule (a))
+                
                 method_now = getattr(self, hook)
                 if method_now in (None, 'none'):
                     continue
                 pkey = hook + '_params'
                 user_params = getattr(self, pkey)
-                if not user_params:                      # None or empty dict
-                    # If our rule produced a method+params pair AND the
-                    # method matches what's currently set, prefer those
-                    # (they may include richer fields like noise_info);
-                    # otherwise derive from the per-method resolver.
+                if not user_params:                      
                     if cfg.get(hook) == method_now and cfg.get(pkey):
                         params = dict(cfg[pkey])
                     else:
@@ -715,36 +562,17 @@ class HTP_BD(DeconvolutionAlgorithm):
                     applied[pkey] = params
             self.auto_mode_applied = applied
             if self.verbose and applied:
-                print(f'[HTP_BD] auto_mode applied: {applied}')
+                print(f'[HTP_BD] Применена автоконфигурация шумоподавления: {applied}')
 
-            # ── (c) NON-BLIND VARIANT — noise-aware swap ───────────────
-            # Two regimes (only when user kept the default fft_cg_sr_al
-            # AND did not explicitly override 'nonblind_method'):
-            #   σ < 0.01   → 'firls'            (FBDHSGP / BID-HBSP
-            #                routine — sharper than fft_cg_sr_al on
-            #                clean data; same prior family but UBC
-            #                boundary + IRLS schedule)
-            #   σ ≥ 0.01   → 'ringing_removal'  (TV-ADM + L0 + bilateral;
-            #                suppresses the strong ringing fft_cg_sr_al
-            #                produces near OTF zeros under noise)
-            sigma = float(self.noise_sigma or 0.0)
-            user_locked_nb = (
-                'nonblind_method' in (self.auto_mode_overrides or {})
-            )
-            if (self.nonblind_method == 'fft_cg_sr_al'
-                    and not user_locked_nb):
+            # Адаптивный выбор метода финальной неслепой деконволюции
+            user_locked_nb = ('nonblind_method' in (self.auto_mode_overrides or {}))
+            if (self.nonblind_method == 'fft_cg_sr_al' and not user_locked_nb):
                 if sigma < 0.01:
                     self.nonblind_method = 'firls'
-                    if self.verbose:
-                        print(f'[HTP_BD] auto_mode \u2192 nonblind_method='
-                              f'firls (sigma={sigma:.3f}, clean image)')
                 else:
                     self.nonblind_method = 'ringing_removal'
-                    if self.verbose:
-                        print(f'[HTP_BD] auto_mode \u2192 nonblind_method='
-                              f'ringing_removal (sigma={sigma:.3f})')
 
-        # ── 2. Build parameter dict and run the multiscale pipeline ─────
+        # 2. Выполнение алгоритма многомасштабной оценки ядра
         PAR = self._build_par()
         hsize = (self.kernel_size, self.kernel_size)
 
@@ -757,18 +585,11 @@ class HTP_BD(DeconvolutionAlgorithm):
         )
         U = np.clip(U, 0.0, 1.0)
 
-        # ── 2b. Auto-recenter the kernel (translation-ambiguity fix) ────
-        # Blind deconvolution is translation-invariant: (h(x), u(x)) and
-        # (h(x-d), u(x+d)) explain the same observation g.  In practice
-        # the recovered kernel often drifts off-center (typically up).
-        # We compensate by computing the kernel's "centre" (centroid of
-        # the thresholded mass, robust to noise floor), shifting the
-        # kernel to put it at the window centre, and shifting the image
-        # by the OPPOSITE amount so that g = h * u remains invariant.
+        # 3. Финальное центрирование ядра (опционально)
         if self.auto_recenter:
             H, U = self._recenter_kernel_and_image(H, U)
 
-        # ── 3. Output ──────────────────────────────────────────────────
+        # 4. Формирование результатов
         self.hyperparams = {
             'kernel_size': self.kernel_size,
             'Lp': self.Lp,
@@ -801,7 +622,6 @@ class HTP_BD(DeconvolutionAlgorithm):
             H_out = H
         return x_final, H_out
 
-    # ── Interface methods ────────────────────────────────────────────────
     def get_param(self) -> List[Tuple[str, Any]]:
         return [
             ('kernel_size', self.kernel_size),

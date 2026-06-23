@@ -1,23 +1,16 @@
 """
 solvers.py
 
-Core solver functions for Variational Bayesian Pansharpening / Super-Resolution.
+Функции-решатели для алгоритма вариационного байесовского сверхразрешения (паншарпенинга).
 
-Ported from MATLAB code:
-    Pérez-Bueno, F., Vega, M., Mateos, J., Molina, R., & Katsaggelos, A. K. (2020).
-    Variational Bayesian Pansharpening with Super-Gaussian Sparse Image Priors.
-    Sensors, 20(18), 5308.
-
-    M. Vega, J. Mateos, R. Molina, and A. K. Katsaggelos, "Super resolution of
-    multispectral images using TV image models," KES 2008, pp. 408-415.
-
-Contains:
-    restoreSAR         — SAR denoising/deblurring (initial hyperparameter estimation)
-    alfaTVpvini        — initial alpha for TV prior
-    alfaSGlogvini      — initial alpha for SG log prior
-    alfaSGlpvini       — initial alpha for SG lp prior
-    restSGME_Sens      — main SG (log / lp) pansharpening algorithm
-    TVME_Sens          — TV-prior pansharpening algorithm
+Основные функции:
+    restoreSAR    - Байесовское шумоподавление/деконволюция с априорным распределением SAR.
+                    Используется для начальной оценки гиперпараметров.
+    alfaTVpvini   - Начальная оценка параметра alpha для TV-регуляризации.
+    alfaSGlogvini - Начальная оценка параметра alpha для супергауссовского (log) априорного распределения.
+    alfaSGlpvini  - Начальная оценка параметра alpha для супергауссовского (lp) априорного распределения.
+    restSGME_Sens - Вариационный байесовский алгоритм паншарпенинга с супергауссовскими априорными распределениями.
+    TVME_Sens     - Вариационный байесовский алгоритм паншарпенинга с TV-априорным распределением.
 """
 
 import numpy as np
@@ -39,32 +32,23 @@ from .utils import (
 )
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# restoreSAR  (from restoreSAR.m)
-# ═════════════════════════════════════════════════════════════════════════════
-
+# --- Оценка начальных гиперпараметров через SAR ---
 def restoreSAR(img, h, term=1e-6, nitermax=100):
-    """Bayesian image denoising / deblurring with a SAR (Simultaneous
-    Auto-Regressive) prior.  Used for **initial hyperparameter estimation**.
-
-    Parameters
+    """
+    Оценка начальных гиперпараметров на основе модели одновременной авторегрессии (SAR).
+    
+    Параметры
     ----------
-    img      : (M, N) observed image
-    h        : 2-D convolution kernel  (use ``np.array([[1]])`` for denoising)
-    term     : float — convergence threshold
-    nitermax : int — max iterations
+    img      : Наблюдаемое изображение, форма (M, N).
+    h        : Ядро свертки 2D (для шумоподавления передается единичное ядро).
+    term     : Порог сходимости.
+    nitermax : Максимальное количество итераций.
 
-    Returns
+    Возвращает
     -------
-    out   : (M, N) restored image
-    alpha : float — estimated prior precision
-    beta  : float — estimated noise precision
-
-    Reference
-    ---------
-    R. Molina, A.K. Katsaggelos, J. Mateos, "Bayesian and Regularization
-    Methods for Hyperparameter Estimation in Image Restoration",
-    IEEE TIP, 8(2), 231-246, 1999.
+    out   : Восстановленное изображение.
+    alpha : Оцененная точность априорного распределения.
+    beta  : Оцененная точность шума.
     """
     img = np.asarray(img, dtype=np.float64)
     h = np.asarray(h, dtype=np.float64)
@@ -78,7 +62,6 @@ def restoreSAR(img, h, term=1e-6, nitermax=100):
     Ht = Tcent_nucleus2fft(h, M, N)
     HtH = Ht * H
 
-    # SAR prior kernel  C^T C
     priorn = np.array([[0, -0.25, 0],
                        [-0.25, 1, -0.25],
                        [0, -0.25, 0]])
@@ -132,15 +115,10 @@ def restoreSAR(img, h, term=1e-6, nitermax=100):
     return out, alpha, beta
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Initial alpha estimators
-# ═════════════════════════════════════════════════════════════════════════════
+# --- Оценка начального параметра alpha ---
 
 def alfaTVpvini(x, p=2):
-    """Initial alpha for the TV prior.
-
-    alpha = sum(p_ij) / (4 * sum( (|grad(x)|^2)^(1/p) ))
-    """
+    """Начальная оценка параметра alpha для TV-регуляризации."""
     x = np.asarray(x, dtype=np.float64)
     if x.ndim == 3:
         x = x[:, :, 0]
@@ -153,18 +131,7 @@ def alfaTVpvini(x, p=2):
 
 
 def alfaSGlogvini(Y, filtersetname, epsW=1e-6):
-    """Initial alpha values for the SG *log* prior.
-
-    Parameters
-    ----------
-    Y              : (M, N, nbands) or (M, N)
-    filtersetname  : str
-    epsW           : float
-
-    Returns
-    -------
-    alpha : list of (nbands,) arrays — one per filter
-    """
+    """Начальная оценка параметра alpha для супергауссовского априорного распределения типа log."""
     Y = np.asarray(Y, dtype=np.float64)
     if Y.ndim == 2:
         Y = Y[:, :, np.newaxis]
@@ -193,19 +160,7 @@ def alfaSGlogvini(Y, filtersetname, epsW=1e-6):
 
 
 def alfaSGlpvini(Y, p, filtersetname, epsW=1e-5):
-    """Initial alpha values for the SG *lp* prior.
-
-    Parameters
-    ----------
-    Y              : (M, N, nbands) or (M, N)
-    p              : float — lp exponent
-    filtersetname  : str
-    epsW           : float
-
-    Returns
-    -------
-    alpha : list of (nbands,) arrays — one per filter
-    """
+    """Начальная оценка параметра alpha для супергауссовского априорного распределения типа lp."""
     Y = np.asarray(Y, dtype=np.float64)
     if Y.ndim == 2:
         Y = Y[:, :, np.newaxis]
@@ -233,9 +188,7 @@ def alfaSGlpvini(Y, p, filtersetname, epsW=1e-5):
     return alpha
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# restSGME_Sens  (from restSGME_Sens.m — MAIN SG ALGORITHM)
-# ═════════════════════════════════════════════════════════════════════════════
+# --- Вариационный решатель с SG априорными распределениями ---
 
 def restSGME_Sens(
     Y, x, lam, kappa, filtersetname, hnuclei, nbands,
@@ -245,43 +198,15 @@ def restSGME_Sens(
     eps_y=1e-7, itmax_y=30,
     verbose=False,
 ):
-    """Variational Bayesian Pansharpening with Super-Gaussian priors.
+    """
+    Вариационный байесовский алгоритм паншарпенинга с супергауссовскими 
+    априорными распределениями.
 
-    Solves:
-        Y_b = D H y_b + n_b       (MS observation)
-        x   = sum_b lam_b y_b + η  (PAN observation)
+    Целевая модель:
+        Y_b = D * H * y_b + n_b       (Модель формирования мультиспектрального изображения)
+        x   = sum_b lam_b * y_b + η   (Модель формирования панхроматического изображения)
 
-    using SG (log or lp) sparsity priors on filtered images {F_ν y_b}.
-
-    Parameters
-    ----------
-    Y              : (lr_h, lr_w, nbands) LR multispectral observation
-    x              : (hr_h, hr_w) HR panchromatic observation
-    lam            : (nbands,) lambda coefficients
-    kappa          : [kappa_f, rho_f, alpha_f] from getkappa()
-    filtersetname  : 'fohv' or 'fo'
-    hnuclei        : PSF kernel (2-D array) or list of per-band kernels
-    nbands         : int
-    eps_map        : convergence threshold
-    itmax_map      : max outer iterations
-    itmin_map      : min outer iterations
-    gamma_alpha    : (nbands,) Gamma hyperprior confidence for alpha
-    gamma_beta     : (nbands,) Gamma hyperprior confidence for beta
-    gamma_gamma    : float — Gamma hyperprior confidence for gamma
-    alpha_mode     : list of (nbands,) reference alpha values per filter
-    beta_mode      : (nbands,) reference beta values
-    gamma_mode     : float — reference gamma value
-    eps_y          : CG convergence tolerance
-    itmax_y        : CG max iterations
-    verbose        : bool
-
-    Returns
-    -------
-    y      : (hr_h, hr_w, nbands) reconstructed HR MS image
-    alpha  : list of (nbands,) estimated alpha per filter
-    beta   : (nbands,) estimated beta
-    gamma  : float estimated gamma
-    W      : list of (hr_h, hr_w, nbands) weight matrices
+    Оптимизация выполняется на основе полифазного представления в частотной области.
     """
     Y = np.asarray(Y, dtype=np.float64)
     x = np.asarray(x, dtype=np.float64)
@@ -294,7 +219,6 @@ def restSGME_Sens(
     hr_h, hr_w = x.shape[:2]
     SRratio = hr_h // lr_h
 
-    # Defaults
     vec1 = np.ones(nbands)
     if gamma_alpha is None:
         gamma_alpha = np.zeros(nbands)
@@ -311,7 +235,7 @@ def restSGME_Sens(
 
     epsW = float(np.mean(Y)) * 1e-5
 
-    # ── Pre-compute filter FFTs ──────────────────────────────────────────
+    # --- Предварительное вычисление Фурье-образов фильтров ---
     filtersT = []
     filterTfilter = []
     Df = []
@@ -329,7 +253,7 @@ def restSGME_Sens(
             cent_nucleus2blk_fft2(fTf, hr_h, hr_w, SRratio, SRratio)
         )
 
-    # ── Pre-compute observation model operators ──────────────────────────
+    # --- Подготовка операторов модели наблюдений ---
     DtD = blk_fft2_DtD(hr_h, hr_w, SRratio, SRratio)
 
     psf_is_list = isinstance(hnuclei, list)
@@ -350,7 +274,7 @@ def restSGME_Sens(
         DtDH = blk_fd_conv(DtD, H_blk)
         HtDtDH = blk_fd_conv(Ht_blk, DtDH)
 
-    # ── Independent terms (constant across iterations) ───────────────────
+    # --- Инициализация независимых констант ---
     indep_wo_gamma = np.zeros((hr_h, hr_w, nbands))
     indep_wo_beta = np.zeros((hr_h, hr_w, nbands))
 
@@ -364,7 +288,6 @@ def restSGME_Sens(
             v = blk_fd_conv(Ht_blk, dtY_f)
         indep_wo_beta[:, :, i] = np.real(im_comp(blk_ifft2(v), SRratio, SRratio))
 
-    # ── Initial estimate: bicubic upsample ───────────────────────────────
     y0_img = np.zeros((hr_h, hr_w, nbands))
     for i in range(nbands):
         y0_img[:, :, i] = zoom(Y[:, :, i], SRratio, order=3)
@@ -379,13 +302,12 @@ def restSGME_Sens(
     conv_crit = eps_map + 1.0
     iteration = 0
 
-    # ── Main iteration loop ──────────────────────────────────────────────
+    # --- Основной цикл оптимизации ---
     while iteration <= itmin_map or (conv_crit > eps_map and iteration < itmax_map):
         iteration += 1
         if verbose:
             print(f"iter = {iteration}")
 
-        # --- Update hyperparameters ---
         alpha, beta, gamma_val, W = _sg_update_params(
             x, Y, H_blk, y_img, lam, nfilters, Df, kappa,
             tralpha, trbeta, trgamma, SRratio, nbands,
@@ -394,20 +316,12 @@ def restSGME_Sens(
             psf_is_list,
         )
 
-        if verbose:
-            for nu in range(nfilters):
-                print(f"  alpha[{nu}] = {alpha[nu]}")
-            print(f"  beta = {beta}")
-            print(f"  gamma = {gamma_val}")
-
-        # --- Build RHS ---
         indep_term = np.zeros((hr_h, hr_w, nbands))
         for i in range(nbands):
             indep_term[:, :, i] = (gamma_val * indep_wo_gamma[:, :, i] +
                                    beta[i] * indep_wo_beta[:, :, i])
         rhs = convertToMBVec(indep_term)
 
-        # --- Solve Σ^{-1} y = rhs via CG ---
         def matvec(v):
             return _sg_multiply_by_invcov(
                 v, nfilters, Df, Dft, alpha, W, beta, HtDtDH,
@@ -419,7 +333,6 @@ def restSGME_Sens(
         A_op = LinearOperator((n_total, n_total), matvec=matvec, dtype=np.float64)
         y_vec, cg_info = scipy_cg(A_op, rhs, x0=y0, rtol=eps_y, maxiter=itmax_y)
 
-        # --- Convergence check ---
         if iteration > 1:
             denom = np.dot(y0, y0)
             if denom > 0:
@@ -427,11 +340,10 @@ def restSGME_Sens(
             else:
                 conv_crit = 0.0
             if verbose:
-                print(f"  ||y-y0||^2/||y0||^2 = {conv_crit:.6e}")
+                print(f"  Критерий сходимости = {conv_crit:.6e}")
 
         y0 = y_vec.copy()
 
-        # --- Trace computation for next iteration ---
         tralpha, trbeta, trgamma = _sg_calc_trazas(
             alpha, nfilters, DftDf, W, beta, HtDtDH, gamma_val, lam,
             (lr_h, lr_w), SRratio, nbands, psf_is_list,
@@ -442,7 +354,6 @@ def restSGME_Sens(
     return y_img, alpha, beta, gamma_val, W
 
 
-# ── SG helper: update hyperparameters ────────────────────────────────────
 def _sg_update_params(
     x, Y, H_blk, y, lam, nfilters, Df, kappa,
     tralpha, trbeta, trgamma, bkn, nbands,
@@ -450,6 +361,7 @@ def _sg_update_params(
     alpha_mode, beta_mode, gamma_mode, epsW,
     psf_is_list,
 ):
+    """Обновление гиперпараметров (alpha, beta, gamma) для модели SG."""
     M, N = y.shape[:2]
     ysupport = M * N
     observationsupport = ysupport / bkn / bkn
@@ -463,7 +375,6 @@ def _sg_update_params(
     E_beta = np.zeros(nbands)
 
     for i in range(nbands):
-        # Prior weights
         for nu in range(nfilters):
             xnu = ifft2(Df[nu] * fft2(y[:, :, i]))
             u = epsW + np.abs(xnu * xnu + tralpha[i] / ysupport) ** 0.5
@@ -472,7 +383,6 @@ def _sg_update_params(
             inv_E = gamma_alpha[i] / alpha_mode[nu][i] + (1.0 - gamma_alpha[i]) / alpha_f(val)
             E_alpha[nu][i] = max(1.0 / inv_E, _EPS)
 
-        # Observation error
         YB = blk_fft2(im_decomp(y[:, :, i], bkn, bkn))
         if psf_is_list:
             recon = np.real(im_comp(blk_ifft2(blk_fd_conv(H_blk[i], YB)), bkn, bkn))
@@ -493,11 +403,11 @@ def _sg_update_params(
     return E_alpha, E_beta, E_gamma, W
 
 
-# ── SG helper: matrix-vector product Σ^{-1} y ───────────────────────────
 def _sg_multiply_by_invcov(
     y_vec, nfilters, Df, Dft, alpha, W, beta, HtDtDH,
     gamma_val, lam, nr, nc, bkn, nbands, psf_is_list,
 ):
+    """Вычисление матрично-векторного произведения Σ^{-1} y для метода сопряженных градиентов."""
     yd = convertToMBImg(y_vec, nr, nc, nbands)
     Ay = np.zeros((nr, nc, nbands))
 
@@ -508,7 +418,6 @@ def _sg_multiply_by_invcov(
         else:
             v = beta[i] * im_comp(blk_ifft2(blk_fd_conv(HtDtDH, ydbf)), bkn, bkn)
 
-        # Prior term: sum_nu alpha[nu][i] * F_nu^T * diag(W[nu][:,:,i]) * F_nu * y_i
         prior_term = np.zeros((nr, nc))
         ydf = fft2(yd[:, :, i])
         for nu in range(nfilters):
@@ -517,7 +426,6 @@ def _sg_multiply_by_invcov(
 
         Ay[:, :, i] = v + prior_term
 
-    # PAN coupling term: gamma * lam_i * lam_j * y_j
     for i in range(nbands):
         for j in range(nbands):
             Ay[:, :, i] += gamma_val * lam[i] * lam[j] * yd[:, :, j]
@@ -525,11 +433,11 @@ def _sg_multiply_by_invcov(
     return convertToMBVec(Ay)
 
 
-# ── SG helper: trace computation ─────────────────────────────────────────
 def _sg_calc_trazas(
     alpha, nfilters, DftDf, W, beta, HtDtDH, gamma_val, lam,
     lr_size, SRratio, nbands, psf_is_list,
 ):
+    """Вычисление следа матриц неопределенности для обновления гиперпараметров."""
     Qinv = _sg_calc_cov_inv(
         alpha, nfilters, DftDf, W, beta, HtDtDH, gamma_val, lam,
         lr_size, SRratio, nbands, psf_is_list,
@@ -557,19 +465,14 @@ def _sg_calc_cov_inv(
     alpha, nfilters, DftDf, W, beta, HtDtDH, gamma_val, lam,
     lr_size, SRratio, nbands, psf_is_list,
 ):
-    """Compute the block-inverse of the precision matrix Q for trace calculations.
-
-    Returns a nested list  Qinv[i][j]  of shape (low_nr, low_nc, bkn2, bkn2).
-    """
+    """Вычисление блочной инверсии матрицы точности (precision matrix) Q в полифазной области."""
     low_nr, low_nc = lr_size
     bkn2 = SRratio * SRratio
 
-    # Identity block
     I_blk = np.zeros((low_nr, low_nc, bkn2, bkn2))
     for k in range(bkn2):
         I_blk[:, :, k, k] = 1.0
 
-    # Build Q[i][j] blocks  (6-D in MATLAB, here nested list of 4D)
     Q = [[None] * nbands for _ in range(nbands)]
 
     for i in range(nbands):
@@ -588,10 +491,8 @@ def _sg_calc_cov_inv(
             Q[i][j] = off_block.copy()
             Q[j][i] = off_block.copy()
 
-    # Small diagonal regularisation to prevent singular blocks
     reg = _EPS * I_blk
 
-    # For nbands==1 simplify: just invert the (bkn2 x bkn2) block at each freq
     if nbands == 1:
         Qinv = [[np.zeros_like(Q[0][0])]]
         for fi in range(low_nr):
@@ -600,8 +501,6 @@ def _sg_calc_cov_inv(
                 Qinv[0][0][fi, fj, :, :] = np.linalg.inv(mat)
         return Qinv
 
-    # General case: for each (fi, fj) frequency, build the full
-    # (nbands*bkn2) x (nbands*bkn2) matrix and invert
     Qinv = [[np.zeros((low_nr, low_nc, bkn2, bkn2)) for _ in range(nbands)]
             for _ in range(nbands)]
 
@@ -629,7 +528,7 @@ def _sg_calc_cov_inv(
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# TVME_Sens  (from TVME_Sens.m — TV PRIOR ALGORITHM)
+# Вариационный решатель с TV априорным распределением
 # ═════════════════════════════════════════════════════════════════════════════
 
 def TVME_Sens(
@@ -640,29 +539,7 @@ def TVME_Sens(
     eps_y=1e-7, itmax_y=30,
     verbose=False,
 ):
-    """Variational Bayesian Pansharpening with Total-Variation prior.
-
-    Parameters
-    ----------
-    Y              : (lr_h, lr_w, nbands) LR multispectral observation
-    x              : (hr_h, hr_w) HR panchromatic observation
-    lam            : (nbands,) lambda coefficients
-    hnuclei        : PSF kernel (2-D) or list of per-band kernels
-    nbands         : int
-    eps_map, itmax_map, itmin_map : convergence params
-    gamma_alpha, gamma_beta, gamma_gamma : Gamma hyperprior confidences
-    alpha_mode, beta_mode, gamma_mode    : Gamma hyperprior reference values
-    eps_y, itmax_y : CG params
-    verbose        : bool
-
-    Returns
-    -------
-    y      : (hr_h, hr_w, nbands) reconstructed HR image
-    alpha  : (nbands,) estimated alpha
-    beta   : (nbands,) estimated beta
-    gamma  : float estimated gamma
-    W      : (hr_h, hr_w, nbands) weight matrix
-    """
+    """Вариационный байесовский алгоритм паншарпенинга с TV-регуляризацией."""
     Y = np.asarray(Y, dtype=np.float64)
     x = np.asarray(x, dtype=np.float64)
     lam = np.asarray(lam, dtype=np.float64)
@@ -685,13 +562,12 @@ def TVME_Sens(
     if beta_mode is None:
         beta_mode = np.ones(nbands)
 
-    # ── TV difference kernels in block-FFT ──
+    # --- Операторы конечных разностей ---
     DhtDh_kern = np.array([[1.0, -2.0, 1.0]])
     DvtDv_kern = DhtDh_kern.T
     DhtDh = cent_nucleus2blk_fft2(DhtDh_kern, hr_h, hr_w, SRratio, SRratio)
     DvtDv = cent_nucleus2blk_fft2(DvtDv_kern, hr_h, hr_w, SRratio, SRratio)
 
-    # ── Observation model operators ──
     DtD = blk_fft2_DtD(hr_h, hr_w, SRratio, SRratio)
 
     psf_is_list = isinstance(hnuclei, list)
@@ -712,7 +588,6 @@ def TVME_Sens(
         DtDH_single = blk_fd_conv(DtD, H_blk)
         HtDtDH = blk_fd_conv(Ht_blk, DtDH_single)
 
-    # ── Constant RHS parts ──
     indep_wo_gamma = np.zeros((hr_h, hr_w, nbands))
     indep_wo_beta = np.zeros((hr_h, hr_w, nbands))
 
@@ -726,7 +601,6 @@ def TVME_Sens(
             v = blk_fd_conv(Ht_blk, dtY_f)
         indep_wo_beta[:, :, i] = np.real(im_comp(blk_ifft2(v), SRratio, SRratio))
 
-    # ── Initialise parameters via SAR ──
     alpha, beta, gamma_val, W_mat = _tv_ini_params(
         x, Y, indep_wo_beta, indep_wo_gamma, nbands,
         gamma_alpha, gamma_beta, gamma_gamma,
@@ -737,20 +611,17 @@ def TVME_Sens(
     conv_crit = eps_map + 1.0
     iteration = 0
 
-    # ── Main loop ──
     while iteration <= itmin_map or (conv_crit > eps_map and iteration < itmax_map):
         iteration += 1
         if verbose:
             print(f"iter = {iteration}")
 
-        # RHS
         indep_term = np.zeros((hr_h, hr_w, nbands))
         for i in range(nbands):
             indep_term[:, :, i] = (gamma_val * indep_wo_gamma[:, :, i] +
                                    beta[i] * indep_wo_beta[:, :, i])
         rhs = convertToMBVec(indep_term)
 
-        # CG solve
         def matvec(v):
             return _tv_multiply_by_invcov(
                 v, alpha, W_mat, beta, HtDtDH, gamma_val, lam,
@@ -762,7 +633,6 @@ def TVME_Sens(
         A_op = LinearOperator((n_total, n_total), matvec=matvec, dtype=np.float64)
         y_vec, _ = scipy_cg(A_op, rhs, x0=y0, rtol=eps_y, maxiter=itmax_y)
 
-        # Convergence
         if iteration > 1:
             denom = np.dot(y0, y0)
             if denom > 0:
@@ -770,11 +640,10 @@ def TVME_Sens(
             else:
                 conv_crit = 0.0
             if verbose:
-                print(f"  ||y-y0||^2/||y0||^2 = {conv_crit:.6e}")
+                print(f"  Критерий сходимости = {conv_crit:.6e}")
 
         y0 = y_vec.copy()
 
-        # Traces
         tralpha, trbeta, trgamma = _tv_calc_trazas(
             alpha, DhtDh, DvtDv, W_mat, beta, HtDtDH, gamma_val, lam,
             (lr_h, lr_w), SRratio, nbands, psf_is_list,
@@ -782,7 +651,6 @@ def TVME_Sens(
 
         y_img = convertToMBImg(y_vec, hr_h, hr_w, nbands)
 
-        # Update params
         alpha, beta, gamma_val, W_mat = _tv_update_params(
             x, Y, H_blk, y_img, lam,
             tralpha, trbeta, trgamma, SRratio, nbands,
@@ -791,22 +659,19 @@ def TVME_Sens(
             psf_is_list,
         )
 
-        if verbose:
-            print(f"  alpha = {alpha}, beta = {beta}, gamma = {gamma_val}")
-
     y_img = convertToMBImg(y_vec, hr_h, hr_w, nbands)
     return y_img, alpha, beta, gamma_val, W_mat
 
 
-# ── TV helper: initial parameters via SAR ────────────────────────────────
 def _tv_ini_params(
     x, Y, indep_wo_beta, indep_wo_gamma, nbands,
     gamma_alpha, gamma_beta, gamma_gamma,
     alpha_mode, beta_mode, gamma_mode, epsW,
 ):
+    """Инициализация гиперпараметров для модели TV-регуляризации."""
     M, N = x.shape[:2]
     _, alpha_SAR, gamma_SAR = restoreSAR(x, np.array([[1.0]]))
-    alpha_init = alfaTVpvini(np.real(ifft2(fft2(x))), 2)  # on PAN
+    alpha_init = alfaTVpvini(np.real(ifft2(fft2(x))), 2)
 
     E_alpha = np.zeros(nbands)
     E_beta = np.zeros(nbands)
@@ -821,7 +686,6 @@ def _tv_ini_params(
     E_gamma = gamma_gamma / gamma_mode + (1.0 - gamma_gamma) / gamma_SAR
     E_gamma = 1.0 / E_gamma
 
-    # Initial weights
     indep_term = np.zeros_like(indep_wo_gamma)
     for i in range(nbands):
         indep_term[:, :, i] = E_gamma * indep_wo_gamma[:, :, i] + E_beta[i] * indep_wo_beta[:, :, i]
@@ -835,7 +699,6 @@ def _tv_ini_params(
     return E_alpha, E_beta, E_gamma, W
 
 
-# ── TV helper: update hyperparameters ────────────────────────────────────
 def _tv_update_params(
     x, Y, H_blk, y, lam,
     tralpha, trbeta, trgamma, bkn, nbands,
@@ -843,6 +706,7 @@ def _tv_update_params(
     alpha_mode, beta_mode, gamma_mode, epsW,
     psf_is_list,
 ):
+    """Обновление гиперпараметров (alpha, beta, gamma) для TV-модели."""
     M, N = y.shape[:2]
     ysupport = M * N
     observationsupport = ysupport / bkn / bkn
@@ -853,7 +717,6 @@ def _tv_update_params(
     E_beta = np.zeros(nbands)
 
     for i in range(nbands):
-        # TV prior weights
         Dhy, Dvy = circ_gradient2(y[:, :, i])
         v = Dhy ** 2 + Dvy ** 2 + tralpha[i]
         v[v < 0] = 0.0
@@ -863,7 +726,6 @@ def _tv_update_params(
         sum_p = 2.0 * ysupport
         normprior_i = np.sum(sum_t)
 
-        # Observation error
         YB = blk_fft2(im_decomp(y[:, :, i], bkn, bkn))
         if psf_is_list:
             recon = np.real(im_comp(blk_ifft2(blk_fd_conv(H_blk[i], YB)), bkn, bkn))
@@ -886,11 +748,11 @@ def _tv_update_params(
     return E_alpha, E_beta, E_gamma, W
 
 
-# ── TV helper: matrix-vector product ─────────────────────────────────────
 def _tv_multiply_by_invcov(
     y_vec, alpha, W, beta, HtDtDH, gamma_val, lam,
     nr, nc, bkn, nbands, psf_is_list,
 ):
+    """Вычисление матрично-векторного произведения Σ^{-1} y для модели TV."""
     yd = convertToMBImg(y_vec, nr, nc, nbands)
     Ay = np.zeros((nr, nc, nbands))
 
@@ -913,11 +775,11 @@ def _tv_multiply_by_invcov(
     return convertToMBVec(Ay)
 
 
-# ── TV helper: trace computation ─────────────────────────────────────────
 def _tv_calc_trazas(
     alpha, DhtDh, DvtDv, W, beta, HtDtDH, gamma_val, lam,
     lr_size, SRratio, nbands, psf_is_list,
 ):
+    """Вычисление следа матриц неопределенности для обновления гиперпараметров TV-модели."""
     Qinv = _tv_calc_cov_inv(
         alpha, DhtDh, DvtDv, W, beta, HtDtDH, gamma_val, lam,
         lr_size, SRratio, nbands, psf_is_list,
@@ -945,6 +807,7 @@ def _tv_calc_cov_inv(
     alpha, DhtDh, DvtDv, W, beta, HtDtDH, gamma_val, lam,
     lr_size, SRratio, nbands, psf_is_list,
 ):
+    """Вычисление блочной инверсии матрицы точности Q в полифазной области для TV-модели."""
     low_nr, low_nc = lr_size
     bkn2 = SRratio * SRratio
 
@@ -968,10 +831,8 @@ def _tv_calc_cov_inv(
             Q[i][j] = off.copy()
             Q[j][i] = off.copy()
 
-    # Small diagonal regularisation to prevent singular blocks
     reg = _EPS * I_blk
 
-    # Invert per frequency point
     if nbands == 1:
         Qinv = [[np.zeros_like(Q[0][0])]]
         for fi in range(low_nr):

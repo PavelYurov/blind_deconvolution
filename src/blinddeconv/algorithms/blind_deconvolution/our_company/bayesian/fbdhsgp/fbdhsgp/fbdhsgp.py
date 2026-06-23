@@ -1,27 +1,22 @@
 """
 fbdhsgp.py
 
-Framework wrapper for FBDHSGP — Fast Bayesian Blind Deconvolution with
-Huber Super Gaussian Priors.
+Быстрая байесовская слепая деконволюция с хуберовскими супергауссовскими 
+априорными распределениями (Fast Bayesian Blind Deconvolution with Huber 
+Super Gaussian Priors - FBDHSGP).
 
-Reference
----------
-    X. Zhou, M. Vega, F. Zhou, R. Molina, A. K. Katsaggelos,
+Содержит:
+    - FBDHSGP: Основной класс алгоритма слепой деконволюции. Принимает изображение
+      и возвращает восстановленный результат вместе с оцененным ядром размытия.
+    - _multiscale_bid: Реализация многомасштабной оценки ядра на основе 
+      построения пирамиды изображений.
+    - _init_vars, _default_firls_opts: Вспомогательные методы инициализации 
+      параметров для решателей и финальной неслепой деконволюции.
+
+Литература:
+[1] X. Zhou, M. Vega, F. Zhou, R. Molina, A. K. Katsaggelos,
     "Fast Bayesian Blind Deconvolution with Huber Super Gaussian Priors",
-    Digital Signal Processing, 2016.
-
-Pipeline (mirrors MATLAB ``FBDHSGP.m``)
----------------------------------------
-    1. Normalise input image to float64 in [0, 1].
-    2. Optional gamma correction (``y .^ gamma_correct``).
-    3. Build a coarse-to-fine pyramid of kernel sizes (factor √2).
-    4. At each scale:
-         * initialise kernel (Gaussian on coarsest, bilinear-up from previous);
-         * centre kernel via ``shift_kernel_img_space``;
-         * run ``ss_deb`` (alternating ``x_admm_ubc_bi`` and ``h_admm_ubc_bi``).
-    5. Run ``frils_deb_ubc`` (final non-blind ℓ_p deconvolution) on the
-       full-size image with the estimated kernel.
-    6. Return ``(restored_image_int16, kernel_float64)``.
+    Digital Signal Processing, 2017.
 """
 
 from __future__ import annotations
@@ -31,7 +26,6 @@ from typing import Any, Dict, List, Tuple
 
 import numpy as np
 
-# ── Framework base class import (DO NOT MODIFY) ─────────────────────────────
 import sys
 from pathlib import Path
 
@@ -55,7 +49,6 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
         sys.path.insert(0, _path)
 
 from blinddeconv.algorithms.base import DeconvolutionAlgorithm
-# ─────────────────────────────────────────────────────────────────────────────
 
 from .solvers import frils_deb_ubc, ss_deb
 from .utils import (
@@ -68,75 +61,79 @@ from .utils import (
 
 class FBDHSGP(DeconvolutionAlgorithm):
     """
-    Fast Bayesian Blind Deconvolution with Huber Super Gaussian Priors.
+    Алгоритм быстрой байесовской слепой деконволюции с хуберовскими 
+    супергауссовскими априорными распределениями.
 
-    The wrapper accepts a single grayscale image and returns the deblurred
-    image together with the estimated PSF.
+    Принимает одно полутоновое изображение и возвращает восстановленное 
+    изображение вместе с оцененной функцией рассеяния точки (ФРТ).
 
-    Parameters
-    ----------
+    Параметры алгоритма
+    -------------------
     kernel_size : tuple[int, int]
-        Spatial support of the unknown PSF (must be odd; default ``(35, 35)``).
+        Пространственный размер неизвестного ядра размытия (оба числа 
+        должны быть нечетными; по умолчанию (35, 35)).
     sigma : float
-        Noise standard deviation (default ``0.01`` per paper §4).
+        Стандартное отклонение шума (по умолчанию 0.01 согласно Разделу 4 статьи).
     epsilon_min : float
-        Huber Super Gaussian ``ε`` parameter (default ``0.002``; recommended
-        range ``[0.001, 0.004]``).
+        Параметр eps для априорного распределения Хьюбера (по умолчанию 0.002; 
+        рекомендуемый диапазон [0.001, 0.004]).
     beta_v : float
-        ADMM penalty for ``v_γ = F_γ x`` (default ``0.1``; recommended
-        ``[0.1, 1]``).
+        Параметр штрафа ADMM для v_gamma = F_gamma * x 
+        (по умолчанию 0.1; рекомендуемый диапазон [0.1, 1]).
     beta_H : float
-        ADMM penalty for ``H = F P h`` (default ``10``).
+        Параметр штрафа ADMM для H = F * P * h (по умолчанию 10.0).
     K1 : int
-        Outer IRLS iterations of ``x_admm_ubc_bi`` (default ``10``).
+        Внешние итерации метода IRLS для обновления изображения (по умолчанию 10).
     K2 : int
-        Inner ADMM iterations of ``x_admm_ubc_bi`` (default ``1``;
-        ``K2=1`` together with a large ``beta_v`` gives the SADMM variant).
+        Внутренние итерации ADMM для обновления изображения (по умолчанию 1; 
+        вместе с большим значением beta_v это реализует сглаженный вариант SADMM).
     xh_iter : int
-        Number of alternating image/kernel updates per scale (default ``15``).
+        Количество чередующихся обновлений изображения/ядра на каждом масштабе 
+        (по умолчанию 15).
     h_iter : int
-        ADMM iterations inside ``h_admm_ubc_bi`` (default ``10``).
+        Итерации ADMM внутри процедуры оценки ядра (по умолчанию 10).
     delta : float
-        Stop tolerance for ``h`` updates inside Algorithm 2 (default ``0.002``).
+        Допуск остановки для обновлений h внутри Алгоритма 2 (по умолчанию 0.002).
     delta_x : float
-        Stop tolerance for the IRLS image loop (default ``0.001``).
+        Допуск остановки для цикла IRLS оценки изображения (по умолчанию 0.001).
     x_warm_start : int
-        If 1, reuse ``x`` between scales/iterations (default ``1``).
+        Если 1, используется "теплый старт" для x между масштабами/итерациями 
+        (по умолчанию 1).
     gamma_correct : float
-        Gamma exponent applied to the input before BID (default ``1.0``).
+        Экспонента гамма-коррекции, применяемая к входу перед деконволюцией 
+        (по умолчанию 1.0).
     prior_name : str
-        One of ``{'Log', 'Lp', 'MOG', 'NL1'}`` (default ``'Log'``).
+        Выбор априорной модели: 'Log', 'Lp', 'MOG' или 'NL1' (по умолчанию 'Log').
     prior_alpha : float
-        Prior strength multiplier ``t`` (default ``1.0``).
+        Множитель силы априорной регуляризации t (по умолчанию 1.0).
 
-    Final non-blind (``frils_deb_ubc``) parameters
-    ----------------------------------------------
-    These control the final ℓ_p deconvolution (Eq. (31) of the paper).
-    Defaults match ``test_real_fbdhsgp.m`` / ``test_on_zhou_dataset.m``.
-    For challenging (large or curvy) PSFs the most useful knobs are:
-        * ``firls_out_iter`` — increase from 5 → 10..20 to let β reach ``β_max``.
-        * ``firls_alpha``    — 2/3 (default, sharper) or 0.8 (FIRLS-ICIP2014, milder).
-        * ``firls_lambda``   — decrease for sharper output, increase if noisy.
-        * ``firls_epsilon_min`` — smaller ⇒ closer to true ℓ_p, sharper edges.
+    Параметры финального неслепого шага (frils_deb_ubc)
+    ---------------------------------------------------
+    Контролируют финальную деконволюцию с Lp-регуляризацией (Уравнение 31).
+    Настройки по умолчанию соответствуют рекомендациям оригинальной статьи.
+    Для сложных (больших или криволинейных) ядер наиболее важными параметрами являются:
+        * firls_out_iter — увеличение с 5 до 10..20 позволяет beta достичь beta_max.
+        * firls_alpha — 2/3 (по умолчанию, более резкий результат) или 0.8 (мягче).
+        * firls_lambda — уменьшить для большей резкости, увеличить при сильном шуме.
+        * firls_epsilon_min — меньшее значение приближает модель к истинной Lp-норме.
 
     firls_out_iter : int
-        Outer continuation iterations on β (default ``5``).
+        Внешние итерации продолжения (continuation) по параметру beta (по умолчанию 5).
     firls_inner_iter : int
-        Inner ADMM iterations per β level (default ``4``).
+        Внутренние итерации ADMM на каждый уровень beta (по умолчанию 4).
     firls_IF : float
-        β multiplicative continuation factor (default ``sqrt(2)``).
+        Множитель для шага продолжения beta (по умолчанию sqrt(2)).
     firls_lambda : float
-        Data-fidelity vs. prior trade-off (default ``2e-4``).
+        Компромисс между точностью данных и априорным распределением (по умолчанию 2e-4).
     firls_lambda_u : float
-        FOV-constraint penalty for the ``u``-subproblem (default ``0.1``).
+        Штраф за ограничение поля зрения (FOV) для подзадачи u (по умолчанию 0.1).
     firls_epsilon_min : float
-        ε for the Huber-ℓ_p prior, small floor (default ``2.55/255``).
+        Параметр eps для априорного распределения Huber-Lp (по умолчанию 2.55/255).
     firls_epsilon_max : float
-        ε starting value (default = ``firls_epsilon_min``; in FIRLS-ICIP2014
-        this is set to a larger value, e.g. ``20/255``, to start with mild
-        regularisation and tighten gradually).
+        Начальное значение eps (по умолчанию равно firls_epsilon_min; для постепенного
+        ужесточения регуляризации можно использовать большее значение).
     firls_alpha : float
-        ℓ_p exponent for the prior (default ``2/3``).
+        Экспонента Lp для априорного распределения (по умолчанию 2/3).
     """
 
     def __init__(
@@ -156,7 +153,6 @@ class FBDHSGP(DeconvolutionAlgorithm):
         gamma_correct: float = 1.0,
         prior_name: str = "Log",
         prior_alpha: float = 1.0,
-        # ── final non-blind (firls_deb_ubc) ─────────────────────────────
         firls_out_iter: int = 5,
         firls_inner_iter: int = 4,
         firls_IF: float = float(np.sqrt(2.0)),
@@ -200,19 +196,16 @@ class FBDHSGP(DeconvolutionAlgorithm):
         self.history: Dict[str, list] = {"kernel_diff": []}
         self.hyperparams: Dict[str, Any] = {}
 
-    # =========================================================================
-    # Main entry point
-    # =========================================================================
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """Основной процесс деконволюции."""
         start_time = time.time()
 
-        # ── 1. Normalise to float64 ∈ [0, 1] ─────────────────────────────
+        # Нормализация в float64 [0, 1]
         y = np.asarray(image).astype(np.float64)
         if y.max() > 1.0:
             y = y / 255.0
 
-        # The framework guarantees a single grayscale image, but tolerate a
-        # trailing singleton channel (or a 3-channel input collapsed to grey).
+        # Перевод в градации серого, если на входе RGB
         if y.ndim == 3:
             if y.shape[2] == 1:
                 y = y[:, :, 0]
@@ -223,18 +216,18 @@ class FBDHSGP(DeconvolutionAlgorithm):
                     + 0.1140 * y[:, :, 2]
                 )
 
-        # ── 2. Gamma correction ──────────────────────────────────────────
+        # Гамма-коррекция (опционально)
         if self.gamma_correct != 1.0:
             y = np.power(y, self.gamma_correct)
 
-        # ── 3. Build pyramid + run multiscale BID → kernel ──────────────
+        # Построение пирамиды и многомасштабная оценка ядра
         kernel = self._multiscale_bid(y)
 
-        # ── 4. Final non-blind ℓ_p deconvolution ────────────────────────
+        # Финальная неслепая Lp деконволюция
         firls_opts = self._default_firls_opts()
         x_final = frils_deb_ubc(y, kernel, firls_opts)
 
-        # ── 5. Output ────────────────────────────────────────────────────
+        # Формирование результатов
         self.hyperparams = {
             "kernel_size": self.kernel_size,
             "sigma": self.sigma,
@@ -256,13 +249,11 @@ class FBDHSGP(DeconvolutionAlgorithm):
         x_final = np.clip(x_final, 0, 255).astype(np.int16)
         return x_final, kernel
 
-    # =========================================================================
-    # Multiscale BID (FBDHSGP.m main loop)
-    # =========================================================================
     def _multiscale_bid(self, y: np.ndarray) -> np.ndarray:
+        """Реализация многомасштабной слепой деконволюции от грубого к точному."""
         blur_size = self.kernel_size
 
-        # --- choose minimum kernel size at coarsest level (must be odd) ---
+        # Выбор минимального размера ядра на самом грубом уровне
         max_ks = max(self.kernel_size)
         ind1 = 0 if self.kernel_size[0] >= self.kernel_size[1] else 1
         ind2 = 1 - ind1
@@ -278,7 +269,7 @@ class FBDHSGP(DeconvolutionAlgorithm):
 
         resize_step = np.sqrt(2.0)
 
-        # --- enumerate scales -------------------------------------------
+        # Формирование списка масштабов
         ksize: List[List[int]] = []
         tmp = minsize[ind1]
         while tmp < max_ks:
@@ -298,7 +289,6 @@ class FBDHSGP(DeconvolutionAlgorithm):
         ksize.append([int(self.kernel_size[0]), int(self.kernel_size[1])])
         num_scales = len(ksize)
 
-        # --- per-scale state ---------------------------------------------
         ks: List[np.ndarray | None] = [None] * num_scales
         ls: List[np.ndarray | None] = [None] * num_scales
 
@@ -322,7 +312,7 @@ class FBDHSGP(DeconvolutionAlgorithm):
                 if s_sum > 0:
                     ks[s] = ks[s] / s_sum
 
-            # --- image size at this scale --------------------------------
+            # Вычисление размера изображения для текущего масштаба
             r = int(np.floor(y.shape[0] * k1 / blur_size[0]))
             c = int(np.floor(y.shape[1] * k2 / blur_size[1]))
             if s == num_scales - 1:
@@ -334,17 +324,17 @@ class FBDHSGP(DeconvolutionAlgorithm):
                 ls[s] = ys
             else:
                 ls[s] = imresize_bilinear(ls[s - 1], (r, c))
-                ls[s - 1] = None  # free memory
+                ls[s - 1] = None
 
-            # --- centre kernel ------------------------------------------
+            # Центрирование ядра в пространстве изображения
             ls[s], ks[s] = shift_kernel_img_space(ls[s], ks[s])
 
             hks1 = k1 // 2
             hks2 = k2 // 2
 
-            # --- prepare per-scale parameter dicts ----------------------
             xvars["x0"] = pad_replicate(ls[s], hks1, hks2)
-            # New scale ⇒ flush warm-state for variables whose shapes change
+            
+            # Сброс временных параметров при переходе на новый масштаб
             for key in ("RR", "cov_img", "dvx", "dvy", "ye", "X", "H"):
                 xvars.pop(key, None)
             for key in ("H", "dH"):
@@ -355,7 +345,7 @@ class FBDHSGP(DeconvolutionAlgorithm):
                 ksize[num_scales - 1][0] * ksize[num_scales - 1][1]
             )
 
-            # --- run single-scale BID -----------------------------------
+            # Выполнение слепой деконволюции для одного масштаба
             ls[s], ks[s] = ss_deb(ys, xvars, hvars)
 
         kernel = ks[num_scales - 1]
@@ -364,13 +354,9 @@ class FBDHSGP(DeconvolutionAlgorithm):
         if s_sum > 0:
             kernel = kernel / s_sum
 
-        # ── Python-specific safeguard: re-centre the *final* kernel ─────
-        # MATLAB calls ``shift_kernel_img_space`` only at the start of each
-        # scale, so any sub-pixel drift accumulated during the very last
-        # ``ss_deb`` is left as a global translation.  We use a
-        # **non-destructive** centroid-based integer roll here (no
-        # thresholding, no convolution) so that diffuse / curvy kernels
-        # (e.g. dendritic, defocus-ring) keep all of their mass.
+        # Финальное центрирование итогового ядра
+        # Гарантирует отсутствие глобального смещения (трансляции) изображения,
+        # сохраняя при этом все компоненты диффузных или сложных ядер.
         ks_h, ks_w = kernel.shape
         if kernel.sum() > 0:
             ys_idx, xs_idx = np.indices(kernel.shape)
@@ -381,7 +367,6 @@ class FBDHSGP(DeconvolutionAlgorithm):
             if shift_y != 0 or shift_x != 0:
                 kernel = np.roll(kernel, shift_y, axis=0)
                 kernel = np.roll(kernel, shift_x, axis=1)
-                # zero out wrapped border rows/cols to avoid wrap-around
                 if shift_y > 0:
                     kernel[:shift_y, :] = 0.0
                 elif shift_y < 0:
@@ -396,10 +381,8 @@ class FBDHSGP(DeconvolutionAlgorithm):
 
         return kernel
 
-    # =========================================================================
-    # Parameter initialisation (FBDHSGP.m::init_vars)
-    # =========================================================================
     def _init_vars(self) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """Инициализация словарей с параметрами для решателей."""
         prior = {
             "name": self.prior_name,
             "alpha": self.prior_alpha,
@@ -428,12 +411,10 @@ class FBDHSGP(DeconvolutionAlgorithm):
         return xvars, hvars
 
     def _default_firls_opts(self) -> Dict[str, float]:
-        """
-        Build the option dict for ``frils_deb_ubc`` from the wrapper's fields.
-
-        ``beta_a`` follows the formula used in ``test_real_fbdhsgp.m``::
-
-            beta_a = lambda * alpha * (20/255) ** (alpha - 2)
+        """Сборка параметров для финальной неслепой деконволюции.
+        
+        Вычисление параметра beta_a согласно рекомендациям оригинального алгоритма:
+        beta_a = lambda * alpha * (20/255) ** (alpha - 2)
         """
         firls = {
             "out_iter": self.firls_out_iter,
@@ -452,9 +433,6 @@ class FBDHSGP(DeconvolutionAlgorithm):
         )
         return firls
 
-    # =========================================================================
-    # Framework interface methods
-    # =========================================================================
     def get_param(self) -> List[Tuple[str, Any]]:
         return [
             ("kernel_size", self.kernel_size),

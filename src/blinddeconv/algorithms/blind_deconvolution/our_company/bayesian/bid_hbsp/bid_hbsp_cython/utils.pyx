@@ -1,21 +1,24 @@
 # cython: boundscheck=False, wraparound=False, cdivision=True, language_level=3
 """
-utils_cy.pyx — Cython-accelerated utility functions for BID-HBSP.
+utils_cy.pyx
 
-Provides fast typed-memoryview implementations of:
-    - forward_diff_x / forward_diff_y  (gradient operators)
-    - adjoint_diff_x / adjoint_diff_y  (adjoint gradient operators)
-    - compute_hs_weights               (image-space HS weights)
-    - compute_hs_weights_scalar        (filter-space HS weights)
+Ускоренные с помощью Cython вспомогательные функции для алгоритма BID-HBSP.
+
+Предоставляет быстрые реализации с использованием типизированных memoryview для:
+    - forward_diff_x / forward_diff_y (операторы градиентов)
+    - adjoint_diff_x / adjoint_diff_y (сопряженные операторы градиентов)
+    - compute_hs_weights (веса HS для пространства изображений)
+    - compute_hs_weights_scalar (веса HS для пространства фильтров)
     - project_kernel / threshold_kernel
-    - psf2otf, otf2psf, fft_convolve   (thin wrappers — FFT stays in NumPy)
+    - psf2otf, otf2psf, fft_convolve (легкие обертки - FFT остается в NumPy)
     - precompute_gradient_operators
     - init_gaussian_kernel
     - edgetaper
 
-All pixel-level loops use typed memoryviews and release the GIL.
-FFT calls delegate to numpy.fft (FFTPACK/MKL) — Cython can't beat
-LAPACK for large transforms, so we optimize the *surrounding* code.
+Все попиксельные циклы используют типизированные memoryview и освобождают GIL.
+Вызовы FFT делегируются в numpy.fft (FFTPACK/MKL), так как Cython не может 
+превзойти LAPACK для больших преобразований, поэтому мы оптимизируем 
+окружающий код.
 """
 
 import numpy as np
@@ -24,20 +27,16 @@ from libc.math cimport sqrt, tanh, exp, fabs, cos, floor, round as c_round
 
 np.import_array()
 
-# ═══════════════════════════════════════════════════════════════
-#  Constants
-# ═══════════════════════════════════════════════════════════════
+# --- Константы ---
 
 DEF EPSILON = 1e-12
 DEF M_PI = 3.14159265358979323846
 
 
-# ═══════════════════════════════════════════════════════════════
-#  Gradient operators — tight C loops
-# ═══════════════════════════════════════════════════════════════
+# --- Операторы градиента (быстрые циклы C) ---
 
 def forward_diff_x(double[:, :] u not None):
-    """Horizontal forward difference: out[i,j] = u[i, j+1] - u[i, j]."""
+    """Горизонтальная прямая разность: out[i,j] = u[i, j+1] - u[i, j]."""
     cdef Py_ssize_t H = u.shape[0]
     cdef Py_ssize_t W = u.shape[1]
     cdef Py_ssize_t i, j
@@ -47,12 +46,12 @@ def forward_diff_x(double[:, :] u not None):
         for i in range(H):
             for j in range(W - 1):
                 out[i, j] = u[i, j + 1] - u[i, j]
-            out[i, W - 1] = u[i, 0] - u[i, W - 1]  # periodic
+            out[i, W - 1] = u[i, 0] - u[i, W - 1]  # периодические границы
     return np.asarray(out)
 
 
 def forward_diff_y(double[:, :] u not None):
-    """Vertical forward difference: out[i,j] = u[i+1, j] - u[i, j]."""
+    """Вертикальная прямая разность: out[i,j] = u[i+1, j] - u[i, j]."""
     cdef Py_ssize_t H = u.shape[0]
     cdef Py_ssize_t W = u.shape[1]
     cdef Py_ssize_t i, j
@@ -63,12 +62,12 @@ def forward_diff_y(double[:, :] u not None):
             for j in range(W):
                 out[i, j] = u[i + 1, j] - u[i, j]
         for j in range(W):
-            out[H - 1, j] = u[0, j] - u[H - 1, j]  # periodic
+            out[H - 1, j] = u[0, j] - u[H - 1, j]  # периодические границы
     return np.asarray(out)
 
 
 def adjoint_diff_x(double[:, :] v not None):
-    """Adjoint of horizontal forward difference: out[i,j] = v[i, j-1] - v[i, j]."""
+    """Сопряженный оператор горизонтальной прямой разности: out[i,j] = v[i, j-1] - v[i, j]."""
     cdef Py_ssize_t H = v.shape[0]
     cdef Py_ssize_t W = v.shape[1]
     cdef Py_ssize_t i, j
@@ -76,14 +75,14 @@ def adjoint_diff_x(double[:, :] v not None):
 
     with nogil:
         for i in range(H):
-            out[i, 0] = v[i, W - 1] - v[i, 0]  # periodic
+            out[i, 0] = v[i, W - 1] - v[i, 0]  # периодические границы
             for j in range(1, W):
                 out[i, j] = v[i, j - 1] - v[i, j]
     return np.asarray(out)
 
 
 def adjoint_diff_y(double[:, :] v not None):
-    """Adjoint of vertical forward difference: out[i,j] = v[i-1, j] - v[i, j]."""
+    """Сопряженный оператор вертикальной прямой разности: out[i,j] = v[i-1, j] - v[i, j]."""
     cdef Py_ssize_t H = v.shape[0]
     cdef Py_ssize_t W = v.shape[1]
     cdef Py_ssize_t i, j
@@ -91,16 +90,14 @@ def adjoint_diff_y(double[:, :] v not None):
 
     with nogil:
         for j in range(W):
-            out[0, j] = v[H - 1, j] - v[0, j]  # periodic
+            out[0, j] = v[H - 1, j] - v[0, j]  # периодические границы
         for i in range(1, H):
             for j in range(W):
                 out[i, j] = v[i - 1, j] - v[i, j]
     return np.asarray(out)
 
 
-# ═══════════════════════════════════════════════════════════════
-#  HS weights — fused gradient + tanh in a single pass
-# ═══════════════════════════════════════════════════════════════
+# --- Веса HS (объединенный градиент + tanh за один проход) ---
 
 def compute_hs_weights(
     double[:, :] dx not None,
@@ -108,9 +105,9 @@ def compute_hs_weights(
     double[:, :] sigma_x not None,
     double b,
 ):
-    """Compute E[ω] for the HS prior (image-space formulation).
+    """Вычисляет E[w] для априорного распределения HS (формулировка в пространстве изображений).
 
-    Returns (gamma_x, gamma_y) — diagonal weight arrays.
+    Возвращает (gamma_x, gamma_y) - массивы диагональных весов.
     """
     cdef Py_ssize_t H = dx.shape[0]
     cdef Py_ssize_t W = dx.shape[1]
@@ -137,10 +134,10 @@ def compute_hs_weights_scalar(
     double[:, :] sigma_sq_n not None,
     double alpha_n,
 ):
-    """Compute HS weights for filter-space formulation.
+    """Вычисляет веса HS для формулировки в пространстве фильтров.
 
-    θ_n(i) = α_n · tanh(α_n · ξ_n(i)) / ξ_n(i),
-    where ξ_n(i) = sqrt(x_n²(i) + σ²_n(i) + ε).
+    theta_n(i) = alpha_n * tanh(alpha_n * ksi_n(i)) / ksi_n(i),
+    где ksi_n(i) = sqrt(x_n^2(i) + sigma_sq_n(i) + eps).
     """
     cdef Py_ssize_t H = x_n.shape[0]
     cdef Py_ssize_t W = x_n.shape[1]
@@ -158,12 +155,10 @@ def compute_hs_weights_scalar(
     return np.asarray(theta)
 
 
-# ═══════════════════════════════════════════════════════════════
-#  Kernel utilities
-# ═══════════════════════════════════════════════════════════════
+# --- Утилиты для ядра ---
 
 def project_kernel(double[:, :] h not None):
-    """Project kernel onto probability simplex h≥0, Σh=1."""
+    """Проецирует ядро на вероятностный симплекс h >= 0, sum(h) = 1."""
     cdef Py_ssize_t kh = h.shape[0]
     cdef Py_ssize_t kw = h.shape[1]
     cdef Py_ssize_t i, j
@@ -196,7 +191,7 @@ def project_kernel(double[:, :] h not None):
 
 
 def threshold_kernel(double[:, :] h not None, double ratio=0.05):
-    """Threshold small kernel values, then project onto simplex."""
+    """Обрезает малые значения ядра по порогу, затем проецирует на симплекс."""
     cdef Py_ssize_t kh = h.shape[0]
     cdef Py_ssize_t kw = h.shape[1]
     cdef Py_ssize_t i, j
@@ -219,15 +214,13 @@ def threshold_kernel(double[:, :] h not None, double ratio=0.05):
     return project_kernel(r)
 
 
-# ═══════════════════════════════════════════════════════════════
-#  FFT wrappers  (delegate to numpy — can't beat MKL/FFTPACK)
-# ═══════════════════════════════════════════════════════════════
+# --- Обертки FFT (делегируются numpy - не превзойти MKL/FFTPACK) ---
 
 from numpy.fft import fft2, ifft2
 
 
 def psf2otf(psf, shape):
-    """PSF → OTF via zero-padding + circshift + fft2."""
+    """Перевод PSF в OTF через заполнение нулями, циклический сдвиг и fft2."""
     cdef int kh = psf.shape[0]
     cdef int kw = psf.shape[1]
     padded = np.zeros(shape, dtype=np.float64)
@@ -238,7 +231,7 @@ def psf2otf(psf, shape):
 
 
 def otf2psf(otf, kernel_shape):
-    """OTF → PSF via ifft2 + circshift + crop."""
+    """Перевод OTF в PSF через ifft2, циклический сдвиг и обрезку."""
     cdef int kh = kernel_shape[0]
     cdef int kw = kernel_shape[1]
     psf_full = np.real(ifft2(otf))
@@ -248,7 +241,7 @@ def otf2psf(otf, kernel_shape):
 
 
 def precompute_gradient_operators(shape):
-    """DFT of first-order finite-difference operators."""
+    """DFT операторов первых конечных разностей."""
     cdef int H = shape[0]
     cdef int W = shape[1]
     dx = np.zeros((H, W), dtype=np.float64)
@@ -264,7 +257,7 @@ def precompute_gradient_operators(shape):
 
 
 def init_gaussian_kernel(shape, sigma=None):
-    """Gaussian kernel normalised to unit sum."""
+    """Гауссовское ядро, нормализованное на единичную сумму."""
     cdef int kh = shape[0]
     cdef int kw = shape[1]
     if sigma is None:
@@ -277,13 +270,13 @@ def init_gaussian_kernel(shape, sigma=None):
 
 
 def fft_convolve(x, h):
-    """Circular convolution h*x via FFT."""
+    """Круговая свертка h*x через FFT."""
     F_h = psf2otf(h, (x.shape[0], x.shape[1]))
     return np.real(ifft2(F_h * fft2(x)))
 
 
 def edgetaper(img, kernel, n_taper=None):
-    """Edge tapering for FFT boundary artefact suppression."""
+    """Сглаживание краев для подавления краевых артефактов FFT."""
     from scipy.signal import fftconvolve
 
     cdef int h_img = img.shape[0]

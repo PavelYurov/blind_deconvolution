@@ -1,35 +1,40 @@
 """
 htp.py
 
-Blind Image Deblurring Using Heavy-Tailed Priors (HTP).
+Слепая деконволюция изображений с использованием априорных распределений 
+с тяжелыми хвостами (Blind Image Deblurring Using Heavy-Tailed Priors - HTP).
 
-Reference:
-    J. Kotera, F. Sroubek, P. Milanfar:
+Содержит:
+    - HTP_BD: Основной класс алгоритма слепой деконволюции. Принимает изображение
+      и возвращает восстановленный результат вместе с оцененным ядром размытия.
+
+Содержание алгоритма:
+    1. Нормализация входного изображения в диапазон [0, 1] (тип float64).
+    2. Построение пирамиды изображений от грубого к точному масштабу для 
+       центральной области интереса (ROI).
+    3. Многомасштабная чередующаяся MAP-оценка для скрытого изображения u 
+       и функции рассеяния точки (ФРТ) h. Используется Lp-априорное 
+       распределение на градиенты изображения (p < 1) и L1-априорное 
+       распределение на ФРТ. Решается через полуквадратичное расщепление 
+       и итерации Брегмана в Фурье-области на каждом масштабе.
+    4. Финальная неслепая деконволюция полного изображения с усиленным 
+       согласованием данных и TV-подобной регуляризацией (Lp_nonblind = 1).
+
+Литература:
+[1] J. Kotera, F. Sroubek, P. Milanfar:
     "Blind Deconvolution Using Alternating Maximum a Posteriori
      Estimation with Heavy-tailed Priors", CAIP 2013.
-
-Pipeline (mirrors MATLAB demo.m / MCrestoration.m):
-    1. Normalise input to float64 [0, 1].
-    2. Build coarse-to-fine pyramid of the central ROI
-       (green channel for RGB, full image for grayscale).
-    3. Multi-scale alternating MAP for (u, h) with heavy-tailed Lp prior
-       on image gradients (p < 1) and L1 prior on the PSF, solved via
-       half-quadratic splitting + Bregman iterations in the FFT domain
-       (psf_estim_lno_rgrad at each scale).
-    4. Final non-blind deconvolution on the full image (fft_cg_sr_al)
-       with stronger data-term and TV-like prior (Lp_nonblind = 1).
-    5. Return restored image (int16, [0, 255]) and kernel.
 """
 
-import numpy as np
 import time
-from typing import Tuple, List, Any, Dict
-
-# ── Framework base class import (DO NOT MODIFY) ─────────────────────────────
 import sys
 from pathlib import Path
+from typing import Tuple, List, Any, Dict
+
+import numpy as np
 
 
+# --- Внутренний импорт базового класса алгоритма ---
 def _find_project_root(start: Path) -> Path:
     path = start.resolve()
     while not (path / "pyproject.toml").exists():
@@ -49,61 +54,80 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
         sys.path.insert(0, _path)
 
 from blinddeconv.algorithms.base import DeconvolutionAlgorithm
-# ─────────────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------
 
 from .solvers import mc_restoration
 
 
 class HTP_BD(DeconvolutionAlgorithm):
     """
-    Blind deconvolution with heavy-tailed priors (Kotera et al., CAIP 2013).
+    Алгоритм слепой деконволюции с использованием априорных распределений 
+    с тяжелыми хвостами [1].
 
-    Parameters
-    ----------
+    Параметры алгоритма
+    -------------------
     kernel_size : int
-        Spatial support of the unknown PSF (square, equals MATLAB hsize).
-        Default 31 (matching demo_levin.m).
+        Пространственный размер неизвестной функции рассеяния точки 
+        (квадратное ядро). По умолчанию 31.
     Lp : float
-        Lp-norm exponent for the gradient prior on the latent image
-        during PSF estimation, 0 < p <= 1.  Default 0.3 (heavy-tailed).
+        Экспонента Lp-нормы для априорного распределения на градиенты 
+        скрытого изображения во время оценки ФРТ (0 < p <= 1). 
+        По умолчанию 0.3 (тяжелые хвосты).
     gamma : float
-        Data-term weight during PSF estimation.  Should be tuned to the
-        noise level (10 dB → 1e1, 20 dB → 1e2, ...).  Default 1e2.
+        Вес члена согласования данных (data-term) при оценке ФРТ. 
+        Настраивается в зависимости от уровня шума (например, 10 дБ -> 1e1). 
+        По умолчанию 1e2.
     alpha_u : float
-        Image-prior weight relative scale (multiplied by gamma).
-        Default 1e-2.
+        Относительный вес априорного распределения изображения 
+        (умножается на gamma). По умолчанию 1e-2.
     beta_u : float
-        Coupling (split-Bregman) weight relative scale (× gamma).
-        Default 1e0.
+        Относительный вес штрафа расщепления Брегмана для изображения 
+        (умножается на gamma). По умолчанию 1e0.
     alpha_h : float
-        PSF L1-prior weight relative scale (× gamma).  Default 1e1.
+        Относительный вес L1-априорного распределения для ФРТ 
+        (умножается на gamma). По умолчанию 1e1.
     beta_h : float
-        PSF coupling weight relative scale (× gamma).  Default 1e4.
+        Относительный вес штрафа расщепления Брегмана для ФРТ 
+        (умножается на gamma). По умолчанию 1e4.
     centering_threshold : float
-        Threshold used in PSF centering between iterations.  Default
-        20/255.  <= 0 disables centering.
+        Порог, используемый при центрировании ФРТ между итерациями. 
+        По умолчанию 20/255. Значение <= 0 отключает центрирование.
     gamma_nonblind : float
-        Data-term weight for the final non-blind deconvolution
-        (relative to gamma).  Default 2e1.
+        Вес члена согласования данных для финальной неслепой деконволюции 
+        (относительно gamma). По умолчанию 2e1.
     beta_u_nonblind : float
-        Coupling weight for the final non-blind step (× gamma_nonblind).
-        Default 1e-2.
+        Вес штрафа расщепления для финального неслепого шага 
+        (умножается на gamma_nonblind). По умолчанию 1e-2.
     Lp_nonblind : float
-        Lp exponent for the final non-blind step.  Default 1.0 (TV-like).
+        Экспонента Lp для финального неслепого шага. 
+        По умолчанию 1.0 (TV-подобная регуляризация).
     maxiter : int
-        Outer alternating iterations per pyramid level.  Default 10.
+        Внешние чередующиеся итерации на каждом уровне пирамиды масштабов. 
+        По умолчанию 10.
     maxiter_u : int
-        Inner u-step iterations.  Default 10.
+        Внутренние итерации оценки скрытого изображения u. По умолчанию 10.
     maxiter_h : int
-        Inner h-step iterations.  Default 10.
+        Внутренние итерации оценки ФРТ h. По умолчанию 10.
     ccreltol : float
-        Relative-change stop criterion for inner loops.  Default 1e-3.
+        Относительный допуск остановки для внутренних циклов. По умолчанию 1e-3.
     MSlevels : int
-        Number of multiscale levels (>= 1).  Default 4.
-    maxROIsize : tuple of int
-        Central ROI used for kernel estimation.  Default (1024, 1024).
+        Количество масштабов пирамиды (>= 1). По умолчанию 4.
+    maxROIsize : tuple[int, int]
+        Центральная область интереса (ROI), используемая для оценки ядра. 
+        По умолчанию (1024, 1024).
     verbose : int
-        0 = silent, 1 = progress messages.  Default 0.
+        0 = без вывода сообщений, 1 = вывод промежуточных шагов. По умолчанию 0.
+    kernel_flip : str
+        Опция отражения/поворота финального ядра ('none', 'lr', 'ud', 'rot180').
+    auto_recenter : bool
+        Если True, применяется автоматическое центрирование итогового ядра.
+    recenter_mode : str
+        Режим центрирования: 'centroid' (центр масс по рамке), 'peak' (максимум) 
+        или 'masscentroid' (прямой центр масс). По умолчанию 'centroid'.
+    kernel_thresh : float
+        Порог жесткого отсечения для ядра. По умолчанию 0.0.
+    iterative_recenter : bool
+        Если True, центрирование ядра выполняется на каждой итерации.
     """
 
     def __init__(
@@ -152,14 +176,18 @@ class HTP_BD(DeconvolutionAlgorithm):
         self.MSlevels = int(MSlevels)
         self.maxROIsize = tuple(maxROIsize)
         self.verbose = int(verbose)
+
         if kernel_flip not in ('none', 'lr', 'ud', 'rot180'):
             raise ValueError(
-                f"kernel_flip must be one of 'none','lr','ud','rot180', got {kernel_flip!r}"
+                f"kernel_flip должно быть 'none', 'lr', 'ud' или 'rot180', "
+                f"получено {kernel_flip!r}"
             )
         self.kernel_flip = kernel_flip
+
         if recenter_mode not in ('centroid', 'peak', 'masscentroid'):
             raise ValueError(
-                f"recenter_mode must be 'centroid','peak' or 'masscentroid', got {recenter_mode!r}"
+                f"recenter_mode должно быть 'centroid', 'peak' или "
+                f"'masscentroid', получено {recenter_mode!r}"
             )
         self.auto_recenter = bool(auto_recenter)
         self.recenter_mode = recenter_mode
@@ -169,67 +197,48 @@ class HTP_BD(DeconvolutionAlgorithm):
         self.history: Dict[str, list] = {'kernel_diff': []}
         self.hyperparams: Dict[str, Any] = {}
 
-    # ── Build the PAR dict expected by solvers (mirrors parameters.m) ────
     def _build_par(self) -> Dict[str, Any]:
+        """
+        Формирование словаря параметров для решателей.
+        Веса априорных распределений масштабируются параметром gamma.
+        """
         gamma = self.gamma
         gamma_nb = self.gamma_nonblind * gamma
         return {
             'verbose': self.verbose,
             'gamma': gamma,
             'Lp': self.Lp,
-            # PSF prior (relative scales × gamma, exactly as in parameters.m)
             'beta_h': self.beta_h * gamma,
             'alpha_h': self.alpha_h * gamma,
             'centering_threshold': self.centering_threshold,
-            # Image prior (relative scales × gamma)
             'beta_u': self.beta_u * gamma,
             'alpha_u': self.alpha_u * gamma,
-            # Non-blind final step (× gamma_nonblind)
             'gamma_nonblind': gamma_nb,
             'beta_u_nonblind': self.beta_u_nonblind * gamma_nb,
             'Lp_nonblind': self.Lp_nonblind,
-            # Iteration limits
             'maxiter_u': self.maxiter_u,
             'maxiter_h': self.maxiter_h,
             'maxiter': self.maxiter,
             'ccreltol': self.ccreltol,
-            # Iterative-improvement knobs (HTP-internal, not in original MATLAB)
             'kernel_thresh': self.kernel_thresh,
             'iterative_recenter': self.iterative_recenter,
         }
 
-    # ── Auto-recentering helper ──────────────────────────────────────────
     def _recenter_kernel_and_image(
         self, H: np.ndarray, U: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Shift the kernel to put its centre at the window centre, and
-        shift the image by the OPPOSITE amount so g = h * u is preserved.
+        Пространственное центрирование ядра H с противоположным сдвигом 
+        изображения U для сохранения инвариантности свертки g = h * u.
 
-        Centring uses the **bounding box** of the thresholded kernel
-        (mirrors FBDHSGP's ``shift_kernel_img_space``):
-
-            shift = round((gap_far - gap_near + bonus) / 2)
-
-        BBox-based centring is much more robust than a naive centroid
-        for diffuse / heavy-tailed kernels (defocus rings, dendritic
-        traces, V-shapes), because the centroid is biased by the
-        negative-tail noise floor and by long thin tails.
-
-        The image counter-shift is realised by replicate-padding on the
-        far side and cropping on the near side — NOT by ``np.roll`` —
-        so no wrap-around.
-
-        Modes:
-          * 'centroid'      – bbox of H clipped at >=20% of max  [default]
-          * 'masscentroid'  – mass-centroid of |H| (legacy)
-          * 'peak'          – argmax(H)
+        Используется ограничивающая рамка (bounding box) порогового 
+        значения ядра для более робастного определения центра.
         """
         kh, kw = H.shape
         cy_int = kh // 2
         cx_int = kw // 2
 
-        # ---- determine target offset (sy, sx): how to move kernel ------
+        # --- Определение смещения ядра ---
         if self.recenter_mode == 'peak':
             iy, ix = np.unravel_index(int(np.argmax(H)), H.shape)
             sy, sx = int(cy_int - iy), int(cx_int - ix)
@@ -246,13 +255,12 @@ class HTP_BD(DeconvolutionAlgorithm):
             sy = int(round((kh - 1) / 2.0 - iy))
             sx = int(round((kw - 1) / 2.0 - ix))
 
-        else:  # 'centroid' — bbox-based (FBDHSGP style)
+        else:  # 'centroid' — на основе ограничивающей рамки
             Hp = np.maximum(H, 0.0)
             m = Hp.max()
             if m <= 0:
                 return H, U
-            # Threshold: keep pixels above max(0.03*max, small floor),
-            # exactly the same recipe FBDHSGP uses.
+            
             tao = 0.03
             thr = min(m * tao, 0.002)
             mask = Hp >= thr
@@ -268,7 +276,7 @@ class HTP_BD(DeconvolutionAlgorithm):
             gap_top = y_top
             gap_bot = (kh - 1) - y_bot
 
-            # Tie-breaker bonus toward the heavier edge column/row
+            # Поправка в сторону более "тяжелого" края
             s_l = Hp[:, x_left].sum()
             s_r = Hp[:, x_right].sum()
             bonus_x = 0.01 if (s_l >= s_r) else -0.01
@@ -282,7 +290,7 @@ class HTP_BD(DeconvolutionAlgorithm):
         if sy == 0 and sx == 0:
             return H, U
 
-        # ---- shift kernel with zero padding (no wrap) ------------------
+        # --- Сдвиг ядра (дополнение нулями) ---
         H_new = np.zeros_like(H)
         src_r0 = max(0, -sy); src_r1 = min(kh, kh - sy)
         src_c0 = max(0, -sx); src_c1 = min(kw, kw - sx)
@@ -294,10 +302,7 @@ class HTP_BD(DeconvolutionAlgorithm):
         if s_h > 0:
             H_new = H_new / s_h
 
-        # ---- counter-shift image: pad-edge on far side, crop on near ---
-        # If kernel moved by (sy, sx), image must move by (-sy, -sx).
-        # Use replicate-edge boundary so we don't introduce wrap-around
-        # or black borders.
+        # --- Обратный сдвиг изображения (дополнение краев) ---
         Mh, Mw = U.shape
         py0 = max(0, sy);  py1 = max(0, -sy)
         px0 = max(0, sx);  px1 = max(0, -sx)
@@ -306,17 +311,16 @@ class HTP_BD(DeconvolutionAlgorithm):
 
         return H_new, U_new
 
-
-    # ── Main entry point ─────────────────────────────────────────────────
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """Основной процесс слепой деконволюции."""
         start_time = time.time()
 
-        # ── 1. Normalise input to float64 [0, 1] ────────────────────────
+        # --- 1. Нормализация входных данных в [0, 1] ---
         y = np.asarray(image, dtype=np.float64)
         if y.max() > 1.0:
             y = y / 255.0
 
-        # ── 2. Build parameter dict and run the multiscale pipeline ─────
+        # --- 2. Формирование словаря параметров и запуск многомасштабной оценки ---
         PAR = self._build_par()
         hsize = (self.kernel_size, self.kernel_size)
 
@@ -329,18 +333,11 @@ class HTP_BD(DeconvolutionAlgorithm):
         )
         U = np.clip(U, 0.0, 1.0)
 
-        # ── 2b. Auto-recenter the kernel (translation-ambiguity fix) ────
-        # Blind deconvolution is translation-invariant: (h(x), u(x)) and
-        # (h(x-d), u(x+d)) explain the same observation g.  In practice
-        # the recovered kernel often drifts off-center (typically up).
-        # We compensate by computing the kernel's "centre" (centroid of
-        # the thresholded mass, robust to noise floor), shifting the
-        # kernel to put it at the window centre, and shifting the image
-        # by the OPPOSITE amount so that g = h * u remains invariant.
+        # --- 3. Автоматическое центрирование ядра (устранение неоднозначности сдвига) ---
         if self.auto_recenter:
             H, U = self._recenter_kernel_and_image(H, U)
 
-        # ── 3. Output ──────────────────────────────────────────────────
+        # --- 4. Формирование результатов ---
         self.hyperparams = {
             'kernel_size': self.kernel_size,
             'Lp': self.Lp,
@@ -371,9 +368,9 @@ class HTP_BD(DeconvolutionAlgorithm):
             H_out = H[::-1, ::-1].copy()
         else:
             H_out = H
+            
         return x_final, H_out
 
-    # ── Interface methods ────────────────────────────────────────────────
     def get_param(self) -> List[Tuple[str, Any]]:
         return [
             ('kernel_size', self.kernel_size),

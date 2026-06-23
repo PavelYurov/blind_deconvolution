@@ -1,17 +1,13 @@
 """
 solvers.py
 
-Core solver functions for the Bayesian Combination of Sparse and Non-Sparse
-Priors Super-Resolution (BCSNSP-SR) algorithm.
+Функции-решатели алгоритма сверхразрешения на основе байесовской комбинации 
+разреженных и неразреженных априорных распределений (BCSNSP-SR).
 
-Ported from MATLAB: create_data.m, LKvar.m, solvex_varL4SAR.m
-by S. Villena, M. Vega, D. Babacan, J. Mateos, R. Molina, A. K. Katsaggelos.
-
-Functions
----------
-create_data        – Simulate L low-resolution frames from a high-resolution image.
-lk_var             – Lucas-Kanade registration with Bayesian uncertainty.
-solvex_var_l4_sar  – Iterative SR with combined anisotropic-TV + SAR prior.
+Основные функции:
+    create_data       - Симуляция наблюдений низкого разрешения (LR) из HR изображения.
+    lk_var            - Регистрация Лукаса-Канаде с байесовской оценкой неопределенности.
+    solvex_var_l4_sar - Итеративная реконструкция сверхразрешения с комбинированной регуляризацией.
 """
 
 import numpy as np
@@ -25,33 +21,30 @@ from .utils import (
 )
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-#  create_data  (create_data.m)
-# ═════════════════════════════════════════════════════════════════════════════
-
+# --- Симуляция наблюдений ---
 def create_data(xtrue, h, M, N, res, L, sx_true, sy_true, theta_true, sigma):
     """
-    Simulate *L* low-resolution observations from a high-resolution image.
+    Симуляция L наблюдений низкого разрешения на основе изображения высокого разрешения.
 
-    Forward model per frame:  y_k = A · H · C_k · x  +  noise
-    Stacked:                  y   = W · x  +  noise
+    Прямая модель для каждого кадра: y_k = A * H * C_k * x + шум
+    Объединенная модель:             y   = W * x + шум
 
-    Parameters
+    Параметры
     ----------
-    xtrue      : (M, N) true HR image (float64).
-    h          : 2-D convolution kernel (PSF).
-    M, N       : HR dimensions.
-    res        : integer downsampling factor.
-    L          : number of LR frames.
-    sx_true    : (L,) sub-pixel x-translation per frame.
-    sy_true    : (L,) sub-pixel y-translation per frame.
-    theta_true : (L,) rotation per frame (radians).
-    sigma      : noise standard deviation.
+    xtrue      : Истинное HR изображение, форма (M, N).
+    h          : Ядро размытия 2D.
+    M, N       : Размеры HR изображения.
+    res        : Коэффициент субдискретизации (даунсэмплинга).
+    L          : Количество LR кадров.
+    sx_true    : Субпиксельные сдвиги по X для каждого кадра.
+    sy_true    : Субпиксельные сдвиги по Y для каждого кадра.
+    theta_true : Угол поворота для каждого кадра (в радианах).
+    sigma      : Стандартное отклонение аддитивного шума.
 
-    Returns
+    Возвращает
     -------
-    y : (L * m * n,) stacked observation vector.
-    W : (L * m * n,  M * N) sparse system matrix.
+    y : Объединенный вектор наблюдений, форма (L * m * n,).
+    W : Разреженная матрица системы, форма (L * m * n, M * N).
     """
     H = circconvmatx2(h, M, N)
     A = dwnsmpl_matrix(M, N, res)
@@ -70,23 +63,17 @@ def create_data(xtrue, h, M, N, res, L, sx_true, sy_true, theta_true, sigma):
     return y, W
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-#  Trace helper for diagonal covariance
-# ═════════════════════════════════════════════════════════════════════════════
-
+# --- Вспомогательные функции для ковариации ---
 def _trace_diag(Oi, Oj, sigma_diag):
-    """trace(Oi^T · Oj · diag(sigma_diag)) for sparse Oi, Oj."""
+    """Вычисление следа произведения матриц: trace(Oi^T * Oj * diag(sigma_diag))."""
     d = np.array(Oi.multiply(Oj).sum(axis=0)).ravel()
     return float(np.dot(d, sigma_diag))
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-#  Registration derivative matrices  (shared by lk_var and main loop)
-# ═════════════════════════════════════════════════════════════════════════════
-
+# --- Матрицы производных для регистрации ---
 def _build_registration_derivatives(theta_k, a, b, Lbl, Lbr, Ltl, Ltr,
                                     A, H, X_coord, Y_coord, nopix):
-    """Build O1, O2, O3 derivative operators for registration."""
+    """Формирование операторов производных O1, O2, O3 для алгоритма регистрации."""
     P1 = sp.diags(-X_coord * np.sin(theta_k) - Y_coord * np.cos(theta_k),
                    0, shape=(nopix, nopix))
     P2 = sp.diags(X_coord * np.cos(theta_k) - Y_coord * np.sin(theta_k),
@@ -104,41 +91,36 @@ def _build_registration_derivatives(theta_k, a, b, Lbl, Lbr, Ltl, Ltr,
     return O1, O2, O3
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-#  LKvar  (LKvar.m)
-# ═════════════════════════════════════════════════════════════════════════════
-
+# --- Оценка параметров регистрации ---
 def lk_var(x, yk, sigma_diag, A, H, Lambda_pk, betak,
            M, N, sx_k, sy_k, theta_k,
            sx_init, sy_init, theta_init,
            X_coord, Y_coord, method='variational',
            lk_maxit=20, lk_thr=1e-4):
     """
-    Lucas-Kanade registration update with Bayesian uncertainty.
+    Регистрация Лукаса-Канаде с байесовской оценкой неопределенности.
 
-    Equivalent to MATLAB ``LKvar.m``.
-
-    Parameters
+    Параметры
     ----------
-    x            : (M*N,) current HR image estimate.
-    yk           : (m*n,) LR observation for this frame.
-    sigma_diag   : (M*N,) diagonal of image covariance, or ``None``.
-    A, H         : sparse downsampling / blur matrices.
-    Lambda_pk    : (3, 3) prior registration covariance.
-    betak        : noise precision scalar.
-    M, N         : HR image dimensions.
-    sx_k, sy_k   : current shift estimates.
-    theta_k      : current rotation estimate.
-    sx_init, sy_init, theta_init : initial registration values.
-    X_coord, Y_coord : (M*N,) coordinate vectors.
-    method       : ``'variational'`` or ``'degenerate'``.
-    lk_maxit     : max iterations.
-    lk_thr       : convergence threshold.
+    x            : Текущая оценка HR изображения, вектор формы (M*N,).
+    yk           : Наблюдение LR для текущего кадра, форма (m*n,).
+    sigma_diag   : Диагональ ковариационной матрицы изображения.
+    A, H         : Матрицы субдискретизации и размытия.
+    Lambda_pk    : Априорная ковариация регистрации, форма (3, 3).
+    betak        : Точность (инвертированная дисперсия) шума.
+    M, N         : Размеры HR изображения.
+    sx_k, sy_k   : Текущие оценки сдвига.
+    theta_k      : Текущая оценка поворота.
+    sx_init, sy_init, theta_init : Инициализационные значения регистрации.
+    X_coord, Y_coord : Векторы координат.
+    method       : Метод оптимизации ('variational' или 'degenerate').
+    lk_maxit     : Максимальное количество итераций.
+    lk_thr       : Порог сходимости.
 
-    Returns
+    Возвращает
     -------
-    newsk   : (3,) updated [theta, sx, sy].
-    Lambdak : (3, 3) posterior covariance, or ``None``.
+    newsk   : Обновленные параметры [поворот, сдвиг X, сдвиг Y].
+    Lambdak : Апостериорная матрица ковариации.
     """
     nopix = M * N
 
@@ -178,7 +160,6 @@ def lk_var(x, yk, sigma_diag, A, H, Lambda_pk, betak,
             Lambdak = Lambdak_min.copy()
             break
 
-        # ── Derivative matrices ──
         O1, O2, O3 = _build_registration_derivatives(
             thetak, a, b, Lbl, Lbr, Ltl, Ltr,
             A, H, X_coord, Y_coord, nopix)
@@ -187,7 +168,7 @@ def lk_var(x, yk, sigma_diag, A, H, Lambda_pk, betak,
         O2x = O2 @ x
         O3x = O3 @ x
 
-        # ── Phi_k (data-fit Hessian for registration) ──
+        # Гессиан согласования данных
         Phik = np.array([
             [O1x @ O1x, O1x @ O2x, O1x @ O3x],
             [O1x @ O2x, O2x @ O2x, O2x @ O3x],
@@ -201,7 +182,7 @@ def lk_var(x, yk, sigma_diag, A, H, Lambda_pk, betak,
                betak * Phik @ sk +
                betak * np.array([err @ O1x, err @ O2x, err @ O3x]))
 
-        # ── Variational terms (image uncertainty) ──
+        # Оценка неопределенности изображения
         if method == 'variational' and sigma_diag is not None:
             Psik = np.array([
                 [_trace_diag(O1, O1, sigma_diag),
@@ -243,10 +224,7 @@ def lk_var(x, yk, sigma_diag, A, H, Lambda_pk, betak,
     return newsk, Lambdak
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-#  solvex_varL4SAR  (solvex_varL4SAR.m)
-# ═════════════════════════════════════════════════════════════════════════════
-
+# --- Основной решатель ---
 def solvex_var_l4_sar(y, *, M, N, m, n, res, L, h,
                       sx, sy, theta,
                       sx_init=None, sy_init=None, theta_init=None,
@@ -266,39 +244,26 @@ def solvex_var_l4_sar(y, *, M, N, m, n, res, L, h,
                       lk_thr=1e-4,
                       verbose=False):
     """
-    Iterative super-resolution with combined L1 (anisotropic TV) + SAR prior.
+    Итеративная реконструкция сверхразрешения с комбинированным априорным 
+    распределением L1 (анизотропный TV) и SAR.
 
-    Equivalent to MATLAB ``solvex_varL4SAR.m``.
-
-    Parameters
+    Параметры
     ----------
-    y              : (L*m*n,) stacked LR observations.
-    M, N           : HR image dimensions.
-    m, n           : LR image dimensions (m = M//res, n = N//res).
-    res            : downsampling factor.
-    L              : number of LR frames.
-    h              : PSF kernel.
-    sx, sy, theta  : (L,) registration estimates.
-    sx_init, sy_init, theta_init : (L,) initial registration values.
-    xtrue          : (M, N) or None — true image (for diagnostics only).
-    method         : ``'variational'`` or ``'degenerate'``.
-    lambda_prior   : trade-off between L1 (TV) and SAR prior in [0, 1].
-    maxit          : max outer iterations.
-    thr            : convergence threshold on relative image change.
-    pcg_thr        : PCG tolerance.
-    pcg_maxit      : PCG max iterations.
-    pcg_minit      : PCG minimum iterations.
-    estimate_registration : whether to update registration each iteration.
-    noise_estimate : ``'SEPARATE'`` (per-frame beta_k) or ``'JOINT'``.
-    approx_sigma   : use diagonal approximation for image covariance.
-    fixed_parameters : if True, hyperparameters are not updated.
-    lk_maxit, lk_thr : LK registration sub-iterations.
-    verbose        : print progress.
+    y              : Вектор наблюдений LR, форма (L*m*n,).
+    M, N           : Пространственные размеры HR изображения.
+    m, n           : Пространственные размеры LR изображения.
+    res            : Коэффициент масштабирования.
+    L              : Количество LR кадров.
+    h              : Ядро размытия.
+    sx, sy, theta  : Начальные оценки регистрации.
+    lambda_prior   : Параметр компромисса между L1 (TV) и SAR (диапазон [0, 1]).
+    maxit          : Максимальное количество внешних итераций.
+    thr            : Порог сходимости относительного изменения изображения.
 
-    Returns
+    Возвращает
     -------
-    x   : (M*N,) reconstructed HR image vector (normalised to [0, 1]).
-    out : dict with hyperparameters, convergence info, history.
+    x   : Вектор восстановленного HR изображения.
+    out : Словарь с гиперпараметрами и историей оптимизации.
     """
     sx = np.array(sx, dtype=np.float64).copy()
     sy = np.array(sy, dtype=np.float64).copy()
@@ -313,7 +278,7 @@ def solvex_var_l4_sar(y, *, M, N, m, n, res, L, h,
 
     nopix = M * N
 
-    # ── Build operators ──────────────────────────────────────────────────
+    # --- Формирование базовых операторов ---
     dx_kern, dy_kern = get_diff_kernels()
     Dx = circconvmatx2(dx_kern, M, N)
     Dy = circconvmatx2(dy_kern, M, N)
@@ -327,14 +292,14 @@ def solvex_var_l4_sar(y, *, M, N, m, n, res, L, h,
 
     X_coord, Y_coord = build_coord_grid(M, N)
 
-    # ── Initial W ────────────────────────────────────────────────────────
+    # --- Формирование начальной матрицы наблюдений W ---
     W_blocks = []
     for k in range(L):
         C, *_ = warp_matrix_bilinear(sx[k], sy[k], theta[k], M, N)
         W_blocks.append(A_mat @ H_mat @ C)
     W = sp.vstack(W_blocks, format='csr')
 
-    # ── Initialise x and hyperparams via SAR ────────────────────────────
+    # --- Инициализация оценки и гиперпараметров ---
     ys, yvecs = unwrap_lr(y, m, n, L)
 
     betak = np.zeros(L)
@@ -342,10 +307,9 @@ def solvex_var_l4_sar(y, *, M, N, m, n, res, L, h,
         _, _, beta_kk = restore_sar(ys[kk].astype(np.float64), h)
         betak[kk] = beta_kk
 
-    # Start with bicubic interpolation of first LR frame
+    # Интерполяция для стартовой оценки
     x = imresize(ys[0], res, order=3).ravel(order='F')
 
-    # ── Normalise y and x ────────────────────────────────────────────────
     y_max = np.max(np.abs(y))
     if y_max > 0:
         y = y / y_max
@@ -360,10 +324,8 @@ def solvex_var_l4_sar(y, *, M, N, m, n, res, L, h,
         if xt_max > 0:
             xtrue_vec = xtrue_vec / xt_max
 
-    # Re-unwrap after normalisation
     ys, yvecs = unwrap_lr(y, m, n, L)
 
-    # ── Initial hyperparameters ──────────────────────────────────────────
     u_h = (Dx @ x) ** 2 + np.finfo(float).eps
     u_v = (Dy @ x) ** 2 + np.finfo(float).eps
 
@@ -386,11 +348,9 @@ def solvex_var_l4_sar(y, *, M, N, m, n, res, L, h,
         e_sq = np.sum(e ** 2) + 1e-30
         betak[:] = len(y) / e_sq
 
-    # ── Registration covariances ─────────────────────────────────────────
     Lambdas = [np.zeros((3, 3)) for _ in range(L)]
     Lambdas_p = [np.zeros((3, 3)) for _ in range(L)]
 
-    # ── History ──────────────────────────────────────────────────────────
     history = {
         'PSNRs': [], 'MSEs': [], 'alpha_h': [], 'alpha_v': [],
         'alpha_sar': [], 'betak': [], 'xconv': [],
@@ -398,13 +358,11 @@ def solvex_var_l4_sar(y, *, M, N, m, n, res, L, h,
 
     sigma_diag = None
 
-    # ══════════════════════════════════════════════════════════════════════
-    #  Main iteration loop
-    # ══════════════════════════════════════════════════════════════════════
+    # --- Основной итеративный цикл ---
     for it in range(maxit):
         oldx = x.copy()
 
-        # ── 1. Build Sigma_inv and rhs ───────────────────────────────────
+        # Построение матрицы системы и правой части
         Sigma_inv = sp.csr_matrix((nopix, nopix))
         W_blocks = []
         rhs = np.zeros(nopix)
@@ -418,7 +376,6 @@ def solvex_var_l4_sar(y, *, M, N, m, n, res, L, h,
             rhs += betak[k] * (B.T @ yvecs[k])
             Sigma_inv = Sigma_inv + betak[k] * (B.T @ B)
 
-            # Variational registration uncertainty terms
             if method == 'variational':
                 O1, O2, O3 = _build_registration_derivatives(
                     theta[k], a, b, Lbl, Lbr, Ltl, Ltr,
@@ -440,22 +397,21 @@ def solvex_var_l4_sar(y, *, M, N, m, n, res, L, h,
 
         W = sp.vstack(W_blocks, format='csr')
 
-        # Prior regularisation
+        # Добавление регуляризации
         Sigma_inv = Sigma_inv + lambda_prior * (
             alpha_h * Dx.T @ T_h @ Dx + alpha_v * Dy.T @ T_v @ Dy
         ) + (1 - lambda_prior) * alpha_sar * CtC
 
-        # ── 2. PCG solve ─────────────────────────────────────────────────
+        # Решение системы методом сопряженных градиентов
         x, flag = pcg_solve(Sigma_inv, rhs, tol=pcg_thr,
                             max_iter=pcg_maxit, x0=x, min_iter=pcg_minit)
 
-        # ── 3. Approximate covariance ────────────────────────────────────
         if approx_sigma:
             diag_vals = Sigma_inv.diagonal().copy()
             diag_vals[diag_vals == 0] = 1e-30
             sigma_diag = 1.0 / diag_vals
 
-        # ── 4. Registration estimation ───────────────────────────────────
+        # Обновление параметров регистрации
         if estimate_registration:
             for k in range(1, L):
                 newsk, Lambdak = lk_var(
@@ -472,7 +428,7 @@ def solvex_var_l4_sar(y, *, M, N, m, n, res, L, h,
                 if Lambdak is not None:
                     Lambdas[k] = Lambdak
 
-        # ── 5. Hyperparameter updates ────────────────────────────────────
+        # Обновление гиперпараметров
         if not fixed_parameters:
             if method == 'variational' and sigma_diag is not None:
                 Sigma_mat = sigma_diag.reshape(M, N, order='F')
@@ -502,7 +458,6 @@ def solvex_var_l4_sar(y, *, M, N, m, n, res, L, h,
                 sar_denom += np.dot(sigma_diag, CtC.diagonal())
             alpha_sar = nopix / (sar_denom + 1e-30)
 
-            # Noise precision estimation
             e = y - W @ x
             if noise_estimate == 'SEPARATE':
                 _, es = unwrap_lr(e, m, n, L)
@@ -515,11 +470,9 @@ def solvex_var_l4_sar(y, *, M, N, m, n, res, L, h,
                                 sx[kk], sy[kk], theta[kk], M, N)
                         B_k = A_mat @ H_mat @ C_k
 
-                        # trace(B_k^T B_k Sigma)
                         traceBkS = _trace_diag(B_k, B_k, sigma_diag)
                         esk += traceBkS
 
-                        # Registration uncertainty contribution
                         O1, O2, O3 = _build_registration_derivatives(
                             theta[kk], a, b, Lbl, Lbr, Ltl, Ltr,
                             A_mat, H_mat, X_coord, Y_coord, nopix)
@@ -550,7 +503,7 @@ def solvex_var_l4_sar(y, *, M, N, m, n, res, L, h,
                 e_sq = np.sum(e ** 2) + 1e-30
                 betak[:] = len(y) / e_sq
 
-        # ── Convergence ──────────────────────────────────────────────────
+        # Проверка сходимости
         xconv = np.linalg.norm(x - oldx) / (np.linalg.norm(oldx) + 1e-30)
 
         if xtrue_vec is not None:
@@ -575,7 +528,7 @@ def solvex_var_l4_sar(y, *, M, N, m, n, res, L, h,
         if xconv < thr:
             break
 
-    # ── Output ───────────────────────────────────────────────────────────
+    # --- Формирование результатов ---
     out = {
         'betak': betak,
         'alpha_h': alpha_h,

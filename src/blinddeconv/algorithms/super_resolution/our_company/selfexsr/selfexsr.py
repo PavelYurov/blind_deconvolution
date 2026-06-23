@@ -1,22 +1,36 @@
 """
 selfexsr.py
 
-Framework wrapper for SelfExSR — Single Image Super-Resolution
-Using Transformed Self-Exemplars (Huang et al., CVPR 2015).
+Алгоритм сверхразрешения одиночного изображения с использованием 
+трансформированных самоподобных патчей (Self-Exemplars).
 
-Interface hack: accepts an image as if it were blurred, runs super-
-resolution, and returns the HR result + a dummy 3×3 zero kernel.
+Содержание алгоритма:
+    1. Инициализация параметров и построение пирамиды изображений.
+    2. Поиск патчей-кандидатов (PatchMatch) внутри пирамиды с учетом 
+       аффинных и перспективных искажений.
+    3. Реконструкция изображения высокого разрешения (HR) на основе 
+       взвешенного голосования найденных патчей.
+    4. Итеративная обратная проекция (back-projection) для уточнения 
+       результата и согласования с исходным изображением низкого разрешения.
+
+Интерфейсная обертка: принимает изображение, выполняет процедуру 
+сверхразрешения и возвращает HR-результат вместе с фиктивным (единичным) 
+ядром размытия, так как алгоритм не производит слепой оценки ФРТ.
+
+Литература:
+[1] J. Huang, A. Singh, and N. Ahuja, 
+    "Single Image Super-Resolution from Transformed Self-Exemplars", 
+    CVPR 2015.
 """
 
-import numpy as np
 import time
-from typing import Tuple, List, Any, Dict
-
-# ── Framework base class import ──────────────────────────────────────────────
 import sys
 from pathlib import Path
+from typing import Tuple, List, Any, Dict
 
+import numpy as np
 
+# --- Интеграция с базовым классом ---
 def _find_project_root(start: Path) -> Path:
     path = start.resolve()
     while not (path / "pyproject.toml").exists():
@@ -36,22 +50,32 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
         sys.path.insert(0, _path)
 
 from blinddeconv.algorithms.base import DeconvolutionAlgorithm
-# ─────────────────────────────────────────────────────────────────────────────
+# ------------------------------------
 
 from .solvers import sr_demo, sr_init_opt
 
 
 class SelfExSR(DeconvolutionAlgorithm):
     """
-    Single Image Super-Resolution Using Transformed Self-Exemplars.
+    Класс алгоритма сверхразрешения на основе самоподобных патчей (SelfExSR).
 
-    Parameters
-    ----------
-    SRF        : int — super-resolution factor (2, 3, 4, or 8). Default 2.
-    numIter    : int — PatchMatch iterations at first level. Default 15.
-    nIterBP    : int — back-projection iterations. Default 20.
-    usePlaneGuide : bool — use planar structure guidance. Default False.
-    useAffine  : bool — use affine PatchMatch. Default True.
+    Параметры алгоритма
+    -------------------
+    SRF : int
+        Коэффициент масштабирования (увеличения разрешения: 2, 3, 4 или 8). 
+        По умолчанию 2.
+    numIter : int
+        Количество итераций поиска PatchMatch на первом (самом грубом) уровне. 
+        По умолчанию 15.
+    nIterBP : int
+        Количество итераций обратной проекции (back-projection). 
+        По умолчанию 20.
+    usePlaneGuide : bool
+        Флаг использования направляющей планарной структуры (упрощенная модель). 
+        По умолчанию False.
+    useAffine : bool
+        Флаг использования аффинных трансформаций в поиске PatchMatch. 
+        По умолчанию True.
     """
 
     def __init__(
@@ -73,18 +97,18 @@ class SelfExSR(DeconvolutionAlgorithm):
         self.history: Dict[str, list] = {}
         self.hyperparams: Dict[str, Any] = {}
 
-    # ── Main entry point ─────────────────────────────────────────────────
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """Основной процесс выполнения сверхразрешения."""
         start_time = time.time()
 
-        # Build options
+        # Формирование параметров алгоритма
         opt = sr_init_opt(self.SRF)
         opt['numIter'] = self.numIter
         opt['nIterBP'] = self.nIterBP
         opt['usePlaneGuide'] = self.usePlaneGuide
         opt['useAffine'] = self.useAffine
 
-        # Run super-resolution
+        # Выполнение сверхразрешения
         img_hr = sr_demo(image, self.SRF, opt=opt)
 
         elapsed = time.time() - start_time
@@ -98,16 +122,15 @@ class SelfExSR(DeconvolutionAlgorithm):
             'time': elapsed,
         }
 
-        # Convert to int16 [0, 255]
+        # Приведение к формату вывода
         img_hr = np.clip(img_hr * 255.0, 0, 255).astype(np.int16)
 
-        # Dummy kernel (interface requirement)
+        # Фиктивное ядро (сохранение интерфейса)
         kernel = np.zeros((3, 3), dtype=np.float64)
         kernel[1, 1] = 1.0
 
         return img_hr, kernel
 
-    # ── Interface methods ────────────────────────────────────────────────
     def get_param(self) -> List[Tuple[str, Any]]:
         return [
             ('SRF', self.SRF),

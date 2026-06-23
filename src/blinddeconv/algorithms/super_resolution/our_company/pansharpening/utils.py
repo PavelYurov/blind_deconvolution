@@ -1,47 +1,27 @@
 """
 utils.py
 
-Utility functions for Variational Bayesian Pansharpening / Super-Resolution.
+Вспомогательные функции для алгоритма вариационного байесовского сверхразрешения (паншарпенинга).
 
-Ported from MATLAB code:
-    Pérez-Bueno, F., Vega, M., Mateos, J., Molina, R., & Katsaggelos, A. K. (2020).
-    Variational Bayesian Pansharpening with Super-Gaussian Sparse Image Priors.
-    Sensors, 20(18), 5308.
-
-    M. Vega, J. Mateos, R. Molina, and A. K. Katsaggelos, "Super resolution of
-    multispectral images using TV image models," in International Conference on
-    Knowledge-Based and Intelligent Information and Engineering Systems, 2008,
-    pp. 408-415.
-
-MATLAB -> Python porting notes:
-    - Indexing: MATLAB is 1-based, Python is 0-based.
-    - Array order: MATLAB is column-major (Fortran), NumPy default is row-major (C).
-      For the polyphase block-FFT representation, all 4D arrays use shape
-      [low_nr, low_nc, bkn2, bkn2] with standard C-order.
-    - reshape(v', N*M, 1) in MATLAB (transpose + col-major flatten) is equivalent
-      to v.flatten() in Python (row-major flatten).
-    - circshift(A, [r, c])  ->  np.roll(np.roll(A, r, axis=0), c, axis=1)
-    - fft2/ifft2/conj       ->  np.fft.fft2 / np.fft.ifft2 / np.conj
-
-Contains:
-    Block-FFT infrastructure for polyphase decimation/interpolation model:
+Содержит:
+    Инфраструктура полифазного преобразования:
         im_decomp, im_comp, blk_fft2, blk_ifft2, blk_fd_conv,
         blk_fd_trace, blk_fft2_DtD, blk_DtY
 
-    FFT-based operator representations:
+    Операторы в частотной области:
         cent_nucleus2fft, Tcent_nucleus2fft,
         cent_nucleus2blk_fft2, Tcent_nucleus2blk_fft2
 
-    Circular gradient operators:
+    Операторы кругового (периодического) градиента:
         circ_gradient2, Tcirc_gradient2
 
-    Multi-band vector <-> image conversions:
+    Преобразование многоканального изображения в вектор:
         convertToMBVec, convertToMBImg
 
-    Prior model functions:
+    Функции вычисления весов априорных распределений:
         compute_Wpvb, getfilters, getkappa, weight_log, weight_lp
 
-    Observation model helpers:
+    Утилиты модели наблюдений:
         calclam, image_normalize, image_denormalize, get_psf
 """
 
@@ -51,25 +31,13 @@ from numpy.fft import fft2, ifft2
 _EPS = np.finfo(np.float64).eps
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Polyphase decomposition / composition  (im_decomp.m / im_comp.m)
-# ═════════════════════════════════════════════════════════════════════════════
+# --- Полифазная декомпозиция и композиция ---
 
 def im_decomp(img, bknr, bknc):
-    """Polyphase decomposition of a 2-D image.
-
-    Splits an [nr, nc] image into [low_nr, low_nc, bknr*bknc, 1] polyphase
-    components by extracting every bknr-th row / bknc-th column.
-
-    Parameters
-    ----------
-    img  : (nr, nc) array
-    bknr : int — vertical block (decimation) factor
-    bknc : int — horizontal block (decimation) factor
-
-    Returns
-    -------
-    out : (low_nr, low_nc, bknr*bknc, 1) real array
+    """
+    Полифазная декомпозиция 2D изображения.
+    Разделяет изображение [nr, nc] на [low_nr, low_nc, bknr*bknc, 1] полифазных
+    компонент путем извлечения каждого bknr-го пикселя по строкам и bknc-го по столбцам.
     """
     nr, nc = img.shape[:2]
     low_nr = int(np.ceil(nr / bknr))
@@ -91,20 +59,9 @@ def im_decomp(img, bknr, bknc):
 
 
 def im_comp(blk, bknr, bknc):
-    """Inverse polyphase composition.
-
-    Reconstructs an [nr, nc] image from its [low_nr, low_nc, bkn2, 1]
-    polyphase representation.
-
-    Parameters
-    ----------
-    blk  : (low_nr, low_nc, bkn2, 1) array
-    bknr : int — vertical block factor
-    bknc : int — horizontal block factor
-
-    Returns
-    -------
-    out : (low_nr*bknr, low_nc*bknc) real array
+    """
+    Обратная полифазная композиция.
+    Восстанавливает изображение [nr, nc] из полифазного представления [low_nr, low_nc, bkn2, 1].
     """
     low_nr, low_nc = blk.shape[:2]
     nr = low_nr * bknr
@@ -118,21 +75,10 @@ def im_comp(blk, bknr, bknc):
     return out
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Block FFT / iFFT  (blk_fft2.m / blk_ifft2.m)
-# ═════════════════════════════════════════════════════════════════════════════
+# --- Блочное Быстрое Преобразование Фурье ---
 
 def blk_fft2(data):
-    """Block-wise 2-D FFT over the first two dimensions.
-
-    Parameters
-    ----------
-    data : (low_nr, low_nc, p, q) real or complex array
-
-    Returns
-    -------
-    out : (low_nr, low_nc, p, q) complex array
-    """
+    """Блочное двумерное БПФ по первым двум измерениям."""
     out = np.zeros_like(data, dtype=complex)
     for i in range(data.shape[2]):
         for j in range(data.shape[3]):
@@ -141,16 +87,7 @@ def blk_fft2(data):
 
 
 def blk_ifft2(data):
-    """Block-wise 2-D inverse FFT (returns real part).
-
-    Parameters
-    ----------
-    data : (low_nr, low_nc, p, q) complex array
-
-    Returns
-    -------
-    out : (low_nr, low_nc, p, q) real array
-    """
+    """Обратное блочное двумерное БПФ (с возвратом вещественной части)."""
     out = np.zeros(data.shape)
     for i in range(data.shape[2]):
         for j in range(data.shape[3]):
@@ -158,28 +95,19 @@ def blk_ifft2(data):
     return out
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Block Fourier-domain arithmetic  (blk_fd_conv.m / blk_fd_trace.m / etc.)
-# ═════════════════════════════════════════════════════════════════════════════
+# --- Арифметика блочных матриц в частотной области ---
 
 def blk_fd_conv(Op1, Op2):
-    """Block Fourier-domain matrix multiplication (convolution).
-
-    Performs element-wise "matrix multiply" over the block indices (axes 2,3)
-    while the spatial-frequency axes (0,1) are point-wise.
-
-    Op1 : (S1, S2, p, q)
-    Op2 : (S1, S2, q, r)
-    Out : (S1, S2, p, r)
     """
-    assert Op1.shape[3] == Op2.shape[2], (
-        f"Inner block dimensions must match: Op1[...,{Op1.shape[3]}] vs Op2[...,{Op2.shape[2]}]"
-    )
-    assert Op1.shape[:2] == Op2.shape[:2], "Spatial dimensions must match"
+    Блочное умножение матриц (свертка) в частотной области.
+    Выполняет поэлементное умножение по пространственно-частотным осям (0,1)
+    с матричным произведением по блочным осям (2,3).
+    """
+    assert Op1.shape[3] == Op2.shape[2], "Внутренние размерности блоков не совпадают"
+    assert Op1.shape[:2] == Op2.shape[:2], "Пространственные размерности не совпадают"
 
     dt = complex if (np.iscomplexobj(Op1) or np.iscomplexobj(Op2)) else float
-    out = np.zeros((Op2.shape[0], Op2.shape[1], Op1.shape[2], Op2.shape[3]),
-                   dtype=dt)
+    out = np.zeros((Op2.shape[0], Op2.shape[1], Op1.shape[2], Op2.shape[3]), dtype=dt)
     for i in range(out.shape[2]):
         for j in range(out.shape[3]):
             for k in range(Op1.shape[3]):
@@ -188,32 +116,21 @@ def blk_fd_conv(Op1, Op2):
 
 
 def blk_fd_trace(m):
-    """Scalar trace of a block Fourier-domain matrix.
-
-    m : (S1, S2, p, p) block matrix.
-    Returns real scalar  sum_{i,j} trace(m[i,j,:,:]).
+    """
+    Вычисление следа блочной матрицы в частотной области.
+    Возвращает вещественный скаляр sum_{i,j} trace(m[i,j,:,:]).
     """
     tr = 0.0 + 0.0j
     for i in range(m.shape[0]):
         for j in range(m.shape[1]):
             tr += np.trace(m[i, j, :, :])
-
-    if abs(np.imag(tr)) > 1e-3:
-        pass  # numerical noise in complex block-FFT ops; MATLAB takes real() implicitly
     return float(np.real(tr))
 
 
 def blk_fft2_DtD(nr, nc, bknr, bknc):
-    """D^T D operator in block-FFT representation.
-
-    D is the regular decimation-by-(bknr, bknc) operator.
-    D^T D selects only the (0,0) polyphase component.
-
-    Always called  with iy=1, ix=1 in MATLAB (=index 0 in Python).
-
-    Returns
-    -------
-    out : (low_nr, low_nc, bkn2, bkn2) real array
+    """
+    Оператор D^T D в блочном Фурье-представлении.
+    Выделяет полифазную компоненту с индексом (0,0).
     """
     low_nr = int(np.ceil(nr / bknr))
     low_nc = int(np.ceil(nc / bknc))
@@ -224,19 +141,9 @@ def blk_fft2_DtD(nr, nc, bknr, bknc):
 
 
 def blk_DtY(Y, bknr, bknc):
-    """D^T Y : up-sampling by zero-insertion.
-
-    Places the LR observation Y into the (0,0) polyphase slot.
-
-    Parameters
-    ----------
-    Y    : (low_nr, low_nc) 2-D observation
-    bknr : int — vertical decimation factor
-    bknc : int — horizontal decimation factor
-
-    Returns
-    -------
-    out : (low_nr, low_nc, bkn2, 1) real array
+    """
+    Оператор D^T Y: интерполяция путем вставки нулей.
+    Размещает LR-наблюдение Y в полифазную позицию (0,0).
     """
     low_nr, low_nc = Y.shape[:2]
     bkn2 = bknr * bknc
@@ -245,29 +152,16 @@ def blk_DtY(Y, bknr, bknc):
     return out
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# PSF <-> FFT conversions  (cent_nucleus2fft.m / Tcent_nucleus2fft.m)
-# ═════════════════════════════════════════════════════════════════════════════
+# --- Перевод ядер свертки в частотную область ---
 
 def cent_nucleus2fft(spkernel, nr, nc):
-    """Optical Transfer Function of a centered convolution kernel.
-
-    Places the kernel with its center at position (0, 0) of an (nr, nc)
-    array (with circular wrap-around for negative indices) and takes fft2.
-
-    Parameters
-    ----------
-    spkernel : 2-D array — spatial-domain convolution kernel
-    nr, nc   : int — target image dimensions
-
-    Returns
-    -------
-    H : (nr, nc) complex array — OTF
+    """
+    Преобразование центрированного ядра свертки в оптическую передаточную функцию (ОТФ).
+    Размещает центр ядра в координате (0, 0) с циклическим смещением.
     """
     spkernel = np.asarray(spkernel, dtype=np.float64)
     kh, kw = spkernel.shape
 
-    # Crop kernel if larger than image (rare edge case)
     if kh > nr or kw > nc:
         fac_orig = spkernel.sum()
         if kh > nr:
@@ -291,35 +185,21 @@ def cent_nucleus2fft(spkernel, nr, nc):
 
 
 def Tcent_nucleus2fft(spkernel, nr, nc):
-    """Adjoint (conjugate-transpose) OTF.
-
-    For a real kernel, the adjoint convolution corresponds to
-    convolution with the flipped kernel, whose OTF is conj(H).
+    """
+    Сопряженная (транспонированная) ОТФ ядра.
+    Для вещественных ядер эквивалентно ОТФ пространственно отраженного ядра.
     """
     return np.conj(cent_nucleus2fft(spkernel, nr, nc))
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Kernel -> block-FFT  (cent_nucleus2blk_fft2.m / Tcent_nucleus2blk_fft2.m)
-# ═════════════════════════════════════════════════════════════════════════════
-
 def cent_nucleus2blk_fft2(spkernel, nr, nc, bknr, bknc):
-    """Convolution kernel -> polyphase block-FFT representation.
-
-    Converts a spatial-domain kernel into the block circulant
-    representation used by the decimation observation model.
-
-    Returns
-    -------
-    H : (low_nr, low_nc, bkn2, bkn2) complex array
-    """
+    """Преобразование ядра свертки в полифазное блочно-циркулянтное Фурье-представление."""
     low_nr = int(np.ceil(nr / bknr))
     low_nc = int(np.ceil(nc / bknc))
     bkn2 = bknr * bknc
 
     H = np.zeros((low_nr, low_nc, bkn2, bkn2))
 
-    # Centered impulse response
     cent_nuc = np.real(ifft2(cent_nucleus2fft(spkernel, nr, nc)))
 
     col_idx = 0
@@ -329,18 +209,15 @@ def cent_nucleus2blk_fft2(spkernel, nr, nc, bknr, bknc):
             col = im_decomp(inter, bknr, bknc)
             H[:, :, :, col_idx] = col[:, :, :, 0]
             col_idx += 1
-            inter = np.roll(inter, 1, axis=1)      # circshift([0 1])
-        cent_nuc = np.roll(cent_nuc, 1, axis=0)     # circshift([1 0])
+            inter = np.roll(inter, 1, axis=1)      
+        cent_nuc = np.roll(cent_nuc, 1, axis=0)    
         inter = cent_nuc.copy()
 
     return blk_fft2(H)
 
 
 def Tcent_nucleus2blk_fft2(spkernel, nr, nc, bknr, bknc):
-    """Adjoint kernel -> polyphase block-FFT representation.
-
-    Like cent_nucleus2blk_fft2 but for H^T.
-    """
+    """Транспонированное (сопряженное) полифазное представление ядра."""
     low_nr = int(np.ceil(nr / bknr))
     low_nc = int(np.ceil(nc / bknc))
     bkn2 = bknr * bknc
@@ -363,17 +240,12 @@ def Tcent_nucleus2blk_fft2(spkernel, nr, nc, bknr, bknc):
     return blk_fft2(H)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Circular gradient operators  (circ_gradient2.m / Tcirc_gradient2.m)
-# ═════════════════════════════════════════════════════════════════════════════
+# --- Операторы кругового градиента ---
 
 def circ_gradient2(f):
-    """Circular (periodic) backward-difference gradient.
-
-    Returns
-    -------
-    dfh : (n, m) — horizontal differences  f[:,j] - f[:,j+1]  (wrap)
-    dfv : (n, m) — vertical differences    f[i,:] - f[i+1,:]  (wrap)
+    """
+    Круговой (периодический) градиент на основе обратных разностей.
+    Возвращает горизонтальные и вертикальные разности с учетом краев.
     """
     dfh = np.concatenate([f[:, :-1] - f[:, 1:],
                           (f[:, -1] - f[:, 0])[:, np.newaxis]], axis=1)
@@ -383,13 +255,7 @@ def circ_gradient2(f):
 
 
 def Tcirc_gradient2(f):
-    """Adjoint (transpose) of the circular gradient.
-
-    Returns
-    -------
-    dfhT : (n, m) — adjoint horizontal
-    dfvT : (n, m) — adjoint vertical
-    """
+    """Сопряженный (транспонированный) оператор кругового градиента."""
     dfhT = np.concatenate([(f[:, 0] - f[:, -1])[:, np.newaxis],
                            f[:, 1:] - f[:, :-1]], axis=1)
     dfvT = np.concatenate([(f[0, :] - f[-1, :])[np.newaxis, :],
@@ -397,15 +263,10 @@ def Tcirc_gradient2(f):
     return dfhT, dfvT
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Multi-band vector <-> image conversions  (convertToMBVec.m / convertToMBImg.m)
-# ═════════════════════════════════════════════════════════════════════════════
+# --- Трансформация массивов (векторизация) ---
 
 def convertToMBVec(x):
-    """Flatten [N, M, nb] multi-band image to a 1-D vector for PCG.
-
-    Band-by-band row-major flattening (matches MATLAB transpose + col-major).
-    """
+    """Преобразование многоканального изображения в одномерный вектор."""
     if x.ndim == 2:
         return x.flatten()
     N, M, nb = x.shape
@@ -414,10 +275,7 @@ def convertToMBVec(x):
 
 
 def convertToMBImg(x, Ng, Mg, nb):
-    """Reshape a flat vector back to [Ng, Mg, nb] multi-band image.
-
-    Inverse of convertToMBVec.
-    """
+    """Восстановление многоканального изображения из одномерного вектора."""
     pix = Ng * Mg
     y = np.zeros((Ng, Mg, nb))
     for i in range(nb):
@@ -425,57 +283,28 @@ def convertToMBImg(x, Ng, Mg, nb):
     return y
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Weight / Prior model functions
-# ═════════════════════════════════════════════════════════════════════════════
+# --- Функции весов априорных распределений ---
 
 def compute_Wpvb(u, p, epsW):
-    """Weights for the TV prior IRLS majorisation.
-
-    W = 2 / (p * (epsW + u^((p-1)/p)))
-
-    Used in TVME_Sens:  u = Dh(y)^2 + Dv(y)^2,  p = 2.
-    """
+    """Вычисление весов для TV-регуляризации при минимизации функции мажоранты (IRLS)."""
     exponent = (p - 1.0) / p
     return 2.0 / (p * (epsW + u ** exponent))
 
 
 def weight_log(u):
-    """Weight function kappa(u) for the Super-Gaussian *log* prior.
-
-    kappa(u) = 1 / (eps + (|u| + eps) * |u|)
-
-    See Table 1 in Pérez-Bueno 2020.
-    """
+    """Весовая функция kappa(u) для супергауссовского (log) априорного распределения."""
     val = _EPS + (np.abs(u) + _EPS) * np.abs(u)
     return 1.0 / val
 
 
 def weight_lp(u, p):
-    """Weight function kappa(u) for the Super-Gaussian *lp* prior.
-
-    kappa(u) = 1 / (eps + |u|^(2-p))
-
-    See Table 1 in Pérez-Bueno 2020.
-    """
+    """Весовая функция kappa(u) для супергауссовского (lp) априорного распределения."""
     val = _EPS + np.abs(u) ** (2 - p)
     return 1.0 / val
 
 
 def getfilters(filtersetname):
-    """Return a list of first-order difference kernels for the SG prior.
-
-    Parameters
-    ----------
-    filtersetname : str
-        'none' — identity (1 filter)
-        'fohv' — horizontal + vertical differences (2 filters)
-        'fo'   — H + V + 2 diagonals (4 filters)
-
-    Returns
-    -------
-    list of 2-D ndarrays
-    """
+    """Инициализация набора фильтров (конечных разностей) для SG-регуляризации."""
     sq2 = np.sqrt(2.0)
     if filtersetname == 'fohv':
         return [
@@ -489,60 +318,35 @@ def getfilters(filtersetname):
             np.array([[0, 0, 0], [0, 1, 0], [0, 0, -1]], dtype=float) / sq2,
             np.array([[0, 0, -1], [0, 1, 0], [0, 0, 0]], dtype=float) / sq2,
         ]
-    else:   # 'none' or unknown
+    else:   
         return [np.array([[1.0]])]
 
 
 def getkappa(sg_prior_name, parameter=None):
-    """Return (kappa_f, rho_f, alpha_f) triplet for a Super-Gaussian prior.
-
-    Parameters
-    ----------
-    sg_prior_name : str — 'log' or 'lp'
-    parameter     : float or None — required for 'lp' (the exponent p)
-
-    Returns
-    -------
-    [kappa_f, rho_f, alpha_f] — three callables
-    """
+    """Возвращает тройку функций-обработчиков (kappa_f, rho_f, alpha_f) для SG-регуляризации."""
     if sg_prior_name == 'log':
         kappa_f = weight_log
         rho_f = lambda nu: np.log(np.abs(nu) + _EPS)
         alpha_f = lambda val: 1.0 + 1.0 / val
     elif sg_prior_name == 'lp':
         if parameter is None:
-            raise ValueError("'lp' prior requires a parameter p")
+            raise ValueError("Для априорного распределения 'lp' требуется параметр p")
         p = parameter
         kappa_f = lambda u, _p=p: weight_lp(u, _p)
         rho_f = lambda nu, _p=p: np.abs(nu) ** _p
         alpha_f = lambda val, _p=p: 1.0 / (_EPS + _p * val)
     else:
-        raise ValueError(f"Unknown SG prior name: {sg_prior_name!r}")
+        raise ValueError(f"Неизвестный тип SG-распределения: {sg_prior_name}")
 
     return [kappa_f, rho_f, alpha_f]
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Observation model helpers
-# ═════════════════════════════════════════════════════════════════════════════
+# --- Модель наблюдений ---
 
 def calclam(hires, pan):
-    """Estimate lambda coefficients: pan ≈ sum_b lambda_b * hires_b.
-
-    Solves the least-squares system  M lambda = r  where:
-        M_ij = sum(hires_i .* hires_j)
-        r_i  = sum(hires_i .* pan)
-
-    For a single-band image returns [1.0].
-
-    Parameters
-    ----------
-    hires : (H, W, nbands) or (H, W) — MS image (same resolution as pan)
-    pan   : (H, W) — panchromatic image
-
-    Returns
-    -------
-    lamb : (nbands,) array — non-negative, normalized to sum=1
+    """
+    Оценка коэффициентов масштабирования (lambda) связи между HR и PAN изображениями 
+    с помощью метода наименьших квадратов.
     """
     if hires.ndim == 2:
         return np.array([1.0])
@@ -568,17 +372,7 @@ def calclam(hires, pan):
 
 
 def image_normalize(Y, x):
-    """Per-band mean normalisation of the MS and PAN images.
-
-    Parameters
-    ----------
-    Y : (lr_h, lr_w, nbands) or (lr_h, lr_w) — LR multi-spectral image
-    x : (hr_h, hr_w) — HR panchromatic image
-
-    Returns
-    -------
-    Y_norm, x_norm, facY, facx
-    """
+    """Поканальная нормализация среднего значения для мультиспектрального и PAN изображений."""
     Y = np.asarray(Y, dtype=np.float64).copy()
     x = np.asarray(x, dtype=np.float64).copy()
 
@@ -603,17 +397,7 @@ def image_normalize(Y, x):
 
 
 def image_denormalize(Y, facY):
-    """Reverse per-band mean normalisation (back to original pixel range).
-
-    Parameters
-    ----------
-    Y    : (h, w, nbands) or (h, w) — normalised image
-    facY : (nbands,) array — normalisation factors from image_normalize
-
-    Returns
-    -------
-    Y_out : image in original range
-    """
+    """Обратная поканальная нормализация среднего значения (возврат к исходному масштабу)."""
     Y = np.asarray(Y, dtype=np.float64).copy()
     Y[Y < _EPS] = 0.0
 
@@ -626,17 +410,9 @@ def image_denormalize(Y, facY):
 
 
 def get_psf(ratio, sensor='none'):
-    """Generate PSF kernel(s) for the degradation model.
-
-    Parameters
-    ----------
-    ratio  : int — decimation ratio (HR_size / LR_size)
-    sensor : str — sensor name: 'none', 'QB', 'IKONOS', 'GeoEye1', 'WV2'
-
-    Returns
-    -------
-    For sensor='none' : single (2*ratio-1, 2*ratio-1) box-filter array.
-    For known sensors : list of per-band Gaussian PSF arrays.
+    """
+    Генерация функции рассеяния точки (ФРТ) для заданного коэффициента масштабирования.
+    Принимает строку с названием сенсора ('QB', 'IKONOS', 'GeoEye1', 'WV2' или 'none').
     """
     known_sensors = {
         'QB':      [0.34, 0.32, 0.30, 0.22],
@@ -657,24 +433,12 @@ def get_psf(ratio, sensor='none'):
             psfs.append(H)
         return psfs
 
-    # Default: box (averaging) filter — no padding needed;
-    # cent_nucleus2blk_fft2 handles embedding into the block representation.
     psf = np.ones((ratio, ratio), dtype=np.float64) / (ratio * ratio)
     return psf
 
 
 def _fspecial_gaussian(size, sigma):
-    """Gaussian filter kernel (equivalent to MATLAB fspecial('gaussian')).
-
-    Parameters
-    ----------
-    size  : int — kernel width/height (square)
-    sigma : float — standard deviation
-
-    Returns
-    -------
-    h : (size, size) normalised Gaussian kernel
-    """
+    """Построение изотропного двумерного фильтра Гаусса."""
     x = np.arange(size, dtype=np.float64) - (size - 1) / 2.0
     g = np.exp(-x ** 2 / (2 * sigma ** 2))
     h = np.outer(g, g)

@@ -1,32 +1,36 @@
 """
 bcsnsp_sr.py
 
-Bayesian Combination of Sparse and Non-Sparse Priors Super-Resolution.
+Сверхразрешение на основе байесовской комбинации разреженных и неразреженных 
+априорных распределений (Bayesian Combination of Sparse and Non-Sparse Priors 
+Super-Resolution - BCSNSP-SR).
 
-References:
-    [1] S. D. Babacan, R. Molina, A. K. Katsaggelos,
-        "Bayesian Super Resolution Image Reconstruction using an l1 Prior",
-        ISPA 2009 / Chapter in Bayesian Inference, 2011.
-    [2] J. Salvador, S. Villena, R. Molina, A. K. Katsaggelos,
-        "Bayesian Combination of Sparse and Non-Sparse Priors in
-        Image Super Resolution", Digital Signal Processing, 2013.
+Содержание алгоритма:
+    1. Инициализация входного изображения (рассматривается как HR оригинал 
+       в режиме тестирования или как базовый кадр в режиме масштабирования).
+    2. Симуляция L наблюдений низкого разрешения (LR) через операторы сдвига 
+       и размытия.
+    3. Выполнение итеративной реконструкции сверхразрешения.
+    4. Возврат восстановленного изображения высокого разрешения (HR).
 
-Pipeline:
-    1. Take input image (treated as HR original).
-    2. Simulate L low-resolution observations via ``create_data``.
-    3. Run ``solvex_var_l4_sar`` to reconstruct.
-    4. Return (enhanced_int16, dummy 3×3 kernel).
+Литература:
+[1] S. D. Babacan, R. Molina, A. K. Katsaggelos,
+    "Bayesian Super Resolution Image Reconstruction using an l1 Prior",
+    ISPA 2009 / Chapter in Bayesian Inference, 2011.
+[2] J. Salvador, S. Villena, R. Molina, A. K. Katsaggelos,
+    "Bayesian Combination of Sparse and Non-Sparse Priors in
+    Image Super Resolution", Digital Signal Processing, 2013.
 """
 
-import numpy as np
 import time
-from typing import Tuple, List, Any, Dict
-
-# ── Framework base class import (DO NOT MODIFY) ─────────────────────────────
 import sys
 from pathlib import Path
+from typing import Tuple, List, Any, Dict
 
+import numpy as np
+from scipy.ndimage import shift as _ndshift
 
+# --- Интеграция с базовым классом ---
 def _find_project_root(start: Path) -> Path:
     path = start.resolve()
     while not (path / "pyproject.toml").exists():
@@ -46,52 +50,67 @@ for _path in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
         sys.path.insert(0, _path)
 
 from blinddeconv.algorithms.base import DeconvolutionAlgorithm
-# ─────────────────────────────────────────────────────────────────────────────
 
 from .solvers import create_data, solvex_var_l4_sar
 from .utils import fspecial_gaussian
 
-from scipy.ndimage import shift as _ndshift
-
 
 class BCSNSP_SR(DeconvolutionAlgorithm):
     """
-    Super-resolution via Bayesian Combination of Sparse and Non-Sparse Priors.
+    Алгоритм сверхразрешения на основе байесовской комбинации априорных распределений.
 
-    Modes
-    -----
-    ``'upscale'``  (default) — real upscaling.
-        Input : LR image  (m × n).
-        Output: HR image  (m*res × n*res).
-        Generates L pseudo-frames from the single input via sub-pixel shifts,
-        then reconstructs a larger HR image.
+    Режимы работы
+    -------------
+    'upscale' (по умолчанию) - Практическое масштабирование.
+        Вход: LR изображение (m × n).
+        Выход: HR изображение (m*res × n*res).
+        Генерирует L псевдокадров из одного входного изображения с помощью 
+        субпиксельных сдвигов, затем реконструирует HR изображение.
 
-    ``'benchmark'`` — simulation / self-test.
-        Input : HR image  (M × N).
-        Output: HR image  (M × N)  — same size.
-        Degrades the HR input into LR frames, then restores it.
+    'benchmark' - Режим симуляции и тестирования.
+        Вход: HR изображение (M × N).
+        Выход: HR изображение (M × N).
+        Искусственно ухудшает HR вход до LR кадров, затем восстанавливает.
 
-    Parameters
-    ----------
-    res           : int   — magnification factor.
-    L             : int   — number of (simulated) LR frames.
-    sigma         : float — assumed observation noise σ.
-    blur_size     : int   — PSF kernel size (odd).
-    blur_sigma    : float — PSF Gaussian σ.
-    lambda_prior  : float — trade-off L1-TV vs SAR, in [0, 1].
-    maxit         : int   — max SR iterations.
-    thr           : float — convergence threshold.
-    method        : str   — ``'variational'`` or ``'degenerate'``.
-    estimate_reg  : bool  — update registration per iteration.
-    max_shift     : float — max sub-pixel shift (in LR pixels for upscale,
-                            in HR pixels for benchmark).
-    max_theta     : float — max random rotation (rad) for benchmark mode.
-    pcg_thr       : float — PCG solver tolerance.
-    pcg_maxit     : int   — PCG max iterations.
-    pcg_minit     : int   — PCG min iterations.
-    mode          : str   — ``'upscale'`` or ``'benchmark'``.
-    verbose       : bool  — print iteration info.
-    seed          : int or None — random seed for reproducibility.
+    Параметры алгоритма
+    -------------------
+    res : int
+        Коэффициент масштабирования (увеличения).
+    L : int
+        Количество (симулируемых) кадров низкого разрешения.
+    sigma : float
+        Ожидаемое стандартное отклонение шума наблюдений.
+    blur_size : int
+        Пространственный размер ядра размытия (нечетное число).
+    blur_sigma : float
+        Стандартное отклонение гауссовского ядра размытия.
+    lambda_prior : float
+        Баланс между L1-TV и SAR априорными распределениями (диапазон [0, 1]).
+    maxit : int
+        Максимальное количество итераций реконструкции.
+    thr : float
+        Порог сходимости для остановки итераций.
+    method : str
+        Метод оптимизации: 'variational' или 'degenerate'.
+    estimate_reg : bool
+        Флаг обновления параметров регистрации на каждой итерации.
+    max_shift : float
+        Максимальный субпиксельный сдвиг (в пикселях LR для 'upscale', 
+        в пикселях HR для 'benchmark').
+    max_theta : float
+        Максимальный случайный угол поворота (в радианах) для режима 'benchmark'.
+    pcg_thr : float
+        Допуск для решателя метода сопряженных градиентов (PCG).
+    pcg_maxit : int
+        Максимальное количество итераций PCG.
+    pcg_minit : int
+        Минимальное количество итераций PCG.
+    mode : str
+        Режим работы: 'upscale' или 'benchmark'.
+    verbose : bool
+        Флаг вывода отладочной информации по итерациям.
+    seed : int или None
+        Начальное значение генератора случайных чисел для воспроизводимости.
     """
 
     def __init__(
@@ -139,14 +158,14 @@ class BCSNSP_SR(DeconvolutionAlgorithm):
         self.history: Dict[str, list] = {'kernel_diff': []}
         self.hyperparams: Dict[str, Any] = {}
 
-    # ── Main entry point ─────────────────────────────────────────────────
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """Основной процесс реконструкции сверхразрешения."""
         start_time = time.time()
 
         if self.seed is not None:
             np.random.seed(self.seed)
 
-        # ── 1. Normalise to float64 [0, 1] grayscale ────────────────────
+        # --- 1. Нормализация к float64 [0, 1] в градациях серого ---
         img = image.astype(np.float64)
         if img.ndim == 3:
             if img.shape[2] == 1:
@@ -159,12 +178,13 @@ class BCSNSP_SR(DeconvolutionAlgorithm):
 
         h = fspecial_gaussian(self.blur_size, self.blur_sigma)
 
+        # --- 2. Выполнение алгоритма в зависимости от режима ---
         if self.mode == 'benchmark':
             x_vec, out, M, N = self._process_benchmark(img, h)
         else:
             x_vec, out, M, N = self._process_upscale(img, h)
 
-        # ── Output ───────────────────────────────────────────────────────
+        # --- 3. Формирование результатов ---
         x_img = x_vec.reshape(M, N, order='F')
         x_img = np.clip(x_img, 0.0, 1.0)
 
@@ -189,34 +209,32 @@ class BCSNSP_SR(DeconvolutionAlgorithm):
         kernel = np.zeros((3, 3), dtype=np.float64)
         return x_final, kernel
 
-    # ── Upscale mode (real SR: input LR → output HR bigger) ─────────────
     def _process_upscale(self, img, h):
         """
-        Input: single LR image (m × n).
-        Creates L pseudo-frames via sub-pixel shifts.
-        Output: HR image vector of size (m*res × n*res).
+        Режим практического масштабирования.
+        Вход: Одно LR изображение (m × n).
+        Генерирует L псевдокадров через субпиксельные сдвиги.
+        Выход: Вектор HR изображения размером (m*res × n*res).
         """
         m, n = img.shape
         M = m * self.res
         N = n * self.res
 
-        # Generate L frames from single input via sub-pixel shifts
-        # Frame 0 = original, frames 1..L-1 = shifted copies
-        sx_lr = np.zeros(self.L)   # shifts in LR pixel space
+        # Генерация L кадров из одного входного через субпиксельные сдвиги
+        sx_lr = np.zeros(self.L)
         sy_lr = np.zeros(self.L)
 
         frames_vec = [img.ravel(order='F')]
         for k in range(1, self.L):
             sx_lr[k] = (np.random.rand() * 2 - 1) * self.max_shift
             sy_lr[k] = (np.random.rand() * 2 - 1) * self.max_shift
-            # scipy.ndimage.shift takes [row_shift, col_shift] = [dy, dx]
             shifted = _ndshift(img, [sy_lr[k], sx_lr[k]],
                                order=1, mode='reflect')
             frames_vec.append(shifted.ravel(order='F'))
 
         y = np.concatenate(frames_vec)
 
-        # Convert LR-pixel shifts to HR-pixel shifts for the solver
+        # Конвертация сдвигов из LR-пространства в HR-пространство
         sx_hr = sx_lr * self.res
         sy_hr = sy_lr * self.res
         theta_hr = np.zeros(self.L)
@@ -232,17 +250,17 @@ class BCSNSP_SR(DeconvolutionAlgorithm):
             pcg_thr=self.pcg_thr,
             pcg_maxit=self.pcg_maxit,
             pcg_minit=self.pcg_minit,
-            estimate_registration=False,  # shifts are known exactly
+            estimate_registration=False,  
             verbose=self.verbose,
         )
         return x_vec, out, M, N
 
-    # ── Benchmark mode (simulation: input HR → degrade → restore HR) ────
     def _process_benchmark(self, img, h):
         """
-        Input: HR image (M × N).
-        Degrades into L LR frames, then reconstructs.
-        Output: HR image vector (same M × N size).
+        Режим симуляции.
+        Вход: Истинное HR изображение (M × N).
+        Искусственно деградирует изображение до L LR кадров, затем реконструирует.
+        Выход: Вектор восстановленного HR изображения.
         """
         M_raw, N_raw = img.shape
         m = M_raw // self.res
@@ -288,7 +306,6 @@ class BCSNSP_SR(DeconvolutionAlgorithm):
         )
         return x_vec, out, M, N
 
-    # ── Interface methods ────────────────────────────────────────────────
     def get_param(self) -> List[Tuple[str, Any]]:
         return [
             ('res', self.res),

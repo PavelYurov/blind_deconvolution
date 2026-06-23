@@ -2,24 +2,25 @@
 """
 bid_hbsp.pyx
 
-Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior (BID-HBSP).
+Байесовская слепая деконволюция изображений с использованием априорного
+распределения гиперболического секанса (BID-HBSP).
+Расширенная версия с конвейером фильтрации шума.
 
-Implements the VB-EM algorithm from Castro-Macías et al. (2024) ICIP
-with two solver modes:
+Реализует алгоритм вариационного байесовского вывода (VB-EM), описанный
+в статье Castro-Macias et al. (2024) ICIP. Поддерживает два режима решателя:
 
-    **filter_space** (default, paper formulation):
-        Decompose into N=2 independent filtered-image problems
-        (Eq. 17–18 of Castro-Macías et al. 2024).
+    'filter_space' (по умолчанию, формулировка из статьи):
+        Декомпозиция на N=2 независимых задач в пространстве отфильтрованных 
+        изображений (Уравнения 17-18 из Castro-Macias et al. 2024).
 
-    **image_space** (alternative):
-        Estimate x as a single image via CG with D^T Γ D prior, then
-        compute gradients for kernel estimation.  Babacan et al. (2009)
-        style; kept for comparison.
-
-References
-[1] Castro-Macías, Pérez-Bueno, et al. (2024), ICIP 2024.
-[2] Babacan, Molina, Katsaggelos (2009), IEEE TIP 18(1).
-[4] Datta, Ghosh & Polson (2024), arXiv:2406.17058v3.
+    'image_space' (альтернативный режим):
+        Оценка x как единого изображения методом сопряженных градиентов (CG) 
+        с априорной матрицей D^T * Gamma * D, затем вычисление градиентов 
+        для оценки ядра.
+        
+Литература:
+[1] Francisco M. Castro-Macias, Fernando Perez-Bueno, et al., "Bayesian Blind 
+    Image Deconvolution using a Hyperbolic-Secant prior", ICIP 2024.
 """
 
 import numpy as np
@@ -72,7 +73,7 @@ for _p in [str(_SRC_DIR), str(_ALGORITHMS_DIR)]:
 from blinddeconv.algorithms.base import DeconvolutionAlgorithm
 
 
-# --- PYRAMID HELPERS ---
+# --- Вспомогательные функции пирамиды масштабов ---
 
 def _init_kernel(kh, kw):
     k = np.zeros((kh, kw), dtype=np.float64)
@@ -136,10 +137,136 @@ def adjust_psf_center(psf: np.ndarray) -> np.ndarray:
                                      order=1, mode='constant', cval=0.0)
     return result.reshape(rows, cols)
 
-# --- END HELPERS ---
+
+# --- Основной алгоритм ---
 
 class BID_HBSP(DeconvolutionAlgorithm):
-    """Bayesian Blind Image Deconvolution with Hyperbolic-Secant Prior."""
+    """
+    Байесовская слепая деконволюция с априорным распределением гиперболического секанса.
+
+    Основные параметры алгоритма
+    -------------------------
+    kernel_shape : (kh, kw)
+        Пространственный размер неизвестной ФРТ (оба числа нечетные).
+    hs_scale : float
+        Масштабный параметр b распределения гиперболического секанса. alpha = 1/b.
+        Меньшее значение b -> более сильная разреженность градиентов.
+        В статье (Levin): alpha_1 ~ 251, alpha_2 ~ 141 -> b ~ 0.004-0.007.
+        В статье (реальные фото): alpha = 100 -> b = 0.01. По умолчанию 0.01.
+    noise_sigma : float
+        Начальное стандартное отклонение шума. Точность beta_0 = 1/sigma^2.
+        В статье (реальные фото): beta = 4e4 -> sigma ~ 0.005. По умолчанию 0.005.
+    max_iter : int
+        Максимальное количество итераций VB-EM на каждом масштабе. По умолчанию 40.
+    cg_iter : int
+        Максимальное количество итераций CG внутри каждого шага VB. По умолчанию 50.
+    cg_tol : float
+        Допуск сходимости CG. По умолчанию 1e-6.
+    irw_iter : int
+        Количество итераций IRLS для финальной неслепой деконволюции. По умолчанию 5.
+
+    Опции архитектуры
+    --------------------
+    kernel_init : 'gaussian' | 'delta' | 'asymmetric'
+        Инициализация ядра. 'asymmetric' нарушает симметрию (рекомендуется).
+    solver_mode : 'filter_space' | 'image_space'
+        Режим решателя (по умолчанию 'filter_space').
+    kernel_solver : 'fourier' | 'qp'
+        Метод оценки ядра. 'qp' - квадратичное программирование (рекомендуется).
+    boundary_mode : 'none' | 'edgetaper' | 'edgetaper_iter' | 'padding'
+        Обработка границ. 'padding' дополняет края перед CG (рекомендуется).
+    jacobi_mode : 'scalar' | 'perpixel'
+        Аппроксимация дисперсии для диагонали (H^T * H).
+    center_kernel : bool
+        Центрировать ядро по центру масс после каждого масштаба (предотвращает дрейф).
+
+    Оценка ядра
+    -----------------
+    lambda_h_init : float
+        Начальный вес L2 регуляризации для ядра. По умолчанию 100.0.
+    lambda_h_min : float
+        Минимальное значение для отжига lambda_h. По умолчанию 1.0.
+    lambda_h_decay : float
+        Мультипликативный коэффициент спада за итерацию. По умолчанию 0.92.
+    kernel_threshold : bool
+        Обнулять малые значения ядра на самом детальном масштабе. По умолчанию True.
+
+    Точность шума
+    ---------------
+    beta_update : bool
+        Обновлять beta по невязке на каждой итерации. По умолчанию False.
+    beta_n_factor : float
+        Делитель для точности шума в пространстве фильтров: beta_n = beta / factor.
+
+    Параметры конвейера шумоподавления (по умолчанию все отключены)
+    ---------------------------------------------------
+    impulse_preprocess : str
+        'auto' - обнаружение и удаление импульсного шума до слепой деконволюции.
+        'none' - пропустить. По умолчанию 'none'.
+    impulse_params : dict или None
+        Параметры обнаружения и удаления импульсного шума.
+    noise_estimation : str
+        Метод оценки дисперсии шума sigma: 'chen', 'pca' или 'none'.
+        Если оценка успешна и auto_beta=True, beta_0 перезаписывается.
+    auto_beta : bool
+        Если True, заменяет noise_sigma на оцененное значение. По умолчанию False.
+    screenot_preprocess : str
+        'auto' - SVD-шумоподавление ScreeNOT до слепого шага. 'none' - пропустить.
+        ВЗАИМОИСКЛЮЧАЕТСЯ с act_preprocess.
+    screenot_params : dict или None
+        Параметры для шумоподавления ScreeNOT.
+    act_preprocess : str
+        'auto' - Адаптивная пороговая обработка курвелетов (ACT) до слепого шага.
+        ВЗАИМОИСКЛЮЧАЕТСЯ с screenot_preprocess.
+    act_params : dict или None
+        Параметры для ACT шумоподавления.
+    preprocess : str
+        Пространственный шумоподавитель ДО слепого цикла (после спектрального).
+        Варианты: 'tv', 'nlm', 'bilateral', 'guided', 'bm3d', 'act', 'none'.
+    preprocess_params : dict или None
+        Параметры пространственного шумоподавителя.
+    noise_preprocess : str
+        Спектральный фильтр шума на базе PSD: 'auto', 'notch', 'bandstop' или 'none'.
+    noise_preprocess_params : dict или None
+        Параметры фильтра PSD.
+    histogram_eq : str
+        Эквализация гистограммы ДО слепого цикла для улучшения контраста.
+        'clahe' (рекомендуется), 'global' или 'none'.
+        ВАЖНО: эквализация применяется только для оценки ядра.
+    histogram_eq_params : dict или None
+        Параметры эквализации.
+    blind_denoise : str
+        Шумоподавитель, применяемый к x внутри слепого цикла на каждой итерации.
+    blind_denoise_params : dict или None
+        Параметры шумоподавителя внутри слепого цикла.
+    pre_nonblind : str
+        Шумоподавитель, применяемый к изображению ДО неслепого шага.
+    pre_nonblind_params : dict или None
+        Параметры шумоподавителя перед неслепым шагом.
+
+    Неслепое восстановление
+    ---------------------
+    final_deconv : str
+        Метод неслепой деконволюции: 'irls' (по умолчанию), 'adaptive_lp', 
+        'wiener', 'tikhonov', 'ringing', 'firls'.
+    nb_params : dict или None
+        Параметры для выбранного метода неслепого восстановления.
+
+    Общие настройки
+    -------
+    auto_mode : str
+        'off' (по умолчанию) - использовать настройки пользователя "как есть".
+        'robust' - Мягкий оркестратор в стиле алгоритма LIP.
+    auto_mode_params : dict или None
+        Настройки оркестратора (пороги sigma, коэффициенты и т.д.).
+    verbose : bool
+        Вывод прогресса в консоль. По умолчанию False.
+
+    Логирование / Коллбеки
+    -----------------
+    Поддерживает функцию обратного вызова (через set_callback), которая
+    вызывается после каждой итерации VB-EM.
+    """
 
     def __init__(
         self,
@@ -150,22 +277,22 @@ class BID_HBSP(DeconvolutionAlgorithm):
         cg_iter: int = 50,
         cg_tol: float = 1e-6,
         irw_iter: int = 5,
-        # Architecture options
+        # Опции архитектуры
         kernel_init: str = "asymmetric",
         solver_mode: str = "filter_space",
         kernel_solver: str = "qp",
         boundary_mode: str = "padding",
         jacobi_mode: str = "scalar",
         center_kernel: bool = True,
-        # Kernel estimation
+        # Оценка ядра
         lambda_h_init: float = 100.0,
         lambda_h_min: float = 1.0,
         lambda_h_decay: float = 0.92,
         kernel_threshold: bool = True,
-        # Noise
+        # Шум
         beta_update: bool = False,
         beta_n_factor: float = 2.0,
-        # ── Noise pipeline (all disabled by default) ────────────────────
+        # --- Конвейер шума (по умолчанию отключен) ---
         impulse_preprocess: str = 'none',
         impulse_params: dict = None,
         noise_estimation: str = 'none',
@@ -184,13 +311,13 @@ class BID_HBSP(DeconvolutionAlgorithm):
         blind_denoise_params: dict = None,
         pre_nonblind: str = 'none',
         pre_nonblind_params: dict = None,
-        # ── Non-blind restoration ───────────────────────────────────────
+        # --- Неслепое восстановление ---
         final_deconv: str = 'irls',
         nb_params: dict = None,
-        # ── Robust orchestrator (LIP-style) ────────────────────────────────
+        # --- Надежный оркестратор ---
         auto_mode: str = 'off',
         auto_mode_params: dict = None,
-        # General
+        # Общие параметры
         verbose: bool = False,
     ):
         super().__init__(name="BID-HBSP")
@@ -217,7 +344,6 @@ class BID_HBSP(DeconvolutionAlgorithm):
         self.beta_update = beta_update
         self.beta_n_factor = beta_n_factor
 
-        # Noise pipeline
         self.impulse_preprocess = impulse_preprocess
         self.impulse_params = impulse_params
         self.noise_estimation = noise_estimation
@@ -237,19 +363,13 @@ class BID_HBSP(DeconvolutionAlgorithm):
         self.pre_nonblind = pre_nonblind
         self.pre_nonblind_params = pre_nonblind_params
 
-        # Non-blind
         self.final_deconv = final_deconv.lower()
         self.nb_params = nb_params
 
-        # Robust orchestrator (LIP-style scheme)
         self.auto_mode = (auto_mode or 'off').lower()
         self.auto_mode_params = auto_mode_params
 
-        # Snapshot of mutable fields from __init__.  The orchestrator
-        # resets to this at the start of every process() call so
-        # repeated runs are deterministic.  HBSP-specific extras
-        # (screenot/act/noise_preprocess/histogram_eq) are NOT managed
-        # by the orchestrator — they remain whatever the user set.
+        # Сохранение исходных изменяемых параметров для работы оркестратора
         self._defaults_snapshot = {
             'preprocess': preprocess,
             'preprocess_params': preprocess_params,
@@ -271,15 +391,15 @@ class BID_HBSP(DeconvolutionAlgorithm):
         self.hyperparams: Dict[str, Any] = {}
 
     def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        """Run the full BID-HBSP pipeline."""
+        """Запуск полного цикла восстановления BID-HBSP."""
         start_time = time.time()
 
-        # ── 1. Normalise ───────────────────────────────────────
+        # --- 1. Нормализация ---
         y_full = image.astype(np.float64)
         if y_full.max() > 1.0:
             y_full /= 255.0
 
-        # ── 2. Grayscale ──────────────────────────────────────
+        # --- 2. Преобразование в градации серого ---
         if y_full.ndim == 3 and y_full.shape[2] == 3:
             y_full = (0.2989 * y_full[:, :, 0]
                       + 0.5870 * y_full[:, :, 1]
@@ -287,7 +407,7 @@ class BID_HBSP(DeconvolutionAlgorithm):
         elif y_full.ndim == 3 and y_full.shape[2] == 1:
             y_full = y_full[:, :, 0]
 
-        # ── 3a. Impulse noise detection & removal ──────────────
+        # --- 3a. Обнаружение и удаление импульсного шума ---
         impulse_info = None
         if self.impulse_preprocess == 'auto':
             from blinddeconv.algorithms.mod_cython._build_pyd.impulse_noise_estimation import (
@@ -301,49 +421,48 @@ class BID_HBSP(DeconvolutionAlgorithm):
             )
             if impulse_info['has_impulse']:
                 if self.verbose:
-                    print(f"[{self.name}] Impulse noise detected "
-                          f"(density={impulse_info['density']:.4f}), "
-                          f"applying adaptive median filter")
+                    print(f"[{self.name}] Обнаружен импульсный шум "
+                          f"(плотность={impulse_info['density']:.4f}), "
+                          f"применяется адаптивный медианный фильтр")
                 y_full = adaptive_median_filter(
                     y_full, impulse_info['impulse_mask'],
                     max_window=ip.get('max_window', 7))
 
-        # ── 3b. Noise σ estimation ─────────────────────────────
+        # --- 3b. Оценка дисперсии шума sigma ---
         noise_info = None
         if self.noise_estimation != 'none':
             noise_info = self._estimate_noise(y_full)
             if self.verbose and noise_info is not None:
                 sigma = noise_info.get('sigma_norm', 0)
-                print(f"[{self.name}] Noise estimation "
+                print(f"[{self.name}] Оценка шума "
                       f"({self.noise_estimation}): "
-                      f"σ={sigma:.5f} (σ_255={sigma * 255:.2f})")
+                      f"sigma={sigma:.5f} (sigma_255={sigma * 255:.2f})")
             if (self.auto_beta and noise_info is not None
                     and noise_info.get('sigma_norm', 0) > 0):
                 self.noise_sigma = noise_info['sigma_norm']
                 if self.verbose:
                     print(f"[{self.name}] auto_beta: noise_sigma "
-                          f"overridden → {self.noise_sigma:.5f}")
+                          f"перезаписана -> {self.noise_sigma:.5f}")
         elif self.auto_mode == 'robust':
-            # Orchestrator needs σ — auto-promote to PCA estimator.
             self.noise_estimation = 'pca'
             noise_info = self._estimate_noise(y_full)
             if self.verbose and noise_info is not None:
                 sigma = noise_info.get('sigma_norm', 0)
-                print(f"[{self.name}] auto_mode='robust' → PCA noise "
-                      f"est.: σ={sigma:.5f} (σ_255={sigma * 255:.2f})")
+                print(f"[{self.name}] auto_mode='robust' -> оценка PCA: "
+                      f"sigma={sigma:.5f} (sigma_255={sigma * 255:.2f})")
 
-        # ── 3b'. Robust orchestrator ───────────────────────────
+        # --- 3b'. Надежный оркестратор ---
         orchestrator_info = None
         if self.auto_mode == 'robust':
             orchestrator_info = self._orchestrate_robust(noise_info)
 
-        # ── 3c. ScreeNOT SVD denoising ─────────────────────────
+        # --- 3c. SVD шумоподавление ScreeNOT ---
         screenot_info = None
         if self.screenot_preprocess == 'auto':
             if self.act_preprocess == 'auto':
                 raise ValueError(
-                    "screenot_preprocess and act_preprocess cannot both "
-                    "be 'auto'. Choose one.")
+                    "screenot_preprocess и act_preprocess не могут быть "
+                    "установлены в 'auto' одновременно. Выберите один.")
             from blinddeconv.algorithms.mod_cython._build_pyd.screenot import screenot_denoise
             sp = self.screenot_params or {}
             y_full, screenot_info = screenot_denoise(
@@ -355,10 +474,10 @@ class BID_HBSP(DeconvolutionAlgorithm):
                 stride=sp.get('stride', 3),
             )
             if self.verbose:
-                print(f"[{self.name}] ScreeNOT applied "
-                      f"(rank={screenot_info.get('rank', '?')})")
+                print(f"[{self.name}] Применен ScreeNOT "
+                      f"(ранг={screenot_info.get('rank', '?')})")
 
-        # ── 3d. ACT curvelet denoising ─────────────────────────
+        # --- 3d. Курвелетное шумоподавление ACT ---
         act_info = None
         if self.act_preprocess == 'auto':
             from blinddeconv.algorithms.mod_cython._build_pyd.act_denoise import act_denoise
@@ -372,32 +491,32 @@ class BID_HBSP(DeconvolutionAlgorithm):
                 threshold_setting=ap.get('threshold_setting', 's'),
             )
             if self.verbose:
-                print(f"[{self.name}] ACT curvelet denoising applied")
+                print(f"[{self.name}] Применено курвелетное шумоподавление ACT")
 
-        # ── 3e. Spatial pre-blind denoise ──────────────────────
+        # --- 3e. Пространственное шумоподавление до слепого цикла ---
         if self.preprocess not in (None, 'none'):
             y_full = self._apply_denoise(
                 y_full, self.preprocess, self.preprocess_params, noise_info)
             if self.verbose:
-                print(f"[{self.name}] Pre-blind denoise: {self.preprocess}")
+                print(f"[{self.name}] Шумоподавитель до слепого цикла: {self.preprocess}")
 
-        # ── 3f. PSD-based noise preprocessing ──────────────────
+        # --- 3f. Фильтрация шума на основе PSD ---
         psd_info = None
         if self.noise_preprocess != 'none':
             y_full, psd_info = self._apply_noise_preprocess(y_full)
             if self.verbose:
-                print(f"[{self.name}] PSD noise preprocess: "
+                print(f"[{self.name}] PSD препроцессинг шума: "
                       f"{self.noise_preprocess}")
 
-        # ── 3g. Histogram equalization ─────────────────────────
+        # --- 3g. Выравнивание гистограмм ---
         y_for_restore = y_full.copy()
         if self.histogram_eq not in (None, 'none'):
             y_full = self._apply_histogram_eq(y_full)
             if self.verbose:
-                print(f"[{self.name}] Histogram equalization: "
+                print(f"[{self.name}] Выравнивание гистограмм: "
                       f"{self.histogram_eq}")
 
-        # ── 4. Coarse-to-fine blind kernel estimation ──────────
+        # --- 4. Иерархическая слепая оценка ядра ---
         kh_full, kw_full = self.kernel_shape
         b = self.hs_scale
         alpha = 1.0 / b
@@ -418,37 +537,34 @@ class BID_HBSP(DeconvolutionAlgorithm):
         self._beta_init = beta
 
         if self.verbose:
-            print(f"[{self.name}] {num_scales} scales, "
-                  f"β={beta:.1f}, α={alpha:.3f}, "
-                  f"mode={self.solver_mode}, "
-                  f"kernel_solver={self.kernel_solver}, "
-                  f"boundary={self.boundary_mode}")
+            print(f"[{self.name}] {num_scales} масштабов, "
+                  f"beta={beta:.1f}, alpha={alpha:.3f}, "
+                  f"режим={self.solver_mode}, "
+                  f"оценка ядра={self.kernel_solver}, "
+                  f"границы={self.boundary_mode}")
 
         n_iter = 0
         for s in range(num_scales - 1, -1, -1):
             kh, kw = int(k1list[s]), int(k2list[s])
             cret = retv[s]
 
-            # Kernel init / upscale
             if s == num_scales - 1:
                 if self.kernel_init == 'asymmetric':
                     h = _init_kernel(kh, kw)
                 elif self.kernel_init == 'delta':
                     h = np.zeros((kh, kw), dtype=np.float64)
                     h[kh // 2, kw // 2] = 1.0
-                else:  # 'gaussian'
+                else:
                     h = init_gaussian_kernel((kh, kw))
             else:
                 h = _resizeKer(h, 1.0 / ret, kh, kw)
 
-            # Image at this scale
             if s == 0:
                 y_level = y_full.copy()
             else:
                 y_level = ndimage.zoom(y_full, cret, order=1)
             H_img, W_img = y_level.shape
 
-            # Boundary handling (once per scale)
             if self.boundary_mode == 'edgetaper':
                 y_work = edgetaper(y_level, h)
             else:
@@ -457,10 +573,9 @@ class BID_HBSP(DeconvolutionAlgorithm):
             lambda_h = self.lambda_h_init
 
             if self.verbose:
-                print(f"\n  Scale {num_scales - s}/{num_scales}  "
-                      f"img {H_img}×{W_img}  kernel {kh}×{kw}")
+                print(f"\n  Масштаб {num_scales - s}/{num_scales}  "
+                      f"изображение {H_img}x{W_img}  ядро {kh}x{kw}")
 
-            # ── Dispatch to solver mode ────────────────────────
             if self.solver_mode == 'filter_space':
                 h, beta, n_iter = self._run_filter_space(
                     y_work, y_level, h, beta, alpha,
@@ -472,29 +587,28 @@ class BID_HBSP(DeconvolutionAlgorithm):
                     (kh, kw), lambda_h, s, num_scales,
                     noise_info)
 
-            # Centre kernel after each scale to prevent drift
             if self.center_kernel:
                 h = adjust_psf_center(h)
                 h[h < 0] = 0.0
                 if h.sum() > 0:
                     h /= h.sum()
 
-        # ── 5. Pre-nonblind denoising ──────────────────────────
+        # --- 5. Шумоподавление перед неслепым шагом ---
         y_nb = y_for_restore
         if self.pre_nonblind not in (None, 'none'):
             y_nb = self._apply_denoise(
                 y_nb, self.pre_nonblind, self.pre_nonblind_params,
                 noise_info)
             if self.verbose:
-                print(f"[{self.name}] Pre-nonblind denoise: "
+                print(f"[{self.name}] Шумоподавитель перед неслепым шагом: "
                       f"{self.pre_nonblind}")
 
-        # ── 6. Non-blind restoration ───────────────────────────
+        # --- 6. Неслепое восстановление ---
         lambda_final = beta * 0.0005
         if self.final_deconv == 'irls':
             if self.verbose:
-                print(f"\n[{self.name}] Non-blind IRLS "
-                      f"(p=0.8, λ={lambda_final:.6f})")
+                print(f"\n[{self.name}] Неслепая деконволюция IRLS "
+                      f"(p=0.8, lambda={lambda_final:.6f})")
             x_final = final_deconvolution(y_nb, h, beta, lambda_final)
         elif self.final_deconv == 'adaptive_lp':
             from .non_blind import adaptive_lp_deconv
@@ -522,9 +636,9 @@ class BID_HBSP(DeconvolutionAlgorithm):
                 weight_ring=nbp.get('weight_ring', 0.5),
             )
             if self.verbose:
-                print(f"[{self.name}] Non-blind: ringing_artifacts_removal "
-                      f"(λ_tv={nbp.get('lambda_tv', 4e-3)}, "
-                      f"λ_l0={nbp.get('lambda_l0', 2e-3)}, "
+                print(f"[{self.name}] Неслепая деконволюция: ringing_artifacts_removal "
+                      f"(lambda_tv={nbp.get('lambda_tv', 4e-3)}, "
+                      f"lambda_l0={nbp.get('lambda_l0', 2e-3)}, "
                       f"w_ring={nbp.get('weight_ring', 0.5)})")
         elif self.final_deconv == 'firls':
             from .non_blind import firls_deconv
@@ -542,20 +656,20 @@ class BID_HBSP(DeconvolutionAlgorithm):
                 beta_if=nbp.get('beta_if', None),
             )
             if self.verbose:
-                print(f"[{self.name}] Non-blind: FIRLS-UBC "
-                      f"(λ={nbp.get('lam', 2e-4)}, "
-                      f"α={nbp.get('alpha', 2.0/3.0):.4f}, "
+                print(f"[{self.name}] Неслепая деконволюция: FIRLS-UBC "
+                      f"(lambda={nbp.get('lam', 2e-4)}, "
+                      f"alpha={nbp.get('alpha', 2.0/3.0):.4f}, "
                       f"out={nbp.get('out_iter', 5)}, "
                       f"inner={nbp.get('inner_iter', 4)})")
         else:
             raise ValueError(
-                f"Unknown final_deconv '{self.final_deconv}'. "
-                "Choose 'irls', 'adaptive_lp', 'wiener', 'tikhonov', "
-                "'ringing', or 'firls'.")
+                f"Неизвестный метод final_deconv '{self.final_deconv}'. "
+                "Выберите 'irls', 'adaptive_lp', 'wiener', 'tikhonov', "
+                "'ringing', или 'firls'.")
 
         x_final = np.clip(x_final, 0.0, 1.0)
 
-        # ── 7. Diagnostics ─────────────────────────────────────
+        # --- 7. Диагностика ---
         self.timer = time.time() - start_time
         self.hyperparams = {
             "hs_scale": b,
@@ -567,7 +681,6 @@ class BID_HBSP(DeconvolutionAlgorithm):
             "iterations": n_iter,
             "time_seconds": self.timer,
             "final_deconv": self.final_deconv,
-            # Noise pipeline info
             "impulse_preprocess": self.impulse_preprocess,
             "impulse_info": ({k_: v for k_, v in impulse_info.items()
                              if k_ != 'impulse_mask'}
@@ -592,9 +705,7 @@ class BID_HBSP(DeconvolutionAlgorithm):
         x_out = np.clip(np.round(x_final * 255.0), 0, 255).astype(np.int16)
         return x_out, h
 
-    # ───────────────────────────────────────────────────────────
-    #  IMAGE-SPACE solver
-    # ───────────────────────────────────────────────────────────
+    # --- Решатель в пространстве изображения ---
     def _run_image_space(self, y_work, y_level, h, beta, b,
                          kernel_shape, lambda_h, s, num_scales,
                          noise_info=None):
@@ -708,19 +819,17 @@ class BID_HBSP(DeconvolutionAlgorithm):
                 })
 
             if self.verbose:
-                print(f"    it {it+1:3d}  ΔH={diff:.2e}  "
-                      f"β={beta:.1f}  λ_h={lambda_h:.2f}")
+                print(f"    итерация {it+1:3d}  dH={diff:.2e}  "
+                      f"beta={beta:.1f}  lambda_h={lambda_h:.2f}")
 
             if diff < 1e-5 and it > 5:
                 if self.verbose:
-                    print(f"    converged at iteration {n_iter}")
+                    print(f"    сходимость достигнута на итерации {n_iter}")
                 break
 
         return h, beta, n_iter
 
-    # ───────────────────────────────────────────────────────────
-    #  FILTER-SPACE solver  (paper formulation, Sec. IV)
-    # ───────────────────────────────────────────────────────────
+    # --- Решатель в пространстве фильтров ---
     def _run_filter_space(self, y_work, y_level, h, beta, alpha,
                           kernel_shape, lambda_h, s, num_scales,
                           noise_info=None):
@@ -861,35 +970,27 @@ class BID_HBSP(DeconvolutionAlgorithm):
                 })
 
             if self.verbose:
-                print(f"    it {it+1:3d}  ΔH={diff:.2e}  "
-                      f"β={beta:.1f}  λ_h={lambda_h:.2f}")
+                print(f"    итерация {it+1:3d}  dH={diff:.2e}  "
+                      f"beta={beta:.1f}  lambda_h={lambda_h:.2f}")
 
             if diff < 1e-5 and it > 5:
                 if self.verbose:
-                    print(f"    converged at iteration {n_iter}")
+                    print(f"    сходимость достигнута на итерации {n_iter}")
                 break
 
         return h, beta, n_iter
 
-    # ═══════════════════════════════════════════════════════════
-    #  Private helpers: noise pipeline
-    # ═══════════════════════════════════════════════════════════
+    # --- Приватные вспомогательные методы для конвейера шума ---
 
-    # ── Robust orchestrator (LIP-style) ───────────────────────
     def _orchestrate_robust(self, noise_info):
-        """Soft-weighted auto configuration of the noise pipeline.
+        """Мягкая автоматическая настройка конвейера фильтрации шума.
 
-        Mirrors ``LIP_BD._orchestrate_robust``.  HBSP-core (β / α /
-        λ_h / cg / max_iter) and HBSP-specific aux denoisers
-        (screenot/act/noise_preprocess/histogram_eq/impulse) are NEVER
-        modified.  Only ``preprocess`` / ``blind_denoise`` /
-        ``pre_nonblind`` and the shared NB weights
-        (``lambda_tv`` / ``lambda_l0`` / ``weight_ring``) are touched.
+        Дублирует поведение алгоритма LIP_BD.
+        Ядро HBSP и специфичные для него фильтры остаются как задано.
         """
         snap = self._defaults_snapshot
         amp = dict(self.auto_mode_params or {})
 
-        # 1) Reset from snapshot — avoid sticky state between calls.
         self.preprocess = snap['preprocess']
         self.preprocess_params = snap['preprocess_params']
         self.blind_denoise = snap['blind_denoise']
@@ -899,7 +1000,6 @@ class BID_HBSP(DeconvolutionAlgorithm):
         self.final_deconv = snap['final_deconv']
         self.nb_params = snap['nb_params']
 
-        # 2) Read σ; missing/zero ⇒ treat as clean.
         sigma = 0.0
         if noise_info is not None:
             sigma = float(noise_info.get('sigma_norm', 0.0) or 0.0)
@@ -913,15 +1013,12 @@ class BID_HBSP(DeconvolutionAlgorithm):
         if nt in ('poisson', 'poisson_gaussian') and sigma >= force_heavy_sigma:
             force_heavy = True
 
-        # 3) Clean branch — DO NOT alter denoisers or parameters.
         if sigma <= sigma_clean and not force_heavy:
-            # Resolve final_deconv='auto' for the clean regime: FIRLS
-            # (mild Tikhonov-like, preserves detail when noise is low).
             if snap['final_deconv'] == 'auto':
                 self.final_deconv = 'firls'
             if self.verbose:
-                print(f"[{self.name}] orchestrator(σ={sigma:.5f}, clean): "
-                      f"defaults kept, final_deconv={self.final_deconv}")
+                print(f"[{self.name}] оркестратор (sigma={sigma:.5f}, чистое): "
+                      f"исходные настройки сохранены, final_deconv={self.final_deconv}")
             return {
                 'sigma_norm': sigma, 'w': 0.0, 'regime': 'clean',
                 'noise_type': nt,
@@ -931,7 +1028,6 @@ class BID_HBSP(DeconvolutionAlgorithm):
                 'final_deconv': self.final_deconv,
             }
 
-        # 4) Heavy branch — smooth weight between σ_clean and σ_heavy.
         w = 1.0 if sigma >= sigma_heavy else (
             (sigma - sigma_clean) / max(sigma_heavy - sigma_clean, 1e-9))
         w = float(np.clip(w, 0.0, 1.0))
@@ -941,7 +1037,6 @@ class BID_HBSP(DeconvolutionAlgorithm):
         poisson_like = noise_type in ('poisson', 'poisson_gaussian',
                                       'unknown')
 
-        # 4a) Blind-loop denoiser — cheap edge-preserving bilateral.
         if w < 0.5:
             self.blind_denoise = 'bilateral'
             self.blind_denoise_params = {
@@ -955,16 +1050,10 @@ class BID_HBSP(DeconvolutionAlgorithm):
                 'sigma_space': 7.0,
             }
 
-        # ── Choose Poisson-branch denoiser ────────────────────────
-        # 'act' (default)  — locally adaptive curvelet thresholding.
-        # 'vst_bm3d'       — Generalized Anscombe VST + BM3D.
-        # Selectable via auto_mode_params['poisson_denoiser'].  Default
-        # preserves the previous behaviour exactly.
         poisson_denoiser = str(amp.get('poisson_denoiser', 'act')).lower()
         if poisson_denoiser not in ('act', 'vst_bm3d'):
             poisson_denoiser = 'act'
 
-        # 4b) Pre-pyramid global denoiser.
         if poisson_like:
             if poisson_denoiser == 'vst_bm3d':
                 self.preprocess = 'vst_bm3d'
@@ -982,7 +1071,6 @@ class BID_HBSP(DeconvolutionAlgorithm):
             self.preprocess = 'bm3d'
             self.preprocess_params = {'sigma': float(sigma)}
 
-        # 4c) Pre-non-blind denoiser.
         if poisson_like:
             if poisson_denoiser == 'vst_bm3d':
                 self.pre_nonblind = 'vst_bm3d'
@@ -994,14 +1082,11 @@ class BID_HBSP(DeconvolutionAlgorithm):
             self.pre_nonblind = 'bm3d'
             self.pre_nonblind_params = {'sigma': float(max(sigma, 0.01))}
         else:
-            # Heavy gaussian: BM3D with slightly inflated σ.  HBSP has
-            # no 'ensemble' denoiser available — just stronger BM3D here.
             self.pre_nonblind = 'bm3d'
             self.pre_nonblind_params = {
                 'sigma': float(max(1.5 * sigma, 0.02)),
             }
 
-        # 4d) σ-blend of shared non-blind weights (ringing_removal).
         nb_default = dict(snap['nb_params'] or {})
         lam_tv0 = float(nb_default.get('lambda_tv', 0.005))
         lam_l00 = float(nb_default.get('lambda_l0', 0.002))
@@ -1021,9 +1106,6 @@ class BID_HBSP(DeconvolutionAlgorithm):
         nb_blended['weight_ring'] = (1.0 - w) * wring0 + w * wring_noisy
         self.nb_params = nb_blended
 
-        # 4e) Resolve final_deconv='auto' for the heavy regime:
-        # ringing-removal (uses lambda_tv/lambda_l0/weight_ring tuned
-        # above and explicitly suppresses inverse-filter ringing).
         if snap['final_deconv'] == 'auto':
             self.final_deconv = 'ringing'
 
@@ -1041,13 +1123,13 @@ class BID_HBSP(DeconvolutionAlgorithm):
             'nb_weight_ring': float(nb_blended['weight_ring']),
         }
         if self.verbose:
-            print(f"[{self.name}] orchestrator(σ={sigma:.5f}, w={w:.2f}, "
-                  f"regime={regime}, type={noise_type}): "
+            print(f"[{self.name}] оркестратор (sigma={sigma:.5f}, w={w:.2f}, "
+                  f"режим={regime}, тип={noise_type}): "
                   f"pre={self.preprocess}, blind={self.blind_denoise}, "
                   f"pre_nb={self.pre_nonblind}, "
-                  f"nb(λtv={nb_blended['lambda_tv']:.4f}, "
-                  f"λl0={nb_blended['lambda_l0']:.4f}, "
-                  f"wring={nb_blended['weight_ring']:.3f})")
+                  f"nb(lambda_tv={nb_blended['lambda_tv']:.4f}, "
+                  f"lambda_l0={nb_blended['lambda_l0']:.4f}, "
+                  f"w_ring={nb_blended['weight_ring']:.3f})")
         return info
 
     def _estimate_noise(self, yg):
@@ -1118,9 +1200,6 @@ class BID_HBSP(DeconvolutionAlgorithm):
             return result
 
         elif method == 'vst_bm3d':
-            # Generalized Anscombe VST + BM3D denoising for Poisson-
-            # Gaussian noise.  Self-contained module (.vst); falls back
-            # to plain BM3D when the noise has no Poisson component.
             from blinddeconv.algorithms.mod_cython._build_pyd.vst import vst_bm3d_denoise
             result, _ = vst_bm3d_denoise(
                 img,
@@ -1135,7 +1214,7 @@ class BID_HBSP(DeconvolutionAlgorithm):
 
         else:
             raise ValueError(
-                f"Unknown denoiser='{method}'. Choose from: "
+                f"Неизвестный шумоподавитель='{method}'. Доступные варианты: "
                 f"'tv', 'nlm', 'bilateral', 'guided', 'bm3d', "
                 f"'act', 'vst_bm3d', 'none'")
 
@@ -1188,8 +1267,8 @@ class BID_HBSP(DeconvolutionAlgorithm):
             )
         else:
             raise ValueError(
-                f"Unknown noise_preprocess='{mode}'. "
-                f"Choose from: 'auto', 'notch', 'bandstop', 'none'")
+                f"Неизвестный режим noise_preprocess='{mode}'. "
+                f"Выберите из: 'auto', 'notch', 'bandstop', 'none'")
 
         return yg_out, psd_info
 
@@ -1209,8 +1288,8 @@ class BID_HBSP(DeconvolutionAlgorithm):
             return equalize_hist(img)
         else:
             raise ValueError(
-                f"Unknown histogram_eq='{method}'. "
-                f"Choose from: 'clahe', 'global', 'none'")
+                f"Неизвестный режим histogram_eq='{method}'. "
+                f"Выберите из: 'clahe', 'global', 'none'")
 
     @staticmethod
     def _guided_filter(I, p, r, eps):
@@ -1259,10 +1338,6 @@ class BID_HBSP(DeconvolutionAlgorithm):
         denom = np.abs(H_otf) ** 2 + alpha * reg
         return np.real(np.fft.ifft2(H_conj * G / denom))
 
-    # ═══════════════════════════════════════════════════════════
-    #  Interface methods
-    # ═══════════════════════════════════════════════════════════
-
     def get_param(self) -> List[Tuple[str, Any]]:
         return [
             ("kernel_shape", self.kernel_shape),
@@ -1280,7 +1355,6 @@ class BID_HBSP(DeconvolutionAlgorithm):
             ("kernel_threshold", self.kernel_threshold),
             ("beta_update", self.beta_update),
             ("beta_n_factor", self.beta_n_factor),
-            # Noise pipeline
             ("impulse_preprocess", self.impulse_preprocess),
             ("impulse_params", self.impulse_params),
             ("noise_estimation", self.noise_estimation),
@@ -1315,72 +1389,7 @@ class BID_HBSP(DeconvolutionAlgorithm):
                     setattr(self, key, value)
 
     def get_history(self) -> dict:
-        """Return per-iteration convergence history."""
         return self.history
 
     def get_hyperparams(self) -> dict:
-        """Return estimated / final hyper-parameters."""
-        return self.hyperparams
-
-    # ═══════════════════════════════════════════════════════════
-    #  Interface methods
-    # ═══════════════════════════════════════════════════════════
-
-    def get_param(self) -> List[Tuple[str, Any]]:
-        return [
-            ("kernel_shape", self.kernel_shape),
-            ("hs_scale", self.hs_scale),
-            ("noise_sigma", self.noise_sigma),
-            ("max_iter", self.max_iter),
-            ("solver_mode", self.solver_mode),
-            ("kernel_solver", self.kernel_solver),
-            ("kernel_init", self.kernel_init),
-            ("boundary_mode", self.boundary_mode),
-            ("jacobi_mode", self.jacobi_mode),
-            ("center_kernel", self.center_kernel),
-            ("lambda_h_init", self.lambda_h_init),
-            ("lambda_h_decay", self.lambda_h_decay),
-            ("kernel_threshold", self.kernel_threshold),
-            ("beta_update", self.beta_update),
-            ("beta_n_factor", self.beta_n_factor),
-            # Noise pipeline
-            ("impulse_preprocess", self.impulse_preprocess),
-            ("impulse_params", self.impulse_params),
-            ("noise_estimation", self.noise_estimation),
-            ("auto_beta", self.auto_beta),
-            ("screenot_preprocess", self.screenot_preprocess),
-            ("screenot_params", self.screenot_params),
-            ("act_preprocess", self.act_preprocess),
-            ("act_params", self.act_params),
-            ("preprocess", self.preprocess),
-            ("preprocess_params", self.preprocess_params),
-            ("noise_preprocess", self.noise_preprocess),
-            ("noise_preprocess_params", self.noise_preprocess_params),
-            ("histogram_eq", self.histogram_eq),
-            ("histogram_eq_params", self.histogram_eq_params),
-            ("blind_denoise", self.blind_denoise),
-            ("blind_denoise_params", self.blind_denoise_params),
-            ("pre_nonblind", self.pre_nonblind),
-            ("pre_nonblind_params", self.pre_nonblind_params),
-            ("final_deconv", self.final_deconv),
-            ("nb_params", self.nb_params),
-            ("verbose", self.verbose),
-        ]
-
-    def change_param(self, params: Dict[str, Any]) -> None:
-        for key, value in params.items():
-            if hasattr(self, key):
-                if key == "kernel_shape":
-                    self.kernel_shape = tuple(value)
-                elif key == "final_deconv":
-                    self.final_deconv = value.lower()
-                else:
-                    setattr(self, key, value)
-
-    def get_history(self) -> dict:
-        """Return per-iteration convergence history."""
-        return self.history
-
-    def get_hyperparams(self) -> dict:
-        """Return estimated / final hyper-parameters."""
         return self.hyperparams
