@@ -1,13 +1,3 @@
-"""
-Solver functions for BID-HBSP + BCSNSP-SR integration.
-
-Contains all solvers from the original BID-HBSP (solve_image_cg,
-solve_kernel_fourier, update_noise_precision, update_hs_weights,
-final_deconvolution).
-
-The original BID-HBSP and BCSNSP-SR source files are NOT modified.
-"""
-
 import numpy as np
 from numpy.fft import fft2, ifft2
 from scipy.sparse.linalg import LinearOperator, cg
@@ -27,7 +17,6 @@ from .utils import (
     EPSILON,
     edgetaper,
 )
-
 
 def solve_image_cg(
     y: np.ndarray,
@@ -64,7 +53,6 @@ def solve_image_cg(
     )
     x_out = x_flat.reshape((H, W))
 
-
     h_energy = np.sum(h ** 2)
     reg_strength = (
         gamma_x + np.roll(gamma_x, 1, axis=1)
@@ -73,7 +61,6 @@ def solve_image_cg(
     sigma_sq = 1.0 / (beta * h_energy + reg_strength + EPSILON)
 
     return np.maximum(x_out, 0.0), sigma_sq
-
 
 def solve_kernel_fourier(
     y: np.ndarray,
@@ -91,7 +78,6 @@ def solve_kernel_fourier(
     dy_y = forward_diff_y(y)
     dx_x = forward_diff_x(x)
     dx_y = forward_diff_y(x)
-
 
     dy_x[:, -1] = 0.0
     dx_x[:, -1] = 0.0
@@ -119,7 +105,6 @@ def solve_kernel_fourier(
         h = project_kernel(h)
     return h
 
-
 def update_noise_precision(
     y: np.ndarray,
     h: np.ndarray,
@@ -138,7 +123,6 @@ def update_noise_precision(
     beta = float(np.clip(beta, 1.0, 1e8))
     return beta
 
-
 def update_hs_weights(
     x: np.ndarray, sigma_sq: np.ndarray, b: float,
 ) -> Tuple:
@@ -146,7 +130,6 @@ def update_hs_weights(
     dx = forward_diff_x(x)
     dy = forward_diff_y(x)
     return compute_hs_weights(dx, dy, sigma_sq, b)
-
 
 def final_deconvolution(
     y: np.ndarray, h: np.ndarray, beta: float, lambda_reg: float,
@@ -194,7 +177,6 @@ def final_deconvolution(
     x_final = x[pad_h:-pad_h, pad_w:-pad_w]
     return x_final
 
-
 def _solve_image_irls_step(
     rhs: np.ndarray,
     F_h_sq: np.ndarray,
@@ -224,7 +206,6 @@ def _solve_image_irls_step(
         A_op, rhs.ravel(), x0=x_init.ravel(), maxiter=cg_iter, atol=1e-5,
     )
     return x_flat.reshape((H, W))
-
 
 def solve_image_irw(*args, **kwargs):
     raise NotImplementedError(

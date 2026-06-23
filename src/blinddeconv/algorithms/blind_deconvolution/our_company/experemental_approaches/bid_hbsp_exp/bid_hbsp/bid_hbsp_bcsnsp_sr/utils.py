@@ -1,34 +1,9 @@
-"""
-Utility functions for BID-HBSP + BCSNSP-SR integration.
-
-This module combines:
-  - All utility functions from the original BID-HBSP (psf2otf, gradient
-    operators, HS weights, kernel ops, edgetaper, fft_convolve).
-  - A fast FFT-based ``sr_initial_estimate`` that uses the SAR deconvolver
-    from BCSNSP-SR (restore_sar — pure frequency-domain, O(N log N)) followed
-    by a lightweight TV-IRLS refinement to sharpen the initial image estimate.
-
-No sparse matrices are built — all operations are element-wise in the
-Fourier domain, so the initialization adds only ~1-2 seconds even for
-large images.
-
-The original BID-HBSP and BCSNSP-SR source files are NOT modified.
-
-References
-----------
-[1] Castro-Macías et al. (2024), "Bayesian Blind Image Deconvolution
-    using a Hyperbolic-Secant prior", ICIP 2024.
-[2] Salvador, Villena, Molina, Katsaggelos (2013), "Bayesian Combination
-    of Sparse and Non-Sparse Priors in Image Super Resolution", DSP.
-"""
-
 import numpy as np
 from numpy.fft import fft2, ifft2
 from scipy.signal import fftconvolve
 from typing import Tuple
 
 EPSILON = 1e-12
-
 
 def psf2otf(psf: np.ndarray, shape: Tuple[int, int]) -> np.ndarray:
 
@@ -39,7 +14,6 @@ def psf2otf(psf: np.ndarray, shape: Tuple[int, int]) -> np.ndarray:
     padded = np.roll(padded, -(kw // 2), axis=1)
     return fft2(padded)
 
-
 def otf2psf(otf: np.ndarray, kernel_shape: Tuple[int, int]) -> np.ndarray:
 
     kh, kw = kernel_shape
@@ -47,7 +21,6 @@ def otf2psf(otf: np.ndarray, kernel_shape: Tuple[int, int]) -> np.ndarray:
     psf_full = np.roll(psf_full, kh // 2, axis=0)
     psf_full = np.roll(psf_full, kw // 2, axis=1)
     return psf_full[:kh, :kw]
-
 
 def precompute_gradient_operators(
     shape: Tuple[int, int],
@@ -65,26 +38,21 @@ def precompute_gradient_operators(
     F_grad_sq = np.abs(F_dx) ** 2 + np.abs(F_dy) ** 2
     return F_dx, F_dy, F_grad_sq
 
-
 def forward_diff_x(u: np.ndarray) -> np.ndarray:
 
     return np.roll(u, -1, axis=1) - u
-
 
 def forward_diff_y(u: np.ndarray) -> np.ndarray:
 
     return np.roll(u, -1, axis=0) - u
 
-
 def adjoint_diff_x(v: np.ndarray) -> np.ndarray:
 
     return np.roll(v, 1, axis=1) - v
 
-
 def adjoint_diff_y(v: np.ndarray) -> np.ndarray:
 
     return np.roll(v, 1, axis=0) - v
-
 
 def compute_hs_weights(
     dx: np.ndarray,
@@ -93,7 +61,6 @@ def compute_hs_weights(
     b: float,
 ) -> Tuple[np.ndarray, np.ndarray]:
 
-
     sigma_grad = 2.0 * sigma_x
     nu_x = np.sqrt(dx ** 2 + sigma_grad + EPSILON)
     nu_y = np.sqrt(dy ** 2 + sigma_grad + EPSILON)
@@ -101,7 +68,6 @@ def compute_hs_weights(
     gamma_x = (alpha * np.tanh(alpha * nu_x)) / nu_x
     gamma_y = (alpha * np.tanh(alpha * nu_y)) / nu_y
     return gamma_x, gamma_y
-
 
 def project_kernel(h: np.ndarray) -> np.ndarray:
 
@@ -113,13 +79,11 @@ def project_kernel(h: np.ndarray) -> np.ndarray:
         h = np.ones_like(h) / h.size
     return h
 
-
 def threshold_kernel(h: np.ndarray, ratio: float = 0.05) -> np.ndarray:
 
     h = np.maximum(h, 0.0)
     h[h < ratio * np.max(h)] = 0.0
     return project_kernel(h)
-
 
 def init_gaussian_kernel(
     shape: Tuple[int, int], sigma: float = None,
@@ -134,12 +98,10 @@ def init_gaussian_kernel(
     kernel /= kernel.sum()
     return kernel
 
-
 def fft_convolve(x: np.ndarray, h: np.ndarray) -> np.ndarray:
 
     F_h = psf2otf(h, x.shape)
     return np.real(ifft2(F_h * fft2(x)))
-
 
 def edgetaper(
     img: np.ndarray, kernel: np.ndarray, n_taper: int = None,
@@ -179,7 +141,6 @@ def edgetaper(
     blurred = fftconvolve(img, kernel, mode="same")
     return img * W + blurred * (1 - W)
 
-
 def sr_initial_estimate(
     y: np.ndarray,
     h_init: np.ndarray,
@@ -188,13 +149,11 @@ def sr_initial_estimate(
     verbose: bool = False,
 ) -> np.ndarray:
 
-
     from blinddeconv.algorithms.super_resolution.our_company.bcsnsp_sr.utils import (
         restore_sar,
     )
 
     H, W = y.shape
-
 
     x_sar, alpha_sar, beta_sar = restore_sar(y, h_init)
     x_sar = np.clip(x_sar, 0.0, 1.0)
@@ -207,7 +166,6 @@ def sr_initial_estimate(
     if lambda_prior <= 0.0 or tv_iters <= 0:
         return x_sar
 
-
     from scipy.sparse.linalg import LinearOperator, cg as sp_cg
 
     F_h = psf2otf(h_init, (H, W))
@@ -216,7 +174,6 @@ def sr_initial_estimate(
     F_y = fft2(y)
 
     beta = beta_sar
-
 
     lambda_tv = lambda_prior * alpha_sar * 0.5
 
