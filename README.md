@@ -201,20 +201,25 @@ blind_deconvolution/
 │   └── blinddeconv/                     # Python-пакет blinddeconv
 │       ├── algorithms/                  # Алгоритмы и обёртки
 │       │   ├── base.py                  # DeconvolutionAlgorithm (ABC)
+│       │   ├── iteration_logger.py      # Итерационный логер для методов
 │       │   ├── blind_deconvolution/     # Алгоритмы восстановления изображений вслепую
 │       │   │   ├── our_company/         # Собственные реализации
 │       │   │   │   ├── bayesian/
-│       │   │   │   ├── classic/
-│       │   │   │   ├── sparse/
-│       │   │   │   └── variational/
+│       │   │   │   ├── ...
+│       │   │   │   └── experimental_approaches/
 │       │   │   └── third_party_company/
 │       │   ├── nonblind_deconvolution/  # Алгоритмы восстановления с известным PSF
 │       │   ├── kernel_estimation/       # Алгоритмы оценки PSF
-│       │   ├── unsorted/                # Экспериментальные
+│       │   ├── denoise/                 # Обертка методов шумоподавления в фреймворк
+│       │   ├── mod_denoise/             # Модификации методов
+│       │   ├── mod_cython/              # Модификации методов (на cython)
+│       │   ├── super_resolution/        # Методы Super Resolution
 │       │   └── README.md                # Путеводитель по алгоритмам
 │       ├── filters/                     # Генерация искажений
 │       │   ├── base.py                  # FilterBase (ABC)
 │       │   ├── blur.py                  # DefocusBlur, MotionBlur, и др.
+│       │   ├── colored_noise.py         # Модуль коррелированного шума
+│       │   ├── denoise.py               # Предобработка шумоподавлением (устаревшее решение)
 │       │   ├── noise.py                 # GaussianNoise, PoissonNoise, и др.
 │       │   ├── smooth.py                # MeanBlur, GaussianBlur, и др.
 │       │   └── distributions.py         # PSF-функции
@@ -235,24 +240,28 @@ blind_deconvolution/
 │       │       ├── hyperparameter_optimization.py
 │       │       └── pareto_analysis.py
 │       ├── system/                      # Служебные модули
-│       │   ├── octave/                  # Octave/MATLAB-обвязка
-│       │   │   ├── octaveconfig.py
-│       │   │   └── octavewrapper.py
-│       │   └── cython/                
-│       └── scripts/                     # Генераторы данных
-│           ├── dataset_generator.py
-│           └── kernel_generator.py
+│       │   └── octave/                  # Octave/MATLAB-обвязка
+│       │       ├── octaveconfig.py
+│       │       └── octavewrapper.py               
+│       └── scripts/                     # Скрипты запуска и генерации
+│           └──...
 │
 ├── scripts/                             # Утилиты проекта
-│   ├── install.py                       # Интерактивный установщик
-│   └── uninstall.py                     # Интерактивное удаление
+│   ├── build_cython
+│   │   └── build_all_cython.py          # Сборщик Cython кода                   
+│   ├── runner/                          # Итерактивный запуск конфигурационных файлов
+│   │   ├── run.py                       # Автоматизация по конфигам
+│   │   ├── make_visuals.py              # Генерации визуализации
+│   │   └── cli.py                       # CLI-интерфейс
+│   └── installation/                      
+│       ├── install.py                   # Интерактивный установщик
+│       └── uninstall.py                 # Интерактивное удаление
 │
 ├── configs/                             # Конфигурационные файлы
 │   ├── basic_deconvolution.yaml         # Базовый пример (YAML)
 │   ├── ...
 │   └── experiment_template.json         # Полный шаблон (JSON)
-├── run.py                               # Автоматизация по конфигам
-├── cli.py                               # CLI-интерфейс
+
 │
 ├── docs/                                # Документация (Sphinx + Markdown)
 │   ├── source/
@@ -262,13 +271,10 @@ blind_deconvolution/
 │   └── tools/
 │       └── build_docs.py                # Сборка документации
 │
-├── images/                              # Примеры изображений/искажения
-│   ├── dataset_bind.json
-│   ├── distorted/
-│   │   └── ...
+├── images/                              # Примеры изображений/искажения/наборы данных
 │   └── ...
 ├── references/                          # PDF-материалы/статьи
-│   └── *.pdf
+│   └── ...*.pdf
 ├── tests/                               # Тестовые данные/выходы прогонов
 │   └── ...
 ├── utils/                               # Вспомогательные утилиты
