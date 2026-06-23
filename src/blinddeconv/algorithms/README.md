@@ -1,99 +1,26 @@
 # Путеводитель по алгоритмам
 
-## Собственные реализации
+## Blind Deconvolution (`blind_deconvolution/`)
 
-Методы сгруппированы по типу подхода
+Методы сгруппированы по типу источника кода - `our_company` и `third_party_company`
 
-### `blind_deconvolution/our company/`
+### Собственные реализации (`blind_deconvolution/our_company/`)
 
-#### `classic/` — классические итеративные методы. [Описание](blind_deconvolution/implementations/classic/README.md)
-
-- [`richardson_lucy.py`](blind_deconvolution/implementations/classic/richardson_lucy.py) — Richardson–Lucy (blind/non-blind; пуассоновское Maximum Likelihood Estimation) [2][3]
-- [`alternating_minimization.py`](blind_deconvolution/implementations/classic/alternating_minimization.py) — Maximum A Posteriori blind deconvolution с Huber-регуляризацией, alternating minimization [8][21][30]
-- [`expectation_maximization.py`](blind_deconvolution/implementations/classic/expectation_maximization.py) — EM для идентификации blur/восстановления изображения [18][19]
-
-#### `bayesian/` — байесовские методы. [Описание](blind_deconvolution/implementations/bayesian/README.md)
-
-- [`bid_hbsp`](blind_deconvolution/our_company/bayesian/bid_hbsp) — Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior (2024) [Литература](<../../../references/bid_hbsp/(2024) Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior.pdf>)
-- [`fbdhsgp`](blind_deconvolution/our_company/bayesian/fbdhsgp) — Fast Bayesian blind deconvolution with Huber super Gaussian priors (2017) [Литература](<../../../references/fbdhsgp>)
-- [`htp`](blind_deconvolution/our_company/bayesian/htp) — Blind Deconvolution Using Alternating Maximum a Posteriori Estimation with Heavy-Tailed Priors (2013) [Литература](<../../../references/htp/(2013) Blind Deconvolution Using Alternating Maximum a Posteriori Estimation with Heavy-Tailed Priors.pdf>)
-
-- **Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior (2024)** | [Код](blind_deconvolution/our_company/bayesian/bid_hbsp) | [Теория](../../../references/bid_hbsp)
-- **Fast Bayesian blind deconvolution with Huber super Gaussian priors (2017)** | [Код](blind_deconvolution/our_company/bayesian/fbdhsgp) | [Теория](../../../references/fbdhsgp)
-- **Blind Deconvolution Using Alternating MAP with Heavy-Tailed Priors (2013)** | [Код](blind_deconvolution/our_company/bayesian/htp) | [Теория](../../../references/htp)
-
-| Код | Название статьи | Год | Литература |
-| :--- | :--- | :---: | :--- |
-| [`bid_hbsp`](blind_deconvolution/our_company/bayesian/bid_hbsp) | **Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior** | 2024 | [Литература](<../../../references/bid_hbsp/(2024) Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior.pdf>) |
-| [`fbdhsgp`](blind_deconvolution/our_company/bayesian/fbdhsgp) | **Fast Bayesian blind deconvolution with Huber super Gaussian priors** | 2017 | [Литература](../../../references/fbdhsgp) |
-| [`htp`](blind_deconvolution/our_company/bayesian/htp) | **Blind Deconvolution Using Alternating Maximum a Posteriori Estimation with Heavy-Tailed Priors** | 2013 | [Литература](<../../../references/htp/(2013) Blind Deconvolution Using Alternating Maximum a Posteriori Estimation with Heavy-Tailed Priors.pdf>) |
-
-
-| Код | Метод / Название статьи | Год |
-| :--- | :--- | :---: |
-| [`bid_hbsp`](blind_deconvolution/our_company/bayesian/bid_hbsp) | [**Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior**](<../../../references/bid_hbsp/(2024) Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior.pdf>) | 2024 |
-| [`fbdhsgp`](blind_deconvolution/our_company/bayesian/fbdhsgp) | [**Fast Bayesian blind deconvolution with Huber super Gaussian priors**](../../../references/fbdhsgp) | 2017 |
-| [`htp`](blind_deconvolution/our_company/bayesian/htp) | [**Blind Deconvolution Using Alternating Maximum a Posteriori Estimation with Heavy-Tailed Priors**](<../../../references/htp/(2013) Blind Deconvolution Using Alternating Maximum a Posteriori Estimation with Heavy-Tailed Priors.pdf>) | 2013 |
-
+Имплементации на основе статей
 
 | Код | Метод / Название статьи | Год | Литература |
 | :--- | :--- | :---: | :--- |
-| [`bid_hbsp`](blind_deconvolution/our_company/bayesian/bid_hbsp) | **Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior** | 2024 | [источник](<../../../references/bid_hbsp/(2024) Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior.pdf>) |
-| [`fbdhsgp`](blind_deconvolution/our_company/bayesian/fbdhsgp) | **Fast Bayesian blind deconvolution with Huber super Gaussian priors** | 2017 | [источник](../../../references/fbdhsgp) |
-| [`htp`](blind_deconvolution/our_company/bayesian/htp) | **Blind Deconvolution Using Alternating Maximum a Posteriori Estimation with Heavy-Tailed Priors** | 2013 | [источник](<../../../references/htp/(2013) Blind Deconvolution Using Alternating Maximum a Posteriori Estimation with Heavy-Tailed Priors.pdf>) |
+| [`bid_hbsp`](blind_deconvolution/our_company/bayesian/bid_hbsp) | **Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior** | 2024 | [Источник](<../../../references/bid_hbsp/(2024) Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior.pdf>) |
+| [`fbdhsgp`](blind_deconvolution/our_company/bayesian/fbdhsgp) | **Fast Bayesian blind deconvolution with Huber super Gaussian priors** | 2017 | [Источники](../../../references/fbdhsgp) |
+| [`htp`](blind_deconvolution/our_company/bayesian/htp) | **Blind Deconvolution Using Alternating Maximum a Posteriori Estimation with Heavy-Tailed Priors** | 2013 | [Источник](<../../../references/htp/(2013) Blind Deconvolution Using Alternating Maximum a Posteriori Estimation with Heavy-Tailed Priors.pdf>) |
 
+### Внешние обёртки и источники (`blind_deconvolution/third_party_company/`)
 
+Модуль для алгоритмов, заимствованных из внешних репозиториев и адаптированных под фреймворк.
 
-- [`vbbid_tv.py`](blind_deconvolution/implementations/bayesian/vbbid_tv.py) — Variational Bayesian blind deconvolution с TV prior [10]
-- [`bbd_deip.py`](blind_deconvolution/implementations/bayesian/bbd_deip.py) — Bayesian blind deconvolution по паре изображений с разной экспозицией [11]
-- [`sb_bid_pe.py`](blind_deconvolution/implementations/bayesian/sb_bid_pe.py) — Sparse Bayesian blind deconvolution с оценкой параметров [12]
+## Non-Blind Deconvolution (`nonblind_deconvolution/`)
 
-#### `variational/` — вариационные методы. [Описание](blind_deconvolution/implementations/variational/README.md)
-
-- [`vabid.py`](blind_deconvolution/implementations/variational/vabid.py) — Variational Bayes blind deconvolution (VAR3, alternating variational) [14]
-- [`vapibe.py`](blind_deconvolution/implementations/variational/vapibe.py) — Variational Bayes для совместной оценки параметров/изображения/blur [15]
-- [`vbsk_sid_st.py`](blind_deconvolution/implementations/variational/vbsk_sid_st.py) — VB sparse kernel-based blind deconvolution со Student’s-t priors [16]
-
-#### `sparse/` — разреженные/TV-подобные регуляризации. [Описание](blind_deconvolution/implementations/sparse/README.md)
-
-- [`vbc_bid.py`](blind_deconvolution/implementations/sparse/vbc_bid.py) — VB compressive blind image deconvolution (VB-ADMM, wavelet sparsity) [13]
-- [`pbtvgr.py`](blind_deconvolution/implementations/sparse/pbtvgr.py) — blind deconvolution для Poisson noise: TV + L0 gradient regularization [24]
-
-## Внешние обёртки и источники
-
-Алгоритмы, заимствованные из внешних репозиториев
-
-### `blind_deconvolution/third party company/`
-
-- [`BYchao100_Graph_Based_Blind_Image_Deblurring`](blind_deconvolution/external/BYchao100_Graph_Based_Blind_Image_Deblurring) — [repo](https://github.com/BYchao100/Graph-Based-Blind-Image-Deblurring/), graph-based blind deblurring (оценка PSF через графовую модель/регуляризацию) [8][35]
-- [`KanuGaba_Image_Deblurrer`](blind_deconvolution/external/KanuGaba_Image_Deblurrer) — [repo](https://github.com/KanuGaba/Image-Deblurrer/), Wiener deconvolution (не слепая, motion PSF `LEN/THETA`) [1]
-- [`MaxMB_Image_Restoration_Wiener_Blind`](blind_deconvolution/external/MaxMB_Image_Restoration_Wiener_Blind) — [repo](https://github.com/MaxMB/Image_Restoration_Wiener_Blind), Wiener optimal filtering + baseline `deconvlucy`/`deconvblind` (MATLAB) [1][2][3][6]
-- [`TobiasWolf_math_Blind_Deconvolution_MHDM`](blind_deconvolution/external/TobiasWolf_math_Blind_Deconvolution_MHDM) — [repo](https://github.com/TobiasWolf-math/Blind-Deconvolution-MHDM), multiscale hierarchical decomposition method (MHDM) для blind deconvolution [6][8]
-- [`Youngforgithub_Deblurring_Text_Images_via_L0_Regularized_Intensity_and_Gradient`](blind_deconvolution/external/Youngforgithub_Deblurring_Text_Images_via_L0_Regularized_Intensity_and_Gradient) — [repo](https://github.com/Youngforgithub/Deblurring-Text-Images-via-L0-Regularized-Intensity-and-Gradient), L0-regularized intensity+gradient + TV prior (text deblurring) [20][23]
-- [`adamalavi_Blind_motion_deblurring_for_license_plates`](blind_deconvolution/external/adamalavi_Blind_motion_deblurring_for_license_plates) — [repo](https://github.com/ankitVP77/Blind-Motion-Deblurring-for-Legible-License-Plates-using-Deep-Learning), CNN-оценка параметров motion PSF (длина/угол по FFT) + Wiener deconvolution [1][5]
-- [`alexis_mignon_pydeconv`](blind_deconvolution/external/alexis_mignon_pydeconv) — [repo](https://github.com/alexis-mignon/pydeconv), Maximum A Posteriori blind deconvolution с priors на градиенты (global/local), оптимизация по изображению и PSF [8][9]
-- [`ceciledellavalle_BlindDeconvolution`](blind_deconvolution/external/ceciledellavalle_BlindDeconvolution) — [repo](https://github.com/ceciledellavalle/BlindDeconvolution), классический blind deconvolution (итеративная оптимизация по изображению и PSF) [6][8]
-- [`crewleader_BlindDeconvolutionLowRank`](blind_deconvolution/external/crewleader_BlindDeconvolutionLowRank) — [repo](https://github.com/crewleader/BlindDeconvolutionLowRank), multi-image blind deconvolution через low-rank representation [36]
-- [`dragos2001_Total_Variation_Blind_Deconvolution`](blind_deconvolution/external/dragos2001_Total_Variation_Blind_Deconvolution) — [repo](https://github.com/dragos2001/Total_Variation_Blind_Deconvolution), Total Variation blind deconvolution (Chan–Wong PCG / Perrone–Favaro GD-вариант) [20][21][37]
-- [`felixwempe_blind_deconvolution`](blind_deconvolution/external/felixwempe_blind_deconvolution) — [repo](https://github.com/felixwempe/blind_deconvolution/), blind deconvolution через convex programming (Ahmed–Recht–Romberg, CVX) [27][28]
-- [`huacheng_Shift_Invariant_Deblurring`](blind_deconvolution/external/huacheng_Shift_Invariant_Deblurring) — [repo](https://github.com/huacheng/Shift-Invariant-Deblurring), two-phase kernel estimation (Xu et al.) + shock/nonlinear diffusion preprocessing + Shan non-blind deconvolution [20][23]
-- [`jtaoz_GKPILE_Deconvolution`](blind_deconvolution/external/jtaoz_GKPILE_Deconvolution) — [repo](https://github.com/jtaoz/GKPILE-Deconvolution), generative-based kernel prior + initializer via latent encoding (GKPILE) [5][6][8]
-- [`lisiyaoATbnu_low_rank_kernel`](blind_deconvolution/external/lisiyaoATbnu_low_rank_kernel) — [repo](https://github.com/lisiyaoATbnu/low_rank_kernel), oversized-kernel suppression через low-rank kernel prior; non-blind часть: hyper-Laplacian prior (Krishnan–Fergus) [25][36]
-- [`muhammadhamzaazhar_Image_Enhancement_Filters`](blind_deconvolution/external/muhammadhamzaazhar_Image_Enhancement_Filters) — [repo](https://github.com/muhammadhamzaazhar/Image-Enhancement-Filters), набор методов: blind deconvolution + Lucy–Richardson + Wiener filtering [1][2][3][6]
-- [`mujib2020_Non_blind_and_Blind_Deconvolution_under_Poisson_noise`](blind_deconvolution/external/mujib2020_Non_blind_and_Blind_Deconvolution_under_Poisson_noise) — [repo](https://github.com/mujib2020/Non-blind-and-Blind-Deconvolution-under-Poisson-noise), EM blind deconvolution и fractional-order total variation (FOTV) под Poisson noise [17][22]
-- [`panpanfei_Phase_only_Image_Based_Kernel_Estimation_for_Blind_Motion_Deblurring`](blind_deconvolution/external/panpanfei_Phase_only_Image_Based_Kernel_Estimation_for_Blind_Motion_Deblurring) — [repo](https://github.com/panpanfei/Phase-only-Image-Based-Kernel-Estimation-for-Blind-Motion-Deblurring/), phase-only kernel estimation (CVPR’19) + L0/TV регуляризация [20][23][34]
-- [`qingqu06_MCS_BD`](blind_deconvolution/external/qingqu06_MCS_BD) — [repo](https://github.com/qingqu06/MCS-BD), multichannel sparse blind deconvolution (неconvex оптимизация/ландшафт) [33]
-- [`vipgugr_BCDSAR`](blind_deconvolution/external/vipgugr_BCDSAR) — [repo](https://github.com/vipgugr/BCDSAR), variational Bayesian blind color deconvolution (VB inference) [9]
-- [`warrenzha_blind_deconvolution`](blind_deconvolution/external/warrenzha_blind_deconvolution) — [repo](https://github.com/warrenzha/blind-deconvolution), blind deconvolution через convex optimization (в т.ч. 2D-версия) [27][28]
-- [`yenhsunlin_blind_deconv`](blind_deconvolution/external/yenhsunlin_blind_deconv) — [repo](https://github.com/yenhsunlin/blind_deconv), Bayesian blind deconvolution с hyper-Laplacian \(L_p, 0<p<1\) регуляризацией (Kotera et al.) [9][25]
-- [`zalteck_BCDTV`](blind_deconvolution/external/zalteck_BCDTV) — [repo](https://github.com/zalteck/BCDTV), TV-based variational Bayesian blind color deconvolution (TV prior + VB/ELBO) [9][20][21]
-
-### `nonblind_deconvolution/`
-
-- [`HQMotionBlurRestoration`](nonblind_deconvolution/HQMotionBlurRestoration) — [repo](https://github.com/gpl27/deblur), High-Quality Motion Deblurring (SIGGRAPH 2008), non-blind deconvolution (локальная обёртка) [1]
-- [`ztCao_Variational_Bayesian_Blind_Deconvolution_Using_a_Total_Variation_Prior`](nonblind_deconvolution/ztCao_Variational_Bayesian_Blind_Deconvolution_Using_a_Total_Variation_Prior) — [repo](https://github.com/2924878374/Variational-Bayesian-Blind-Deconvolution-Using-a-Total-Variation-Prior), Variational Bayesian blind deconvolution с Total Variation prior (TV1/TV2) [9][20][21]
-
-### `kernel_estimation/`
+## PSF Estimation (`kernel_estimation/`)
 
 Папка зарезервирована под алгоритмы оценки ядра (PSF/kernel estimation); сейчас в репозитории пустая.
 
