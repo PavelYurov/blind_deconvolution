@@ -81,9 +81,9 @@
 - Измерение времени выполнения алгоритмов
 
 ### Оптимизация гиперпараметров
-- **Байесовская оптимизация**: Tree‑Structured Parzen Estimator (TPE), MCMC - Factorized Mixture Proposal (MCMC-FMP)
-- **(t,m,s)-nets**: low-discrepancy sequences  
-- **Поиск по сетке** 
+- **TPE**: Tree‑Structured Parzen Estimator
+- **MCMC-FMP**: MCMC - Factorized Mixture Proposal
+- **(t,m,s)-nets**: low-discrepancy sequences   
 
 ### Визуализация
 - **Построение многомерных Парето-фронтов** (качество, сложность смаза, изолированный вклад шума)
