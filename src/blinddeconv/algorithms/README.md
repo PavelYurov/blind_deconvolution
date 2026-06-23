@@ -21,6 +21,8 @@
 | Код | Метод / Название статьи | Год | Литература |
 | :--- | :--- | :---: | :--- |
 | [`ard`](blind_deconvolution/our_company/experimental_approaches/bayesian/ard) | Blind Deconvolution with Model Discrepancies | 2017 | [Источник](<../../../references/ard/(2017) Blind Deconvolution with Model Discrepancies.pdf>) |
+| [`сgmrf`](blind_deconvolution/our_company/experimental_approaches/bayesian/cgmrf) | Bayesian image restoration using compound Gauss-Markov random fields | 2003 | [Источники](<../../../references/cgmrf>) |
+| [`eml`](blind_deconvolution/our_company/experimental_approaches/bayesian/eml) | Efficient Marginal Likelihood Optimization in Blind Deconvolution | 2011 | [Источники](<../../../references/eml>) |
 
 ### Внешние обёртки и источники (`blind_deconvolution/third_party_company/`)
 
@@ -33,7 +35,7 @@
 Папка зарезервирована под алгоритмы оценки ядра (PSF/kernel estimation); сейчас в репозитории пустая.
 
 ## Модификации (`mod_denoise/`)
-Методы, использованнные в качестве модификации методов слепой деконволюции для оценки и подавления влияния шум и улучшения качества восстановления.
+Методы, использованнные в качестве модификации методов слепой деконволюции для оценки и подавления влияния шума и улучшения качества восстановления.
 
 | Код | Метод / Название статьи | Год | Литература |
 | :--- | :--- | :---: | :--- |
