@@ -74,7 +74,7 @@
 
 ## Super Resolution (`super_resolution/`)
 
-Модуль для задач повышения пространственного разрешения. Алгоритмы этого раздела дополняют функционал деконволюции, позволяя решать комплексные задачи улучшения качества. Применение Super Resolution перед этапом оценки ядра размытия в Blind Deconvolution особенно полезно на искаженных изображениях с низкой детализацией.
+Модуль для задач повышения пространственного разрешения. Алгоритмы этого раздела дополняют функционал деконволюции, позволяя решать комплексные задачи улучшения качества. 
 
 | Код | Метод / Название статьи | Год | Литература |
 | :--- | :--- | :---: | :--- |
@@ -82,5 +82,9 @@
 | [`pansharpening`](super_resolution/our_company/selfexsr) | Single Image Super-resolution from Transformed Self-Exemplars | 2015 | [Источник](<../../../references/selfexsr/(2015) Single Image Super-resolution from Transformed Self-Exemplars.pdf>) |
 | [`pansharpening`](super_resolution/our_company/pansharpening) | Variational Bayesian Pansharpening with Super-Gaussian Sparse Image Priors | 2020 | [Источники](<../../../references/pansharpening/(2020) Variational Bayesian Pansharpening with Super-Gaussian Sparse Image Priors.pdf>) |
 
+Применение Super Resolution перед этапом оценки ядра размытия в Blind Deconvolution особенно полезно на искаженных изображениях с низкой детализацией. 
+Реализации гибридных схем (Joint SR and Blind Deconvolution):
+- [`bid_hbsp_bcsnsp_sr`](blind_deconvolution/our_company/experimental_approaches/bid_hbsp_exp/bid_hbsp/bid_hbsp_bcsnsp_sr) — Bayesian combination of sparse and non-sparse priors in image super resolution (`bcsnsp_sr`) & Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior (`bid_hbsp`)
+- [`dcp_selfexsr`](blind_deconvolution/our_company/experimental_approaches/dcp_exp/dcp_selfexsr) — Single Image Super-resolution from Transformed Self-Exemplars (`selfexsr`) & Blind Image Deblurring Using Dark Channel Prior (`dcp`)
 
 
