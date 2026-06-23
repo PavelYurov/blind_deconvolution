@@ -13,7 +13,14 @@
 | Код | Метод / Название статьи | Год | Литература |
 | :--- | :--- | :---: | :--- |
 | [`htp`](blind_deconvolution/our_company/bayesian/htp) | Blind Deconvolution Using Alternating Maximum a Posteriori Estimation with Heavy-Tailed Priors | 2013 | [Источник](<../../../references/htp/(2013) Blind Deconvolution Using Alternating Maximum a Posteriori Estimation with Heavy-Tailed Priors.pdf>) |
+| [`lip`](blind_deconvolution/our_company/logarithmic_pds) | Blind Deconvolution via Lower-Bounded Logarithmic Image Priors | 2015 | [Источники](<../../../references/lip>) |
+| [`dcp`](blind_deconvolution/our_company/dark_channel_prior) | Blind Image Deblurring Using Dark Channel Prior | 2016 | [Источники](<../../../references/dcp>) |
+| [`ecp`](blind_deconvolution/our_company/ecp) | Image Deblurring via Extreme Channels Prior | 2017 | [Источник](<../../../references/ecp/(2017) Image Deblurring via Extreme Channels Prior>) |
+| [`gbbid`](blind_deconvolution/our_company/graph) | Blind Image Deblurring Via Reweighted Graph Total Variation | 2017 | [Источники](<../../../references/graph>) |
+| [`lmgp`](blind_deconvolution/our_company/lmgp) | Blind Image Deblurring with Local Maximum Gradient Prior | 2019 | [Источник](<../../../references/lmgp/(2019) Blind Image Deblurring with Local Maximum Gradient Prior.pdf>) |
 | [`fbdhsgp`](blind_deconvolution/our_company/bayesian/fbdhsgp) | Fast Bayesian blind deconvolution with Huber super Gaussian priors | 2017 | [Источники](../../../references/fbdhsgp) |
+| [`pmp`](blind_deconvolution/our_company/patch_wise_minimum_pixels_prior) | Blind Deblurring via Patch-wise Minimal Pixels Prior | 2020 | [Источник](<../../../references/pmp/(2020) A Simple Local Minimal Intensity Prior and An Improved Algorithm for Blind Image Deblurring.pdf>) |
+| [`esm`](blind_deconvolution/our_company/esm) | Enhanced Sparse Model for Blind Deblurring | 2020 | [Источник](<../../../references/esm/(2020) Enhanced Sparse Model for Blind Deblurring.pdf>) |
 | [`bid_hbsp`](blind_deconvolution/our_company/bayesian/bid_hbsp) | Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior | 2024 | [Источник](<../../../references/bid_hbsp/(2024) Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior.pdf>) |
 
 
