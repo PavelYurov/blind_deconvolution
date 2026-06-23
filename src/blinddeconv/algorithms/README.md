@@ -14,13 +14,36 @@
 
 #### `bayesian/` — байесовские методы. [Описание](blind_deconvolution/implementations/bayesian/README.md)
 
-- [`bid_hbsp`](blind_deconvolution/our_company/bayesian/bid_hbsp) — Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior [читать](<../../../references/bid_hbsp/(2024) Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior.pdf>)
-- [`fbdhsgp`](blind_deconvolution/our_company/bayesian/fbdhsgp) — Fast Bayesian blind deconvolution with Huber super Gaussian priors [читать](<../../../references/fbdhsgp>)
-- [`htp`](blind_deconvolution/our_company/bayesian/htp) — Blind Deconvolution Using Alternating Maximum a Posteriori Estimation with Heavy-Tailed Priors [читать](<../../../references/htp/(2013) Blind Deconvolution Using Alternating Maximum a Posteriori Estimation with Heavy-Tailed Priors.pdf>)
+- [`bid_hbsp`](blind_deconvolution/our_company/bayesian/bid_hbsp) — Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior (2024) [Литература](<../../../references/bid_hbsp/(2024) Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior.pdf>)
+- [`fbdhsgp`](blind_deconvolution/our_company/bayesian/fbdhsgp) — Fast Bayesian blind deconvolution with Huber super Gaussian priors (2017) [Литература](<../../../references/fbdhsgp>)
+- [`htp`](blind_deconvolution/our_company/bayesian/htp) — Blind Deconvolution Using Alternating Maximum a Posteriori Estimation with Heavy-Tailed Priors (2013) [Литература](<../../../references/htp/(2013) Blind Deconvolution Using Alternating Maximum a Posteriori Estimation with Heavy-Tailed Priors.pdf>)
 
 - **Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior (2024)** | [Код](blind_deconvolution/our_company/bayesian/bid_hbsp) | [Теория](../../../references/bid_hbsp)
 - **Fast Bayesian blind deconvolution with Huber super Gaussian priors (2017)** | [Код](blind_deconvolution/our_company/bayesian/fbdhsgp) | [Теория](../../../references/fbdhsgp)
 - **Blind Deconvolution Using Alternating MAP with Heavy-Tailed Priors (2013)** | [Код](blind_deconvolution/our_company/bayesian/htp) | [Теория](../../../references/htp)
+
+| Код | Название статьи | Год | Литература |
+| :--- | :--- | :---: | :--- |
+| [`bid_hbsp`](blind_deconvolution/our_company/bayesian/bid_hbsp) | **Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior** | 2024 | [Литература](<../../../references/bid_hbsp/(2024) Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior.pdf>) |
+| [`fbdhsgp`](blind_deconvolution/our_company/bayesian/fbdhsgp) | **Fast Bayesian blind deconvolution with Huber super Gaussian priors** | 2017 | [Литература](../../../references/fbdhsgp) |
+| [`htp`](blind_deconvolution/our_company/bayesian/htp) | **Blind Deconvolution Using Alternating Maximum a Posteriori Estimation with Heavy-Tailed Priors** | 2013 | [Литература](<../../../references/htp/(2013) Blind Deconvolution Using Alternating Maximum a Posteriori Estimation with Heavy-Tailed Priors.pdf>) |
+
+
+| Код | Метод / Название статьи | Год |
+| :--- | :--- | :---: |
+| [`bid_hbsp`](blind_deconvolution/our_company/bayesian/bid_hbsp) | [**Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior**](<../../../references/bid_hbsp/(2024) Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior.pdf>) | 2024 |
+| [`fbdhsgp`](blind_deconvolution/our_company/bayesian/fbdhsgp) | [**Fast Bayesian blind deconvolution with Huber super Gaussian priors**](../../../references/fbdhsgp) | 2017 |
+| [`htp`](blind_deconvolution/our_company/bayesian/htp) | [**Blind Deconvolution Using Alternating Maximum a Posteriori Estimation with Heavy-Tailed Priors**](<../../../references/htp/(2013) Blind Deconvolution Using Alternating Maximum a Posteriori Estimation with Heavy-Tailed Priors.pdf>) | 2013 |
+
+
+| Код | Метод / Название статьи | Год | Литература |
+| :--- | :--- | :---: | :--- |
+| [`bid_hbsp`](blind_deconvolution/our_company/bayesian/bid_hbsp) | **Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior** | 2024 | [источник](<../../../references/bid_hbsp/(2024) Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior.pdf>) |
+| [`fbdhsgp`](blind_deconvolution/our_company/bayesian/fbdhsgp) | **Fast Bayesian blind deconvolution with Huber super Gaussian priors** | 2017 | [источник](../../../references/fbdhsgp) |
+| [`htp`](blind_deconvolution/our_company/bayesian/htp) | **Blind Deconvolution Using Alternating Maximum a Posteriori Estimation with Heavy-Tailed Priors** | 2013 | [источник](<../../../references/htp/(2013) Blind Deconvolution Using Alternating Maximum a Posteriori Estimation with Heavy-Tailed Priors.pdf>) |
+
+
+
 - [`vbbid_tv.py`](blind_deconvolution/implementations/bayesian/vbbid_tv.py) — Variational Bayesian blind deconvolution с TV prior [10]
 - [`bbd_deip.py`](blind_deconvolution/implementations/bayesian/bbd_deip.py) — Bayesian blind deconvolution по паре изображений с разной экспозицией [11]
 - [`sb_bid_pe.py`](blind_deconvolution/implementations/bayesian/sb_bid_pe.py) — Sparse Bayesian blind deconvolution с оценкой параметров [12]
