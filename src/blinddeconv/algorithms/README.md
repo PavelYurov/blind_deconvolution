@@ -16,6 +16,7 @@
 | [`fbdhsgp`](blind_deconvolution/our_company/bayesian/fbdhsgp) | Fast Bayesian blind deconvolution with Huber super Gaussian priors | 2017 | [Источники](../../../references/fbdhsgp) |
 | [`bid_hbsp`](blind_deconvolution/our_company/bayesian/bid_hbsp) | Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior | 2024 | [Источник](<../../../references/bid_hbsp/(2024) Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior.pdf>) |
 
+
 #### Дополнительные подходы (`blind_deconvolution/our_company/experimental_approaches`)
 Реализации альтернативных подходов и исследовательские наработки.
 | Код | Метод / Название статьи | Год | Литература |
@@ -23,6 +24,18 @@
 | [`ard`](blind_deconvolution/our_company/experimental_approaches/bayesian/ard) | Blind Deconvolution with Model Discrepancies | 2017 | [Источник](<../../../references/ard/(2017) Blind Deconvolution with Model Discrepancies.pdf>) |
 | [`сgmrf`](blind_deconvolution/our_company/experimental_approaches/bayesian/cgmrf) | Bayesian image restoration using compound Gauss-Markov random fields | 2003 | [Источники](<../../../references/cgmrf>) |
 | [`eml`](blind_deconvolution/our_company/experimental_approaches/bayesian/eml) | Efficient Marginal Likelihood Optimization in Blind Deconvolution | 2011 | [Источники](<../../../references/eml>) |
+| [`hsp`](blind_deconvolution/our_company/experimental_approaches/bayesian/hsp) | Bayesian Blind Image Deconvolution using a Hyperbolic-Secant Prior | 2024 | [Источники](<../../../references/hsp>) |
+| [`rcs`](blind_deconvolution/our_company/experimental_approaches/bayesian/rcs) | Removing Camera Shake from a Single Photograph | 2006 | [Источник](<../../../references/rcs/(2006) Removing Camera Shake from a Single Photograph.pdf>) |
+| [`vbskb_bid_sp`](blind_deconvolution/our_company/experimental_approaches/bayesian/vbskb_bid_sp) | Variational Bayesian Sparse Kernel-Based Blind Image Deconvolution With Student's-t Priors | 2009 | [Источники](<../../../references/vbskb_bid_sp>) |
+| [`vdbke`](blind_deconvolution/our_company/experimental_approaches/bayesian/vdbke) |  Variational Dirichlet Blur Kernel Estimation | 2015 | [Источник](<../../../references/vdbke/(2015) Variational Dirichlet Blur Kernel Estimation.pdf>) |
+| [`bdgsp`](blind_deconvolution/our_company/experimental_approaches/bayesian/bdgsp) | Bayesian Blind Deconvolution with General Sparse Image Priors | 2012 | [Источник](<../../../references/bdgsp/(2012) Bayesian Blind Deconvolution with General Sparse Image Priors.pdf>) |
+| [`fractional_order`](blind_deconvolution/our_company/experimental_approaches/fractional_order) | Blind Image Deconvolution - When Patch-wise Minimal Pixels Prior Meets Fractional-Order Method | 2025 | [Источник](<../../../references/fractional_order/(2025) Blind Image Deconvolution - When Patch-wise Minimal Pixels Prior Meets Fractional-Order Method.pdf>) |
+
+
+
+
+
+
 
 ### Внешние обёртки и источники (`blind_deconvolution/third_party_company/`)
 
