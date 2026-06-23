@@ -32,7 +32,17 @@
 
 Папка зарезервирована под алгоритмы оценки ядра (PSF/kernel estimation); сейчас в репозитории пустая.
 
-## Denoising (`denoise/`, `mod_denoise/`)
+## Модификации (`mod_denoise/`)
+Методы, использованнные в качестве модификации методов слепой деконволюции для оценки и подавления влияния шум и улучшения качества восстановления.
+
+| Код | Метод / Название статьи | Год | Литература |
+| :--- | :--- | :---: | :--- |
+| [`act`](mod_denoise/act_denoise.py) | Compressive Sensing Image Restoration Using Adaptive Curvelet Thresholding and Nonlocal Sparse Regularization | 2016 | [Источник](<../../../references/act/(2016) Compressive Sensing Image Restoration Using Adaptive Curvelet Thresholding and Nonlocal Sparse Regularization.pdf>) |
+| [`pyatykh` / `pca`](mod_denoise/pyatykh_noise_reconstruction.py) | Image Noise Level Estimation by Principal Component Analysis | 2014 | [Источник](<../../../references/pyatykh/(2014) Image Noise Level Estimation by Principal Component Analysis.pdf>) |
+| [`screenot`](mod_denoise/screenot.py) | ScreeNOT Exact MSE-optimal singular value thresholding in correlated noise | 2023 | [Источник](<../../../references/screenot/(2023) ScreeNOT Exact MSE-optimal singular value thresholding in correlated noise.pdf>) |
+| [`chen`](mod_denoise/chen_noise_estimate.py) | An Efficient Statistical Method for Image Noise Level Estimation | 2015 | [Источник](<../../../references/chen/(2015) An Efficient Statistical Method for Image Noise Level Estimation.pdf>) |
+| [`vst`](mod_denoise/vst.py) | Optimal inversion of the generalized Anscombe transformation for Poisson-Gaussian noise | 2013 | [Источник](<../../../references/vst/(2013) Optimal inversion of the generalized Anscombe transformation for Poisson-Gaussian noise.pdf>) |
+
 
 ## Super Resolution (`kernel_estimation/`)
 
