@@ -79,7 +79,7 @@
 | Код | Метод / Название статьи | Год | Литература |
 | :--- | :--- | :---: | :--- |
 | [`bcsnsp_sr`](super_resolution/our_company/bcsnsp_sr) | Bayesian combination of sparse and non-sparse priors in image super resolution | 2013 | [Источники](<../../../references/bcsnsp_sr>) |
-| [`pansharpening`](super_resolution/our_company/selfexsr) | Single Image Super-resolution from Transformed Self-Exemplars | 2015 | [Источник](<../../../references/selfexsr/(2015) Single Image Super-resolution from Transformed Self-Exemplars.pdf>) |
+| [`selfexsr`](super_resolution/our_company/selfexsr) | Single Image Super-resolution from Transformed Self-Exemplars | 2015 | [Источник](<../../../references/selfexsr/(2015) Single Image Super-resolution from Transformed Self-Exemplars.pdf>) |
 | [`pansharpening`](super_resolution/our_company/pansharpening) | Variational Bayesian Pansharpening with Super-Gaussian Sparse Image Priors | 2020 | [Источники](<../../../references/pansharpening/(2020) Variational Bayesian Pansharpening with Super-Gaussian Sparse Image Priors.pdf>) |
 
 Применение Super Resolution перед этапом оценки ядра размытия в Blind Deconvolution особенно полезно на искаженных изображениях с низкой детализацией. 
