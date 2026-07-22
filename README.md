@@ -60,6 +60,12 @@
 ### Визуализация
 - **Построение многомерных Парето-фронтов** (качество, сложность смаза, изолированный вклад шума)
 
+<p align="center">
+  <img src="images/demo/nd_1.png" width="280">
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="images/demo/nd_2.png" width="280">
+</p>
+
 ## Методы восстановления
 - **Байесовские и вариационные подходы методы**:
   - Робастные модели с тяжёлыми хвостами (Hyperbolic-Secant, Mixture of Gaussians, t-Student)
