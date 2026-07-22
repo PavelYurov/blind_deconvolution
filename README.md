@@ -7,11 +7,26 @@
 Данный проект посвящен исследованию и созданию методов Blind Image Deconvolution - восстановления искаженных изображений вслепую без априорной информации о функции рассеяния точки Point Spread Function с интегрированной системой автоматической оптимизации гиперпараметров. Основное внимание уделяется разработке и сравнению алгоритмов, способных реконструировать исходное изображение в условиях высокой неопределенности относительно характера размытия и аппаратного шума.
 
 ##  Полученные результаты
+
+### Бенчмарки
+
+**Levin:**
 <p align="center">
   <img src="images/demo/visual_comparison_best_Levin.png" width="850">
 </p>
 
-На реальных данных без известного эталонного кадра
+**Sun:**
+<p align="center">
+  <img src="images/demo/visual_comparison_best_Sun.png" width="850">
+</p>
+
+**Kohler:**
+<p align="center">
+  <img src="images/demo/visual_comparison_best_Kohler.png" width="850">
+</p>
+
+### Реальные данных без известного заранее эталонного кадра
+
 | Искаженное | Восстановленное | Оцененное ядро |
 | :---: | :---: | :---: |
 | <img src="images/demo/real.png" width="350"> | <img src="images/demo/real_restored.png" width="350"> | <img src="images/demo/real_kernel.png" width="150"> |
