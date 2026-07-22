@@ -9,8 +9,11 @@
 ##  Полученные результаты
 
 <p align="center">
-  <img src="images/demo/visual_comparison_best_Sun.png" width="850">
+  <img src="images/demo/visual_comparison_best_Levin.png" width="850">
 </p>
+
+**[Восстановление на бенчмарках](docs/benchmark_results.md)**
+**[Восстановление для реальных данных](docs/real_results.md)**
 
 ### Цель исследования
 
