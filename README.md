@@ -61,9 +61,9 @@
 - **Построение многомерных Парето-фронтов** (качество, сложность смаза, изолированный вклад шума)
 
 <p align="center">
-  <img src="images/demo/nd_1.png" width="280">
-  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="images/demo/nd_2.png" width="280">
+  <img src="images/demo/nd_1.png" width="750">
+  <br>
+  <img src="images/demo/nd_2.png" width="750">
 </p>
 
 ## Методы восстановления
