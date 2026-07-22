@@ -1,4 +1,4 @@
-# Исследование методов Blind Image Deconvolution
+# Research and Development of Blind Image Deconvolution Methods
 
 [![CI](https://github.com/PavelYurov/blind_deconvolution/actions/workflows/ci.yml/badge.svg?branch=feature/module-redesign)](https://github.com/PavelYurov/blind_deconvolution/actions/workflows/ci.yml)
 
@@ -53,7 +53,7 @@
 ### Основные задачи
 - **Исследование современных методов Blind Deconvolution, Kernel & Noise Estimation, Super-Resolution**
 - **Разработка и имплементация алгоритмов восстановления изображений:** вариационные байесовские, структруные интенсивностные, и разреживающие модели
-- **Создание интегрированной системы автоматической оптимизации гиперпараметров и многокритериального анализа (multiobjectivization):** применение байесовской оптимизации - TPE (Tree-structured Parzen Estimator), MCMC-FMP (MCMC - Factorized Mixture Proposal), а также (t,m,s)-nets (low-discrepancy sequences); построение многомерных Парето‑фронтов для визуализации компромиссов между качеством и устойчивостью к искажениям.
+- **Создание интегрированной системы автоматической оптимизации гиперпараметров и многокритериального анализа (multiobjectivization):** применение байесовской оптимизации - TPE (Tree-structured Parzen Estimator), MCMC-FMP (MCMC - Factorized Mixture Proposal) в сочетании с (t,m,s)-nets (low-discrepancy sequences); построение многомерных Парето‑фронтов для визуализации компромиссов между качеством и устойчивостью к искажениям.
 - **Сравнительный анализ современных подходов** — оценка точности восстановления, качества оценки PSF и вычислительной эффективности разработанных методов
 
 ## Функциональность фреймворка
@@ -81,7 +81,7 @@
 - Оценка устойчивости к шумам
 - Измерение времени выполнения алгоритмов
 
-### Оптимизация гиперпараметров
+### Оптимизации гиперпараметров
 - **TPE**: Tree‑Structured Parzen Estimator
 - **MCMC-FMP**: MCMC - Factorized Mixture Proposal
 - **(t,m,s)-nets**: low-discrepancy sequences   
@@ -91,7 +91,7 @@
 
 ## Методы восстановления
 - **Байесовские и вариационные подходы методы**:
-  - Робастные модели с тяжёлыми хвостами (Hyperbolic-Secant, Mixture of Gaussians, Student‑t)
+  - Робастные модели с тяжёлыми хвостами (Hyperbolic-Secant, Mixture of Gaussians, t-Student)
   - Супергауссовские априорные распределения (Super-Gaussian Priors)
   - Вариационный байесовский вывод (Variational Bayesian Inference)
 - **Методы на основе статистики каналов и градиентов**:
