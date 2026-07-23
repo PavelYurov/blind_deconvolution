@@ -8,29 +8,33 @@
 
 ##  Полученные результаты
 
-### Бенчмарки
+### На бенчмарках
 
-**Levin:**
+**Levin**
 <p align="center">
   <img src="images/demo/visual_comparison_best_Levin.png" width="850">
 </p>
 
-**Sun:**
+**Sun**
 <p align="center">
   <img src="images/demo/visual_comparison_best_Sun.png" width="850">
 </p>
 
-**Kohler:**
+**Kohler**
 <p align="center">
   <img src="images/demo/visual_comparison_best_Kohler.png" width="850">
 </p>
 
-### Реальные данных без известного заранее эталонного кадра
+### На реальных данных без известного заранее эталонного кадра
 
 | Искаженное | Восстановленное | Оцененное ядро |
 | :---: | :---: | :---: |
 | <img src="images/demo/real.png" width="350"> | <img src="images/demo/real_restored.png" width="350"> | <img src="images/demo/real_kernel.png" width="150"> |
 | <img src="images/demo/real2.png" width="350"> | <img src="images/demo/real2_restored.png" width="350"> | <img src="images/demo/real2_kernel.png" width="150"> |
+| <img src="images/demo/real3.png" width="350"> | <img src="images/demo/real3_restored.png" width="350"> | <img src="images/demo/real3_kernel.png" width="150"> |
+| <img src="images/demo/real4.png" width="350"> | <img src="images/demo/real4_restored.png" width="350"> | <img src="images/demo/real4_kernel.png" width="150"> |
+| <img src="images/demo/real5.png" width="350"> | <img src="images/demo/real5_restored.png" width="350"> | <img src="images/demo/real5_kernel.png" width="150"> |
+
 
 ### Цель исследования
 
