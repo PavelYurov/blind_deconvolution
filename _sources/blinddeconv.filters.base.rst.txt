@@ -1,0 +1,7 @@
+blinddeconv.filters.base module
+===============================
+
+.. automodule:: blinddeconv.filters.base
+   :members:
+   :undoc-members:
+   :show-inheritance:

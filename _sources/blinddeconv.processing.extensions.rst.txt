@@ -1,0 +1,20 @@
+blinddeconv.processing.extensions package
+=========================================
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   blinddeconv.processing.extensions.base
+   blinddeconv.processing.extensions.hyperparameter_optimization
+   blinddeconv.processing.extensions.pareto_analysis
+
+Module contents
+---------------
+
+.. automodule:: blinddeconv.processing.extensions
+   :members:
+   :undoc-members:
+   :show-inheritance:

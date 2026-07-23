@@ -1,0 +1,7 @@
+blinddeconv.filters.smooth module
+=================================
+
+.. automodule:: blinddeconv.filters.smooth
+   :members:
+   :undoc-members:
+   :show-inheritance:

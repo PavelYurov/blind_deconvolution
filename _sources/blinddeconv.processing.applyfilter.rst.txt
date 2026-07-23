@@ -1,0 +1,7 @@
+blinddeconv.processing.applyfilter module
+=========================================
+
+.. automodule:: blinddeconv.processing.applyfilter
+   :members:
+   :undoc-members:
+   :show-inheritance:

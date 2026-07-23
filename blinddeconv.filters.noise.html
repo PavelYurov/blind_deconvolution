@@ -1,0 +1,507 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="ru" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>blinddeconv.filters.noise module &mdash; документация BlindDeconvolution 1.0.0</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=e35015f7"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/translations.js?v=5b699b7f"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Алфавитный указатель" href="genindex.html" />
+    <link rel="search" title="Поиск" href="search.html" />
+    <link rel="next" title="blinddeconv.filters.smooth module" href="blinddeconv.filters.smooth.html" />
+    <link rel="prev" title="blinddeconv.filters.distributions module" href="blinddeconv.filters.distributions.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            BlindDeconvolution
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Поиск в документации" aria-label="Поиск в документации" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Меню навигации">
+              <p class="caption" role="heading"><span class="caption-text">Руководство пользователя</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Установка и настройка</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage_guide.html">Руководство пользователя</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Конфигурационные файлы</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_flow.html">Поток данных (Dataflow) через Pipeline</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Архитектура и API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="architecture.html">Архитектура системы</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api_reference.html">API Reference</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Теория методов</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="theory/placeholder.html">Теоретические основы</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Автодокументация модулей</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">src</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="blinddeconv.html">blinddeconv package</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="blinddeconv.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.algorithms.html">blinddeconv.algorithms package</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="blinddeconv.filters.html">blinddeconv.filters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.output.html">blinddeconv.output package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.html">blinddeconv.processing package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.html#module-blinddeconv">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Меню навигации для мобильных устройств" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">BlindDeconvolution</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Навигация по страницам">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="modules.html">src</a></li>
+          <li class="breadcrumb-item"><a href="blinddeconv.html">blinddeconv package</a></li>
+          <li class="breadcrumb-item"><a href="blinddeconv.filters.html">blinddeconv.filters package</a></li>
+      <li class="breadcrumb-item active">blinddeconv.filters.noise module</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/blinddeconv.filters.noise.rst.txt" rel="nofollow"> Просмотреть исходный код страницы</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-blinddeconv.filters.noise">
+<span id="blinddeconv-filters-noise-module"></span><h1>blinddeconv.filters.noise module<a class="headerlink" href="#module-blinddeconv.filters.noise" title="Ссылка на этот заголовок"></a></h1>
+<p>Фильтры добавления шума к изображениям.</p>
+<p>Автор: Юров П.И.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.Brown_Noise">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">blinddeconv.filters.noise.</span></span><span class="sig-name descname"><span class="pre">Brown_Noise</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">noise_level</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.2</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#Brown_Noise"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.Brown_Noise" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <a class="reference internal" href="blinddeconv.filters.base.html#blinddeconv.filters.base.FilterBase" title="blinddeconv.filters.base.FilterBase"><code class="xref py py-class docutils literal notranslate"><span class="pre">FilterBase</span></code></a></p>
+<p>Коричневый шум (1/f)^2.</p>
+<section id="id1">
+<h2>Атрибуты<a class="headerlink" href="#id1" title="Ссылка на этот заголовок"></a></h2>
+<dl class="simple">
+<dt>noise_level<span class="classifier">float</span></dt><dd><p>Уровень шума (0.0 - без шума, 1.0 - сильный шум).</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.Brown_Noise.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">noise_level</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.2</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#Brown_Noise.__init__"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.Brown_Noise.__init__" title="Ссылка на это определение"></a></dt>
+<dd><p>Инициализация.</p>
+<section id="id2">
+<h3>Параметры<a class="headerlink" href="#id2" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>noise_level<span class="classifier">float</span></dt><dd><p>Уровень шума (0.0 - без шума, 1.0 - сильный шум).</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.Brown_Noise.description">
+<span class="sig-name descname"><span class="pre">description</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#Brown_Noise.description"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.Brown_Noise.description" title="Ссылка на это определение"></a></dt>
+<dd><p>Выдает название шума в файловой системе с параметром.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.Brown_Noise.filter">
+<span class="sig-name descname"><span class="pre">filter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">img</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#Brown_Noise.filter"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.Brown_Noise.filter" title="Ссылка на это определение"></a></dt>
+<dd><p>Применяет коричневый шум к изображению.</p>
+</dd></dl>
+
+</section>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.ColoredNoise">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">blinddeconv.filters.noise.</span></span><span class="sig-name descname"><span class="pre">ColoredNoise</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">noise_level</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">beta</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#ColoredNoise"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.ColoredNoise" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <a class="reference internal" href="blinddeconv.filters.base.html#blinddeconv.filters.base.FilterBase" title="blinddeconv.filters.base.FilterBase"><code class="xref py py-class docutils literal notranslate"><span class="pre">FilterBase</span></code></a></p>
+<p>Цветной шум (1/f)^beta.</p>
+<section id="id3">
+<h2>Атрибуты<a class="headerlink" href="#id3" title="Ссылка на этот заголовок"></a></h2>
+<dl class="simple">
+<dt>noise_level<span class="classifier">float</span></dt><dd><p>Уровень шума (0.0 - без шума, 1.0 - сильный шум).</p>
+</dd>
+<dt>beta<span class="classifier">float</span></dt><dd><p>Параметр спектрального наклона (1.0 = розовый шум, 2.0 = коричневый).</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.ColoredNoise.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">noise_level</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">beta</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#ColoredNoise.__init__"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.ColoredNoise.__init__" title="Ссылка на это определение"></a></dt>
+<dd><p>Инициализация.</p>
+<section id="id4">
+<h3>Параметры<a class="headerlink" href="#id4" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>noise_level<span class="classifier">float</span></dt><dd><p>Уровень шума (0.0 - без шума, 1.0 - сильный шум).</p>
+</dd>
+<dt>beta<span class="classifier">float</span></dt><dd><p>Параметр спектрального наклона (1.0 = розовый, 2.0 = коричневый).</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.ColoredNoise.description">
+<span class="sig-name descname"><span class="pre">description</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#ColoredNoise.description"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.ColoredNoise.description" title="Ссылка на это определение"></a></dt>
+<dd><p>Выдает название шума в файловой системе с параметром.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.ColoredNoise.filter">
+<span class="sig-name descname"><span class="pre">filter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">img</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#ColoredNoise.filter"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.ColoredNoise.filter" title="Ссылка на это определение"></a></dt>
+<dd><p>Применяет цветной шум к изображению.</p>
+</dd></dl>
+
+</section>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.GaussianNoise">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">blinddeconv.filters.noise.</span></span><span class="sig-name descname"><span class="pre">GaussianNoise</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">param</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#GaussianNoise"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.GaussianNoise" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <a class="reference internal" href="blinddeconv.filters.base.html#blinddeconv.filters.base.FilterBase" title="blinddeconv.filters.base.FilterBase"><code class="xref py py-class docutils literal notranslate"><span class="pre">FilterBase</span></code></a></p>
+<p>Фильтр аддитивного гауссовского шума.</p>
+<p>Добавляет нормально распределенный шум с заданным стандартным отклонением.</p>
+<section id="id5">
+<h2>Атрибуты<a class="headerlink" href="#id5" title="Ссылка на этот заголовок"></a></h2>
+<dl class="simple">
+<dt>param<span class="classifier">float</span></dt><dd><p>Стандартное отклонение гауссовского шума.</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.GaussianNoise.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">param</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#GaussianNoise.__init__"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.GaussianNoise.__init__" title="Ссылка на это определение"></a></dt>
+<dd><p>Инициализация фильтра гауссовского шума.</p>
+<section id="id6">
+<h3>Параметры<a class="headerlink" href="#id6" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>param<span class="classifier">float</span></dt><dd><p>Стандартное отклонение шума (должно быть положительным).</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.GaussianNoise.description">
+<span class="sig-name descname"><span class="pre">description</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#GaussianNoise.description"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.GaussianNoise.description" title="Ссылка на это определение"></a></dt>
+<dd><p>Выдает название шума в файловой системе с параметром.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.GaussianNoise.filter">
+<span class="sig-name descname"><span class="pre">filter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">image</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#GaussianNoise.filter"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.GaussianNoise.filter" title="Ссылка на это определение"></a></dt>
+<dd><p>Применение гауссовского шума к изображению.</p>
+<section id="id7">
+<h3>Параметры<a class="headerlink" href="#id7" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>image<span class="classifier">np.ndarray</span></dt><dd><p>Входное изображение (любой тип, будет преобразовано в float32).</p>
+</dd>
+</dl>
+</section>
+<section id="id8">
+<h3>Возвращает<a class="headerlink" href="#id8" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>np.ndarray</dt><dd><p>Зашумленное изображение (той же формы и типа, что и входное).</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+</section>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.OldPhotoNoise">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">blinddeconv.filters.noise.</span></span><span class="sig-name descname"><span class="pre">OldPhotoNoise</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">strength</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(в Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">30</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">f3dB</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.05</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">apply_highpass</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(в Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">highpass_cutoff</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.01</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#OldPhotoNoise"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.OldPhotoNoise" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <a class="reference internal" href="blinddeconv.filters.base.html#blinddeconv.filters.base.FilterBase" title="blinddeconv.filters.base.FilterBase"><code class="xref py py-class docutils literal notranslate"><span class="pre">FilterBase</span></code></a></p>
+<p>Коричневый шум для имитации старых фотографий.</p>
+<section id="id9">
+<h2>Атрибуты<a class="headerlink" href="#id9" title="Ссылка на этот заголовок"></a></h2>
+<dl class="simple">
+<dt>strength<span class="classifier">int</span></dt><dd><p>Сила шума (0-255).</p>
+</dd>
+<dt>f3dB<span class="classifier">float</span></dt><dd><p>Частота среза экспоненциального фильтра (0-0.5).</p>
+</dd>
+<dt>fs<span class="classifier">float</span></dt><dd><p>Псевдо-частота дискретизации.</p>
+</dd>
+<dt>apply_highpass<span class="classifier">bool</span></dt><dd><p>Применять ли high-pass фильтр.</p>
+</dd>
+<dt>highpass_cutoff<span class="classifier">float</span></dt><dd><p>Cutoff частота для high-pass фильтра.</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.OldPhotoNoise.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">strength</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(в Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">30</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">f3dB</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.05</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">apply_highpass</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(в Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">highpass_cutoff</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.01</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#OldPhotoNoise.__init__"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.OldPhotoNoise.__init__" title="Ссылка на это определение"></a></dt>
+<dd><p>Инициализация.</p>
+<section id="id10">
+<h3>Параметры<a class="headerlink" href="#id10" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>strength<span class="classifier">int</span></dt><dd><p>Сила шума (0-255).</p>
+</dd>
+<dt>f3dB<span class="classifier">float</span></dt><dd><p>Частота среза экспоненциального фильтра (0-0.5).</p>
+</dd>
+<dt>fs<span class="classifier">float</span></dt><dd><p>Псевдо-частота дискретизации.</p>
+</dd>
+<dt>apply_highpass<span class="classifier">bool</span></dt><dd><p>Применять ли high-pass фильтр.</p>
+</dd>
+<dt>highpass_cutoff<span class="classifier">float</span></dt><dd><p>Cutoff частота для high-pass фильтра.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.OldPhotoNoise.description">
+<span class="sig-name descname"><span class="pre">description</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#OldPhotoNoise.description"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.OldPhotoNoise.description" title="Ссылка на это определение"></a></dt>
+<dd><p>Выдает название шума в файловой системе с параметром.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.OldPhotoNoise.filter">
+<span class="sig-name descname"><span class="pre">filter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">img</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#OldPhotoNoise.filter"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.OldPhotoNoise.filter" title="Ссылка на это определение"></a></dt>
+<dd><p>Применяет 2D Brownian шум к изображению.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.OldPhotoNoise.find_alpha">
+<span class="sig-name descname"><span class="pre">find_alpha</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">Fs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">f3dB</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#OldPhotoNoise.find_alpha"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.OldPhotoNoise.find_alpha" title="Ссылка на это определение"></a></dt>
+<dd><p>Вычислить альфу для экспоненциального фильтра.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.OldPhotoNoise.generate_2d_brownian_noise">
+<span class="sig-name descname"><span class="pre">generate_2d_brownian_noise</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">shape</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(в Python v3.14)"><span class="pre">Tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(в Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(в Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#OldPhotoNoise.generate_2d_brownian_noise"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.OldPhotoNoise.generate_2d_brownian_noise" title="Ссылка на это определение"></a></dt>
+<dd><p>Создает 2D коричневый шум с фильтрацией по строкам и столбцам.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.OldPhotoNoise.high_pass_filter_2d">
+<span class="sig-name descname"><span class="pre">high_pass_filter_2d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">img</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">fs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">cutoff</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.01</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#OldPhotoNoise.high_pass_filter_2d"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.OldPhotoNoise.high_pass_filter_2d" title="Ссылка на это определение"></a></dt>
+<dd><p>Применяет 2D high-pass фильтр через Butterworth.</p>
+</dd></dl>
+
+</section>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.Pink_Noise">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">blinddeconv.filters.noise.</span></span><span class="sig-name descname"><span class="pre">Pink_Noise</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">noise_level</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.2</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#Pink_Noise"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.Pink_Noise" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <a class="reference internal" href="blinddeconv.filters.base.html#blinddeconv.filters.base.FilterBase" title="blinddeconv.filters.base.FilterBase"><code class="xref py py-class docutils literal notranslate"><span class="pre">FilterBase</span></code></a></p>
+<p>Розовый шум (1/f).</p>
+<section id="id11">
+<h2>Атрибуты<a class="headerlink" href="#id11" title="Ссылка на этот заголовок"></a></h2>
+<dl class="simple">
+<dt>noise_level<span class="classifier">float</span></dt><dd><p>Уровень шума (0.0 - без шума, 1.0 - сильный шум).</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.Pink_Noise.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">noise_level</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.2</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#Pink_Noise.__init__"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.Pink_Noise.__init__" title="Ссылка на это определение"></a></dt>
+<dd><p>Инициализация.</p>
+<section id="id12">
+<h3>Параметры<a class="headerlink" href="#id12" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>noise_level<span class="classifier">float</span></dt><dd><p>Уровень шума (0.0 - без шума, 1.0 - сильный шум).</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.Pink_Noise.description">
+<span class="sig-name descname"><span class="pre">description</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#Pink_Noise.description"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.Pink_Noise.description" title="Ссылка на это определение"></a></dt>
+<dd><p>Выдает название шума в файловой системе с параметром.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.Pink_Noise.filter">
+<span class="sig-name descname"><span class="pre">filter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">img</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#Pink_Noise.filter"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.Pink_Noise.filter" title="Ссылка на это определение"></a></dt>
+<dd><p>Применяет розовый шум к изображению.</p>
+</dd></dl>
+
+</section>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.PoissonNoise">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">blinddeconv.filters.noise.</span></span><span class="sig-name descname"><span class="pre">PoissonNoise</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">param</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#PoissonNoise"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.PoissonNoise" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <a class="reference internal" href="blinddeconv.filters.base.html#blinddeconv.filters.base.FilterBase" title="blinddeconv.filters.base.FilterBase"><code class="xref py py-class docutils literal notranslate"><span class="pre">FilterBase</span></code></a></p>
+<p>Фильтр пуассоновского шума (шума дробления).</p>
+<p>Имитирует шум подсчета фотонов с пуассоновской статистикой.</p>
+<section id="id13">
+<h2>Атрибуты<a class="headerlink" href="#id13" title="Ссылка на этот заголовок"></a></h2>
+<dl class="simple">
+<dt>param<span class="classifier">float</span></dt><dd><p>Интенсивность шума (от 0.0 до 1.0).</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.PoissonNoise.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">param</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#PoissonNoise.__init__"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.PoissonNoise.__init__" title="Ссылка на это определение"></a></dt>
+<dd><p>Инициализация фильтра пуассоновского шума.</p>
+<section id="id14">
+<h3>Параметры<a class="headerlink" href="#id14" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>param<span class="classifier">float</span></dt><dd><p>Интенсивность шума (от 0.0 до 1.0).</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.PoissonNoise.description">
+<span class="sig-name descname"><span class="pre">description</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#PoissonNoise.description"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.PoissonNoise.description" title="Ссылка на это определение"></a></dt>
+<dd><p>Выдает название шума в файловой системе с параметром.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.PoissonNoise.filter">
+<span class="sig-name descname"><span class="pre">filter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">image</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#PoissonNoise.filter"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.PoissonNoise.filter" title="Ссылка на это определение"></a></dt>
+<dd><p>Применение пуассоновского шума к изображению.</p>
+<section id="id15">
+<h3>Параметры<a class="headerlink" href="#id15" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>image<span class="classifier">np.ndarray</span></dt><dd><p>Входное изображение (любой тип).</p>
+</dd>
+</dl>
+</section>
+<section id="id16">
+<h3>Возвращает<a class="headerlink" href="#id16" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>np.ndarray</dt><dd><p>Зашумленное изображение (той же формы и типа, что и входное).</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+</section>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.SaltAndPepperNoise">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">blinddeconv.filters.noise.</span></span><span class="sig-name descname"><span class="pre">SaltAndPepperNoise</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">param</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(в Python v3.14)"><span class="pre">Tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#SaltAndPepperNoise"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.SaltAndPepperNoise" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <a class="reference internal" href="blinddeconv.filters.base.html#blinddeconv.filters.base.FilterBase" title="blinddeconv.filters.base.FilterBase"><code class="xref py py-class docutils literal notranslate"><span class="pre">FilterBase</span></code></a></p>
+<p>Фильтр импульсного шума (типа «соль-перец»).</p>
+<p>Добавляет случайные белые (соль) и черные (перец) пиксели к изображению.</p>
+<section id="id17">
+<h2>Атрибуты<a class="headerlink" href="#id17" title="Ссылка на этот заголовок"></a></h2>
+<dl class="simple">
+<dt>white_pixel<span class="classifier">float</span></dt><dd><p>Относительная интенсивность белых пикселей (соль).</p>
+</dd>
+<dt>black_pixel<span class="classifier">float</span></dt><dd><p>Относительная интенсивность черных пикселей (перец).</p>
+</dd>
+<dt>noise_amount<span class="classifier">int</span></dt><dd><p>Максимальное количество зашумляемых пикселей.</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.SaltAndPepperNoise.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">param</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(в Python v3.14)"><span class="pre">Tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#SaltAndPepperNoise.__init__"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.SaltAndPepperNoise.__init__" title="Ссылка на это определение"></a></dt>
+<dd><p>Инициализация фильтра шума «соль-перец».</p>
+<section id="id18">
+<h3>Параметры<a class="headerlink" href="#id18" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>param<span class="classifier">Tuple[float, float, float]</span></dt><dd><p>Кортеж, содержащий:
+- white_pixel: Относительное количество белых пикселей (&gt;=0).
+- black_pixel: Относительное количество черных пикселей (&gt;=0).
+- noise_amount: Максимальное число изменяемых пикселей (&gt;=0).</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.SaltAndPepperNoise.description">
+<span class="sig-name descname"><span class="pre">description</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#SaltAndPepperNoise.description"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.SaltAndPepperNoise.description" title="Ссылка на это определение"></a></dt>
+<dd><p>Выдает название шума в файловой системе с параметром.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.noise.SaltAndPepperNoise.filter">
+<span class="sig-name descname"><span class="pre">filter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">image</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/noise.html#SaltAndPepperNoise.filter"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.noise.SaltAndPepperNoise.filter" title="Ссылка на это определение"></a></dt>
+<dd><p>Применение шума «соль-перец» к входному изображению.</p>
+<section id="id19">
+<h3>Параметры<a class="headerlink" href="#id19" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>image<span class="classifier">np.ndarray</span></dt><dd><p>Входное изображение (в градациях серого или цветное).</p>
+</dd>
+</dl>
+</section>
+<section id="id20">
+<h3>Возвращает<a class="headerlink" href="#id20" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>np.ndarray</dt><dd><p>Изображение с добавленным шумом «соль-перец».</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+</section>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Нижняя область">
+        <a href="blinddeconv.filters.distributions.html" class="btn btn-neutral float-left" title="blinddeconv.filters.distributions module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Предыдущая</a>
+        <a href="blinddeconv.filters.smooth.html" class="btn btn-neutral float-right" title="blinddeconv.filters.smooth module" accesskey="n" rel="next">Следующая <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Авторские права 2024-2026, Юров П.И., Беззаборов А.А., Куропатов К.Л., Малыш Я.В.. </p>
+  </div>
+
+  Собрано при помощи <a href="https://www.sphinx-doc.org/">Sphinx</a> с использованием
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">темы,</a>
+    предоставленной <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

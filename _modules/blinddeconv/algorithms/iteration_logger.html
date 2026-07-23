@@ -1,0 +1,393 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="ru" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>blinddeconv.algorithms.iteration_logger &mdash; документация BlindDeconvolution 1.0.0</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=e35015f7"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/translations.js?v=5b699b7f"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Алфавитный указатель" href="../../../genindex.html" />
+    <link rel="search" title="Поиск" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            BlindDeconvolution
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Поиск в документации" aria-label="Поиск в документации" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Меню навигации">
+              <p class="caption" role="heading"><span class="caption-text">Руководство пользователя</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../installation.html">Установка и настройка</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../usage_guide.html">Руководство пользователя</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Конфигурационные файлы</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../data_flow.html">Поток данных (Dataflow) через Pipeline</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Архитектура и API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../architecture.html">Архитектура системы</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api_reference.html">API Reference</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Теория методов</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../theory/placeholder.html">Теоретические основы</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Автодокументация модулей</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">src</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Меню навигации для мобильных устройств" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">BlindDeconvolution</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Навигация по страницам">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Код модуля</a></li>
+      <li class="breadcrumb-item active">blinddeconv.algorithms.iteration_logger</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Исходный код blinddeconv.algorithms.iteration_logger</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Универсальный логгер итераций для алгоритмов слепой деконволюции.</span>
+
+<span class="sd">Используется как callback: alg.set_callback(logger) перед alg.process().</span>
+<span class="sd">Собирает промежуточные ядра, изображения, метрики и сохраняет их.</span>
+
+<span class="sd">Пример использования:</span>
+<span class="sd">    from blinddeconv.algorithms.iteration_logger import IterationLogger</span>
+
+<span class="sd">    logger = IterationLogger(</span>
+<span class="sd">        save_dir=Path(&quot;results/iterations/img1&quot;),</span>
+<span class="sd">        original=original_image,       # для PSNR/SSIM</span>
+<span class="sd">        gt_kernel=gt_kernel,           # для kernel MSE / error ratio</span>
+<span class="sd">        blurred=blurred_image,         # для non-blind восстановления</span>
+<span class="sd">        nonblind_func=my_nonblind,     # callable(blurred, kernel) -&gt; restored</span>
+<span class="sd">        save_kernel_every=5,</span>
+<span class="sd">        save_image_every=10,</span>
+<span class="sd">    )</span>
+<span class="sd">    alg.set_callback(logger)</span>
+<span class="sd">    restored, kernel = alg.process(blurred)</span>
+<span class="sd">    logger.save_csv()</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">cv2</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">cv</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Callable</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_find_project_root</span><span class="p">(</span><span class="n">start</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="n">start</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+    <span class="k">while</span> <span class="ow">not</span> <span class="p">(</span><span class="n">path</span> <span class="o">/</span> <span class="s2">&quot;pyproject.toml&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">parent</span> <span class="o">==</span> <span class="n">path</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Cannot locate project root&quot;</span><span class="p">)</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">parent</span>
+    <span class="k">return</span> <span class="n">path</span>
+
+
+<span class="n">_CURRENT_FILE</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+<span class="n">_PROJECT_ROOT</span> <span class="o">=</span> <span class="n">_find_project_root</span><span class="p">(</span><span class="n">_CURRENT_FILE</span><span class="p">)</span>
+<span class="n">_SRC_DIR</span> <span class="o">=</span> <span class="n">_PROJECT_ROOT</span> <span class="o">/</span> <span class="s2">&quot;src&quot;</span>
+<span class="n">_ALGORITHMS_DIR</span> <span class="o">=</span> <span class="n">_SRC_DIR</span> <span class="o">/</span> <span class="s2">&quot;blinddeconv&quot;</span> <span class="o">/</span> <span class="s2">&quot;algorithms&quot;</span>
+
+<span class="k">for</span> <span class="n">_path</span> <span class="ow">in</span> <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">_SRC_DIR</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">_ALGORITHMS_DIR</span><span class="p">)]:</span>
+    <span class="k">if</span> <span class="n">_path</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="p">:</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">_path</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="IterationLogger">
+<a class="viewcode-back" href="../../../blinddeconv.algorithms.iteration_logger.html#blinddeconv.algorithms.iteration_logger.IterationLogger">[документация]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">IterationLogger</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Callback-логгер для сбора промежуточных результатов по итерациям.</span>
+
+<span class="sd">    Вызывается алгоритмом как self._callback(state), где state — dict:</span>
+<span class="sd">        &#39;iteration&#39;  : int   — номер итерации (внутри текущего масштаба)</span>
+<span class="sd">        &#39;scale&#39;      : int   — индекс масштаба пирамиды (0 = финальный)</span>
+<span class="sd">        &#39;num_scales&#39; : int   — всего масштабов</span>
+<span class="sd">        &#39;kernel&#39;     : ndarray — текущая оценка ядра</span>
+<span class="sd">        &#39;image&#39;      : ndarray or None — текущее латентное изображение</span>
+<span class="sd">        &#39;metrics&#39;    : dict  — доп. метрики из алгоритма (kernel_diff, beta, ...)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="IterationLogger.__init__">
+<a class="viewcode-back" href="../../../blinddeconv.algorithms.iteration_logger.html#blinddeconv.algorithms.iteration_logger.IterationLogger.__init__">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">save_dir</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">original</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">gt_kernel</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">blurred</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">nonblind_func</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">save_kernel_every</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span>
+        <span class="n">save_image_every</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
+        <span class="n">only_finest_scale</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        save_dir : Path</span>
+<span class="sd">            Папка для сохранения (создаётся автоматически).</span>
+<span class="sd">        original : ndarray or None</span>
+<span class="sd">            Оригинальное изображение float64 [0,1] для вычисления PSNR/SSIM.</span>
+<span class="sd">        gt_kernel : ndarray or None</span>
+<span class="sd">            Истинное ядро float64 (нормализованное, sum=1) для kernel MSE.</span>
+<span class="sd">        blurred : ndarray or None</span>
+<span class="sd">            Размытое изображение float64 [0,1] для non-blind восстановления.</span>
+<span class="sd">        nonblind_func : callable or None</span>
+<span class="sd">            Функция (blurred, kernel) -&gt; restored_float64 для полного</span>
+<span class="sd">            non-blind шага на каждой сохраняемой итерации.</span>
+<span class="sd">        save_kernel_every : int</span>
+<span class="sd">            Сохранять ядро как PNG каждые N итераций (только finest scale).</span>
+<span class="sd">        save_image_every : int</span>
+<span class="sd">            Сохранять восстановленное изображение каждые N итераций.</span>
+<span class="sd">            Требует nonblind_func и blurred.</span>
+<span class="sd">        only_finest_scale : bool</span>
+<span class="sd">            Если True — логируем только finest scale (scale=0).</span>
+<span class="sd">            Если False — логируем все масштабы.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">save_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">save_dir</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">save_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">save_dir</span> <span class="o">/</span> <span class="s2">&quot;kernels&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">save_dir</span> <span class="o">/</span> <span class="s2">&quot;restored&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">original</span> <span class="o">=</span> <span class="n">original</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">gt_kernel</span> <span class="o">=</span> <span class="n">gt_kernel</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">blurred</span> <span class="o">=</span> <span class="n">blurred</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">nonblind_func</span> <span class="o">=</span> <span class="n">nonblind_func</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">save_kernel_every</span> <span class="o">=</span> <span class="n">save_kernel_every</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">save_image_every</span> <span class="o">=</span> <span class="n">save_image_every</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">only_finest_scale</span> <span class="o">=</span> <span class="n">only_finest_scale</span>
+
+        <span class="c1"># Глобальный счётчик итераций (через все масштабы)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">global_iter</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="c1"># Счётчик итераций внутри finest scale</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_finest_iter</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="c1"># Лог: список словарей, каждый — одна итерация</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span> <span class="o">=</span> <span class="p">[]</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Вызывается алгоритмом на каждой итерации.&quot;&quot;&quot;</span>
+        <span class="n">scale</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;scale&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">num_scales</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;num_scales&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">iteration</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;iteration&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">global_iter</span><span class="p">)</span>
+        <span class="n">kernel</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;kernel&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">image</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;image&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">metrics</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;metrics&#39;</span><span class="p">,</span> <span class="p">{})</span>
+
+        <span class="n">is_finest</span> <span class="o">=</span> <span class="p">(</span><span class="n">scale</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">only_finest_scale</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">is_finest</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">global_iter</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">return</span>
+
+        <span class="k">if</span> <span class="n">is_finest</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_finest_iter</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">local_iter</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_finest_iter</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">local_iter</span> <span class="o">=</span> <span class="n">iteration</span>
+
+        <span class="c1"># Базовая строка лога</span>
+        <span class="n">row</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;global_iter&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">global_iter</span><span class="p">,</span>
+            <span class="s1">&#39;scale&#39;</span><span class="p">:</span> <span class="n">scale</span><span class="p">,</span>
+            <span class="s1">&#39;num_scales&#39;</span><span class="p">:</span> <span class="n">num_scales</span><span class="p">,</span>
+            <span class="s1">&#39;local_iter&#39;</span><span class="p">:</span> <span class="n">local_iter</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="n">row</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">metrics</span><span class="p">)</span>
+
+        <span class="c1"># Kernel MSE (если есть GT ядро)</span>
+        <span class="k">if</span> <span class="n">kernel</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">gt_kernel</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">k_est</span> <span class="o">=</span> <span class="n">kernel</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">k_est</span><span class="o">.</span><span class="n">ndim</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="n">k_est</span> <span class="o">=</span> <span class="n">k_est</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]</span>
+            <span class="n">k_est_norm</span> <span class="o">=</span> <span class="n">k_est</span> <span class="o">/</span> <span class="p">(</span><span class="n">k_est</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">+</span> <span class="mf">1e-12</span><span class="p">)</span>
+
+            <span class="n">k_gt</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">gt_kernel</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">k_gt</span><span class="o">.</span><span class="n">ndim</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="n">k_gt</span> <span class="o">=</span> <span class="n">k_gt</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]</span>
+            <span class="n">k_gt_norm</span> <span class="o">=</span> <span class="n">k_gt</span> <span class="o">/</span> <span class="p">(</span><span class="n">k_gt</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">+</span> <span class="mf">1e-12</span><span class="p">)</span>
+
+            <span class="c1"># Привести к одному размеру</span>
+            <span class="n">k_est_p</span><span class="p">,</span> <span class="n">k_gt_p</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_match_kernel_sizes</span><span class="p">(</span><span class="n">k_est_norm</span><span class="p">,</span> <span class="n">k_gt_norm</span><span class="p">)</span>
+
+            <span class="n">row</span><span class="p">[</span><span class="s1">&#39;kernel_mse&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">((</span><span class="n">k_est_p</span> <span class="o">-</span> <span class="n">k_gt_p</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">))</span>
+            <span class="n">row</span><span class="p">[</span><span class="s1">&#39;kernel_rmse&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;kernel_mse&#39;</span><span class="p">]))</span>
+            <span class="n">row</span><span class="p">[</span><span class="s1">&#39;kernel_mae&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">k_est_p</span> <span class="o">-</span> <span class="n">k_gt_p</span><span class="p">)))</span>
+
+        <span class="c1"># Сохранение ядра как PNG </span>
+        <span class="k">if</span> <span class="n">kernel</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">local_iter</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">save_kernel_every</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">k_save</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">rot90</span><span class="p">(</span><span class="n">kernel</span><span class="o">.</span><span class="n">copy</span><span class="p">(),</span> <span class="mi">2</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">k_save</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">k_save</span> <span class="o">=</span> <span class="p">(</span><span class="n">k_save</span> <span class="o">/</span> <span class="n">k_save</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">*</span> <span class="mi">255</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+            <span class="n">fname</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;kernel_s</span><span class="si">{</span><span class="n">scale</span><span class="si">}</span><span class="s2">_iter</span><span class="si">{</span><span class="n">local_iter</span><span class="si">:</span><span class="s2">04d</span><span class="si">}</span><span class="s2">.png&quot;</span>
+            <span class="n">cv</span><span class="o">.</span><span class="n">imwrite</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">save_dir</span> <span class="o">/</span> <span class="s2">&quot;kernels&quot;</span> <span class="o">/</span> <span class="n">fname</span><span class="p">),</span> <span class="n">k_save</span><span class="p">)</span>
+
+        <span class="c1"># Non-blind восстановление: метрики каждую итерацию, PNG каждые N</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">kernel</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">nonblind_func</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">blurred</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">restored</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">nonblind_func</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">blurred</span><span class="p">,</span> <span class="n">kernel</span><span class="p">)</span>
+                <span class="n">restored</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">restored</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+
+                <span class="c1"># Сохранение PNG (только каждые save_image_every итераций)</span>
+                <span class="k">if</span> <span class="n">local_iter</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">save_image_every</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">r_save</span> <span class="o">=</span> <span class="p">(</span><span class="n">restored</span> <span class="o">*</span> <span class="mi">255</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+                    <span class="n">fname</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;restored_s</span><span class="si">{</span><span class="n">scale</span><span class="si">}</span><span class="s2">_iter</span><span class="si">{</span><span class="n">local_iter</span><span class="si">:</span><span class="s2">04d</span><span class="si">}</span><span class="s2">.png&quot;</span>
+                    <span class="n">cv</span><span class="o">.</span><span class="n">imwrite</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">save_dir</span> <span class="o">/</span> <span class="s2">&quot;restored&quot;</span> <span class="o">/</span> <span class="n">fname</span><span class="p">),</span> <span class="n">r_save</span><span class="p">)</span>
+
+                <span class="c1"># PSNR / SSIM — считаем каждую итерацию</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">original</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">psnr</span><span class="p">,</span> <span class="n">ssim</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_metrics</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">original</span><span class="p">,</span> <span class="n">restored</span><span class="p">)</span>
+                    <span class="n">row</span><span class="p">[</span><span class="s1">&#39;psnr&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">round</span><span class="p">(</span><span class="n">psnr</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+                    <span class="n">row</span><span class="p">[</span><span class="s1">&#39;ssim&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">round</span><span class="p">(</span><span class="n">ssim</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">row</span><span class="p">[</span><span class="s1">&#39;nonblind_error&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">row</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">global_iter</span> <span class="o">+=</span> <span class="mi">1</span>
+
+<div class="viewcode-block" id="IterationLogger.save_csv">
+<a class="viewcode-back" href="../../../blinddeconv.algorithms.iteration_logger.html#blinddeconv.algorithms.iteration_logger.IterationLogger.save_csv">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">save_csv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;iterations_log.csv&quot;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Сохранить лог итераций в CSV.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">)</span>
+        <span class="n">df</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">save_dir</span> <span class="o">/</span> <span class="n">filename</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="IterationLogger.to_dataframe">
+<a class="viewcode-back" href="../../../blinddeconv.algorithms.iteration_logger.html#blinddeconv.algorithms.iteration_logger.IterationLogger.to_dataframe">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_dataframe</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="IterationLogger.reset">
+<a class="viewcode-back" href="../../../blinddeconv.algorithms.iteration_logger.html#blinddeconv.algorithms.iteration_logger.IterationLogger.reset">[документация]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">reset</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Сброс логгера для повторного использования.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">global_iter</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_finest_iter</span> <span class="o">=</span> <span class="mi">0</span></div>
+
+
+    <span class="c1"># Вспомогательные методы</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_match_kernel_sizes</span><span class="p">(</span><span class="n">k1</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">k2</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Привести два ядра к одному размеру (pad нулями по центру).&quot;&quot;&quot;</span>
+        <span class="n">h</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">k1</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">k2</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">w</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">k1</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">k2</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">_center_pad</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">th</span><span class="p">,</span> <span class="n">tw</span><span class="p">):</span>
+            <span class="n">ph</span> <span class="o">=</span> <span class="n">th</span> <span class="o">-</span> <span class="n">k</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">pw</span> <span class="o">=</span> <span class="n">tw</span> <span class="o">-</span> <span class="n">k</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">pad</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="p">((</span><span class="n">ph</span> <span class="o">//</span> <span class="mi">2</span><span class="p">,</span> <span class="n">ph</span> <span class="o">-</span> <span class="n">ph</span> <span class="o">//</span> <span class="mi">2</span><span class="p">),</span>
+                              <span class="p">(</span><span class="n">pw</span> <span class="o">//</span> <span class="mi">2</span><span class="p">,</span> <span class="n">pw</span> <span class="o">-</span> <span class="n">pw</span> <span class="o">//</span> <span class="mi">2</span><span class="p">)))</span>
+
+        <span class="k">return</span> <span class="n">_center_pad</span><span class="p">(</span><span class="n">k1</span><span class="p">,</span> <span class="n">h</span><span class="p">,</span> <span class="n">w</span><span class="p">),</span> <span class="n">_center_pad</span><span class="p">(</span><span class="n">k2</span><span class="p">,</span> <span class="n">h</span><span class="p">,</span> <span class="n">w</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_compute_metrics</span><span class="p">(</span><span class="n">original</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">restored</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;PSNR и SSIM между двумя float64 [0,1] изображениями.&quot;&quot;&quot;</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">blinddeconv.processing.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">calculate_metrics</span>
+        <span class="n">orig</span> <span class="o">=</span> <span class="n">original</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">orig</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mf">1.0</span><span class="p">:</span>
+            <span class="n">orig</span> <span class="o">/=</span> <span class="mf">255.0</span>
+        <span class="n">rest</span> <span class="o">=</span> <span class="n">restored</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">rest</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mf">1.0</span><span class="p">:</span>
+            <span class="n">rest</span> <span class="o">/=</span> <span class="mf">255.0</span>
+
+        <span class="c1"># Привести к одному количеству каналов</span>
+        <span class="k">if</span> <span class="n">orig</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">3</span> <span class="ow">and</span> <span class="n">rest</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">rest</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">rest</span><span class="p">]</span> <span class="o">*</span> <span class="n">orig</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">orig</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">2</span> <span class="ow">and</span> <span class="n">rest</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="n">orig</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">orig</span><span class="p">]</span> <span class="o">*</span> <span class="n">rest</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="c1"># Обрезать до минимального размера</span>
+        <span class="n">h</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">orig</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">rest</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">w</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">orig</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">rest</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="n">orig</span> <span class="o">=</span> <span class="n">orig</span><span class="p">[:</span><span class="n">h</span><span class="p">,</span> <span class="p">:</span><span class="n">w</span><span class="p">]</span>
+        <span class="n">rest</span> <span class="o">=</span> <span class="n">rest</span><span class="p">[:</span><span class="n">h</span><span class="p">,</span> <span class="p">:</span><span class="n">w</span><span class="p">]</span>
+
+        <span class="n">psnr</span><span class="p">,</span> <span class="n">ssim</span> <span class="o">=</span> <span class="n">calculate_metrics</span><span class="p">(</span><span class="n">orig</span><span class="p">,</span> <span class="n">rest</span><span class="p">,</span> <span class="n">data_range</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">psnr</span><span class="p">,</span> <span class="n">ssim</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Авторские права 2024-2026, Юров П.И., Беззаборов А.А., Куропатов К.Л., Малыш Я.В.. </p>
+  </div>
+
+  Собрано при помощи <a href="https://www.sphinx-doc.org/">Sphinx</a> с использованием
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">темы,</a>
+    предоставленной <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

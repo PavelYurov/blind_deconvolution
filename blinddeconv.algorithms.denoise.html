@@ -1,0 +1,252 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="ru" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>blinddeconv.algorithms.denoise package &mdash; документация BlindDeconvolution 1.0.0</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=e35015f7"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/translations.js?v=5b699b7f"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Алфавитный указатель" href="genindex.html" />
+    <link rel="search" title="Поиск" href="search.html" />
+    <link rel="next" title="blinddeconv.algorithms.denoise.Denoise module" href="blinddeconv.algorithms.denoise.Denoise.html" />
+    <link rel="prev" title="blinddeconv.algorithms package" href="blinddeconv.algorithms.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            BlindDeconvolution
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Поиск в документации" aria-label="Поиск в документации" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Меню навигации">
+              <p class="caption" role="heading"><span class="caption-text">Руководство пользователя</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Установка и настройка</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage_guide.html">Руководство пользователя</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Конфигурационные файлы</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_flow.html">Поток данных (Dataflow) через Pipeline</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Архитектура и API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="architecture.html">Архитектура системы</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api_reference.html">API Reference</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Теория методов</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="theory/placeholder.html">Теоретические основы</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Автодокументация модулей</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">src</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="blinddeconv.html">blinddeconv package</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="blinddeconv.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l4 current"><a class="reference internal" href="blinddeconv.algorithms.html">blinddeconv.algorithms package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.filters.html">blinddeconv.filters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.output.html">blinddeconv.output package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.html">blinddeconv.processing package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.html#module-blinddeconv">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Меню навигации для мобильных устройств" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">BlindDeconvolution</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Навигация по страницам">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="modules.html">src</a></li>
+          <li class="breadcrumb-item"><a href="blinddeconv.html">blinddeconv package</a></li>
+          <li class="breadcrumb-item"><a href="blinddeconv.algorithms.html">blinddeconv.algorithms package</a></li>
+      <li class="breadcrumb-item active">blinddeconv.algorithms.denoise package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/blinddeconv.algorithms.denoise.rst.txt" rel="nofollow"> Просмотреть исходный код страницы</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="blinddeconv-algorithms-denoise-package">
+<h1>blinddeconv.algorithms.denoise package<a class="headerlink" href="#blinddeconv-algorithms-denoise-package" title="Ссылка на этот заголовок"></a></h1>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Ссылка на этот заголовок"></a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="blinddeconv.algorithms.denoise.Denoise.html">blinddeconv.algorithms.denoise.Denoise module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="blinddeconv.algorithms.denoise.Denoise.html#blinddeconv.algorithms.denoise.Denoise.DenoiseWrapper"><code class="docutils literal notranslate"><span class="pre">DenoiseWrapper</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.algorithms.denoise.Denoise.html#blinddeconv.algorithms.denoise.Denoise.DenoiseWrapper.change_param"><code class="docutils literal notranslate"><span class="pre">DenoiseWrapper.change_param()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.algorithms.denoise.Denoise.html#blinddeconv.algorithms.denoise.Denoise.DenoiseWrapper.get_history"><code class="docutils literal notranslate"><span class="pre">DenoiseWrapper.get_history()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.algorithms.denoise.Denoise.html#blinddeconv.algorithms.denoise.Denoise.DenoiseWrapper.get_hyperparams"><code class="docutils literal notranslate"><span class="pre">DenoiseWrapper.get_hyperparams()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.algorithms.denoise.Denoise.html#blinddeconv.algorithms.denoise.Denoise.DenoiseWrapper.get_param"><code class="docutils literal notranslate"><span class="pre">DenoiseWrapper.get_param()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.algorithms.denoise.Denoise.html#blinddeconv.algorithms.denoise.Denoise.DenoiseWrapper.process"><code class="docutils literal notranslate"><span class="pre">DenoiseWrapper.process()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="blinddeconv.algorithms.denoise.Denoise.html#blinddeconv.algorithms.denoise.Denoise.make_size_odd"><code class="docutils literal notranslate"><span class="pre">make_size_odd()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section id="module-blinddeconv.algorithms.denoise">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-blinddeconv.algorithms.denoise" title="Ссылка на этот заголовок"></a></h2>
+<p>Denoise Algorithm Module</p>
+<p>Pure image denoising wrapper algorithm with automatic noise estimation
+and support for 7 different denoiser backends.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="blinddeconv.algorithms.denoise.DenoiseWrapper">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">blinddeconv.algorithms.denoise.</span></span><span class="sig-name descname"><span class="pre">DenoiseWrapper</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'bm3d'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">noise_estimation</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'chen'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">denoiser_params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(в Python v3.14)"><span class="pre">dict</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">noise_estimation_params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(в Python v3.14)"><span class="pre">dict</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(в Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/blinddeconv/algorithms/denoise/Denoise.html#DenoiseWrapper"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.algorithms.denoise.DenoiseWrapper" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <a class="reference internal" href="blinddeconv.algorithms.base.html#blinddeconv.algorithms.base.DeconvolutionAlgorithm" title="blinddeconv.algorithms.base.DeconvolutionAlgorithm"><code class="xref py py-class docutils literal notranslate"><span class="pre">DeconvolutionAlgorithm</span></code></a></p>
+<p>Алгоритм-обертка для применения методов шумоподавления в рамках
+инфраструктуры слепой деконволюции.</p>
+<p>Применяет одиночный фильтр с параметрами, которые могут вычисляться
+адаптивно на основе оценки уровня шума. Возвращаемая функция рассеяния
+точки представляет собой единичный импульс в центре.</p>
+<section id="id1">
+<h3>Параметры<a class="headerlink" href="#id1" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>method<span class="classifier">str</span></dt><dd><p>Идентификатор метода шумоподавления. Допустимые значения: „bm3d“,
+„guided“, „bilateral“, „nlm“, „tv“, „vst+bm3d“, „act“, „median“.</p>
+</dd>
+<dt>noise_estimation<span class="classifier">str</span></dt><dd><p>Идентификатор метода оценки шума: „chen“, „pca“ или „none“.
+При значении „none“ используются параметры фильтра по умолчанию.</p>
+</dd>
+<dt>denoiser_params<span class="classifier">dict, опционально</span></dt><dd><p>Словарь специфических параметров для выбранного метода шумоподавления.</p>
+</dd>
+<dt>noise_estimation_params<span class="classifier">dict, опционально</span></dt><dd><p>Словарь параметров для алгоритма оценки шума.</p>
+</dd>
+<dt>verbose<span class="classifier">bool, по умолчанию False</span></dt><dd><p>Флаг вывода диагностической информации в консоль.</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.algorithms.denoise.DenoiseWrapper.change_param">
+<span class="sig-name descname"><span class="pre">change_param</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(в Python v3.14)"><span class="pre">Dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(в Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/algorithms/denoise/Denoise.html#DenoiseWrapper.change_param"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.algorithms.denoise.DenoiseWrapper.change_param" title="Ссылка на это определение"></a></dt>
+<dd><p>Изменение гиперпараметров алгоритма.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Параметры<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>param</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(в Python v3.14)"><em>dict</em></a>) – Словарь с параметрами для изменения.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.algorithms.denoise.DenoiseWrapper.get_history">
+<span class="sig-name descname"><span class="pre">get_history</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(в Python v3.14)"><span class="pre">dict</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/algorithms/denoise/Denoise.html#DenoiseWrapper.get_history"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.algorithms.denoise.DenoiseWrapper.get_history" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.algorithms.denoise.DenoiseWrapper.get_hyperparams">
+<span class="sig-name descname"><span class="pre">get_hyperparams</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(в Python v3.14)"><span class="pre">dict</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/algorithms/denoise/Denoise.html#DenoiseWrapper.get_hyperparams"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.algorithms.denoise.DenoiseWrapper.get_hyperparams" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.algorithms.denoise.DenoiseWrapper.get_param">
+<span class="sig-name descname"><span class="pre">get_param</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(в Python v3.14)"><span class="pre">List</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(в Python v3.14)"><span class="pre">Tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(в Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/blinddeconv/algorithms/denoise/Denoise.html#DenoiseWrapper.get_param"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.algorithms.denoise.DenoiseWrapper.get_param" title="Ссылка на это определение"></a></dt>
+<dd><p>Получение текущих гиперпараметров алгоритма.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Результат<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>params</strong> – Список кортежей (название_параметра, значение).</p>
+</dd>
+<dt class="field-even">Тип результата<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(в Python v3.14)">list</a> of <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(в Python v3.14)">tuple</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.algorithms.denoise.DenoiseWrapper.process">
+<span class="sig-name descname"><span class="pre">process</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">image</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(в Python v3.14)"><span class="pre">Tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/blinddeconv/algorithms/denoise/Denoise.html#DenoiseWrapper.process"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.algorithms.denoise.DenoiseWrapper.process" title="Ссылка на это определение"></a></dt>
+<dd><p>Выполнение процедуры шумоподавления для входного изображения.</p>
+<section id="id2">
+<h4>Параметры<a class="headerlink" href="#id2" title="Ссылка на этот заголовок"></a></h4>
+<dl class="simple">
+<dt>image<span class="classifier">ndarray</span></dt><dd><p>Входное изображение размерности (H, W) или (H, W, 3).</p>
+</dd>
+</dl>
+</section>
+<section id="id3">
+<h4>Возвращает<a class="headerlink" href="#id3" title="Ссылка на этот заголовок"></a></h4>
+<dl class="simple">
+<dt>x_final<span class="classifier">ndarray</span></dt><dd><p>Отфильтрованное изображение в формате int16 [0, 255].</p>
+</dd>
+<dt>h<span class="classifier">ndarray</span></dt><dd><p>Функция рассеяния точки (матрица 1x1 с единицей).</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+</section>
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Нижняя область">
+        <a href="blinddeconv.algorithms.html" class="btn btn-neutral float-left" title="blinddeconv.algorithms package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Предыдущая</a>
+        <a href="blinddeconv.algorithms.denoise.Denoise.html" class="btn btn-neutral float-right" title="blinddeconv.algorithms.denoise.Denoise module" accesskey="n" rel="next">Следующая <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Авторские права 2024-2026, Юров П.И., Беззаборов А.А., Куропатов К.Л., Малыш Я.В.. </p>
+  </div>
+
+  Собрано при помощи <a href="https://www.sphinx-doc.org/">Sphinx</a> с использованием
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">темы,</a>
+    предоставленной <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

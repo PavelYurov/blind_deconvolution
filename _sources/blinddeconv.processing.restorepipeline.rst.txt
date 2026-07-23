@@ -1,0 +1,7 @@
+blinddeconv.processing.restorepipeline module
+=============================================
+
+.. automodule:: blinddeconv.processing.restorepipeline
+   :members:
+   :undoc-members:
+   :show-inheritance:

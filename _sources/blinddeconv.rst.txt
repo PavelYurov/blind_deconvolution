@@ -1,0 +1,21 @@
+blinddeconv package
+===================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   blinddeconv.algorithms
+   blinddeconv.filters
+   blinddeconv.output
+   blinddeconv.processing
+
+Module contents
+---------------
+
+.. automodule:: blinddeconv
+   :members:
+   :undoc-members:
+   :show-inheritance:

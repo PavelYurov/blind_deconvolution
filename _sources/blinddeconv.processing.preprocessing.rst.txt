@@ -1,0 +1,7 @@
+blinddeconv.processing.preprocessing module
+===========================================
+
+.. automodule:: blinddeconv.processing.preprocessing
+   :members:
+   :undoc-members:
+   :show-inheritance:

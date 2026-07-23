@@ -1,0 +1,311 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="ru" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>blinddeconv.filters.distributions module &mdash; документация BlindDeconvolution 1.0.0</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=e35015f7"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/translations.js?v=5b699b7f"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Алфавитный указатель" href="genindex.html" />
+    <link rel="search" title="Поиск" href="search.html" />
+    <link rel="next" title="blinddeconv.filters.noise module" href="blinddeconv.filters.noise.html" />
+    <link rel="prev" title="blinddeconv.filters.denoise module" href="blinddeconv.filters.denoise.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            BlindDeconvolution
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Поиск в документации" aria-label="Поиск в документации" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Меню навигации">
+              <p class="caption" role="heading"><span class="caption-text">Руководство пользователя</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Установка и настройка</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage_guide.html">Руководство пользователя</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Конфигурационные файлы</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_flow.html">Поток данных (Dataflow) через Pipeline</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Архитектура и API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="architecture.html">Архитектура системы</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api_reference.html">API Reference</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Теория методов</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="theory/placeholder.html">Теоретические основы</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Автодокументация модулей</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">src</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="blinddeconv.html">blinddeconv package</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="blinddeconv.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.algorithms.html">blinddeconv.algorithms package</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="blinddeconv.filters.html">blinddeconv.filters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.output.html">blinddeconv.output package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.html">blinddeconv.processing package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.html#module-blinddeconv">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Меню навигации для мобильных устройств" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">BlindDeconvolution</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Навигация по страницам">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="modules.html">src</a></li>
+          <li class="breadcrumb-item"><a href="blinddeconv.html">blinddeconv package</a></li>
+          <li class="breadcrumb-item"><a href="blinddeconv.filters.html">blinddeconv.filters package</a></li>
+      <li class="breadcrumb-item active">blinddeconv.filters.distributions module</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/blinddeconv.filters.distributions.rst.txt" rel="nofollow"> Просмотреть исходный код страницы</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-blinddeconv.filters.distributions">
+<span id="blinddeconv-filters-distributions-module"></span><h1>blinddeconv.filters.distributions module<a class="headerlink" href="#module-blinddeconv.filters.distributions" title="Ссылка на этот заголовок"></a></h1>
+<p>Функции распределения для генерации ядер PSF.</p>
+<p>Автор: Беззаборов А.А., Юров П.И.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="blinddeconv.filters.distributions.exponential_decay_distribution">
+<span class="sig-prename descclassname"><span class="pre">blinddeconv.filters.distributions.</span></span><span class="sig-name descname"><span class="pre">exponential_decay_distribution</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">scale</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/distributions.html#exponential_decay_distribution"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.distributions.exponential_decay_distribution" title="Ссылка на это определение"></a></dt>
+<dd><p>Экспоненциально убывающее распределение (специфично для размытия в движении).</p>
+<section id="id1">
+<h2>Параметры<a class="headerlink" href="#id1" title="Ссылка на этот заголовок"></a></h2>
+<dl class="simple">
+<dt>x<span class="classifier">np.ndarray</span></dt><dd><p>1D массив координат вдоль направления движения.</p>
+</dd>
+<dt>scale<span class="classifier">float</span></dt><dd><p>Параметр масштаба.</p>
+</dd>
+</dl>
+</section>
+<section id="id2">
+<h2>Возвращает<a class="headerlink" href="#id2" title="Ссылка на этот заголовок"></a></h2>
+<dl class="simple">
+<dt>np.ndarray</dt><dd><p>Ненормализованные значения распределения.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="blinddeconv.filters.distributions.gaussian_distribution">
+<span class="sig-prename descclassname"><span class="pre">blinddeconv.filters.distributions.</span></span><span class="sig-name descname"><span class="pre">gaussian_distribution</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/distributions.html#gaussian_distribution"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.distributions.gaussian_distribution" title="Ссылка на это определение"></a></dt>
+<dd><p>Гауссовская функция распределения.</p>
+<p>Применение:
+- Для DefocusBlur: передаем 2D радиус (x = sqrt(x² + y²)).
+- Для MotionBlur: передаем 1D координаты вдоль направления движения.</p>
+<section id="id3">
+<h2>Параметры<a class="headerlink" href="#id3" title="Ссылка на этот заголовок"></a></h2>
+<dl class="simple">
+<dt>x<span class="classifier">np.ndarray</span></dt><dd><p>Входной массив расстояний/координат.</p>
+</dd>
+<dt>std<span class="classifier">float</span></dt><dd><p>Стандартное отклонение.</p>
+</dd>
+</dl>
+</section>
+<section id="id4">
+<h2>Возвращает<a class="headerlink" href="#id4" title="Ссылка на этот заголовок"></a></h2>
+<dl class="simple">
+<dt>np.ndarray</dt><dd><p>Ненормализованные значения распределения.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="blinddeconv.filters.distributions.generate_bspline_motion_kernel">
+<span class="sig-prename descclassname"><span class="pre">blinddeconv.filters.distributions.</span></span><span class="sig-name descname"><span class="pre">generate_bspline_motion_kernel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ksize</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(в Python v3.14)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">points</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(в Python v3.14)"><span class="pre">list</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">thickness</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(в Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">3</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/distributions.html#generate_bspline_motion_kernel"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.distributions.generate_bspline_motion_kernel" title="Ссылка на это определение"></a></dt>
+<dd><p>Генерирует ядро размытия в движении по кривой, заданной B-сплайном.</p>
+<section id="id5">
+<h2>Параметры<a class="headerlink" href="#id5" title="Ссылка на этот заголовок"></a></h2>
+<dl class="simple">
+<dt>ksize<span class="classifier">int</span></dt><dd><p>Размер выходного ядра (должен быть нечетным).</p>
+</dd>
+<dt>points<span class="classifier">list</span></dt><dd><p>Список контрольных точек [(x1, y1), (x2, y2), …],
+заданных относительно центра ядра (0,0).</p>
+</dd>
+<dt>thickness<span class="classifier">int</span></dt><dd><p>Толщина кривой в пикселях.</p>
+</dd>
+</dl>
+</section>
+<section id="id6">
+<h2>Возвращает<a class="headerlink" href="#id6" title="Ссылка на этот заголовок"></a></h2>
+<dl class="simple">
+<dt>np.ndarray</dt><dd><p>Нормализованное 2D ядро размытия.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="blinddeconv.filters.distributions.generate_multivariate_normal_kernel">
+<span class="sig-prename descclassname"><span class="pre">blinddeconv.filters.distributions.</span></span><span class="sig-name descname"><span class="pre">generate_multivariate_normal_kernel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ksize</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(в Python v3.14)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">cov</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(в Python v3.14)"><span class="pre">list</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/distributions.html#generate_multivariate_normal_kernel"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.distributions.generate_multivariate_normal_kernel" title="Ссылка на это определение"></a></dt>
+<dd><p>Генерирует 2D-ядро на основе многомерного нормального распределения.</p>
+<p>Форма, размер и поворот ядра полностью определяются матрицей ковариации.</p>
+<section id="id7">
+<h2>Параметры<a class="headerlink" href="#id7" title="Ссылка на этот заголовок"></a></h2>
+<dl class="simple">
+<dt>ksize<span class="classifier">int</span></dt><dd><p>Размер выходного ядра (должен быть нечетным).</p>
+</dd>
+<dt>cov<span class="classifier">list</span></dt><dd><p>Матрица ковариации.</p>
+</dd>
+</dl>
+</section>
+<section id="id8">
+<h2>Возвращает<a class="headerlink" href="#id8" title="Ссылка на этот заголовок"></a></h2>
+<dl class="simple">
+<dt>np.ndarray</dt><dd><p>Нормализованное 2D ядро размытия.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="blinddeconv.filters.distributions.linear_decay_distribution">
+<span class="sig-prename descclassname"><span class="pre">blinddeconv.filters.distributions.</span></span><span class="sig-name descname"><span class="pre">linear_decay_distribution</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">radius</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/distributions.html#linear_decay_distribution"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.distributions.linear_decay_distribution" title="Ссылка на это определение"></a></dt>
+<dd><p>Универсальная линейно убывающая функция распределения.</p>
+<p>Применение:
+- Для DefocusBlur: создает конус (cone_psf).
+- Для MotionBlur: создает треугольное размытие.</p>
+<section id="id9">
+<h2>Параметры<a class="headerlink" href="#id9" title="Ссылка на этот заголовок"></a></h2>
+<dl class="simple">
+<dt>x<span class="classifier">np.ndarray</span></dt><dd><p>Входной массив расстояний/координат.</p>
+</dd>
+<dt>radius<span class="classifier">float</span></dt><dd><p>Радиус/полуширина распределения.</p>
+</dd>
+</dl>
+</section>
+<section id="id10">
+<h2>Возвращает<a class="headerlink" href="#id10" title="Ссылка на этот заголовок"></a></h2>
+<dl class="simple">
+<dt>np.ndarray</dt><dd><p>Ненормализованные значения распределения.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="blinddeconv.filters.distributions.ring_distribution">
+<span class="sig-prename descclassname"><span class="pre">blinddeconv.filters.distributions.</span></span><span class="sig-name descname"><span class="pre">ring_distribution</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">radius</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/distributions.html#ring_distribution"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.distributions.ring_distribution" title="Ссылка на это определение"></a></dt>
+<dd><p>Кольцевое распределение (специфично для размытия вне фокуса).</p>
+<section id="id11">
+<h2>Параметры<a class="headerlink" href="#id11" title="Ссылка на этот заголовок"></a></h2>
+<dl class="simple">
+<dt>x<span class="classifier">np.ndarray</span></dt><dd><p>Входной массив расстояний.</p>
+</dd>
+<dt>radius<span class="classifier">float</span></dt><dd><p>Радиус кольца.</p>
+</dd>
+</dl>
+</section>
+<section id="id12">
+<h2>Возвращает<a class="headerlink" href="#id12" title="Ссылка на этот заголовок"></a></h2>
+<dl class="simple">
+<dt>np.ndarray</dt><dd><p>Ненормализованные значения распределения.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="blinddeconv.filters.distributions.uniform_distribution">
+<span class="sig-prename descclassname"><span class="pre">blinddeconv.filters.distributions.</span></span><span class="sig-name descname"><span class="pre">uniform_distribution</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">radius</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/distributions.html#uniform_distribution"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.distributions.uniform_distribution" title="Ссылка на это определение"></a></dt>
+<dd><p>Равномерная функция распределения.</p>
+<p>Применение:
+- Для DefocusBlur: создает диск (disk_psf).
+- Для MotionBlur: создает прямоугольное размытие.</p>
+<section id="id13">
+<h2>Параметры<a class="headerlink" href="#id13" title="Ссылка на этот заголовок"></a></h2>
+<dl class="simple">
+<dt>x<span class="classifier">np.ndarray</span></dt><dd><p>Входной массив расстояний/координат.</p>
+</dd>
+<dt>radius<span class="classifier">float</span></dt><dd><p>Радиус/полуширина распределения.</p>
+</dd>
+</dl>
+</section>
+<section id="id14">
+<h2>Возвращает<a class="headerlink" href="#id14" title="Ссылка на этот заголовок"></a></h2>
+<dl class="simple">
+<dt>np.ndarray</dt><dd><p>Ненормализованные значения распределения.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Нижняя область">
+        <a href="blinddeconv.filters.denoise.html" class="btn btn-neutral float-left" title="blinddeconv.filters.denoise module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Предыдущая</a>
+        <a href="blinddeconv.filters.noise.html" class="btn btn-neutral float-right" title="blinddeconv.filters.noise module" accesskey="n" rel="next">Следующая <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Авторские права 2024-2026, Юров П.И., Беззаборов А.А., Куропатов К.Л., Малыш Я.В.. </p>
+  </div>
+
+  Собрано при помощи <a href="https://www.sphinx-doc.org/">Sphinx</a> с использованием
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">темы,</a>
+    предоставленной <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

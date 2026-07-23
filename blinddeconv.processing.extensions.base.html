@@ -1,0 +1,456 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="ru" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>blinddeconv.processing.extensions.base module &mdash; документация BlindDeconvolution 1.0.0</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=e35015f7"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/translations.js?v=5b699b7f"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Алфавитный указатель" href="genindex.html" />
+    <link rel="search" title="Поиск" href="search.html" />
+    <link rel="next" title="blinddeconv.processing.extensions.hyperparameter_optimization module" href="blinddeconv.processing.extensions.hyperparameter_optimization.html" />
+    <link rel="prev" title="blinddeconv.processing.extensions package" href="blinddeconv.processing.extensions.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            BlindDeconvolution
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Поиск в документации" aria-label="Поиск в документации" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Меню навигации">
+              <p class="caption" role="heading"><span class="caption-text">Руководство пользователя</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Установка и настройка</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage_guide.html">Руководство пользователя</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Конфигурационные файлы</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_flow.html">Поток данных (Dataflow) через Pipeline</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Архитектура и API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="architecture.html">Архитектура системы</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api_reference.html">API Reference</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Теория методов</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="theory/placeholder.html">Теоретические основы</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Автодокументация модулей</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">src</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="blinddeconv.html">blinddeconv package</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="blinddeconv.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.algorithms.html">blinddeconv.algorithms package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.filters.html">blinddeconv.filters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.output.html">blinddeconv.output package</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="blinddeconv.processing.html">blinddeconv.processing package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.html#module-blinddeconv">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Меню навигации для мобильных устройств" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">BlindDeconvolution</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Навигация по страницам">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="modules.html">src</a></li>
+          <li class="breadcrumb-item"><a href="blinddeconv.html">blinddeconv package</a></li>
+          <li class="breadcrumb-item"><a href="blinddeconv.processing.html">blinddeconv.processing package</a></li>
+          <li class="breadcrumb-item"><a href="blinddeconv.processing.extensions.html">blinddeconv.processing.extensions package</a></li>
+      <li class="breadcrumb-item active">blinddeconv.processing.extensions.base module</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/blinddeconv.processing.extensions.base.rst.txt" rel="nofollow"> Просмотреть исходный код страницы</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-blinddeconv.processing.extensions.base">
+<span id="blinddeconv-processing-extensions-base-module"></span><h1>blinddeconv.processing.extensions.base module<a class="headerlink" href="#module-blinddeconv.processing.extensions.base" title="Ссылка на этот заголовок"></a></h1>
+<p>Базовые классы и типы для пакета расширений.</p>
+<dl class="simple">
+<dt>Содержит:</dt><dd><ul class="simple">
+<li><p>Абстрактный базовый класс ProcessingExtension</p></li>
+<li><p>Классы данных для параметров и результатов</p></li>
+<li><p>Перечисления для методов оптимизации и метрик</p></li>
+</ul>
+</dd>
+</dl>
+<p>Автор: Беззаборов А.А.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.MetricType">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">blinddeconv.processing.extensions.base.</span></span><span class="sig-name descname"><span class="pre">MetricType</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/blinddeconv/processing/extensions/base.html#MetricType"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.extensions.base.MetricType" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <a class="reference external" href="https://docs.python.org/3/library/enum.html#enum.Enum" title="(в Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></a></p>
+<p>Метрики качества для оценки восстановления изображений.</p>
+<p>Для всех метрик большее значение соответствует лучшему качеству.</p>
+<p>PSNR - пиковое отношение сигнал-шум (дБ)
+SSIM - индекс структурного сходства
+SHARPNESS - мера резкости на основе лапласиана</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.MetricType.PSNR">
+<span class="sig-name descname"><span class="pre">PSNR</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'psnr'</span></em><a class="headerlink" href="#blinddeconv.processing.extensions.base.MetricType.PSNR" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.MetricType.SHARPNESS">
+<span class="sig-name descname"><span class="pre">SHARPNESS</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'sharpness'</span></em><a class="headerlink" href="#blinddeconv.processing.extensions.base.MetricType.SHARPNESS" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.MetricType.SSIM">
+<span class="sig-name descname"><span class="pre">SSIM</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'ssim'</span></em><a class="headerlink" href="#blinddeconv.processing.extensions.base.MetricType.SSIM" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.MetricType.from_string">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_string</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#blinddeconv.processing.extensions.base.MetricType" title="blinddeconv.processing.extensions.base.MetricType"><span class="pre">MetricType</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/extensions/base.html#MetricType.from_string"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.extensions.base.MetricType.from_string" title="Ссылка на это определение"></a></dt>
+<dd><p>Создание из строкового представления.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.OptimizationMethod">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">blinddeconv.processing.extensions.base.</span></span><span class="sig-name descname"><span class="pre">OptimizationMethod</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/blinddeconv/processing/extensions/base.html#OptimizationMethod"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.extensions.base.OptimizationMethod" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <a class="reference external" href="https://docs.python.org/3/library/enum.html#enum.Enum" title="(в Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></a></p>
+<p>Поддерживаемые методы оптимизации.</p>
+<dl class="simple">
+<dt>TPE<span class="classifier">str</span></dt><dd><p>Tree-structured Parzen Estimator (байесовская оптимизация).
+Рекомендуется для общей настройки гиперпараметров.</p>
+</dd>
+<dt>RANDOM<span class="classifier">str</span></dt><dd><p>Случайный поиск.
+Эффективен для многомерных пространств и параллельных вычислений.</p>
+</dd>
+<dt>GP<span class="classifier">str</span></dt><dd><p>Гауссовские процессы (требует BoTorch).
+Оптимален для дорогостоящих вычислений в малоразмерных пространствах.</p>
+</dd>
+<dt>NSGA2<span class="classifier">str</span></dt><dd><p>Non-dominated Sorting Genetic Algorithm II.
+Предназначен для многокритериальной оптимизации.</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.OptimizationMethod.GP">
+<span class="sig-name descname"><span class="pre">GP</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'gp'</span></em><a class="headerlink" href="#blinddeconv.processing.extensions.base.OptimizationMethod.GP" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.OptimizationMethod.NSGA2">
+<span class="sig-name descname"><span class="pre">NSGA2</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'nsga2'</span></em><a class="headerlink" href="#blinddeconv.processing.extensions.base.OptimizationMethod.NSGA2" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.OptimizationMethod.RANDOM">
+<span class="sig-name descname"><span class="pre">RANDOM</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'random'</span></em><a class="headerlink" href="#blinddeconv.processing.extensions.base.OptimizationMethod.RANDOM" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.OptimizationMethod.TPE">
+<span class="sig-name descname"><span class="pre">TPE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'tpe'</span></em><a class="headerlink" href="#blinddeconv.processing.extensions.base.OptimizationMethod.TPE" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.OptimizationMethod.from_string">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_string</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#blinddeconv.processing.extensions.base.OptimizationMethod" title="blinddeconv.processing.extensions.base.OptimizationMethod"><span class="pre">OptimizationMethod</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/extensions/base.html#OptimizationMethod.from_string"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.extensions.base.OptimizationMethod.from_string" title="Ссылка на это определение"></a></dt>
+<dd><p>Создание из строкового представления.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.OptimizationResult">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">blinddeconv.processing.extensions.base.</span></span><span class="sig-name descname"><span class="pre">OptimizationResult</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">best_params:</span> <span class="pre">~typing.Dict[str,</span> <span class="pre">~typing.Any],</span> <span class="pre">best_value:</span> <span class="pre">float,</span> <span class="pre">n_trials:</span> <span class="pre">int,</span> <span class="pre">study:</span> <span class="pre">~typing.Any</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None,</span> <span class="pre">history:</span> <span class="pre">~typing.List[~typing.Dict[str,</span> <span class="pre">~typing.Any]]</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;,</span> <span class="pre">elapsed_time:</span> <span class="pre">float</span> <span class="pre">=</span> <span class="pre">0.0</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/blinddeconv/processing/extensions/base.html#OptimizationResult"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.extensions.base.OptimizationResult" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(в Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>Контейнер для результатов оптимизации.</p>
+<section id="id1">
+<h2>Атрибуты<a class="headerlink" href="#id1" title="Ссылка на этот заголовок"></a></h2>
+<dl class="simple">
+<dt>best_params<span class="classifier">Dict[str, Any]</span></dt><dd><p>Лучшие найденные гиперпараметры.</p>
+</dd>
+<dt>best_value<span class="classifier">float</span></dt><dd><p>Лучшее достигнутое значение целевой функции.</p>
+</dd>
+<dt>n_trials<span class="classifier">int</span></dt><dd><p>Количество выполненных испытаний.</p>
+</dd>
+<dt>study<span class="classifier">Optional[Any]</span></dt><dd><p>Объект исследования Optuna для дальнейшего анализа.</p>
+</dd>
+<dt>history<span class="classifier">List[Dict[str, Any]]</span></dt><dd><p>История испытаний с параметрами и оценками.</p>
+</dd>
+<dt>elapsed_time<span class="classifier">float</span></dt><dd><p>Затраченное время в секундах.</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.OptimizationResult.best_params">
+<span class="sig-name descname"><span class="pre">best_params</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(в Python v3.14)"><span class="pre">Dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(в Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#blinddeconv.processing.extensions.base.OptimizationResult.best_params" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.OptimizationResult.best_value">
+<span class="sig-name descname"><span class="pre">best_value</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></em><a class="headerlink" href="#blinddeconv.processing.extensions.base.OptimizationResult.best_value" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.OptimizationResult.elapsed_time">
+<span class="sig-name descname"><span class="pre">elapsed_time</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.0</span></em><a class="headerlink" href="#blinddeconv.processing.extensions.base.OptimizationResult.elapsed_time" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.OptimizationResult.history">
+<span class="sig-name descname"><span class="pre">history</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(в Python v3.14)"><span class="pre">List</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(в Python v3.14)"><span class="pre">Dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(в Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#blinddeconv.processing.extensions.base.OptimizationResult.history" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.OptimizationResult.n_trials">
+<span class="sig-name descname"><span class="pre">n_trials</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(в Python v3.14)"><span class="pre">int</span></a></em><a class="headerlink" href="#blinddeconv.processing.extensions.base.OptimizationResult.n_trials" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.OptimizationResult.study">
+<span class="sig-name descname"><span class="pre">study</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(в Python v3.14)"><span class="pre">Any</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#blinddeconv.processing.extensions.base.OptimizationResult.study" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.OptimizationResult.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(в Python v3.14)"><span class="pre">Dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(в Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/blinddeconv/processing/extensions/base.html#OptimizationResult.to_dict"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.extensions.base.OptimizationResult.to_dict" title="Ссылка на это определение"></a></dt>
+<dd><p>Преобразование результатов в словарь.</p>
+</dd></dl>
+
+</section>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.ParameterRange">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">blinddeconv.processing.extensions.base.</span></span><span class="sig-name descname"><span class="pre">ParameterRange</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(в Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(в Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_scale</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(в Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">step</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/blinddeconv/processing/extensions/base.html#ParameterRange"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.extensions.base.ParameterRange" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(в Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>Диапазон поиска гиперпараметра.</p>
+<section id="id2">
+<h2>Атрибуты<a class="headerlink" href="#id2" title="Ссылка на этот заголовок"></a></h2>
+<dl class="simple">
+<dt>name<span class="classifier">str</span></dt><dd><p>Имя параметра.</p>
+</dd>
+<dt>min_value<span class="classifier">Union[int, float]</span></dt><dd><p>Минимальное значение диапазона.</p>
+</dd>
+<dt>max_value<span class="classifier">Union[int, float]</span></dt><dd><p>Максимальное значение диапазона.</p>
+</dd>
+<dt>log_scale<span class="classifier">bool</span></dt><dd><p>Использовать логарифмическую шкалу для параметров,
+охватывающих несколько порядков величины.</p>
+</dd>
+<dt>step<span class="classifier">Optional[float]</span></dt><dd><p>Размер дискретного шага (None для непрерывных параметров).</p>
+</dd>
+</dl>
+<dl class="py property">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.ParameterRange.is_integer">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">is_integer</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(в Python v3.14)"><span class="pre">bool</span></a></em><a class="headerlink" href="#blinddeconv.processing.extensions.base.ParameterRange.is_integer" title="Ссылка на это определение"></a></dt>
+<dd><p>Проверка, является ли параметр целочисленным.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.ParameterRange.log_scale">
+<span class="sig-name descname"><span class="pre">log_scale</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(в Python v3.14)"><span class="pre">bool</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></em><a class="headerlink" href="#blinddeconv.processing.extensions.base.ParameterRange.log_scale" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.ParameterRange.max_value">
+<span class="sig-name descname"><span class="pre">max_value</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(в Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></em><a class="headerlink" href="#blinddeconv.processing.extensions.base.ParameterRange.max_value" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.ParameterRange.min_value">
+<span class="sig-name descname"><span class="pre">min_value</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(в Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></em><a class="headerlink" href="#blinddeconv.processing.extensions.base.ParameterRange.min_value" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.ParameterRange.name">
+<span class="sig-name descname"><span class="pre">name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></em><a class="headerlink" href="#blinddeconv.processing.extensions.base.ParameterRange.name" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.ParameterRange.step">
+<span class="sig-name descname"><span class="pre">step</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#blinddeconv.processing.extensions.base.ParameterRange.step" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.ParameterRange.validate">
+<span class="sig-name descname"><span class="pre">validate</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(в Python v3.14)"><span class="pre">bool</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/extensions/base.html#ParameterRange.validate"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.extensions.base.ParameterRange.validate" title="Ссылка на это определение"></a></dt>
+<dd><p>Проверка корректности диапазона.</p>
+</dd></dl>
+
+</section>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.ParetoPoint">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">blinddeconv.processing.extensions.base.</span></span><span class="sig-name descname"><span class="pre">ParetoPoint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">objectives:</span> <span class="pre">~typing.Dict[str,</span> <span class="pre">float],</span> <span class="pre">parameters:</span> <span class="pre">~typing.Dict[str,</span> <span class="pre">~typing.Any],</span> <span class="pre">metadata:</span> <span class="pre">~typing.Dict[str,</span> <span class="pre">~typing.Any]</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;,</span> <span class="pre">is_pareto_optimal:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/blinddeconv/processing/extensions/base.html#ParetoPoint"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.extensions.base.ParetoPoint" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(в Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>Точка в многокритериальном пространстве.</p>
+<section id="id3">
+<h2>Атрибуты<a class="headerlink" href="#id3" title="Ссылка на этот заголовок"></a></h2>
+<dl class="simple">
+<dt>objectives<span class="classifier">Dict[str, float]</span></dt><dd><p>Значения целевых функций (например, {„psnr“: 25.0, „time“: 1.5}).</p>
+</dd>
+<dt>parameters<span class="classifier">Dict[str, Any]</span></dt><dd><p>Связанные гиперпараметры.</p>
+</dd>
+<dt>metadata<span class="classifier">Dict[str, Any]</span></dt><dd><p>Дополнительная информация (имя алгоритма, изображение и т.д.).</p>
+</dd>
+<dt>is_pareto_optimal<span class="classifier">bool</span></dt><dd><p>Принадлежит ли точка фронту Парето.</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.ParetoPoint.dominates">
+<span class="sig-name descname"><span class="pre">dominates</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">other</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#blinddeconv.processing.extensions.base.ParetoPoint" title="blinddeconv.processing.extensions.base.ParetoPoint"><span class="pre">ParetoPoint</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">maximize</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(в Python v3.14)"><span class="pre">List</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(в Python v3.14)"><span class="pre">bool</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/extensions/base.html#ParetoPoint.dominates"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.extensions.base.ParetoPoint.dominates" title="Ссылка на это определение"></a></dt>
+<dd><p>Проверка доминирования текущей точки над другой.</p>
+<section id="id4">
+<h3>Параметры<a class="headerlink" href="#id4" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>other<span class="classifier">ParetoPoint</span></dt><dd><p>Другая точка для сравнения.</p>
+</dd>
+<dt>maximize<span class="classifier">List[str]</span></dt><dd><p>Список критериев для максимизации.</p>
+</dd>
+</dl>
+</section>
+<section id="id5">
+<h3>Возвращает<a class="headerlink" href="#id5" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>bool</dt><dd><p>True если текущая точка доминирует над other.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.ParetoPoint.is_pareto_optimal">
+<span class="sig-name descname"><span class="pre">is_pareto_optimal</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(в Python v3.14)"><span class="pre">bool</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></em><a class="headerlink" href="#blinddeconv.processing.extensions.base.ParetoPoint.is_pareto_optimal" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.ParetoPoint.metadata">
+<span class="sig-name descname"><span class="pre">metadata</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(в Python v3.14)"><span class="pre">Dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(в Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#blinddeconv.processing.extensions.base.ParetoPoint.metadata" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.ParetoPoint.objectives">
+<span class="sig-name descname"><span class="pre">objectives</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(в Python v3.14)"><span class="pre">Dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#blinddeconv.processing.extensions.base.ParetoPoint.objectives" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.ParetoPoint.parameters">
+<span class="sig-name descname"><span class="pre">parameters</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(в Python v3.14)"><span class="pre">Dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(в Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#blinddeconv.processing.extensions.base.ParetoPoint.parameters" title="Ссылка на это определение"></a></dt>
+<dd></dd></dl>
+
+</section>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.ProcessingExtension">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">blinddeconv.processing.extensions.base.</span></span><span class="sig-name descname"><span class="pre">ProcessingExtension</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">processing_instance</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(в Python v3.14)"><span class="pre">Any</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_folder</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'output'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/blinddeconv/processing/extensions/base.html#ProcessingExtension"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.extensions.base.ProcessingExtension" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <a class="reference external" href="https://docs.python.org/3/library/abc.html#abc.ABC" title="(в Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></a></p>
+<p>Абстрактный базовый класс для расширений обработки.</p>
+<p>Предоставляет общий функционал для расширений,
+дополняющих основной конвейер обработки изображений.</p>
+<section id="id6">
+<h2>Атрибуты<a class="headerlink" href="#id6" title="Ссылка на этот заголовок"></a></h2>
+<dl class="simple">
+<dt>processing<span class="classifier">Any</span></dt><dd><p>Ссылка на основной экземпляр обработки.</p>
+</dd>
+<dt>output_folder<span class="classifier">Path</span></dt><dd><p>Директория для сохранения результатов.</p>
+</dd>
+<dt>logger<span class="classifier">logging.Logger</span></dt><dd><p>Логгер для данного расширения.</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.ProcessingExtension.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">processing_instance</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(в Python v3.14)"><span class="pre">Any</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_folder</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'output'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/blinddeconv/processing/extensions/base.html#ProcessingExtension.__init__"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.extensions.base.ProcessingExtension.__init__" title="Ссылка на это определение"></a></dt>
+<dd><p>Инициализация расширения.</p>
+<section id="id7">
+<h3>Параметры<a class="headerlink" href="#id7" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>processing_instance<span class="classifier">Any</span></dt><dd><p>Ссылка на объект Processing.</p>
+</dd>
+<dt>output_folder<span class="classifier">str</span></dt><dd><p>Директория для сохранения результатов.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.extensions.base.ProcessingExtension.execute">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(в Python v3.14)"><span class="pre">Any</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/extensions/base.html#ProcessingExtension.execute"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.extensions.base.ProcessingExtension.execute" title="Ссылка на это определение"></a></dt>
+<dd><p>Выполнение основного функционала расширения.</p>
+<p>Должен быть реализован в подклассах.</p>
+</dd></dl>
+
+</section>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Нижняя область">
+        <a href="blinddeconv.processing.extensions.html" class="btn btn-neutral float-left" title="blinddeconv.processing.extensions package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Предыдущая</a>
+        <a href="blinddeconv.processing.extensions.hyperparameter_optimization.html" class="btn btn-neutral float-right" title="blinddeconv.processing.extensions.hyperparameter_optimization module" accesskey="n" rel="next">Следующая <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Авторские права 2024-2026, Юров П.И., Беззаборов А.А., Куропатов К.Л., Малыш Я.В.. </p>
+  </div>
+
+  Собрано при помощи <a href="https://www.sphinx-doc.org/">Sphinx</a> с использованием
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">темы,</a>
+    предоставленной <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

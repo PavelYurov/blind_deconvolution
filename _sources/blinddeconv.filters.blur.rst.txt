@@ -1,0 +1,7 @@
+blinddeconv.filters.blur module
+===============================
+
+.. automodule:: blinddeconv.filters.blur
+   :members:
+   :undoc-members:
+   :show-inheritance:

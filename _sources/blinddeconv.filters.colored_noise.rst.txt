@@ -1,0 +1,7 @@
+blinddeconv.filters.colored\_noise module
+=========================================
+
+.. automodule:: blinddeconv.filters.colored_noise
+   :members:
+   :undoc-members:
+   :show-inheritance:

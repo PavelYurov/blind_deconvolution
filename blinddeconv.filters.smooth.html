@@ -1,0 +1,320 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="ru" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>blinddeconv.filters.smooth module &mdash; документация BlindDeconvolution 1.0.0</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=e35015f7"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/translations.js?v=5b699b7f"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Алфавитный указатель" href="genindex.html" />
+    <link rel="search" title="Поиск" href="search.html" />
+    <link rel="next" title="blinddeconv.output package" href="blinddeconv.output.html" />
+    <link rel="prev" title="blinddeconv.filters.noise module" href="blinddeconv.filters.noise.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            BlindDeconvolution
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Поиск в документации" aria-label="Поиск в документации" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Меню навигации">
+              <p class="caption" role="heading"><span class="caption-text">Руководство пользователя</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Установка и настройка</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage_guide.html">Руководство пользователя</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Конфигурационные файлы</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_flow.html">Поток данных (Dataflow) через Pipeline</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Архитектура и API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="architecture.html">Архитектура системы</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api_reference.html">API Reference</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Теория методов</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="theory/placeholder.html">Теоретические основы</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Автодокументация модулей</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">src</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="blinddeconv.html">blinddeconv package</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="blinddeconv.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.algorithms.html">blinddeconv.algorithms package</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="blinddeconv.filters.html">blinddeconv.filters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.output.html">blinddeconv.output package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.html">blinddeconv.processing package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.html#module-blinddeconv">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Меню навигации для мобильных устройств" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">BlindDeconvolution</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Навигация по страницам">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="modules.html">src</a></li>
+          <li class="breadcrumb-item"><a href="blinddeconv.html">blinddeconv package</a></li>
+          <li class="breadcrumb-item"><a href="blinddeconv.filters.html">blinddeconv.filters package</a></li>
+      <li class="breadcrumb-item active">blinddeconv.filters.smooth module</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/blinddeconv.filters.smooth.rst.txt" rel="nofollow"> Просмотреть исходный код страницы</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-blinddeconv.filters.smooth">
+<span id="blinddeconv-filters-smooth-module"></span><h1>blinddeconv.filters.smooth module<a class="headerlink" href="#module-blinddeconv.filters.smooth" title="Ссылка на этот заголовок"></a></h1>
+<p>Фильтры сглаживания изображений.</p>
+<p>Автор: Беззаборов А.А.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="blinddeconv.filters.smooth.BilateralFilter">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">blinddeconv.filters.smooth.</span></span><span class="sig-name descname"><span class="pre">BilateralFilter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(в Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(в Python v3.14)"><span class="pre">Tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(в Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/blinddeconv/filters/smooth.html#BilateralFilter"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.smooth.BilateralFilter" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <a class="reference internal" href="blinddeconv.filters.base.html#blinddeconv.filters.base.FilterBase" title="blinddeconv.filters.base.FilterBase"><code class="xref py py-class docutils literal notranslate"><span class="pre">FilterBase</span></code></a></p>
+<p>Билатеральный фильтр (с сохранением границ).</p>
+<section id="id1">
+<h2>Атрибуты<a class="headerlink" href="#id1" title="Ссылка на этот заголовок"></a></h2>
+<dl class="simple">
+<dt>d<span class="classifier">int</span></dt><dd><p>Диаметр окрестности пикселя.</p>
+</dd>
+<dt>sigma_color<span class="classifier">float</span></dt><dd><p>Сигма фильтр в цветовом пространстве.</p>
+</dd>
+<dt>sigma_space<span class="classifier">float</span></dt><dd><p>Сигма фильтр в координатном пространстве.</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.smooth.BilateralFilter.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(в Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(в Python v3.14)"><span class="pre">Tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(в Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/blinddeconv/filters/smooth.html#BilateralFilter.__init__"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.smooth.BilateralFilter.__init__" title="Ссылка на это определение"></a></dt>
+<dd><p>Инициализация билатерального фильтра.</p>
+<section id="id2">
+<h3>Параметры<a class="headerlink" href="#id2" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>params<span class="classifier">Union[int, Tuple[int, float, float]]</span></dt><dd><p>d или (d, sigma_color, sigma_space).</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.smooth.BilateralFilter.description">
+<span class="sig-name descname"><span class="pre">description</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/smooth.html#BilateralFilter.description"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.smooth.BilateralFilter.description" title="Ссылка на это определение"></a></dt>
+<dd><p>Выдает название смаза с параметром.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.smooth.BilateralFilter.filter">
+<span class="sig-name descname"><span class="pre">filter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">img</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/smooth.html#BilateralFilter.filter"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.smooth.BilateralFilter.filter" title="Ссылка на это определение"></a></dt>
+<dd><p>Применение билатерального фильтра к изображению.</p>
+</dd></dl>
+
+</section>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="blinddeconv.filters.smooth.GaussianBlur">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">blinddeconv.filters.smooth.</span></span><span class="sig-name descname"><span class="pre">GaussianBlur</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(в Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(в Python v3.14)"><span class="pre">Tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(в Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/blinddeconv/filters/smooth.html#GaussianBlur"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.smooth.GaussianBlur" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <a class="reference internal" href="blinddeconv.filters.base.html#blinddeconv.filters.base.FilterBase" title="blinddeconv.filters.base.FilterBase"><code class="xref py py-class docutils literal notranslate"><span class="pre">FilterBase</span></code></a></p>
+<p>Гауссовский фильтр размытия.</p>
+<section id="id3">
+<h2>Атрибуты<a class="headerlink" href="#id3" title="Ссылка на этот заголовок"></a></h2>
+<dl class="simple">
+<dt>kernel_size<span class="classifier">int</span></dt><dd><p>Размер гауссовского ядра (должен быть нечетным и положительным).</p>
+</dd>
+<dt>std<span class="classifier">float</span></dt><dd><p>Стандартное отклонение (0 для автоматического расчета).</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.smooth.GaussianBlur.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(в Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(в Python v3.14)"><span class="pre">Tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(в Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/smooth.html#GaussianBlur.__init__"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.smooth.GaussianBlur.__init__" title="Ссылка на это определение"></a></dt>
+<dd><p>Инициализация гауссовского фильтра.</p>
+<section id="id4">
+<h3>Параметры<a class="headerlink" href="#id4" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>params<span class="classifier">Union[int, Tuple[int, float]]</span></dt><dd><p>kernel_size или (kernel_size, std).</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.smooth.GaussianBlur.description">
+<span class="sig-name descname"><span class="pre">description</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/smooth.html#GaussianBlur.description"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.smooth.GaussianBlur.description" title="Ссылка на это определение"></a></dt>
+<dd><p>Выдает название смаза с параметром.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.smooth.GaussianBlur.filter">
+<span class="sig-name descname"><span class="pre">filter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">img</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/smooth.html#GaussianBlur.filter"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.smooth.GaussianBlur.filter" title="Ссылка на это определение"></a></dt>
+<dd><p>Применить гауссовское размытие к изображению.</p>
+</dd></dl>
+
+</section>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="blinddeconv.filters.smooth.MeanBlur">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">blinddeconv.filters.smooth.</span></span><span class="sig-name descname"><span class="pre">MeanBlur</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">kernel_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(в Python v3.14)"><span class="pre">int</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/blinddeconv/filters/smooth.html#MeanBlur"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.smooth.MeanBlur" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <a class="reference internal" href="blinddeconv.filters.base.html#blinddeconv.filters.base.FilterBase" title="blinddeconv.filters.base.FilterBase"><code class="xref py py-class docutils literal notranslate"><span class="pre">FilterBase</span></code></a></p>
+<p>Усредняющий (боксовый) фильтр размытия.</p>
+<section id="id5">
+<h2>Атрибуты<a class="headerlink" href="#id5" title="Ссылка на этот заголовок"></a></h2>
+<dl class="simple">
+<dt>kernel_size<span class="classifier">int</span></dt><dd><p>Размер усредняющего ядра (должен быть нечетным и положительным).</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.smooth.MeanBlur.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">kernel_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(в Python v3.14)"><span class="pre">int</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/smooth.html#MeanBlur.__init__"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.smooth.MeanBlur.__init__" title="Ссылка на это определение"></a></dt>
+<dd><p>Инициализация усредняющего фильтра.</p>
+<section id="id6">
+<h3>Параметры<a class="headerlink" href="#id6" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>kernel_size<span class="classifier">int</span></dt><dd><p>Размер усредняющего ядра (должен быть нечетным и положительным).</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.smooth.MeanBlur.description">
+<span class="sig-name descname"><span class="pre">description</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/smooth.html#MeanBlur.description"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.smooth.MeanBlur.description" title="Ссылка на это определение"></a></dt>
+<dd><p>Выдает название смаза с параметром.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.smooth.MeanBlur.filter">
+<span class="sig-name descname"><span class="pre">filter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">image</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/smooth.html#MeanBlur.filter"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.smooth.MeanBlur.filter" title="Ссылка на это определение"></a></dt>
+<dd><p>Применить усредняющее размытие к изображению.</p>
+<section id="id7">
+<h3>Параметры<a class="headerlink" href="#id7" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>image<span class="classifier">np.ndarray</span></dt><dd><p>Входное изображение (в градациях серого или цветное).</p>
+</dd>
+</dl>
+</section>
+<section id="id8">
+<h3>Возвращает<a class="headerlink" href="#id8" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>np.ndarray</dt><dd><p>Размытое изображение.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+</section>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="blinddeconv.filters.smooth.MedianBlur">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">blinddeconv.filters.smooth.</span></span><span class="sig-name descname"><span class="pre">MedianBlur</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">kernel_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(в Python v3.14)"><span class="pre">int</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/blinddeconv/filters/smooth.html#MedianBlur"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.smooth.MedianBlur" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <a class="reference internal" href="blinddeconv.filters.base.html#blinddeconv.filters.base.FilterBase" title="blinddeconv.filters.base.FilterBase"><code class="xref py py-class docutils literal notranslate"><span class="pre">FilterBase</span></code></a></p>
+<p>Медианный фильтр (эффективен против шума «соль-перец»).</p>
+<section id="id9">
+<h2>Атрибуты<a class="headerlink" href="#id9" title="Ссылка на этот заголовок"></a></h2>
+<dl class="simple">
+<dt>kernel_size<span class="classifier">int</span></dt><dd><p>Размер медианного ядра (должен быть нечетным и &gt;=3).</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.smooth.MedianBlur.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">kernel_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(в Python v3.14)"><span class="pre">int</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/smooth.html#MedianBlur.__init__"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.smooth.MedianBlur.__init__" title="Ссылка на это определение"></a></dt>
+<dd><p>Инициализация медианного фильтра.</p>
+<section id="id10">
+<h3>Параметры<a class="headerlink" href="#id10" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>kernel_size<span class="classifier">int</span></dt><dd><p>Размер медианного ядра (должен быть нечетным и &gt;=3).</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.smooth.MedianBlur.description">
+<span class="sig-name descname"><span class="pre">description</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/smooth.html#MedianBlur.description"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.smooth.MedianBlur.description" title="Ссылка на это определение"></a></dt>
+<dd><p>Выдает название смаза с параметром.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.filters.smooth.MedianBlur.filter">
+<span class="sig-name descname"><span class="pre">filter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">image</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(в NumPy v2.5)"><span class="pre">ndarray</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/filters/smooth.html#MedianBlur.filter"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.filters.smooth.MedianBlur.filter" title="Ссылка на это определение"></a></dt>
+<dd><p>Применить медианное размытие к изображению.</p>
+</dd></dl>
+
+</section>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Нижняя область">
+        <a href="blinddeconv.filters.noise.html" class="btn btn-neutral float-left" title="blinddeconv.filters.noise module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Предыдущая</a>
+        <a href="blinddeconv.output.html" class="btn btn-neutral float-right" title="blinddeconv.output package" accesskey="n" rel="next">Следующая <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Авторские права 2024-2026, Юров П.И., Беззаборов А.А., Куропатов К.Л., Малыш Я.В.. </p>
+  </div>
+
+  Собрано при помощи <a href="https://www.sphinx-doc.org/">Sphinx</a> с использованием
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">темы,</a>
+    предоставленной <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,405 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="ru" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Установка и настройка &mdash; документация BlindDeconvolution 1.0.0</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=e35015f7"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/translations.js?v=5b699b7f"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Алфавитный указатель" href="genindex.html" />
+    <link rel="search" title="Поиск" href="search.html" />
+    <link rel="next" title="Руководство пользователя" href="usage_guide.html" />
+    <link rel="prev" title="BlindDeconvolution Documentation" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            BlindDeconvolution
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Поиск в документации" aria-label="Поиск в документации" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Меню навигации">
+              <p class="caption" role="heading"><span class="caption-text">Руководство пользователя</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Установка и настройка</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#id2">Системные требования</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id3">Установка</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id4">Удаление</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id5">Профили зависимостей</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id6">Интерактивное развертывание окружения</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#install-py">Интерактивный установщик зависимостей (<code class="docutils literal notranslate"><span class="pre">install.py</span></code>)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#uninstall-py">Интерактивное удаление зависимостей (<code class="docutils literal notranslate"><span class="pre">uninstall.py</span></code>)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#id7">Настройка виртуального окружения (вручную)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id8">Опциональные зависимости</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#gnu-octave-matlab">GNU Octave (для MATLAB-обёрток)</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#octave-env">Настройка пути к Octave через <code class="docutils literal notranslate"><span class="pre">.env</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#cuda-gpu">CUDA / GPU (для нейросетевых методов)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#id9">Проверка установки</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id10">Решение проблем</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#importerror-no-module-named-cv2"><code class="docutils literal notranslate"><span class="pre">ImportError:</span> <span class="pre">No</span> <span class="pre">module</span> <span class="pre">named</span> <span class="pre">'cv2'</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#modulenotfounderror-no-module-named-blinddeconv"><code class="docutils literal notranslate"><span class="pre">ModuleNotFoundError:</span> <span class="pre">No</span> <span class="pre">module</span> <span class="pre">named</span> <span class="pre">'blinddeconv'</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id11">Ошибки при сборке документации</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="usage_guide.html">Руководство пользователя</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Конфигурационные файлы</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_flow.html">Поток данных (Dataflow) через Pipeline</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Архитектура и API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="architecture.html">Архитектура системы</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api_reference.html">API Reference</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Теория методов</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="theory/placeholder.html">Теоретические основы</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Автодокументация модулей</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">src</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Меню навигации для мобильных устройств" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">BlindDeconvolution</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Навигация по страницам">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Установка и настройка</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/installation.md.txt" rel="nofollow"> Просмотреть исходный код страницы</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="id1">
+<h1>Установка и настройка<a class="headerlink" href="#id1" title="Ссылка на этот заголовок"></a></h1>
+<section id="id2">
+<h2>Системные требования<a class="headerlink" href="#id2" title="Ссылка на этот заголовок"></a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Требование</p></th>
+<th class="head"><p>Минимум</p></th>
+<th class="head"><p>Рекомендуется</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Python</p></td>
+<td><p>3.10</p></td>
+<td><p>3.11+</p></td>
+</tr>
+<tr class="row-odd"><td><p>ОС</p></td>
+<td><p>Windows 10 / Linux / macOS</p></td>
+<td><p>—</p></td>
+</tr>
+<tr class="row-even"><td><p>ОЗУ</p></td>
+<td><p>4 ГБ</p></td>
+<td><p>8+ ГБ</p></td>
+</tr>
+<tr class="row-odd"><td><p>Диск</p></td>
+<td><p>500 МБ</p></td>
+<td><p>2+ ГБ (с данными)</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<hr class="docutils" />
+<section id="id3">
+<h2>Установка<a class="headerlink" href="#id3" title="Ссылка на этот заголовок"></a></h2>
+<ol class="arabic simple">
+<li><p>Установить последнюю версию пакета:</p></li>
+</ol>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>git+https://github.com/PavelYurov/blind_deconvolution.git
+</pre></div>
+</div>
+<p>Будут установлен пакет <code class="docutils literal notranslate"><span class="pre">blinddeconv</span></code> и остальные зависимости (<code class="docutils literal notranslate"><span class="pre">numpy</span></code>, <code class="docutils literal notranslate"><span class="pre">scipy</span></code>, <code class="docutils literal notranslate"><span class="pre">opencv-python</span></code>, <code class="docutils literal notranslate"><span class="pre">scikit-image</span></code>, и др.)</p>
+<div class="highlight-py notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">blinddeconv</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="2">
+<li><p>Установка с дополнительными зависимостями:</p></li>
+</ol>
+<p>Включает инструменты для тестирования, линтинга и интерактивной работы (<code class="docutils literal notranslate"><span class="pre">pytest</span></code>, <code class="docutils literal notranslate"><span class="pre">flake8</span></code>, <code class="docutils literal notranslate"><span class="pre">ipython</span></code>, <code class="docutils literal notranslate"><span class="pre">setuptools</span></code>)</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;git+https://github.com/PavelYurov/blind_deconvolution.git[dev]&quot;</span>
+</pre></div>
+</div>
+<p>Включает CLI-интерфейс и автоматизацию (<code class="docutils literal notranslate"><span class="pre">click</span></code>, <code class="docutils literal notranslate"><span class="pre">pyyaml</span></code>, <code class="docutils literal notranslate"><span class="pre">jsonschema</span></code>)</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;git+https://github.com/PavelYurov/blind_deconvolution.git[cli]&quot;</span>
+</pre></div>
+</div>
+<p>Необходимо для генерации документации через Sphinx (<code class="docutils literal notranslate"><span class="pre">sphinx</span></code>, <code class="docutils literal notranslate"><span class="pre">sphinx-rtd-theme</span></code>)</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;git+https://github.com/PavelYurov/blind_deconvolution.git[docs]&quot;</span>
+</pre></div>
+</div>
+<p>Всё вместе:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;git+https://github.com/PavelYurov/blind_deconvolution.git[cli,dev,docs]&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="id4">
+<h2>Удаление<a class="headerlink" href="#id4" title="Ссылка на этот заголовок"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>uninstall<span class="w"> </span>blinddeconv
+</pre></div>
+</div>
+</section>
+<hr class="docutils" />
+<section id="id5">
+<h2>Профили зависимостей<a class="headerlink" href="#id5" title="Ссылка на этот заголовок"></a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Профиль</p></th>
+<th class="head"><p>Что включает</p></th>
+<th class="head"><p>Команда</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">base</span></code></p></td>
+<td><p>Основные зависимости проекта</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">.</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">cli</span></code></p></td>
+<td><p>CLI-интерфейс (<code class="docutils literal notranslate"><span class="pre">click</span></code>, <code class="docutils literal notranslate"><span class="pre">pyyaml</span></code>, <code class="docutils literal notranslate"><span class="pre">jsonschema</span></code>)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">&quot;.[cli]&quot;</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">full</span></code></p></td>
+<td><p>Расширенные версии (<code class="docutils literal notranslate"><span class="pre">scikit-image&gt;=0.19</span></code>, <code class="docutils literal notranslate"><span class="pre">optuna&gt;=3.0</span></code>)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">&quot;.[full]&quot;</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dev</span></code></p></td>
+<td><p>Инструменты разработки (<code class="docutils literal notranslate"><span class="pre">pytest</span></code>, <code class="docutils literal notranslate"><span class="pre">flake8</span></code>, <code class="docutils literal notranslate"><span class="pre">ipython</span></code>)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">&quot;.[dev]&quot;</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">docs</span></code></p></td>
+<td><p>Генерация документации (<code class="docutils literal notranslate"><span class="pre">sphinx</span></code>, <code class="docutils literal notranslate"><span class="pre">sphinx-rtd-theme</span></code>, <code class="docutils literal notranslate"><span class="pre">myst-parser</span></code>)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">&quot;.[docs]&quot;</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<p>Комбинирование профилей:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># CLI + разработка</span>
+pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;.[cli,dev]&quot;</span>
+
+<span class="c1"># Всё вместе</span>
+pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;.[cli,dev,docs,full]&quot;</span>
+</pre></div>
+</div>
+</section>
+<hr class="docutils" />
+<section id="id6">
+<h2>Интерактивное развертывание окружения<a class="headerlink" href="#id6" title="Ссылка на этот заголовок"></a></h2>
+<section id="install-py">
+<h3>Интерактивный установщик зависимостей (<code class="docutils literal notranslate"><span class="pre">install.py</span></code>)<a class="headerlink" href="#install-py" title="Ссылка на этот заголовок"></a></h3>
+<p>Скрипт обеспечивает автоматизированную настройку рабочего окружения. Основные функции:</p>
+<ul class="simple">
+<li><p>создает и настраивает виртуальное окружение (по умолчанию <code class="docutils literal notranslate"><span class="pre">.venv</span></code>);</p></li>
+<li><p>проверяет совместимость версии Python и наличие системных библиотек;</p></li>
+<li><p>разрешает зависимости указанного профиля из <code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code> (секция <code class="docutils literal notranslate"><span class="pre">[tool.preflight.profiles]</span></code>);</p></li>
+<li><p>устанавливает недостающие пакеты и регистрирует их в файле состояния <code class="docutils literal notranslate"><span class="pre">.dependency_state.json</span></code>.</p></li>
+</ul>
+<p><strong>Показать доступные профили:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>install.py<span class="w"> </span>list-profiles
+</pre></div>
+</div>
+<p><strong>Проверить статус зависимостей (без установки):</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>install.py<span class="w"> </span>check<span class="w"> </span>base
+</pre></div>
+</div>
+<p><strong>Установить зависимости профиля (интерактивно):</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>install.py<span class="w"> </span>install<span class="w"> </span>base
+</pre></div>
+</div>
+<p><strong>Автоматический режим (без запросов подтверждения):</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>install.py<span class="w"> </span>install<span class="w"> </span>base<span class="w"> </span>-y
+</pre></div>
+</div>
+<p><strong>Указание пути к виртуальному окружению:</strong>
+Скрипт автоматически использует указанное окружение (создает его при отсутствии).</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>install.py<span class="w"> </span>--venv<span class="w"> </span>my_env<span class="w"> </span>install<span class="w"> </span>base
+</pre></div>
+</div>
+</section>
+<section id="uninstall-py">
+<h3>Интерактивное удаление зависимостей (<code class="docutils literal notranslate"><span class="pre">uninstall.py</span></code>)<a class="headerlink" href="#uninstall-py" title="Ссылка на этот заголовок"></a></h3>
+<p>Скрипт выполняет безопасное удаление пакетов, опираясь на историю установок (<code class="docutils literal notranslate"><span class="pre">.dependency_state.json</span></code>). Алгоритм учитывает пересечения зависимостей между профилями:</p>
+<ul class="simple">
+<li><p>удаляет пакеты, относящиеся <em>только</em> к выбранному профилю;</p></li>
+<li><p>сохраняет пакеты, которые используются другими активными профилями;</p></li>
+<li><p>поддерживает полную очистку окружения.</p></li>
+</ul>
+<p><strong>Удалить зависимости конкретного профиля:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>uninstall.py<span class="w"> </span>base
+</pre></div>
+</div>
+<p><em>Пример: если пакет <code class="docutils literal notranslate"><span class="pre">numpy</span></code> используется и в профиле <code class="docutils literal notranslate"><span class="pre">base</span></code>, и в профиле <code class="docutils literal notranslate"><span class="pre">dev</span></code>, то при удалении <code class="docutils literal notranslate"><span class="pre">base</span></code> пакет <code class="docutils literal notranslate"><span class="pre">numpy</span></code> останется в системе.</em></p>
+<p><strong>Полная очистка (сброс проекта):</strong>
+Удаляет каталог виртуального окружения и файл истории установок.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>uninstall.py<span class="w"> </span>--clean-all
+</pre></div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="id7">
+<h2>Настройка виртуального окружения (вручную)<a class="headerlink" href="#id7" title="Ссылка на этот заголовок"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Создание</span>
+python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>.venv
+
+<span class="c1"># Активация (Windows PowerShell)</span>
+.venv<span class="se">\S</span>cripts<span class="se">\A</span>ctivate.ps1
+
+<span class="c1"># Активация (Linux / macOS)</span>
+<span class="nb">source</span><span class="w"> </span>.venv/bin/activate
+
+<span class="c1"># Установка проекта</span>
+pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[cli,dev]&quot;</span>
+</pre></div>
+</div>
+</section>
+<hr class="docutils" />
+<section id="id8">
+<h2>Опциональные зависимости<a class="headerlink" href="#id8" title="Ссылка на этот заголовок"></a></h2>
+<section id="gnu-octave-matlab">
+<h3>GNU Octave (для MATLAB-обёрток)<a class="headerlink" href="#gnu-octave-matlab" title="Ссылка на этот заголовок"></a></h3>
+<p>Некоторые внешние алгоритмы требуют GNU Octave:</p>
+<ol class="arabic simple">
+<li><p>Установите <a class="reference external" href="https://octave.org/download">GNU Octave</a></p></li>
+<li><p>Убедитесь, что <code class="docutils literal notranslate"><span class="pre">octave</span></code> доступен в <code class="docutils literal notranslate"><span class="pre">PATH</span></code></p></li>
+<li><p>Установите Python-обёртку: <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">oct2py</span></code></p></li>
+</ol>
+<section id="octave-env">
+<h4>Настройка пути к Octave через <code class="docutils literal notranslate"><span class="pre">.env</span></code><a class="headerlink" href="#octave-env" title="Ссылка на этот заголовок"></a></h4>
+<p>Модуль <code class="docutils literal notranslate"><span class="pre">blinddeconv.system.octave</span></code> использует <code class="docutils literal notranslate"><span class="pre">pydantic-settings</span></code> и автоматически читает файл <code class="docutils literal notranslate"><span class="pre">.env</span></code> из корня проекта. Если исполняемый файл Octave не находится в <code class="docutils literal notranslate"><span class="pre">PATH</span></code>, создайте <code class="docutils literal notranslate"><span class="pre">.env</span></code>:</p>
+<div class="highlight-dotenv notranslate"><div class="highlight"><pre><span></span># .env (в корне проекта)
+OCTAVE_EXECUTABLE=C:\Program Files\GNU Octave\mingw64\bin\octave-cli.exe
+</pre></div>
+</div>
+<p>На Linux/macOS:</p>
+<div class="highlight-dotenv notranslate"><div class="highlight"><pre><span></span>OCTAVE_EXECUTABLE=/usr/local/bin/octave-cli
+</pre></div>
+</div>
+<p>Если переменная не задана, система попытается найти <code class="docutils literal notranslate"><span class="pre">octave-cli</span></code> или <code class="docutils literal notranslate"><span class="pre">octave</span></code> через <code class="docutils literal notranslate"><span class="pre">shutil.which()</span></code>. При неудаче будет выведено предупреждение, но остальной функционал фреймворка продолжит работать.</p>
+</section>
+</section>
+<section id="cuda-gpu">
+<h3>CUDA / GPU (для нейросетевых методов)<a class="headerlink" href="#cuda-gpu" title="Ссылка на этот заголовок"></a></h3>
+<p>Для алгоритмов на базе PyTorch:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>torch<span class="w"> </span>torchvision<span class="w"> </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/cu121
+</pre></div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="id9">
+<h2>Проверка установки<a class="headerlink" href="#id9" title="Ссылка на этот заголовок"></a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">blinddeconv</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">blinddeconv.processing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Processing</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Версия: </span><span class="si">{</span><span class="n">blinddeconv</span><span class="o">.</span><span class="n">processing</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="c1"># Создание экземпляра Processing</span>
+<span class="n">p</span> <span class="o">=</span> <span class="n">Processing</span><span class="p">(</span><span class="n">images_folder</span><span class="o">=</span><span class="s2">&quot;images/original&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Установка прошла успешно!&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<hr class="docutils" />
+<section id="id10">
+<h2>Решение проблем<a class="headerlink" href="#id10" title="Ссылка на этот заголовок"></a></h2>
+<section id="importerror-no-module-named-cv2">
+<h3><code class="docutils literal notranslate"><span class="pre">ImportError:</span> <span class="pre">No</span> <span class="pre">module</span> <span class="pre">named</span> <span class="pre">'cv2'</span></code><a class="headerlink" href="#importerror-no-module-named-cv2" title="Ссылка на этот заголовок"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>opencv-python
+</pre></div>
+</div>
+</section>
+<section id="modulenotfounderror-no-module-named-blinddeconv">
+<h3><code class="docutils literal notranslate"><span class="pre">ModuleNotFoundError:</span> <span class="pre">No</span> <span class="pre">module</span> <span class="pre">named</span> <span class="pre">'blinddeconv'</span></code><a class="headerlink" href="#modulenotfounderror-no-module-named-blinddeconv" title="Ссылка на этот заголовок"></a></h3>
+<p>Убедитесь, что пакет установлен в текущее виртуальное окружение:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>show<span class="w"> </span>blind-deconvolution
+</pre></div>
+</div>
+</section>
+<section id="id11">
+<h3>Ошибки при сборке документации<a class="headerlink" href="#id11" title="Ссылка на этот заголовок"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;.[docs]&quot;</span>
+pip<span class="w"> </span>install<span class="w"> </span>myst-parser
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Нижняя область">
+        <a href="index.html" class="btn btn-neutral float-left" title="BlindDeconvolution Documentation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Предыдущая</a>
+        <a href="usage_guide.html" class="btn btn-neutral float-right" title="Руководство пользователя" accesskey="n" rel="next">Следующая <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Авторские права 2024-2026, Юров П.И., Беззаборов А.А., Куропатов К.Л., Малыш Я.В.. </p>
+  </div>
+
+  Собрано при помощи <a href="https://www.sphinx-doc.org/">Sphinx</a> с использованием
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">темы,</a>
+    предоставленной <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,977 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="ru" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>API Reference &mdash; документация BlindDeconvolution 1.0.0</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=e35015f7"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/translations.js?v=5b699b7f"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Алфавитный указатель" href="genindex.html" />
+    <link rel="search" title="Поиск" href="search.html" />
+    <link rel="next" title="Теоретические основы" href="theory/placeholder.html" />
+    <link rel="prev" title="Архитектура системы" href="architecture.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            BlindDeconvolution
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Поиск в документации" aria-label="Поиск в документации" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Меню навигации">
+              <p class="caption" role="heading"><span class="caption-text">Руководство пользователя</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Установка и настройка</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage_guide.html">Руководство пользователя</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Конфигурационные файлы</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_flow.html">Поток данных (Dataflow) через Pipeline</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Архитектура и API</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="architecture.html">Архитектура системы</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">API Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#blinddeconv-processing-core"><code class="docutils literal notranslate"><span class="pre">blinddeconv.processing.core</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#processing">Класс <code class="docutils literal notranslate"><span class="pre">Processing</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#id1">Конструктор</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id2">Методы загрузки</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id3">Методы обработки</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id4">Предобработка</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id5">Визуализация и экспорт</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id6">Очистка</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id7">Утилиты</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#merge">Функция <code class="docutils literal notranslate"><span class="pre">merge</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#show-from-table">Функция <code class="docutils literal notranslate"><span class="pre">show_from_table</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#blinddeconv-processing-utils"><code class="docutils literal notranslate"><span class="pre">blinddeconv.processing.utils</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#image">Класс <code class="docutils literal notranslate"><span class="pre">Image</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id8">Утилитарные функции</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#blinddeconv-processing-metrics"><code class="docutils literal notranslate"><span class="pre">blinddeconv.processing.metrics</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#blinddeconv-algorithms-base"><code class="docutils literal notranslate"><span class="pre">blinddeconv.algorithms.base</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#deconvolutionalgorithm-abc">Класс <code class="docutils literal notranslate"><span class="pre">DeconvolutionAlgorithm</span></code> (ABC)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id9">Собственные реализации</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#blinddeconv-filters"><code class="docutils literal notranslate"><span class="pre">blinddeconv.filters</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#filterbase-abc">Класс <code class="docutils literal notranslate"><span class="pre">FilterBase</span></code> (ABC)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#blinddeconv-filters-blur"><code class="docutils literal notranslate"><span class="pre">blinddeconv.filters.blur</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#blinddeconv-filters-noise"><code class="docutils literal notranslate"><span class="pre">blinddeconv.filters.noise</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#blinddeconv-filters-smooth"><code class="docutils literal notranslate"><span class="pre">blinddeconv.filters.smooth</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#blinddeconv-filters-distributions"><code class="docutils literal notranslate"><span class="pre">blinddeconv.filters.distributions</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#blinddeconv-processing-extensions"><code class="docutils literal notranslate"><span class="pre">blinddeconv.processing.extensions</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#processingextension-abc">Класс <code class="docutils literal notranslate"><span class="pre">ProcessingExtension</span></code> (ABC)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#hyperparameteroptimizer">Класс <code class="docutils literal notranslate"><span class="pre">HyperparameterOptimizer</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#paretofrontanalyzer">Класс <code class="docutils literal notranslate"><span class="pre">ParetoFrontAnalyzer</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id10">Вспомогательные типы</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#blinddeconv-scripts"><code class="docutils literal notranslate"><span class="pre">blinddeconv.scripts</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#datasetgenerator">Класс <code class="docutils literal notranslate"><span class="pre">DatasetGenerator</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#kernelgenerator">Класс <code class="docutils literal notranslate"><span class="pre">KernelGenerator</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#run-py-api"><code class="docutils literal notranslate"><span class="pre">run.py</span></code> — программный API</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#load-config-config-path-dict"><code class="docutils literal notranslate"><span class="pre">load_config(config_path)</span> <span class="pre">→</span> <span class="pre">dict</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#validate-config-config-list-str"><code class="docutils literal notranslate"><span class="pre">validate_config(config)</span> <span class="pre">→</span> <span class="pre">List[str]</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#run-pipeline-config-output-dir-none-generate-report-false-dry-run-false-dict"><code class="docutils literal notranslate"><span class="pre">run_pipeline(config,</span> <span class="pre">output_dir=None,</span> <span class="pre">generate_report=False,</span> <span class="pre">dry_run=False)</span> <span class="pre">→</span> <span class="pre">dict</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#create-algorithm-algo-config-deconvolutionalgorithm"><code class="docutils literal notranslate"><span class="pre">create_algorithm(algo_config)</span> <span class="pre">→</span> <span class="pre">DeconvolutionAlgorithm</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#create-filter-filter-config-filterbase"><code class="docutils literal notranslate"><span class="pre">create_filter(filter_config)</span> <span class="pre">→</span> <span class="pre">FilterBase</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id11">Реестры</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Теория методов</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="theory/placeholder.html">Теоретические основы</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Автодокументация модулей</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">src</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Меню навигации для мобильных устройств" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">BlindDeconvolution</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Навигация по страницам">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">API Reference</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/api_reference.md.txt" rel="nofollow"> Просмотреть исходный код страницы</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="api-reference">
+<h1>API Reference<a class="headerlink" href="#api-reference" title="Ссылка на этот заголовок"></a></h1>
+<p>Справочник по публичным классам, методам и функциям пакета <code class="docutils literal notranslate"><span class="pre">blinddeconv</span></code>.</p>
+<hr class="docutils" />
+<section id="blinddeconv-processing-core">
+<h2><code class="docutils literal notranslate"><span class="pre">blinddeconv.processing.core</span></code><a class="headerlink" href="#blinddeconv-processing-core" title="Ссылка на этот заголовок"></a></h2>
+<section id="processing">
+<h3>Класс <code class="docutils literal notranslate"><span class="pre">Processing</span></code><a class="headerlink" href="#processing" title="Ссылка на этот заголовок"></a></h3>
+<p>Центральный класс-фасад фреймворка. Управляет загрузкой, фильтрацией, восстановлением и анализом изображений.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">blinddeconv.processing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Processing</span>
+</pre></div>
+</div>
+<section id="id1">
+<h4>Конструктор<a class="headerlink" href="#id1" title="Ссылка на этот заголовок"></a></h4>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">Processing</span><span class="p">(</span>
+    <span class="n">images_folder</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;images&quot;</span><span class="p">,</span>
+    <span class="n">blurred_folder</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;blurred&quot;</span><span class="p">,</span>
+    <span class="n">restored_folder</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;restored&quot;</span><span class="p">,</span>
+    <span class="n">data_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;data&quot;</span><span class="p">,</span>
+    <span class="n">color</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">kernel_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;kernels&quot;</span><span class="p">,</span>
+    <span class="n">preprocess_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;preprocess&quot;</span><span class="p">,</span>
+    <span class="n">dataset_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;dataset&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Параметр</p></th>
+<th class="head"><p>Тип</p></th>
+<th class="head"><p>По умолчанию</p></th>
+<th class="head"><p>Описание</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">images_folder</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;images&quot;</span></code></p></td>
+<td><p>Директория с исходными изображениями</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">blurred_folder</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;blurred&quot;</span></code></p></td>
+<td><p>Директория со смазанными изображениями</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">restored_folder</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;restored&quot;</span></code></p></td>
+<td><p>Директория для восстановленных</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">data_path</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;data&quot;</span></code></p></td>
+<td><p>Директория для CSV/метаданных</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">color</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">bool</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">True</span></code> — цветные, <code class="docutils literal notranslate"><span class="pre">False</span></code> — ч/б</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">kernel_dir</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;kernels&quot;</span></code></p></td>
+<td><p>Директория для ядер</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">preprocess_dir</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;preprocess&quot;</span></code></p></td>
+<td><p>Директория для предобработанных</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dataset_path</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;dataset&quot;</span></code></p></td>
+<td><p>Директория для метаданных датасетов</p></td>
+</tr>
+</tbody>
+</table>
+<p>При инициализации автоматически создаются все директории.</p>
+</section>
+<section id="id2">
+<h4>Методы загрузки<a class="headerlink" href="#id2" title="Ссылка на этот заголовок"></a></h4>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Метод</p></th>
+<th class="head"><p>Описание</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">read_all()</span></code></p></td>
+<td><p>Загружает все изображения из <code class="docutils literal notranslate"><span class="pre">images_folder</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">read_one(path)</span></code></p></td>
+<td><p>Загружает одно изображение по пути</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">bind(original,</span> <span class="pre">blurred,</span> <span class="pre">kernel=None,</span> <span class="pre">filter_description=&quot;unknown&quot;,</span> <span class="pre">color=True)</span> <span class="pre">→</span> <span class="pre">Image</span></code></p></td>
+<td><p>Создаёт связь между оригиналом и смазанным</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">load_bind_state(bind_path)</span></code></p></td>
+<td><p>Загружает связи из JSON</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">save_bind_state(file_path=None)</span></code></p></td>
+<td><p>Сохраняет связи в JSON</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="id3">
+<h4>Методы обработки<a class="headerlink" href="#id3" title="Ссылка на этот заголовок"></a></h4>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Метод</p></th>
+<th class="head"><p>Описание</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">filter(filter_processor)</span></code></p></td>
+<td><p>Применяет фильтр ко всем изображениям</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">save_filter()</span></code></p></td>
+<td><p>Сохраняет текущее смазанное в массив</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">load_filter(index)</span></code></p></td>
+<td><p>Загружает смазанное из массива в буфер</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">custom_filter(kernel_image_path,</span> <span class="pre">kernel_npy_path)</span></code></p></td>
+<td><p>Применяет пользовательское ядро</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">process(algorithm,</span> <span class="pre">metadata=False,</span> <span class="pre">unique_path=True)</span></code></p></td>
+<td><p>Восстанавливает все изображения одним алгоритмом</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">full_process(filters,</span> <span class="pre">methods,</span> <span class="pre">size=0.75,</span> <span class="pre">kernel_intencity_scale=10.0)</span></code></p></td>
+<td><p>Полный пайплайн: фильтры → восстановление → визуализация</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="id4">
+<h4>Предобработка<a class="headerlink" href="#id4" title="Ссылка на этот заголовок"></a></h4>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Метод</p></th>
+<th class="head"><p>Описание</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">histogram_equalization(view_histogram=False)</span></code></p></td>
+<td><p>Выравнивание гистограмм</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">histogram_equalization_CLAHE(view_histogram=False,</span> <span class="pre">clip_limit=0.01)</span></code></p></td>
+<td><p>Адаптивное (CLAHE)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">inverse_histogram_equalization(view_histogram=False)</span></code></p></td>
+<td><p>Обратная коррекция</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="id5">
+<h4>Визуализация и экспорт<a class="headerlink" href="#id5" title="Ссылка на этот заголовок"></a></h4>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Метод</p></th>
+<th class="head"><p>Описание</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">show(size=1.0,</span> <span class="pre">kernel_intencity_scale=1.0,</span> <span class="pre">kernel_size=1.0)</span></code></p></td>
+<td><p>Визуализация сеткой</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">show_line(window_scale=1.0,</span> <span class="pre">fontsize=8)</span></code></p></td>
+<td><p>Визуализация строкой</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">get_table(table_path,</span> <span class="pre">display_table=False)</span></code></p></td>
+<td><p>Экспорт метрик в CSV</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">pareto()</span></code></p></td>
+<td><p>Построение фронта Парето</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">process_hyperparameter_optimization(*args,</span> <span class="pre">**kwargs)</span></code></p></td>
+<td><p>Запуск оптимизации гиперпараметров</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="id6">
+<h4>Очистка<a class="headerlink" href="#id6" title="Ссылка на этот заголовок"></a></h4>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Метод</p></th>
+<th class="head"><p>Описание</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">clear_input()</span></code></p></td>
+<td><p>Удаляет все связи</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">reset()</span></code></p></td>
+<td><p>Сброс состояний до исходного</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">clear_output()</span></code></p></td>
+<td><p>Удаляет файлы + сброс</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">clear_output_directory(warning)</span></code></p></td>
+<td><p>Очистка директорий (с подтверждением)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">clear_restored()</span></code></p></td>
+<td><p>Удаляет восстановленные файлы</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">unbind_restored()</span></code></p></td>
+<td><p>Убирает связи с восстановленными</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">clear_all()</span></code></p></td>
+<td><p>Полная очистка</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="id7">
+<h4>Утилиты<a class="headerlink" href="#id7" title="Ссылка на этот заголовок"></a></h4>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Метод</p></th>
+<th class="head"><p>Описание</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">changescale(color:</span> <span class="pre">bool)</span></code></p></td>
+<td><p>Переключение цветного/ч/б</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">len_blur()</span> <span class="pre">→</span> <span class="pre">int</span></code></p></td>
+<td><p>Количество вариантов размытия</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="merge">
+<h3>Функция <code class="docutils literal notranslate"><span class="pre">merge</span></code><a class="headerlink" href="#merge" title="Ссылка на этот заголовок"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">merge</span><span class="p">(</span><span class="n">frame1</span><span class="p">:</span> <span class="n">Processing</span><span class="p">,</span> <span class="n">frame2</span><span class="p">:</span> <span class="n">Processing</span><span class="p">)</span> <span class="err">→</span> <span class="n">Processing</span>
+</pre></div>
+</div>
+<p>Объединяет массивы изображений из двух экземпляров <code class="docutils literal notranslate"><span class="pre">Processing</span></code>.</p>
+</section>
+<section id="show-from-table">
+<h3>Функция <code class="docutils literal notranslate"><span class="pre">show_from_table</span></code><a class="headerlink" href="#show-from-table" title="Ссылка на этот заголовок"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">show_from_table</span><span class="p">(</span><span class="n">table_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">alg_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">window_scale</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Визуализирует сетку из CSV-таблицы для указанного алгоритма.</p>
+</section>
+</section>
+<hr class="docutils" />
+<section id="blinddeconv-processing-utils">
+<h2><code class="docutils literal notranslate"><span class="pre">blinddeconv.processing.utils</span></code><a class="headerlink" href="#blinddeconv-processing-utils" title="Ссылка на этот заголовок"></a></h2>
+<section id="image">
+<h3>Класс <code class="docutils literal notranslate"><span class="pre">Image</span></code><a class="headerlink" href="#image" title="Ссылка на этот заголовок"></a></h3>
+<p>Структура данных «связь», хранящая граф оригинал → смазанные → восстановленные с метриками.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">Image</span><span class="p">(</span><span class="n">original_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">is_color</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Ключевые методы:</strong></p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Метод</p></th>
+<th class="head"><p>Возвращает</p></th>
+<th class="head"><p>Описание</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">get_original()</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p>Путь к оригиналу</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">get_blurred()</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p>Путь к текущему смазанному (буфер)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">get_blurred_array()</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">np.ndarray</span></code></p></td>
+<td><p>Все сохранённые смазанные</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">get_restored()</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Dict[(str,str),</span> <span class="pre">str]</span></code></p></td>
+<td><p>Восстановленные <code class="docutils literal notranslate"><span class="pre">{(blur,</span> <span class="pre">alg):</span> <span class="pre">path}</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">get_PSNR()</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Dict[(str,str),</span> <span class="pre">float]</span></code></p></td>
+<td><p>PSNR восстановленных</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">get_SSIM()</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Dict[(str,str),</span> <span class="pre">float]</span></code></p></td>
+<td><p>SSIM восстановленных</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">get_algorithm()</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">np.ndarray</span></code></p></td>
+<td><p>Список применённых алгоритмов</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">get_original_image()</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">np.ndarray</span></code></p></td>
+<td><p>Оригинал как массив</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">get_blurred_image()</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">np.ndarray</span></code></p></td>
+<td><p>Смазанное как массив</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">save_filter()</span></code></p></td>
+<td><p>—</p></td>
+<td><p>Перемещает буфер в массив</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="id8">
+<h3>Утилитарные функции<a class="headerlink" href="#id8" title="Ссылка на этот заголовок"></a></h3>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Функция</p></th>
+<th class="head"><p>Описание</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">imread(path,</span> <span class="pre">color)</span> <span class="pre">→</span> <span class="pre">np.ndarray</span></code></p></td>
+<td><p>Загрузка изображения через OpenCV</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">float_img_to_int(image)</span> <span class="pre">→</span> <span class="pre">np.ndarray</span></code></p></td>
+<td><p>Конвертация <code class="docutils literal notranslate"><span class="pre">[0,1]</span></code> → <code class="docutils literal notranslate"><span class="pre">[0,255]</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">prepare_image_for_metric(image)</span> <span class="pre">→</span> <span class="pre">np.ndarray</span></code></p></td>
+<td><p>Нормализация для метрик</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">generate_unique_file_path(directory,</span> <span class="pre">filename)</span> <span class="pre">→</span> <span class="pre">Path</span></code></p></td>
+<td><p>Генерация уникального пути</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">calculate_metrics(original,</span> <span class="pre">restored,</span> <span class="pre">data_range=None)</span> <span class="pre">→</span> <span class="pre">(psnr,</span> <span class="pre">ssim)</span></code></p></td>
+<td><p>Расчёт PSNR и SSIM</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<hr class="docutils" />
+<section id="blinddeconv-processing-metrics">
+<h2><code class="docutils literal notranslate"><span class="pre">blinddeconv.processing.metrics</span></code><a class="headerlink" href="#blinddeconv-processing-metrics" title="Ссылка на этот заголовок"></a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Функция</p></th>
+<th class="head"><p>Сигнатура</p></th>
+<th class="head"><p>Описание</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">PSNR</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(original,</span> <span class="pre">restored)</span> <span class="pre">→</span> <span class="pre">float</span></code></p></td>
+<td><p>Peak Signal-to-Noise Ratio (dB)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">SSIM</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(original,</span> <span class="pre">restored,</span> <span class="pre">data_range=None)</span> <span class="pre">→</span> <span class="pre">float</span></code></p></td>
+<td><p>Structural Similarity Index [0,1]</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Sharpness</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(image)</span> <span class="pre">→</span> <span class="pre">float</span></code></p></td>
+<td><p>Дисперсия Лапласа (мера резкости)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">calculate_sml</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(image)</span> <span class="pre">→</span> <span class="pre">float</span></code></p></td>
+<td><p>Sum of Modified Laplacian</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">blur_complexity</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(original,</span> <span class="pre">blurred)</span> <span class="pre">→</span> <span class="pre">float</span></code></p></td>
+<td><p>Мера сложности смаза [0,1]</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">calculate_snr</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(signal,</span> <span class="pre">noise)</span> <span class="pre">→</span> <span class="pre">float</span></code></p></td>
+<td><p>Signal-to-Noise Ratio (dB)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">noise_complexity</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(signal,</span> <span class="pre">noise,</span> <span class="pre">min_snr,</span> <span class="pre">max_snr)</span> <span class="pre">→</span> <span class="pre">float</span></code></p></td>
+<td><p>Мера сложности шума [0,1]</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<hr class="docutils" />
+<section id="blinddeconv-algorithms-base">
+<h2><code class="docutils literal notranslate"><span class="pre">blinddeconv.algorithms.base</span></code><a class="headerlink" href="#blinddeconv-algorithms-base" title="Ссылка на этот заголовок"></a></h2>
+<section id="deconvolutionalgorithm-abc">
+<h3>Класс <code class="docutils literal notranslate"><span class="pre">DeconvolutionAlgorithm</span></code> (ABC)<a class="headerlink" href="#deconvolutionalgorithm-abc" title="Ссылка на этот заголовок"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">blinddeconv.algorithms.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeconvolutionAlgorithm</span>
+</pre></div>
+</div>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Метод</p></th>
+<th class="head"><p>Тип</p></th>
+<th class="head"><p>Описание</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">process(image)</span> <span class="pre">→</span> <span class="pre">(restored,</span> <span class="pre">kernel)</span></code></p></td>
+<td><p>abstract</p></td>
+<td><p>Обработка изображения</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">change_param(param:</span> <span class="pre">dict)</span></code></p></td>
+<td><p>abstract</p></td>
+<td><p>Изменение гиперпараметров</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">get_param()</span> <span class="pre">→</span> <span class="pre">List[Tuple[str,</span> <span class="pre">Any]]</span></code></p></td>
+<td><p>abstract</p></td>
+<td><p>Получение параметров</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">get_name()</span> <span class="pre">→</span> <span class="pre">str</span></code></p></td>
+<td><p></p></td>
+<td><p>Название алгоритма</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">get_timer()</span> <span class="pre">→</span> <span class="pre">float</span></code></p></td>
+<td><p></p></td>
+<td><p>Время работы (-1 если не запускался)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">import_param_from_file(file:</span> <span class="pre">str)</span></code></p></td>
+<td><p></p></td>
+<td><p>Загрузка параметров из JSON</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="id9">
+<h3>Собственные реализации<a class="headerlink" href="#id9" title="Ссылка на этот заголовок"></a></h3>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Класс</p></th>
+<th class="head"><p>Модуль</p></th>
+<th class="head"><p>Категория</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">RichardsonLucy</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">...classic.richardson_lucy</span></code></p></td>
+<td><p>Классический</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">EMBlindDeconvolution</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">...classic.expectation_maximization</span></code></p></td>
+<td><p>Классический</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">MAPDeconvolution</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">...classic.alternating_minimization</span></code></p></td>
+<td><p>Классический</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">VBBID_TV</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">...bayesian.vbbid_tv</span></code></p></td>
+<td><p>Байесовский</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">BBD_DEIP</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">...bayesian.bbd_deip</span></code></p></td>
+<td><p>Байесовский</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">SB_BID_PE</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">...bayesian.sb_bid_pe</span></code></p></td>
+<td><p>Байесовский</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">VAPIBE</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">...variational.vapibe</span></code></p></td>
+<td><p>Вариационный</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">VABID</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">...variational.vabid</span></code></p></td>
+<td><p>Вариационный</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">VBSK_SID_ST</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">...variational.vbsk_sid_st</span></code></p></td>
+<td><p>Вариационный</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">VBC_BID</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">...sparse.vbc_bid</span></code></p></td>
+<td><p>Разреженный</p></td>
+</tr>
+</tbody>
+</table>
+<p>Полный путь модуля: <code class="docutils literal notranslate"><span class="pre">blinddeconv.algorithms.blind_deconvolution.our_company.&lt;category&gt;.&lt;module&gt;</span></code></p>
+</section>
+</section>
+<hr class="docutils" />
+<section id="blinddeconv-filters">
+<h2><code class="docutils literal notranslate"><span class="pre">blinddeconv.filters</span></code><a class="headerlink" href="#blinddeconv-filters" title="Ссылка на этот заголовок"></a></h2>
+<section id="filterbase-abc">
+<h3>Класс <code class="docutils literal notranslate"><span class="pre">FilterBase</span></code> (ABC)<a class="headerlink" href="#filterbase-abc" title="Ссылка на этот заголовок"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">blinddeconv.filters.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">FilterBase</span>
+</pre></div>
+</div>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Метод</p></th>
+<th class="head"><p>Описание</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">filter(image:</span> <span class="pre">np.ndarray)</span> <span class="pre">→</span> <span class="pre">np.ndarray</span></code></p></td>
+<td><p>Применение фильтра</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">description()</span> <span class="pre">→</span> <span class="pre">str</span></code></p></td>
+<td><p>Описание для файловой системы</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">get_type()</span> <span class="pre">→</span> <span class="pre">str</span></code></p></td>
+<td><p>Тип: <code class="docutils literal notranslate"><span class="pre">&quot;blur&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;noise&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;denoise&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;custom_kernel&quot;</span></code></p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="blinddeconv-filters-blur">
+<h3><code class="docutils literal notranslate"><span class="pre">blinddeconv.filters.blur</span></code><a class="headerlink" href="#blinddeconv-filters-blur" title="Ссылка на этот заголовок"></a></h3>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Класс</p></th>
+<th class="head"><p>Описание</p></th>
+<th class="head"><p>Параметры</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">DefocusBlur</span></code></p></td>
+<td><p>Размытие вне фокуса (2D)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">psf:</span> <span class="pre">Callable</span></code>, <code class="docutils literal notranslate"><span class="pre">param:</span> <span class="pre">float</span></code>, <code class="docutils literal notranslate"><span class="pre">kernel_size:</span> <span class="pre">int=None</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">MotionBlur</span></code></p></td>
+<td><p>Размытие в движении (1D)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">psf:</span> <span class="pre">Callable</span></code>, <code class="docutils literal notranslate"><span class="pre">param:</span> <span class="pre">float</span></code>, <code class="docutils literal notranslate"><span class="pre">angle:</span> <span class="pre">float=0</span></code>, <code class="docutils literal notranslate"><span class="pre">kernel_length:</span> <span class="pre">int=None</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">BSpline_blur</span></code></p></td>
+<td><p>Криволинейное движение (B-spline)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">shape_points</span></code>, <code class="docutils literal notranslate"><span class="pre">intensity_points</span></code>, <code class="docutils literal notranslate"><span class="pre">output_size</span></code>, <code class="docutils literal notranslate"><span class="pre">shape_degree</span></code>, <code class="docutils literal notranslate"><span class="pre">intensity_degree</span></code>, <code class="docutils literal notranslate"><span class="pre">n_samples</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">Kernel_convolution</span></code></p></td>
+<td><p>Свёртка с ядром из .npy</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">npy_file_path:</span> <span class="pre">str</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Identical_kernel</span></code></p></td>
+<td><p>Тождественный фильтр</p></td>
+<td><p>—</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="blinddeconv-filters-noise">
+<h3><code class="docutils literal notranslate"><span class="pre">blinddeconv.filters.noise</span></code><a class="headerlink" href="#blinddeconv-filters-noise" title="Ссылка на этот заголовок"></a></h3>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Класс</p></th>
+<th class="head"><p>Описание</p></th>
+<th class="head"><p>Параметры</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">GaussianNoise</span></code></p></td>
+<td><p>Аддитивный гауссовский</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">param:</span> <span class="pre">float</span></code> (стд. отклонение)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">PoissonNoise</span></code></p></td>
+<td><p>Пуассоновский (дробления)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">param:</span> <span class="pre">float</span></code> (интенсивность, 0-1)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">SaltAndPepperNoise</span></code></p></td>
+<td><p>Импульсный</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">param:</span> <span class="pre">float</span></code> (вероятность)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">OldPhotoNoise</span></code></p></td>
+<td><p>Имитация старой фотографии</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">param:</span> <span class="pre">float</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ColoredNoise</span></code></p></td>
+<td><p>Цветной шум (powerlaw)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">param:</span> <span class="pre">float</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">Pink_Noise</span></code></p></td>
+<td><p>Розовый шум (1/f)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">param:</span> <span class="pre">float</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Brown_Noise</span></code></p></td>
+<td><p>Коричневый шум (1/f²)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">param:</span> <span class="pre">float</span></code></p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="blinddeconv-filters-smooth">
+<h3><code class="docutils literal notranslate"><span class="pre">blinddeconv.filters.smooth</span></code><a class="headerlink" href="#blinddeconv-filters-smooth" title="Ссылка на этот заголовок"></a></h3>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Класс</p></th>
+<th class="head"><p>Описание</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">MeanBlur</span></code></p></td>
+<td><p>Сглаживание средним</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">MedianBlur</span></code></p></td>
+<td><p>Медианное сглаживание</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">GaussianBlur</span></code></p></td>
+<td><p>Гауссово сглаживание</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">BilateralFilter</span></code></p></td>
+<td><p>Билатеральный фильтр</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="blinddeconv-filters-distributions">
+<h3><code class="docutils literal notranslate"><span class="pre">blinddeconv.filters.distributions</span></code><a class="headerlink" href="#blinddeconv-filters-distributions" title="Ссылка на этот заголовок"></a></h3>
+<p>PSF-функции для <code class="docutils literal notranslate"><span class="pre">DefocusBlur</span></code> и <code class="docutils literal notranslate"><span class="pre">MotionBlur</span></code>:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Функция</p></th>
+<th class="head"><p>Сигнатура</p></th>
+<th class="head"><p>Описание</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gaussian_distribution</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(x,</span> <span class="pre">std)</span> <span class="pre">→</span> <span class="pre">np.ndarray</span></code></p></td>
+<td><p>Гауссова PSF</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">uniform_distribution</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(x,</span> <span class="pre">radius)</span> <span class="pre">→</span> <span class="pre">np.ndarray</span></code></p></td>
+<td><p>Равномерная (диск/прямоугольник)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">linear_decay_distribution</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(x,</span> <span class="pre">radius)</span> <span class="pre">→</span> <span class="pre">np.ndarray</span></code></p></td>
+<td><p>Линейно убывающая (конус)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ring_distribution</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(x,</span> <span class="pre">radius)</span> <span class="pre">→</span> <span class="pre">np.ndarray</span></code></p></td>
+<td><p>Кольцевая</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">exponential_decay_distribution</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(x,</span> <span class="pre">scale)</span> <span class="pre">→</span> <span class="pre">np.ndarray</span></code></p></td>
+<td><p>Экспоненциально убывающая</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">generate_multivariate_normal_kernel</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(ksize,</span> <span class="pre">cov)</span> <span class="pre">→</span> <span class="pre">np.ndarray</span></code></p></td>
+<td><p>2D-ядро из многомерного нормального</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">generate_bspline_motion_kernel</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(ksize,</span> <span class="pre">points,</span> <span class="pre">thickness)</span> <span class="pre">→</span> <span class="pre">np.ndarray</span></code></p></td>
+<td><p>Ядро по B-spline кривой</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<hr class="docutils" />
+<section id="blinddeconv-processing-extensions">
+<h2><code class="docutils literal notranslate"><span class="pre">blinddeconv.processing.extensions</span></code><a class="headerlink" href="#blinddeconv-processing-extensions" title="Ссылка на этот заголовок"></a></h2>
+<section id="processingextension-abc">
+<h3>Класс <code class="docutils literal notranslate"><span class="pre">ProcessingExtension</span></code> (ABC)<a class="headerlink" href="#processingextension-abc" title="Ссылка на этот заголовок"></a></h3>
+<p>Базовый класс для расширений:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Метод</p></th>
+<th class="head"><p>Описание</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">execute(*args,</span> <span class="pre">**kwargs)</span></code></p></td>
+<td><p>Основной метод расширения (abstract)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">_prepare_image(image)</span></code></p></td>
+<td><p>Нормализация изображения для метрик</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">_validate_processing()</span></code></p></td>
+<td><p>Проверка корректности <code class="docutils literal notranslate"><span class="pre">processing</span></code></p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="hyperparameteroptimizer">
+<h3>Класс <code class="docutils literal notranslate"><span class="pre">HyperparameterOptimizer</span></code><a class="headerlink" href="#hyperparameteroptimizer" title="Ссылка на этот заголовок"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">proc</span><span class="o">.</span><span class="n">process_hyperparameter_optimization</span><span class="p">(</span>
+    <span class="n">algorithm_processor</span><span class="o">=</span><span class="n">algo</span><span class="p">,</span>
+    <span class="n">param_ranges</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;max_iter&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">50</span><span class="p">,</span> <span class="mi">500</span><span class="p">),</span> <span class="s2">&quot;kernel_size&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">11</span><span class="p">,</span> <span class="mi">31</span><span class="p">)},</span>
+    <span class="n">n_trials</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+    <span class="n">metric</span><span class="o">=</span><span class="s2">&quot;PSNR&quot;</span><span class="p">,</span>           <span class="c1"># &quot;PSNR&quot; | &quot;SSIM&quot; | &quot;SHARPNESS&quot;</span>
+    <span class="n">method</span><span class="o">=</span><span class="n">OptimizationMethod</span><span class="o">.</span><span class="n">TPE</span><span class="p">,</span>  <span class="c1"># TPE | RANDOM | GP | NSGA2</span>
+    <span class="n">timeout</span><span class="o">=</span><span class="mi">3600</span><span class="p">,</span>
+    <span class="n">n_jobs</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span>
+    <span class="n">save_results</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Возвращает <code class="docutils literal notranslate"><span class="pre">OptimizationResult</span></code> с полями: <code class="docutils literal notranslate"><span class="pre">best_params</span></code>, <code class="docutils literal notranslate"><span class="pre">best_value</span></code>, <code class="docutils literal notranslate"><span class="pre">n_trials</span></code>, <code class="docutils literal notranslate"><span class="pre">history</span></code>, <code class="docutils literal notranslate"><span class="pre">elapsed_time</span></code>.</p>
+</section>
+<section id="paretofrontanalyzer">
+<h3>Класс <code class="docutils literal notranslate"><span class="pre">ParetoFrontAnalyzer</span></code><a class="headerlink" href="#paretofrontanalyzer" title="Ссылка на этот заголовок"></a></h3>
+<p>Многокритериальный анализ: 3D фронт Парето, 2D проекции, тепловые карты.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">proc</span><span class="o">.</span><span class="n">pareto</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="id10">
+<h3>Вспомогательные типы<a class="headerlink" href="#id10" title="Ссылка на этот заголовок"></a></h3>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Класс</p></th>
+<th class="head"><p>Описание</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ParameterRange</span></code></p></td>
+<td><p>Диапазон гиперпараметра (name, min, max, log_scale, step)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">OptimizationResult</span></code></p></td>
+<td><p>Результат оптимизации</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ParetoPoint</span></code></p></td>
+<td><p>Точка в многокритериальном пространстве</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">OptimizationMethod</span></code></p></td>
+<td><p>Enum: <code class="docutils literal notranslate"><span class="pre">TPE</span></code>, <code class="docutils literal notranslate"><span class="pre">RANDOM</span></code>, <code class="docutils literal notranslate"><span class="pre">GP</span></code>, <code class="docutils literal notranslate"><span class="pre">NSGA2</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">MetricType</span></code></p></td>
+<td><p>Enum: <code class="docutils literal notranslate"><span class="pre">PSNR</span></code>, <code class="docutils literal notranslate"><span class="pre">SSIM</span></code>, <code class="docutils literal notranslate"><span class="pre">SHARPNESS</span></code></p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<hr class="docutils" />
+<section id="blinddeconv-scripts">
+<h2><code class="docutils literal notranslate"><span class="pre">blinddeconv.scripts</span></code><a class="headerlink" href="#blinddeconv-scripts" title="Ссылка на этот заголовок"></a></h2>
+<section id="datasetgenerator">
+<h3>Класс <code class="docutils literal notranslate"><span class="pre">DatasetGenerator</span></code><a class="headerlink" href="#datasetgenerator" title="Ссылка на этот заголовок"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">blinddeconv.scripts.dataset_generator</span><span class="w"> </span><span class="kn">import</span> <span class="n">DatasetGenerator</span>
+
+<span class="n">generator</span> <span class="o">=</span> <span class="n">DatasetGenerator</span><span class="p">(</span>
+    <span class="n">processing_instance</span><span class="o">=</span><span class="n">proc</span><span class="p">,</span>
+    <span class="n">input_dir</span><span class="o">=</span><span class="s2">&quot;images/original&quot;</span><span class="p">,</span>
+    <span class="n">output_dir</span><span class="o">=</span><span class="s2">&quot;images/distorted&quot;</span><span class="p">,</span>
+    <span class="n">kernel_dir</span><span class="o">=</span><span class="s2">&quot;images/ground_truth_filters&quot;</span><span class="p">,</span>
+    <span class="n">kernel_data_dir</span><span class="o">=</span><span class="s2">&quot;images/kernel_data&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">generator</span><span class="o">.</span><span class="n">generate</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="kernelgenerator">
+<h3>Класс <code class="docutils literal notranslate"><span class="pre">KernelGenerator</span></code><a class="headerlink" href="#kernelgenerator" title="Ссылка на этот заголовок"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">blinddeconv.scripts.kernel_generator</span><span class="w"> </span><span class="kn">import</span> <span class="n">KernelGenerator</span>
+
+<span class="n">gen</span> <span class="o">=</span> <span class="n">KernelGenerator</span><span class="p">(</span>
+    <span class="n">kernel_dir</span><span class="o">=</span><span class="s2">&quot;kernels/png&quot;</span><span class="p">,</span>
+    <span class="n">kernel_data_dir</span><span class="o">=</span><span class="s2">&quot;kernels/npy&quot;</span><span class="p">,</span>
+    <span class="n">kernel_size</span><span class="o">=</span><span class="mi">51</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="run-py-api">
+<h2><code class="docutils literal notranslate"><span class="pre">run.py</span></code> — программный API<a class="headerlink" href="#run-py-api" title="Ссылка на этот заголовок"></a></h2>
+<section id="load-config-config-path-dict">
+<h3><code class="docutils literal notranslate"><span class="pre">load_config(config_path)</span> <span class="pre">→</span> <span class="pre">dict</span></code><a class="headerlink" href="#load-config-config-path-dict" title="Ссылка на этот заголовок"></a></h3>
+<p>Загрузка YAML/JSON конфигурации.</p>
+</section>
+<section id="validate-config-config-list-str">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_config(config)</span> <span class="pre">→</span> <span class="pre">List[str]</span></code><a class="headerlink" href="#validate-config-config-list-str" title="Ссылка на этот заголовок"></a></h3>
+<p>Валидация по JSON Schema + логические проверки. Возвращает список ошибок.</p>
+</section>
+<section id="run-pipeline-config-output-dir-none-generate-report-false-dry-run-false-dict">
+<h3><code class="docutils literal notranslate"><span class="pre">run_pipeline(config,</span> <span class="pre">output_dir=None,</span> <span class="pre">generate_report=False,</span> <span class="pre">dry_run=False)</span> <span class="pre">→</span> <span class="pre">dict</span></code><a class="headerlink" href="#run-pipeline-config-output-dir-none-generate-report-false-dry-run-false-dict" title="Ссылка на этот заголовок"></a></h3>
+<p>Запуск пайплайна программно:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">run</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_config</span><span class="p">,</span> <span class="n">validate_config</span><span class="p">,</span> <span class="n">run_pipeline</span>
+
+<span class="n">config</span> <span class="o">=</span> <span class="n">load_config</span><span class="p">(</span><span class="s2">&quot;configs/experiment.yaml&quot;</span><span class="p">)</span>
+<span class="n">errors</span> <span class="o">=</span> <span class="n">validate_config</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+<span class="k">if</span> <span class="ow">not</span> <span class="n">errors</span><span class="p">:</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">run_pipeline</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">generate_report</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="create-algorithm-algo-config-deconvolutionalgorithm">
+<h3><code class="docutils literal notranslate"><span class="pre">create_algorithm(algo_config)</span> <span class="pre">→</span> <span class="pre">DeconvolutionAlgorithm</span></code><a class="headerlink" href="#create-algorithm-algo-config-deconvolutionalgorithm" title="Ссылка на этот заголовок"></a></h3>
+<p>Фабрика алгоритмов из конфигурации.</p>
+</section>
+<section id="create-filter-filter-config-filterbase">
+<h3><code class="docutils literal notranslate"><span class="pre">create_filter(filter_config)</span> <span class="pre">→</span> <span class="pre">FilterBase</span></code><a class="headerlink" href="#create-filter-filter-config-filterbase" title="Ссылка на этот заголовок"></a></h3>
+<p>Фабрика фильтров из конфигурации.</p>
+</section>
+<section id="id11">
+<h3>Реестры<a class="headerlink" href="#id11" title="Ссылка на этот заголовок"></a></h3>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ALGORITHM_REGISTRY</span></code> — словарь <code class="docutils literal notranslate"><span class="pre">{name:</span> <span class="pre">{module,</span> <span class="pre">class_name,</span> <span class="pre">description,</span> <span class="pre">category}}</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">FILTER_REGISTRY</span></code> — словарь <code class="docutils literal notranslate"><span class="pre">{name:</span> <span class="pre">{module,</span> <span class="pre">class_name,</span> <span class="pre">requires_psf,</span> <span class="pre">description}}</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">PSF_REGISTRY</span></code> — словарь <code class="docutils literal notranslate"><span class="pre">{name:</span> <span class="pre">full_module_path}</span></code></p></li>
+</ul>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Нижняя область">
+        <a href="architecture.html" class="btn btn-neutral float-left" title="Архитектура системы" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Предыдущая</a>
+        <a href="theory/placeholder.html" class="btn btn-neutral float-right" title="Теоретические основы" accesskey="n" rel="next">Следующая <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Авторские права 2024-2026, Юров П.И., Беззаборов А.А., Куропатов К.Л., Малыш Я.В.. </p>
+  </div>
+
+  Собрано при помощи <a href="https://www.sphinx-doc.org/">Sphinx</a> с использованием
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">темы,</a>
+    предоставленной <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

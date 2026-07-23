@@ -1,0 +1,7 @@
+blinddeconv.processing.extensions.base module
+=============================================
+
+.. automodule:: blinddeconv.processing.extensions.base
+   :members:
+   :undoc-members:
+   :show-inheritance:

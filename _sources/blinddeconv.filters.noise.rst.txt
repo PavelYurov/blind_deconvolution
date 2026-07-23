@@ -1,0 +1,7 @@
+blinddeconv.filters.noise module
+================================
+
+.. automodule:: blinddeconv.filters.noise
+   :members:
+   :undoc-members:
+   :show-inheritance:

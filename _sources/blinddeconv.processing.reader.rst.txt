@@ -1,0 +1,7 @@
+blinddeconv.processing.reader module
+====================================
+
+.. automodule:: blinddeconv.processing.reader
+   :members:
+   :undoc-members:
+   :show-inheritance:

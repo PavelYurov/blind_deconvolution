@@ -1,0 +1,36 @@
+blinddeconv.processing package
+==============================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   blinddeconv.processing.extensions
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   blinddeconv.processing.applyfilter
+   blinddeconv.processing.clear
+   blinddeconv.processing.core
+   blinddeconv.processing.display
+   blinddeconv.processing.metrics
+   blinddeconv.processing.preprocessing
+   blinddeconv.processing.reader
+   blinddeconv.processing.restore
+   blinddeconv.processing.restorepipeline
+   blinddeconv.processing.tables
+   blinddeconv.processing.utils
+
+Module contents
+---------------
+
+.. automodule:: blinddeconv.processing
+   :members:
+   :undoc-members:
+   :show-inheritance:

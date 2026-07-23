@@ -1,0 +1,7 @@
+blinddeconv.algorithms.base module
+==================================
+
+.. automodule:: blinddeconv.algorithms.base
+   :members:
+   :undoc-members:
+   :show-inheritance:

@@ -1,0 +1,356 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="ru" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BlindDeconvolution Documentation &mdash; документация BlindDeconvolution 1.0.0</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=e35015f7"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/translations.js?v=5b699b7f"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Алфавитный указатель" href="genindex.html" />
+    <link rel="search" title="Поиск" href="search.html" />
+    <link rel="next" title="Установка и настройка" href="installation.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="#" class="icon icon-home">
+            BlindDeconvolution
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Поиск в документации" aria-label="Поиск в документации" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Меню навигации">
+              <p class="caption" role="heading"><span class="caption-text">Руководство пользователя</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Установка и настройка</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage_guide.html">Руководство пользователя</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Конфигурационные файлы</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_flow.html">Поток данных (Dataflow) через Pipeline</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Архитектура и API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="architecture.html">Архитектура системы</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api_reference.html">API Reference</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Теория методов</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="theory/placeholder.html">Теоретические основы</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Автодокументация модулей</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">src</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Меню навигации для мобильных устройств" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="#">BlindDeconvolution</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Навигация по страницам">
+  <ul class="wy-breadcrumbs">
+      <li><a href="#" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">BlindDeconvolution Documentation</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/index.rst.txt" rel="nofollow"> Просмотреть исходный код страницы</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="blinddeconvolution-documentation">
+<h1>BlindDeconvolution Documentation<a class="headerlink" href="#blinddeconvolution-documentation" title="Ссылка на этот заголовок"></a></h1>
+<p>Фреймворк для исследования методов слепой деконволюции изображений.</p>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">Руководство пользователя</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Установка и настройка</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#id2">Системные требования</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#id3">Установка</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#id4">Удаление</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#id5">Профили зависимостей</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#id6">Интерактивное развертывание окружения</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="installation.html#install-py">Интерактивный установщик зависимостей (<code class="docutils literal notranslate"><span class="pre">install.py</span></code>)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="installation.html#uninstall-py">Интерактивное удаление зависимостей (<code class="docutils literal notranslate"><span class="pre">uninstall.py</span></code>)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#id7">Настройка виртуального окружения (вручную)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#id8">Опциональные зависимости</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="installation.html#gnu-octave-matlab">GNU Octave (для MATLAB-обёрток)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="installation.html#cuda-gpu">CUDA / GPU (для нейросетевых методов)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#id9">Проверка установки</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#id10">Решение проблем</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="installation.html#importerror-no-module-named-cv2"><code class="docutils literal notranslate"><span class="pre">ImportError:</span> <span class="pre">No</span> <span class="pre">module</span> <span class="pre">named</span> <span class="pre">'cv2'</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="installation.html#modulenotfounderror-no-module-named-blinddeconv"><code class="docutils literal notranslate"><span class="pre">ModuleNotFoundError:</span> <span class="pre">No</span> <span class="pre">module</span> <span class="pre">named</span> <span class="pre">'blinddeconv'</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="installation.html#id11">Ошибки при сборке документации</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="usage_guide.html">Руководство пользователя</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="usage_guide.html#cli">Автоматизация и CLI</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="usage_guide.html#id2">Установка зависимостей CLI</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="usage_guide.html#run-py">run.py — Автоматизация через конфигурационные файлы</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="usage_guide.html#id3">Базовый запуск</a></li>
+<li class="toctree-l3"><a class="reference internal" href="usage_guide.html#id4">Аргументы командной строки</a></li>
+<li class="toctree-l3"><a class="reference internal" href="usage_guide.html#yaml">Структура конфигурационного файла (YAML)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="usage_guide.html#id5">Доступные алгоритмы (реестр)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="usage_guide.html#id6">Доступные фильтры</a></li>
+<li class="toctree-l3"><a class="reference internal" href="usage_guide.html#psf-defocus-blur-motion-blur">PSF-функции (для defocus_blur и motion_blur)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="usage_guide.html#id7">Готовые конфиги</a></li>
+<li class="toctree-l3"><a class="reference internal" href="usage_guide.html#id8">Что генерирует run.py</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="usage_guide.html#cli-py">cli.py — Интерфейс командной строки</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="usage_guide.html#id9">Справка</a></li>
+<li class="toctree-l3"><a class="reference internal" href="usage_guide.html#id10">Команды</a></li>
+<li class="toctree-l3"><a class="reference internal" href="usage_guide.html#tab-completion">Автодополнение команд (Tab completion)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="usage_guide.html#docs-tools-build-docs-py">Сборка документации (<code class="docutils literal notranslate"><span class="pre">docs/tools/build_docs.py</span></code>)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="usage_guide.html#id11">Требования</a></li>
+<li class="toctree-l3"><a class="reference internal" href="usage_guide.html#id12">Запуск</a></li>
+<li class="toctree-l3"><a class="reference internal" href="usage_guide.html#id13">Ручная сборка</a></li>
+<li class="toctree-l3"><a class="reference internal" href="usage_guide.html#id14">Важно</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="usage_guide.html#python">Использование как Python-библиотеки</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="usage_guide.html#id15">Восстановление одного изображения</a></li>
+<li class="toctree-l3"><a class="reference internal" href="usage_guide.html#id16">Сравнение нескольких алгоритмов</a></li>
+<li class="toctree-l3"><a class="reference internal" href="usage_guide.html#id17">Полный пайплайн (фильтры + восстановление)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="usage_guide.html#id18">Оптимизация гиперпараметров</a></li>
+<li class="toctree-l3"><a class="reference internal" href="usage_guide.html#id19">Сохранение и загрузка состояния</a></li>
+<li class="toctree-l3"><a class="reference internal" href="usage_guide.html#id20">Очистка данных</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Конфигурационные файлы</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#id2">Обзор</a></li>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#id3">Формат файла</a></li>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#id4">Структура конфигурации</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#yaml">Полный пример (YAML)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#id5">Описание секций</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#experiment"><code class="docutils literal notranslate"><span class="pre">experiment</span></code> (опционально)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#input"><code class="docutils literal notranslate"><span class="pre">input</span></code> (обязательно)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#output"><code class="docutils literal notranslate"><span class="pre">output</span></code> (опционально)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#processing"><code class="docutils literal notranslate"><span class="pre">processing</span></code> (опционально)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#algorithms"><code class="docutils literal notranslate"><span class="pre">algorithms</span></code> (обязательно)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#filters-full-process"><code class="docutils literal notranslate"><span class="pre">filters</span></code> (для <code class="docutils literal notranslate"><span class="pre">full_process</span></code>)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#report"><code class="docutils literal notranslate"><span class="pre">report</span></code> (опционально)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#id6">Валидация</a></li>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#id7">Готовые конфиги</a></li>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#cli">Генерация конфигов через CLI</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="data_flow.html">Поток данных (Dataflow) через Pipeline</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="data_flow.html#id1">Общая схема</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data_flow.html#processing">Ключевые функции модуля <code class="docutils literal notranslate"><span class="pre">processing</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="data_flow.html#process">Режим 1: <code class="docutils literal notranslate"><span class="pre">process</span></code> — восстановление по связям</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data_flow.html#id2">Шаг 1. Загрузка связей</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_flow.html#id3">Шаг 2. Предобработка (опционально)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_flow.html#id4">Шаг 3. Восстановление</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_flow.html#id5">Шаг 4. Визуализация и экспорт</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="data_flow.html#full-process">Применение фильтров отдельно от <code class="docutils literal notranslate"><span class="pre">full_process</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="data_flow.html#id6">Режим 2: <code class="docutils literal notranslate"><span class="pre">full_process</span></code> — полный пайплайн</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data_flow.html#run-py">Автоматизация через run.py</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data_flow.html#dataset-json">Формат сохранённых связей (dataset.json)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data_flow.html#id7">Обратная гистограммная коррекция</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">Архитектура и API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="architecture.html">Архитектура системы</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="architecture.html#id2">Модульная структура</a></li>
+<li class="toctree-l2"><a class="reference internal" href="architecture.html#id3">Основные компоненты</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="architecture.html#processing">1. <code class="docutils literal notranslate"><span class="pre">Processing</span></code> — центральный класс (фасад)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="architecture.html#image">2. <code class="docutils literal notranslate"><span class="pre">Image</span></code> — связь изображений</a></li>
+<li class="toctree-l3"><a class="reference internal" href="architecture.html#deconvolutionalgorithm">3. <code class="docutils literal notranslate"><span class="pre">DeconvolutionAlgorithm</span></code> — базовый класс алгоритмов</a></li>
+<li class="toctree-l3"><a class="reference internal" href="architecture.html#filterbase">4. <code class="docutils literal notranslate"><span class="pre">FilterBase</span></code> — базовый класс фильтров</a></li>
+<li class="toctree-l3"><a class="reference internal" href="architecture.html#extensions">5. Система расширений (extensions)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="architecture.html#id4">Организация  исхожного кода алгоритмов</a></li>
+<li class="toctree-l2"><a class="reference internal" href="architecture.html#id5">Организация фильтров</a></li>
+<li class="toctree-l2"><a class="reference internal" href="architecture.html#id6">Вспомогательные скрипты</a></li>
+<li class="toctree-l2"><a class="reference internal" href="architecture.html#id7">Система автоматизации</a></li>
+<li class="toctree-l2"><a class="reference internal" href="architecture.html#id8">Паттерны проектирования</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="api_reference.html">API Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="api_reference.html#blinddeconv-processing-core"><code class="docutils literal notranslate"><span class="pre">blinddeconv.processing.core</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api_reference.html#processing">Класс <code class="docutils literal notranslate"><span class="pre">Processing</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api_reference.html#merge">Функция <code class="docutils literal notranslate"><span class="pre">merge</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api_reference.html#show-from-table">Функция <code class="docutils literal notranslate"><span class="pre">show_from_table</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api_reference.html#blinddeconv-processing-utils"><code class="docutils literal notranslate"><span class="pre">blinddeconv.processing.utils</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api_reference.html#image">Класс <code class="docutils literal notranslate"><span class="pre">Image</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api_reference.html#id8">Утилитарные функции</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api_reference.html#blinddeconv-processing-metrics"><code class="docutils literal notranslate"><span class="pre">blinddeconv.processing.metrics</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api_reference.html#blinddeconv-algorithms-base"><code class="docutils literal notranslate"><span class="pre">blinddeconv.algorithms.base</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api_reference.html#deconvolutionalgorithm-abc">Класс <code class="docutils literal notranslate"><span class="pre">DeconvolutionAlgorithm</span></code> (ABC)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api_reference.html#id9">Собственные реализации</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api_reference.html#blinddeconv-filters"><code class="docutils literal notranslate"><span class="pre">blinddeconv.filters</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api_reference.html#filterbase-abc">Класс <code class="docutils literal notranslate"><span class="pre">FilterBase</span></code> (ABC)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api_reference.html#blinddeconv-filters-blur"><code class="docutils literal notranslate"><span class="pre">blinddeconv.filters.blur</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api_reference.html#blinddeconv-filters-noise"><code class="docutils literal notranslate"><span class="pre">blinddeconv.filters.noise</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api_reference.html#blinddeconv-filters-smooth"><code class="docutils literal notranslate"><span class="pre">blinddeconv.filters.smooth</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api_reference.html#blinddeconv-filters-distributions"><code class="docutils literal notranslate"><span class="pre">blinddeconv.filters.distributions</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api_reference.html#blinddeconv-processing-extensions"><code class="docutils literal notranslate"><span class="pre">blinddeconv.processing.extensions</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api_reference.html#processingextension-abc">Класс <code class="docutils literal notranslate"><span class="pre">ProcessingExtension</span></code> (ABC)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api_reference.html#hyperparameteroptimizer">Класс <code class="docutils literal notranslate"><span class="pre">HyperparameterOptimizer</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api_reference.html#paretofrontanalyzer">Класс <code class="docutils literal notranslate"><span class="pre">ParetoFrontAnalyzer</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api_reference.html#id10">Вспомогательные типы</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api_reference.html#blinddeconv-scripts"><code class="docutils literal notranslate"><span class="pre">blinddeconv.scripts</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api_reference.html#datasetgenerator">Класс <code class="docutils literal notranslate"><span class="pre">DatasetGenerator</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api_reference.html#kernelgenerator">Класс <code class="docutils literal notranslate"><span class="pre">KernelGenerator</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api_reference.html#run-py-api"><code class="docutils literal notranslate"><span class="pre">run.py</span></code> — программный API</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api_reference.html#load-config-config-path-dict"><code class="docutils literal notranslate"><span class="pre">load_config(config_path)</span> <span class="pre">→</span> <span class="pre">dict</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api_reference.html#validate-config-config-list-str"><code class="docutils literal notranslate"><span class="pre">validate_config(config)</span> <span class="pre">→</span> <span class="pre">List[str]</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api_reference.html#run-pipeline-config-output-dir-none-generate-report-false-dry-run-false-dict"><code class="docutils literal notranslate"><span class="pre">run_pipeline(config,</span> <span class="pre">output_dir=None,</span> <span class="pre">generate_report=False,</span> <span class="pre">dry_run=False)</span> <span class="pre">→</span> <span class="pre">dict</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api_reference.html#create-algorithm-algo-config-deconvolutionalgorithm"><code class="docutils literal notranslate"><span class="pre">create_algorithm(algo_config)</span> <span class="pre">→</span> <span class="pre">DeconvolutionAlgorithm</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api_reference.html#create-filter-filter-config-filterbase"><code class="docutils literal notranslate"><span class="pre">create_filter(filter_config)</span> <span class="pre">→</span> <span class="pre">FilterBase</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api_reference.html#id11">Реестры</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">Теория методов</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="theory/placeholder.html">Теоретические основы</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="theory/placeholder.html#id2">Планируемые материалы</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
+</div>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">Автодокументация модулей</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">src</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="blinddeconv.html">blinddeconv package</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.html#subpackages">Subpackages</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.algorithms.html">blinddeconv.algorithms package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.filters.html">blinddeconv.filters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.output.html">blinddeconv.output package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.html">blinddeconv.processing package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.html#module-blinddeconv">Module contents</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.html#blinddeconv.Processing"><code class="docutils literal notranslate"><span class="pre">Processing</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+<section id="id1">
+<h2>Быстрый старт<a class="headerlink" href="#id1" title="Ссылка на этот заголовок"></a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">blinddeconv.processing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Processing</span>
+
+<span class="n">proc</span> <span class="o">=</span> <span class="n">Processing</span><span class="p">(</span><span class="n">images_folder</span><span class="o">=</span><span class="s2">&quot;images/original&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">proc</span><span class="o">.</span><span class="n">read_all</span><span class="p">()</span>
+<span class="n">proc</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="id2">
+<h2>Индексы<a class="headerlink" href="#id2" title="Ссылка на этот заголовок"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Состав модуля</span></a> — Индекс модулей</p></li>
+<li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Алфавитный указатель</span></a> — Алфавитный индекс</p></li>
+<li><p><a class="reference internal" href="search.html"><span class="std std-ref">Поиск</span></a> — Поиск</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Нижняя область">
+        <a href="installation.html" class="btn btn-neutral float-right" title="Установка и настройка" accesskey="n" rel="next">Следующая <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Авторские права 2024-2026, Юров П.И., Беззаборов А.А., Куропатов К.Л., Малыш Я.В.. </p>
+  </div>
+
+  Собрано при помощи <a href="https://www.sphinx-doc.org/">Sphinx</a> с использованием
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">темы,</a>
+    предоставленной <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

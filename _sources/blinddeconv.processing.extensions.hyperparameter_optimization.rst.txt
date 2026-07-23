@@ -1,0 +1,7 @@
+blinddeconv.processing.extensions.hyperparameter\_optimization module
+=====================================================================
+
+.. automodule:: blinddeconv.processing.extensions.hyperparameter_optimization
+   :members:
+   :undoc-members:
+   :show-inheritance:

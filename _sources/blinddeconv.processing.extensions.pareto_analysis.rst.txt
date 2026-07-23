@@ -1,0 +1,7 @@
+blinddeconv.processing.extensions.pareto\_analysis module
+=========================================================
+
+.. automodule:: blinddeconv.processing.extensions.pareto_analysis
+   :members:
+   :undoc-members:
+   :show-inheritance:

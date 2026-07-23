@@ -1,0 +1,7 @@
+blinddeconv.filters.distributions module
+========================================
+
+.. automodule:: blinddeconv.filters.distributions
+   :members:
+   :undoc-members:
+   :show-inheritance:

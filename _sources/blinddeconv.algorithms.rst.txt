@@ -1,0 +1,27 @@
+blinddeconv.algorithms package
+==============================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   blinddeconv.algorithms.denoise
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   blinddeconv.algorithms.base
+   blinddeconv.algorithms.iteration_logger
+
+Module contents
+---------------
+
+.. automodule:: blinddeconv.algorithms
+   :members:
+   :undoc-members:
+   :show-inheritance:

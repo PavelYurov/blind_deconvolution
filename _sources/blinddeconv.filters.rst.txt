@@ -1,0 +1,24 @@
+blinddeconv.filters package
+===========================
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   blinddeconv.filters.base
+   blinddeconv.filters.blur
+   blinddeconv.filters.colored_noise
+   blinddeconv.filters.denoise
+   blinddeconv.filters.distributions
+   blinddeconv.filters.noise
+   blinddeconv.filters.smooth
+
+Module contents
+---------------
+
+.. automodule:: blinddeconv.filters
+   :members:
+   :undoc-members:
+   :show-inheritance:

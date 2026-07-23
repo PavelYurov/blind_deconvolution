@@ -1,0 +1,7 @@
+blinddeconv.output.visuals module
+=================================
+
+.. automodule:: blinddeconv.output.visuals
+   :members:
+   :undoc-members:
+   :show-inheritance:

@@ -1,0 +1,7 @@
+blinddeconv.algorithms.iteration\_logger module
+===============================================
+
+.. automodule:: blinddeconv.algorithms.iteration_logger
+   :members:
+   :undoc-members:
+   :show-inheritance:

@@ -1,0 +1,620 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="ru" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Конфигурационные файлы &mdash; документация BlindDeconvolution 1.0.0</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=e35015f7"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/translations.js?v=5b699b7f"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Алфавитный указатель" href="genindex.html" />
+    <link rel="search" title="Поиск" href="search.html" />
+    <link rel="next" title="Поток данных (Dataflow) через Pipeline" href="data_flow.html" />
+    <link rel="prev" title="Руководство пользователя" href="usage_guide.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            BlindDeconvolution
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Поиск в документации" aria-label="Поиск в документации" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Меню навигации">
+              <p class="caption" role="heading"><span class="caption-text">Руководство пользователя</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Установка и настройка</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage_guide.html">Руководство пользователя</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Конфигурационные файлы</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#id2">Обзор</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id3">Формат файла</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id4">Структура конфигурации</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#yaml">Полный пример (YAML)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#id5">Описание секций</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#experiment"><code class="docutils literal notranslate"><span class="pre">experiment</span></code> (опционально)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#input"><code class="docutils literal notranslate"><span class="pre">input</span></code> (обязательно)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#output"><code class="docutils literal notranslate"><span class="pre">output</span></code> (опционально)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#processing"><code class="docutils literal notranslate"><span class="pre">processing</span></code> (опционально)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#algorithms"><code class="docutils literal notranslate"><span class="pre">algorithms</span></code> (обязательно)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#filters-full-process"><code class="docutils literal notranslate"><span class="pre">filters</span></code> (для <code class="docutils literal notranslate"><span class="pre">full_process</span></code>)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#report"><code class="docutils literal notranslate"><span class="pre">report</span></code> (опционально)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#id6">Валидация</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id7">Готовые конфиги</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#cli">Генерация конфигов через CLI</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="data_flow.html">Поток данных (Dataflow) через Pipeline</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Архитектура и API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="architecture.html">Архитектура системы</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api_reference.html">API Reference</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Теория методов</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="theory/placeholder.html">Теоретические основы</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Автодокументация модулей</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">src</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Меню навигации для мобильных устройств" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">BlindDeconvolution</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Навигация по страницам">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Конфигурационные файлы</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/configuration.md.txt" rel="nofollow"> Просмотреть исходный код страницы</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="id1">
+<h1>Конфигурационные файлы<a class="headerlink" href="#id1" title="Ссылка на этот заголовок"></a></h1>
+<section id="id2">
+<h2>Обзор<a class="headerlink" href="#id2" title="Ссылка на этот заголовок"></a></h2>
+<p>Система конфигурации позволяет описать эксперимент целиком в одном файле (YAML или JSON) и запустить одной командой. Конфиги обеспечивают <strong>воспроизводимость экспериментов</strong> — один конфиг всегда даёт одинаковый результат.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>run.py<span class="w"> </span>--config<span class="w"> </span>configs/basic_deconvolution.yaml
+</pre></div>
+</div>
+</section>
+<section id="id3">
+<h2>Формат файла<a class="headerlink" href="#id3" title="Ссылка на этот заголовок"></a></h2>
+<p>Поддерживаются два формата:</p>
+<ul class="simple">
+<li><p><strong>YAML</strong> (<code class="docutils literal notranslate"><span class="pre">.yaml</span></code>, <code class="docutils literal notranslate"><span class="pre">.yml</span></code>) — рекомендуется, удобен для чтения и редактирования</p></li>
+<li><p><strong>JSON</strong> (<code class="docutils literal notranslate"><span class="pre">.json</span></code>) — строгий формат, подходит для программной генерации</p></li>
+</ul>
+</section>
+<section id="id4">
+<h2>Структура конфигурации<a class="headerlink" href="#id4" title="Ссылка на этот заголовок"></a></h2>
+<section id="yaml">
+<h3>Полный пример (YAML)<a class="headerlink" href="#yaml" title="Ссылка на этот заголовок"></a></h3>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># ── Метаданные эксперимента ──</span>
+<span class="nt">experiment</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;My</span><span class="nv"> </span><span class="s">Experiment&quot;</span>
+<span class="w">  </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Описание</span><span class="nv"> </span><span class="s">эксперимента&quot;</span>
+
+<span class="c1"># ── Входные данные ──</span>
+<span class="nt">input</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">images_folder</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;images/original&quot;</span>
+<span class="w">  </span><span class="nt">blurred_folder</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;images/distorted&quot;</span>
+<span class="w">  </span><span class="nt">color</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">  </span><span class="nt">load_mode</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;bind&quot;</span><span class="w">          </span><span class="c1"># &quot;all&quot; | &quot;bind&quot; | &quot;bind_state&quot;</span>
+
+<span class="w">  </span><span class="nt">bindings</span><span class="p">:</span><span class="w">                  </span><span class="c1"># Для load_mode: &quot;bind&quot;</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">original</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;images/original/airplane.png&quot;</span>
+<span class="w">      </span><span class="nt">blurred</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;images/distorted/airplane_blurred.png&quot;</span>
+<span class="w">      </span><span class="nt">kernel</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;images/kernel_data/kernel.npy&quot;</span><span class="w">     </span><span class="c1"># опционально</span>
+<span class="w">      </span><span class="nt">filter_description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;gaussian_blur&quot;</span><span class="w">          </span><span class="c1"># опционально</span>
+
+<span class="w">  </span><span class="c1"># bind_state_path: &quot;dataset/dataset.json&quot;  # Для load_mode: &quot;bind_state&quot;</span>
+
+<span class="c1"># ── Выходные директории ──</span>
+<span class="nt">output</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">restored_folder</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;results/restored&quot;</span>
+<span class="w">  </span><span class="nt">data_folder</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;results/data&quot;</span>
+<span class="w">  </span><span class="nt">kernel_folder</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;results/kernels&quot;</span>
+
+<span class="c1"># ── Режим обработки ──</span>
+<span class="nt">processing</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;process&quot;</span><span class="w">            </span><span class="c1"># &quot;process&quot; | &quot;full_process&quot;</span>
+<span class="w">  </span><span class="nt">metadata</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">unique_paths</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+
+<span class="c1"># ── Алгоритмы (обязательно) ──</span>
+<span class="nt">algorithms</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;vabid&quot;</span>
+<span class="w">    </span><span class="nt">params</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">max_iter</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
+<span class="w">      </span><span class="nt">kernel_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">21</span>
+
+<span class="c1"># ── Фильтры (для mode: &quot;full_process&quot;) ──</span>
+<span class="nt">filters</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">chain</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;defocus_blur&quot;</span>
+<span class="w">        </span><span class="nt">params</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">psf</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;gaussian&quot;</span>
+<span class="w">          </span><span class="nt">param</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5.0</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;gaussian_noise&quot;</span>
+<span class="w">        </span><span class="nt">params</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">param</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10.0</span>
+
+<span class="c1"># ── Отчёт ──</span>
+<span class="nt">report</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">generate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">  </span><span class="nt">format</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;latex&quot;</span>
+<span class="w">  </span><span class="nt">output_path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;results/report.tex&quot;</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="id5">
+<h2>Описание секций<a class="headerlink" href="#id5" title="Ссылка на этот заголовок"></a></h2>
+<section id="experiment">
+<h3><code class="docutils literal notranslate"><span class="pre">experiment</span></code> (опционально)<a class="headerlink" href="#experiment" title="Ссылка на этот заголовок"></a></h3>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Поле</p></th>
+<th class="head"><p>Тип</p></th>
+<th class="head"><p>Описание</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">name</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code></p></td>
+<td><p>Название эксперимента</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">description</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code></p></td>
+<td><p>Описание</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="input">
+<h3><code class="docutils literal notranslate"><span class="pre">input</span></code> (обязательно)<a class="headerlink" href="#input" title="Ссылка на этот заголовок"></a></h3>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Поле</p></th>
+<th class="head"><p>Тип</p></th>
+<th class="head"><p>По умолчанию</p></th>
+<th class="head"><p>Описание</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">images_folder</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code></p></td>
+<td><p><strong>обязательно</strong></p></td>
+<td><p>Папка с оригинальными изображениями</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">blurred_folder</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;blurred&quot;</span></code></p></td>
+<td><p>Папка со смазанными</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">color</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">bool</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">false</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">true</span></code> — цветные, <code class="docutils literal notranslate"><span class="pre">false</span></code> — ч/б</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">load_mode</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;all&quot;</span></code></p></td>
+<td><p>Режим загрузки (см. ниже)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">bindings</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">array</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">[]</span></code></p></td>
+<td><p>Список связей (для <code class="docutils literal notranslate"><span class="pre">bind</span></code>)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">bind_state_path</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code></p></td>
+<td><p>—</p></td>
+<td><p>Путь к JSON (для <code class="docutils literal notranslate"><span class="pre">bind_state</span></code>)</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Режимы загрузки (<code class="docutils literal notranslate"><span class="pre">load_mode</span></code>):</strong></p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Режим</p></th>
+<th class="head"><p>Описание</p></th>
+<th class="head"><p>Когда использовать</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&quot;all&quot;</span></code></p></td>
+<td><p>Загрузить все файлы из <code class="docutils literal notranslate"><span class="pre">images_folder</span></code></p></td>
+<td><p>Режим <code class="docutils literal notranslate"><span class="pre">full_process</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&quot;bind&quot;</span></code></p></td>
+<td><p>Связать конкретные пары оригинал + смазанное</p></td>
+<td><p>Режим <code class="docutils literal notranslate"><span class="pre">process</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&quot;bind_state&quot;</span></code></p></td>
+<td><p>Загрузить из сохранённого <code class="docutils literal notranslate"><span class="pre">dataset.json</span></code></p></td>
+<td><p>Продолжение эксперимента</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="output">
+<h3><code class="docutils literal notranslate"><span class="pre">output</span></code> (опционально)<a class="headerlink" href="#output" title="Ссылка на этот заголовок"></a></h3>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Поле</p></th>
+<th class="head"><p>Тип</p></th>
+<th class="head"><p>По умолчанию</p></th>
+<th class="head"><p>Описание</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">restored_folder</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;restored&quot;</span></code></p></td>
+<td><p>Куда сохранять восстановленные</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">data_folder</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;data&quot;</span></code></p></td>
+<td><p>Куда сохранять CSV/метаданные</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">kernel_folder</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;kernels&quot;</span></code></p></td>
+<td><p>Куда сохранять ядра</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="processing">
+<h3><code class="docutils literal notranslate"><span class="pre">processing</span></code> (опционально)<a class="headerlink" href="#processing" title="Ссылка на этот заголовок"></a></h3>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Поле</p></th>
+<th class="head"><p>Тип</p></th>
+<th class="head"><p>По умолчанию</p></th>
+<th class="head"><p>Описание</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mode</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;process&quot;</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;process&quot;</span></code> или <code class="docutils literal notranslate"><span class="pre">&quot;full_process&quot;</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">metadata</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">bool</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">true</span></code></p></td>
+<td><p>Сохранять JSON-метаданные</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">unique_paths</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">bool</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">true</span></code></p></td>
+<td><p>Генерировать уникальные имена файлов</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="algorithms">
+<h3><code class="docutils literal notranslate"><span class="pre">algorithms</span></code> (обязательно)<a class="headerlink" href="#algorithms" title="Ссылка на этот заголовок"></a></h3>
+<p>Минимум один алгоритм. Каждый элемент:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Поле</p></th>
+<th class="head"><p>Тип</p></th>
+<th class="head"><p>Описание</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">name</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code></p></td>
+<td><p>Имя из реестра или произвольное</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">module</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code></p></td>
+<td><p>(опц.) Полный путь к модулю</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">class_name</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code></p></td>
+<td><p>(опц.) Имя класса</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">params</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">object</span></code></p></td>
+<td><p>(опц.) Параметры конструктора</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Алгоритмы из реестра:</strong></p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Имя</p></th>
+<th class="head"><p>Категория</p></th>
+<th class="head"><p>Класс</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">richardson_lucy</span></code></p></td>
+<td><p>classic</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">RichardsonLucy</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">em</span></code></p></td>
+<td><p>classic</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">EMBlindDeconvolution</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">map</span></code></p></td>
+<td><p>classic</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">MAPDeconvolution</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">vbbid_tv</span></code></p></td>
+<td><p>bayesian</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">VBBID_TV</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">bbd_deip</span></code></p></td>
+<td><p>bayesian</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">BBD_DEIP</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">sb_bid_pe</span></code></p></td>
+<td><p>bayesian</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">SB_BID_PE</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">vapibe</span></code></p></td>
+<td><p>variational</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">VAPIBE</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">vabid</span></code></p></td>
+<td><p>variational</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">VABID</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">vbsk_sid_st</span></code></p></td>
+<td><p>variational</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">VBSK_SID_ST</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">vbc_bid</span></code></p></td>
+<td><p>sparse</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">VBC_BID</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Пользовательский алгоритм:</strong></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">algorithms</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;my_algorithm&quot;</span>
+<span class="w">    </span><span class="nt">module</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;blinddeconv.algorithms.blind_deconvolution.our_company.classic.richardson_lucy&quot;</span>
+<span class="w">    </span><span class="nt">class_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;RichardsonLucy&quot;</span>
+<span class="w">    </span><span class="nt">params</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">max_iter</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">50</span>
+</pre></div>
+</div>
+</section>
+<section id="filters-full-process">
+<h3><code class="docutils literal notranslate"><span class="pre">filters</span></code> (для <code class="docutils literal notranslate"><span class="pre">full_process</span></code>)<a class="headerlink" href="#filters-full-process" title="Ссылка на этот заголовок"></a></h3>
+<p>Список цепочек. Каждая цепочка — последовательность фильтров, применяемых к оригиналу.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Поле фильтра</p></th>
+<th class="head"><p>Тип</p></th>
+<th class="head"><p>Описание</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">type</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code></p></td>
+<td><p>Имя из реестра фильтров</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">params</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">object</span></code></p></td>
+<td><p>Параметры конструктора</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Фильтры из реестра:</strong></p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Имя</p></th>
+<th class="head"><p>Тип</p></th>
+<th class="head"><p>Параметры</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">defocus_blur</span></code></p></td>
+<td><p>blur</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">psf</span></code> (имя PSF-функции), <code class="docutils literal notranslate"><span class="pre">param</span></code>, <code class="docutils literal notranslate"><span class="pre">kernel_size</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">motion_blur</span></code></p></td>
+<td><p>blur</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">psf</span></code>, <code class="docutils literal notranslate"><span class="pre">param</span></code>, <code class="docutils literal notranslate"><span class="pre">angle</span></code>, <code class="docutils literal notranslate"><span class="pre">kernel_length</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gaussian_noise</span></code></p></td>
+<td><p>noise</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">param</span></code> (стд. отклонение)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">poisson_noise</span></code></p></td>
+<td><p>noise</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">param</span></code> (интенсивность)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">salt_pepper_noise</span></code></p></td>
+<td><p>noise</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">param</span></code> (вероятность)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mean_blur</span></code></p></td>
+<td><p>smooth</p></td>
+<td><p>см. документацию <code class="docutils literal notranslate"><span class="pre">MeanBlur</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gaussian_blur</span></code></p></td>
+<td><p>smooth</p></td>
+<td><p>см. документацию <code class="docutils literal notranslate"><span class="pre">GaussianBlur</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>PSF-функции для blur-фильтров:</strong></p>
+<p><code class="docutils literal notranslate"><span class="pre">gaussian</span></code>, <code class="docutils literal notranslate"><span class="pre">uniform</span></code>, <code class="docutils literal notranslate"><span class="pre">linear_decay</span></code>, <code class="docutils literal notranslate"><span class="pre">ring</span></code>, <code class="docutils literal notranslate"><span class="pre">exponential_decay</span></code></p>
+</section>
+<section id="report">
+<h3><code class="docutils literal notranslate"><span class="pre">report</span></code> (опционально)<a class="headerlink" href="#report" title="Ссылка на этот заголовок"></a></h3>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Поле</p></th>
+<th class="head"><p>Тип</p></th>
+<th class="head"><p>По умолчанию</p></th>
+<th class="head"><p>Описание</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">generate</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">bool</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">false</span></code></p></td>
+<td><p>Генерировать LaTeX-отчёт</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">format</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;latex&quot;</span></code></p></td>
+<td><p>Формат отчёта</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">output_path</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;results/report.tex&quot;</span></code></p></td>
+<td><p>Путь к файлу</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="id6">
+<h2>Валидация<a class="headerlink" href="#id6" title="Ссылка на этот заголовок"></a></h2>
+<p>Конфигурация валидируется автоматически по JSON Schema и логическим правилам:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Только валидация (без запуска)</span>
+python<span class="w"> </span>run.py<span class="w"> </span>--config<span class="w"> </span>configs/experiment.yaml<span class="w"> </span>--validate-only
+
+<span class="c1"># Dry-run: план выполнения без обработки</span>
+python<span class="w"> </span>run.py<span class="w"> </span>--config<span class="w"> </span>configs/experiment.yaml<span class="w"> </span>--dry-run
+</pre></div>
+</div>
+<p>Проверяемые правила:</p>
+<ul class="simple">
+<li><p>Обязательные секции <code class="docutils literal notranslate"><span class="pre">input</span></code> и <code class="docutils literal notranslate"><span class="pre">algorithms</span></code> присутствуют</p></li>
+<li><p>Режим <code class="docutils literal notranslate"><span class="pre">process</span></code> требует <code class="docutils literal notranslate"><span class="pre">load_mode:</span> <span class="pre">&quot;bind&quot;</span></code> или <code class="docutils literal notranslate"><span class="pre">&quot;bind_state&quot;</span></code></p></li>
+<li><p>Режим <code class="docutils literal notranslate"><span class="pre">full_process</span></code> требует непустой секции <code class="docutils literal notranslate"><span class="pre">filters</span></code></p></li>
+<li><p>Все имена алгоритмов и фильтров — из реестра или с указанием <code class="docutils literal notranslate"><span class="pre">module</span></code>/<code class="docutils literal notranslate"><span class="pre">class_name</span></code></p></li>
+</ul>
+</section>
+<section id="id7">
+<h2>Готовые конфиги<a class="headerlink" href="#id7" title="Ссылка на этот заголовок"></a></h2>
+<p>В папке <code class="docutils literal notranslate"><span class="pre">configs/</span></code> находятся примеры:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Файл</p></th>
+<th class="head"><p>Описание</p></th>
+<th class="head"><p>Режим</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">basic_deconvolution.yaml</span></code></p></td>
+<td><p>Базовый пример с парой изображений</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">process</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">medical_imaging.yaml</span></code></p></td>
+<td><p>Медицинские изображения</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">full_process</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">satellite_images.yaml</span></code></p></td>
+<td><p>Спутниковые снимки</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">full_process</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">experiment_template.json</span></code></p></td>
+<td><p>Полный шаблон со всеми полями</p></td>
+<td><p>—</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="cli">
+<h2>Генерация конфигов через CLI<a class="headerlink" href="#cli" title="Ссылка на этот заголовок"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Базовый шаблон</span>
+python<span class="w"> </span>cli.py<span class="w"> </span>generate-config<span class="w"> </span>--template<span class="w"> </span>basic<span class="w"> </span>--output<span class="w"> </span>my_config.yaml
+
+<span class="c1"># Медицинский шаблон (JSON)</span>
+python<span class="w"> </span>cli.py<span class="w"> </span>generate-config<span class="w"> </span>-t<span class="w"> </span>medical<span class="w"> </span>-f<span class="w"> </span>json<span class="w"> </span>-o<span class="w"> </span>config.json
+
+<span class="c1"># Просмотр конфига в таблице</span>
+python<span class="w"> </span>cli.py<span class="w"> </span>view-config<span class="w"> </span>configs/experiment.yaml
+
+<span class="c1"># Интерактивный режим (пошаговые вопросы)</span>
+python<span class="w"> </span>cli.py<span class="w"> </span>interactive
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Нижняя область">
+        <a href="usage_guide.html" class="btn btn-neutral float-left" title="Руководство пользователя" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Предыдущая</a>
+        <a href="data_flow.html" class="btn btn-neutral float-right" title="Поток данных (Dataflow) через Pipeline" accesskey="n" rel="next">Следующая <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Авторские права 2024-2026, Юров П.И., Беззаборов А.А., Куропатов К.Л., Малыш Я.В.. </p>
+  </div>
+
+  Собрано при помощи <a href="https://www.sphinx-doc.org/">Sphinx</a> с использованием
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">темы,</a>
+    предоставленной <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

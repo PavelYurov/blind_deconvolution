@@ -1,0 +1,7 @@
+blinddeconv.processing.restore module
+=====================================
+
+.. automodule:: blinddeconv.processing.restore
+   :members:
+   :undoc-members:
+   :show-inheritance:

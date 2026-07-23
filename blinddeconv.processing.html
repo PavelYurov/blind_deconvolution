@@ -1,0 +1,782 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="ru" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>blinddeconv.processing package &mdash; документация BlindDeconvolution 1.0.0</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=e35015f7"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/translations.js?v=5b699b7f"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Алфавитный указатель" href="genindex.html" />
+    <link rel="search" title="Поиск" href="search.html" />
+    <link rel="next" title="blinddeconv.processing.extensions package" href="blinddeconv.processing.extensions.html" />
+    <link rel="prev" title="blinddeconv.output.visuals module" href="blinddeconv.output.visuals.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            BlindDeconvolution
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Поиск в документации" aria-label="Поиск в документации" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Меню навигации">
+              <p class="caption" role="heading"><span class="caption-text">Руководство пользователя</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Установка и настройка</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage_guide.html">Руководство пользователя</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Конфигурационные файлы</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_flow.html">Поток данных (Dataflow) через Pipeline</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Архитектура и API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="architecture.html">Архитектура системы</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api_reference.html">API Reference</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Теория методов</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="theory/placeholder.html">Теоретические основы</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Автодокументация модулей</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">src</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="blinddeconv.html">blinddeconv package</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="blinddeconv.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.algorithms.html">blinddeconv.algorithms package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.filters.html">blinddeconv.filters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.output.html">blinddeconv.output package</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">blinddeconv.processing package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.html#module-blinddeconv">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Меню навигации для мобильных устройств" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">BlindDeconvolution</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Навигация по страницам">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="modules.html">src</a></li>
+          <li class="breadcrumb-item"><a href="blinddeconv.html">blinddeconv package</a></li>
+      <li class="breadcrumb-item active">blinddeconv.processing package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/blinddeconv.processing.rst.txt" rel="nofollow"> Просмотреть исходный код страницы</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="blinddeconv-processing-package">
+<h1>blinddeconv.processing package<a class="headerlink" href="#blinddeconv-processing-package" title="Ссылка на этот заголовок"></a></h1>
+<section id="subpackages">
+<h2>Subpackages<a class="headerlink" href="#subpackages" title="Ссылка на этот заголовок"></a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="blinddeconv.processing.extensions.html">blinddeconv.processing.extensions package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="blinddeconv.processing.extensions.html#submodules">Submodules</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.extensions.base.html">blinddeconv.processing.extensions.base module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.base.html#blinddeconv.processing.extensions.base.MetricType"><code class="docutils literal notranslate"><span class="pre">MetricType</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.base.html#blinddeconv.processing.extensions.base.OptimizationMethod"><code class="docutils literal notranslate"><span class="pre">OptimizationMethod</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.base.html#blinddeconv.processing.extensions.base.OptimizationResult"><code class="docutils literal notranslate"><span class="pre">OptimizationResult</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.base.html#blinddeconv.processing.extensions.base.ParameterRange"><code class="docutils literal notranslate"><span class="pre">ParameterRange</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.base.html#blinddeconv.processing.extensions.base.ParetoPoint"><code class="docutils literal notranslate"><span class="pre">ParetoPoint</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.base.html#blinddeconv.processing.extensions.base.ProcessingExtension"><code class="docutils literal notranslate"><span class="pre">ProcessingExtension</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.extensions.hyperparameter_optimization.html">blinddeconv.processing.extensions.hyperparameter_optimization module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.hyperparameter_optimization.html#blinddeconv.processing.extensions.hyperparameter_optimization.HyperparameterOptimizer"><code class="docutils literal notranslate"><span class="pre">HyperparameterOptimizer</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.extensions.pareto_analysis.html">blinddeconv.processing.extensions.pareto_analysis module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.pareto_analysis.html#blinddeconv.processing.extensions.pareto_analysis.ParetoFrontAnalyzer"><code class="docutils literal notranslate"><span class="pre">ParetoFrontAnalyzer</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="blinddeconv.processing.extensions.html#module-blinddeconv.processing.extensions">Module contents</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.HyperparameterOptimizer"><code class="docutils literal notranslate"><span class="pre">HyperparameterOptimizer</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.HyperparameterOptimizer.__init__"><code class="docutils literal notranslate"><span class="pre">HyperparameterOptimizer.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.HyperparameterOptimizer.execute"><code class="docutils literal notranslate"><span class="pre">HyperparameterOptimizer.execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.MetricType"><code class="docutils literal notranslate"><span class="pre">MetricType</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.MetricType.PSNR"><code class="docutils literal notranslate"><span class="pre">MetricType.PSNR</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.MetricType.SHARPNESS"><code class="docutils literal notranslate"><span class="pre">MetricType.SHARPNESS</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.MetricType.SSIM"><code class="docutils literal notranslate"><span class="pre">MetricType.SSIM</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.MetricType.from_string"><code class="docutils literal notranslate"><span class="pre">MetricType.from_string()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.OptimizationMethod"><code class="docutils literal notranslate"><span class="pre">OptimizationMethod</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.OptimizationMethod.GP"><code class="docutils literal notranslate"><span class="pre">OptimizationMethod.GP</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.OptimizationMethod.NSGA2"><code class="docutils literal notranslate"><span class="pre">OptimizationMethod.NSGA2</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.OptimizationMethod.RANDOM"><code class="docutils literal notranslate"><span class="pre">OptimizationMethod.RANDOM</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.OptimizationMethod.TPE"><code class="docutils literal notranslate"><span class="pre">OptimizationMethod.TPE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.OptimizationMethod.from_string"><code class="docutils literal notranslate"><span class="pre">OptimizationMethod.from_string()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.OptimizationResult"><code class="docutils literal notranslate"><span class="pre">OptimizationResult</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.OptimizationResult.best_params"><code class="docutils literal notranslate"><span class="pre">OptimizationResult.best_params</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.OptimizationResult.best_value"><code class="docutils literal notranslate"><span class="pre">OptimizationResult.best_value</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.OptimizationResult.elapsed_time"><code class="docutils literal notranslate"><span class="pre">OptimizationResult.elapsed_time</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.OptimizationResult.history"><code class="docutils literal notranslate"><span class="pre">OptimizationResult.history</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.OptimizationResult.n_trials"><code class="docutils literal notranslate"><span class="pre">OptimizationResult.n_trials</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.OptimizationResult.study"><code class="docutils literal notranslate"><span class="pre">OptimizationResult.study</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.OptimizationResult.to_dict"><code class="docutils literal notranslate"><span class="pre">OptimizationResult.to_dict()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.ParameterRange"><code class="docutils literal notranslate"><span class="pre">ParameterRange</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.ParameterRange.is_integer"><code class="docutils literal notranslate"><span class="pre">ParameterRange.is_integer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.ParameterRange.log_scale"><code class="docutils literal notranslate"><span class="pre">ParameterRange.log_scale</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.ParameterRange.max_value"><code class="docutils literal notranslate"><span class="pre">ParameterRange.max_value</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.ParameterRange.min_value"><code class="docutils literal notranslate"><span class="pre">ParameterRange.min_value</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.ParameterRange.name"><code class="docutils literal notranslate"><span class="pre">ParameterRange.name</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.ParameterRange.step"><code class="docutils literal notranslate"><span class="pre">ParameterRange.step</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.ParameterRange.validate"><code class="docutils literal notranslate"><span class="pre">ParameterRange.validate()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.ParetoFrontAnalyzer"><code class="docutils literal notranslate"><span class="pre">ParetoFrontAnalyzer</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.ParetoFrontAnalyzer.ALPHA"><code class="docutils literal notranslate"><span class="pre">ParetoFrontAnalyzer.ALPHA</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.ParetoFrontAnalyzer.COLORMAP"><code class="docutils literal notranslate"><span class="pre">ParetoFrontAnalyzer.COLORMAP</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.ParetoFrontAnalyzer.FIGURE_DPI"><code class="docutils literal notranslate"><span class="pre">ParetoFrontAnalyzer.FIGURE_DPI</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.ParetoFrontAnalyzer.LINE_WIDTH"><code class="docutils literal notranslate"><span class="pre">ParetoFrontAnalyzer.LINE_WIDTH</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.ParetoFrontAnalyzer.MARKER_SIZE"><code class="docutils literal notranslate"><span class="pre">ParetoFrontAnalyzer.MARKER_SIZE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.ParetoFrontAnalyzer.__init__"><code class="docutils literal notranslate"><span class="pre">ParetoFrontAnalyzer.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.ParetoFrontAnalyzer.execute"><code class="docutils literal notranslate"><span class="pre">ParetoFrontAnalyzer.execute()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.ParetoPoint"><code class="docutils literal notranslate"><span class="pre">ParetoPoint</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.ParetoPoint.dominates"><code class="docutils literal notranslate"><span class="pre">ParetoPoint.dominates()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.ParetoPoint.is_pareto_optimal"><code class="docutils literal notranslate"><span class="pre">ParetoPoint.is_pareto_optimal</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.ParetoPoint.metadata"><code class="docutils literal notranslate"><span class="pre">ParetoPoint.metadata</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.ParetoPoint.objectives"><code class="docutils literal notranslate"><span class="pre">ParetoPoint.objectives</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.ParetoPoint.parameters"><code class="docutils literal notranslate"><span class="pre">ParetoPoint.parameters</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.ProcessingExtension"><code class="docutils literal notranslate"><span class="pre">ProcessingExtension</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.ProcessingExtension.__init__"><code class="docutils literal notranslate"><span class="pre">ProcessingExtension.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="blinddeconv.processing.extensions.html#blinddeconv.processing.extensions.ProcessingExtension.execute"><code class="docutils literal notranslate"><span class="pre">ProcessingExtension.execute()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Ссылка на этот заголовок"></a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="blinddeconv.processing.applyfilter.html">blinddeconv.processing.applyfilter module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="blinddeconv.processing.applyfilter.html#blinddeconv.processing.applyfilter.ModuleFilter"><code class="docutils literal notranslate"><span class="pre">ModuleFilter</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.applyfilter.html#blinddeconv.processing.applyfilter.ModuleFilter.__init__"><code class="docutils literal notranslate"><span class="pre">ModuleFilter.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.applyfilter.html#blinddeconv.processing.applyfilter.ModuleFilter.custom_filter"><code class="docutils literal notranslate"><span class="pre">ModuleFilter.custom_filter()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.applyfilter.html#blinddeconv.processing.applyfilter.ModuleFilter.filter"><code class="docutils literal notranslate"><span class="pre">ModuleFilter.filter()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="blinddeconv.processing.clear.html">blinddeconv.processing.clear module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="blinddeconv.processing.clear.html#blinddeconv.processing.clear.ModuleClear"><code class="docutils literal notranslate"><span class="pre">ModuleClear</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.clear.html#blinddeconv.processing.clear.ModuleClear.__init__"><code class="docutils literal notranslate"><span class="pre">ModuleClear.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.clear.html#blinddeconv.processing.clear.ModuleClear.clear_all"><code class="docutils literal notranslate"><span class="pre">ModuleClear.clear_all()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.clear.html#blinddeconv.processing.clear.ModuleClear.clear_input"><code class="docutils literal notranslate"><span class="pre">ModuleClear.clear_input()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.clear.html#blinddeconv.processing.clear.ModuleClear.clear_output"><code class="docutils literal notranslate"><span class="pre">ModuleClear.clear_output()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.clear.html#blinddeconv.processing.clear.ModuleClear.clear_output_directory"><code class="docutils literal notranslate"><span class="pre">ModuleClear.clear_output_directory()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.clear.html#blinddeconv.processing.clear.ModuleClear.clear_restored"><code class="docutils literal notranslate"><span class="pre">ModuleClear.clear_restored()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.clear.html#blinddeconv.processing.clear.ModuleClear.reset"><code class="docutils literal notranslate"><span class="pre">ModuleClear.reset()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.clear.html#blinddeconv.processing.clear.ModuleClear.unbind_restored"><code class="docutils literal notranslate"><span class="pre">ModuleClear.unbind_restored()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="blinddeconv.processing.core.html">blinddeconv.processing.core module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing"><code class="docutils literal notranslate"><span class="pre">Processing</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing.__init__"><code class="docutils literal notranslate"><span class="pre">Processing.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing.bind"><code class="docutils literal notranslate"><span class="pre">Processing.bind()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing.changescale"><code class="docutils literal notranslate"><span class="pre">Processing.changescale()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing.clear_all"><code class="docutils literal notranslate"><span class="pre">Processing.clear_all()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing.clear_input"><code class="docutils literal notranslate"><span class="pre">Processing.clear_input()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing.clear_output"><code class="docutils literal notranslate"><span class="pre">Processing.clear_output()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing.clear_output_directory"><code class="docutils literal notranslate"><span class="pre">Processing.clear_output_directory()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing.clear_restored"><code class="docutils literal notranslate"><span class="pre">Processing.clear_restored()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing.custom_filter"><code class="docutils literal notranslate"><span class="pre">Processing.custom_filter()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing.filter"><code class="docutils literal notranslate"><span class="pre">Processing.filter()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing.full_process"><code class="docutils literal notranslate"><span class="pre">Processing.full_process()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing.get_table"><code class="docutils literal notranslate"><span class="pre">Processing.get_table()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing.histogram_equalization"><code class="docutils literal notranslate"><span class="pre">Processing.histogram_equalization()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing.histogram_equalization_CLAHE"><code class="docutils literal notranslate"><span class="pre">Processing.histogram_equalization_CLAHE()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing.inverse_histogram_equalization"><code class="docutils literal notranslate"><span class="pre">Processing.inverse_histogram_equalization()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing.len_blur"><code class="docutils literal notranslate"><span class="pre">Processing.len_blur()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing.load_bind_state"><code class="docutils literal notranslate"><span class="pre">Processing.load_bind_state()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing.load_filter"><code class="docutils literal notranslate"><span class="pre">Processing.load_filter()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing.pareto"><code class="docutils literal notranslate"><span class="pre">Processing.pareto()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing.process"><code class="docutils literal notranslate"><span class="pre">Processing.process()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing.process_hyperparameter_optimization"><code class="docutils literal notranslate"><span class="pre">Processing.process_hyperparameter_optimization()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing.read_all"><code class="docutils literal notranslate"><span class="pre">Processing.read_all()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing.read_one"><code class="docutils literal notranslate"><span class="pre">Processing.read_one()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing.reset"><code class="docutils literal notranslate"><span class="pre">Processing.reset()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing.save_bind_state"><code class="docutils literal notranslate"><span class="pre">Processing.save_bind_state()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing.save_filter"><code class="docutils literal notranslate"><span class="pre">Processing.save_filter()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing.show"><code class="docutils literal notranslate"><span class="pre">Processing.show()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing.show_line"><code class="docutils literal notranslate"><span class="pre">Processing.show_line()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing.unbind_restored"><code class="docutils literal notranslate"><span class="pre">Processing.unbind_restored()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.merge"><code class="docutils literal notranslate"><span class="pre">merge()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.show_from_table"><code class="docutils literal notranslate"><span class="pre">show_from_table()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="blinddeconv.processing.display.html">blinddeconv.processing.display module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="blinddeconv.processing.display.html#blinddeconv.processing.display.ModuleDisplay"><code class="docutils literal notranslate"><span class="pre">ModuleDisplay</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.display.html#blinddeconv.processing.display.ModuleDisplay.__init__"><code class="docutils literal notranslate"><span class="pre">ModuleDisplay.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.display.html#blinddeconv.processing.display.ModuleDisplay.show"><code class="docutils literal notranslate"><span class="pre">ModuleDisplay.show()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.display.html#blinddeconv.processing.display.ModuleDisplay.show_line"><code class="docutils literal notranslate"><span class="pre">ModuleDisplay.show_line()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="blinddeconv.processing.metrics.html">blinddeconv.processing.metrics module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="blinddeconv.processing.metrics.html#blinddeconv.processing.metrics.PSNR"><code class="docutils literal notranslate"><span class="pre">PSNR()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="blinddeconv.processing.metrics.html#blinddeconv.processing.metrics.SSIM"><code class="docutils literal notranslate"><span class="pre">SSIM()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="blinddeconv.processing.metrics.html#blinddeconv.processing.metrics.Sharpness"><code class="docutils literal notranslate"><span class="pre">Sharpness()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="blinddeconv.processing.metrics.html#blinddeconv.processing.metrics.blur_complexity"><code class="docutils literal notranslate"><span class="pre">blur_complexity()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="blinddeconv.processing.metrics.html#blinddeconv.processing.metrics.calculate_sml"><code class="docutils literal notranslate"><span class="pre">calculate_sml()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="blinddeconv.processing.metrics.html#blinddeconv.processing.metrics.calculate_snr"><code class="docutils literal notranslate"><span class="pre">calculate_snr()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="blinddeconv.processing.metrics.html#blinddeconv.processing.metrics.noise_complexity"><code class="docutils literal notranslate"><span class="pre">noise_complexity()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="blinddeconv.processing.preprocessing.html">blinddeconv.processing.preprocessing module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="blinddeconv.processing.preprocessing.html#blinddeconv.processing.preprocessing.ModulePreprocessing"><code class="docutils literal notranslate"><span class="pre">ModulePreprocessing</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.preprocessing.html#blinddeconv.processing.preprocessing.ModulePreprocessing.__init__"><code class="docutils literal notranslate"><span class="pre">ModulePreprocessing.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.preprocessing.html#blinddeconv.processing.preprocessing.ModulePreprocessing.histogram_equalization"><code class="docutils literal notranslate"><span class="pre">ModulePreprocessing.histogram_equalization()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.preprocessing.html#blinddeconv.processing.preprocessing.ModulePreprocessing.histogram_equalization_CLAHE"><code class="docutils literal notranslate"><span class="pre">ModulePreprocessing.histogram_equalization_CLAHE()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.preprocessing.html#blinddeconv.processing.preprocessing.ModulePreprocessing.inverse_histogram_equalization"><code class="docutils literal notranslate"><span class="pre">ModulePreprocessing.inverse_histogram_equalization()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="blinddeconv.processing.reader.html">blinddeconv.processing.reader module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="blinddeconv.processing.reader.html#blinddeconv.processing.reader.ModuleReader"><code class="docutils literal notranslate"><span class="pre">ModuleReader</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.reader.html#blinddeconv.processing.reader.ModuleReader.__init__"><code class="docutils literal notranslate"><span class="pre">ModuleReader.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.reader.html#blinddeconv.processing.reader.ModuleReader.bind"><code class="docutils literal notranslate"><span class="pre">ModuleReader.bind()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.reader.html#blinddeconv.processing.reader.ModuleReader.load_bind_state"><code class="docutils literal notranslate"><span class="pre">ModuleReader.load_bind_state()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.reader.html#blinddeconv.processing.reader.ModuleReader.read_all"><code class="docutils literal notranslate"><span class="pre">ModuleReader.read_all()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.reader.html#blinddeconv.processing.reader.ModuleReader.read_one"><code class="docutils literal notranslate"><span class="pre">ModuleReader.read_one()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.reader.html#blinddeconv.processing.reader.ModuleReader.save_bind_state"><code class="docutils literal notranslate"><span class="pre">ModuleReader.save_bind_state()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="blinddeconv.processing.restore.html">blinddeconv.processing.restore module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="blinddeconv.processing.restore.html#blinddeconv.processing.restore.ModuleProcess"><code class="docutils literal notranslate"><span class="pre">ModuleProcess</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.restore.html#blinddeconv.processing.restore.ModuleProcess.__init__"><code class="docutils literal notranslate"><span class="pre">ModuleProcess.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.restore.html#blinddeconv.processing.restore.ModuleProcess.process"><code class="docutils literal notranslate"><span class="pre">ModuleProcess.process()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="blinddeconv.processing.restorepipeline.html">blinddeconv.processing.restorepipeline module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="blinddeconv.processing.restorepipeline.html#blinddeconv.processing.restorepipeline.ModuleProcessPipeline"><code class="docutils literal notranslate"><span class="pre">ModuleProcessPipeline</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.restorepipeline.html#blinddeconv.processing.restorepipeline.ModuleProcessPipeline.__init__"><code class="docutils literal notranslate"><span class="pre">ModuleProcessPipeline.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.restorepipeline.html#blinddeconv.processing.restorepipeline.ModuleProcessPipeline.full_process"><code class="docutils literal notranslate"><span class="pre">ModuleProcessPipeline.full_process()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="blinddeconv.processing.tables.html">blinddeconv.processing.tables module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="blinddeconv.processing.tables.html#blinddeconv.processing.tables.ModuleData"><code class="docutils literal notranslate"><span class="pre">ModuleData</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.tables.html#blinddeconv.processing.tables.ModuleData.__init__"><code class="docutils literal notranslate"><span class="pre">ModuleData.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.tables.html#blinddeconv.processing.tables.ModuleData.get_table"><code class="docutils literal notranslate"><span class="pre">ModuleData.get_table()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="blinddeconv.processing.utils.html">blinddeconv.processing.utils module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image"><code class="docutils literal notranslate"><span class="pre">Image</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.__init__"><code class="docutils literal notranslate"><span class="pre">Image.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.add_PSNR"><code class="docutils literal notranslate"><span class="pre">Image.add_PSNR()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.add_SSIM"><code class="docutils literal notranslate"><span class="pre">Image.add_SSIM()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.add_algorithm"><code class="docutils literal notranslate"><span class="pre">Image.add_algorithm()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.add_blurred_PSNR"><code class="docutils literal notranslate"><span class="pre">Image.add_blurred_PSNR()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.add_blurred_SSIM"><code class="docutils literal notranslate"><span class="pre">Image.add_blurred_SSIM()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.add_kernel"><code class="docutils literal notranslate"><span class="pre">Image.add_kernel()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.add_original_kernel"><code class="docutils literal notranslate"><span class="pre">Image.add_original_kernel()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.add_preprocessed_blurred_path"><code class="docutils literal notranslate"><span class="pre">Image.add_preprocessed_blurred_path()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.add_restored"><code class="docutils literal notranslate"><span class="pre">Image.add_restored()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.add_to_current_filter"><code class="docutils literal notranslate"><span class="pre">Image.add_to_current_filter()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.get_PSNR"><code class="docutils literal notranslate"><span class="pre">Image.get_PSNR()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.get_SSIM"><code class="docutils literal notranslate"><span class="pre">Image.get_SSIM()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.get_algorithm"><code class="docutils literal notranslate"><span class="pre">Image.get_algorithm()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.get_all_blurred_images"><code class="docutils literal notranslate"><span class="pre">Image.get_all_blurred_images()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.get_all_filters"><code class="docutils literal notranslate"><span class="pre">Image.get_all_filters()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.get_blurred"><code class="docutils literal notranslate"><span class="pre">Image.get_blurred()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.get_blurred_PSNR"><code class="docutils literal notranslate"><span class="pre">Image.get_blurred_PSNR()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.get_blurred_SSIM"><code class="docutils literal notranslate"><span class="pre">Image.get_blurred_SSIM()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.get_blurred_array"><code class="docutils literal notranslate"><span class="pre">Image.get_blurred_array()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.get_blurred_image"><code class="docutils literal notranslate"><span class="pre">Image.get_blurred_image()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.get_color"><code class="docutils literal notranslate"><span class="pre">Image.get_color()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.get_current_filter"><code class="docutils literal notranslate"><span class="pre">Image.get_current_filter()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.get_filters"><code class="docutils literal notranslate"><span class="pre">Image.get_filters()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.get_kernels"><code class="docutils literal notranslate"><span class="pre">Image.get_kernels()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.get_len_algorithms"><code class="docutils literal notranslate"><span class="pre">Image.get_len_algorithms()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.get_len_filter"><code class="docutils literal notranslate"><span class="pre">Image.get_len_filter()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.get_original"><code class="docutils literal notranslate"><span class="pre">Image.get_original()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.get_original_image"><code class="docutils literal notranslate"><span class="pre">Image.get_original_image()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.get_original_kernels"><code class="docutils literal notranslate"><span class="pre">Image.get_original_kernels()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.get_preprocessed_blurred_path"><code class="docutils literal notranslate"><span class="pre">Image.get_preprocessed_blurred_path()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.get_restored"><code class="docutils literal notranslate"><span class="pre">Image.get_restored()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.load"><code class="docutils literal notranslate"><span class="pre">Image.load()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.save_filter"><code class="docutils literal notranslate"><span class="pre">Image.save_filter()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.set_PSNR"><code class="docutils literal notranslate"><span class="pre">Image.set_PSNR()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.set_SSIM"><code class="docutils literal notranslate"><span class="pre">Image.set_SSIM()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.set_algorithm"><code class="docutils literal notranslate"><span class="pre">Image.set_algorithm()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.set_blurred"><code class="docutils literal notranslate"><span class="pre">Image.set_blurred()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.set_blurred_PSNR"><code class="docutils literal notranslate"><span class="pre">Image.set_blurred_PSNR()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.set_blurred_SSIM"><code class="docutils literal notranslate"><span class="pre">Image.set_blurred_SSIM()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.set_blurred_array"><code class="docutils literal notranslate"><span class="pre">Image.set_blurred_array()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.set_current_filter"><code class="docutils literal notranslate"><span class="pre">Image.set_current_filter()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.set_filters"><code class="docutils literal notranslate"><span class="pre">Image.set_filters()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.set_kernels"><code class="docutils literal notranslate"><span class="pre">Image.set_kernels()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.set_original"><code class="docutils literal notranslate"><span class="pre">Image.set_original()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.set_original_kernels"><code class="docutils literal notranslate"><span class="pre">Image.set_original_kernels()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.set_preprocessed_blurred_path"><code class="docutils literal notranslate"><span class="pre">Image.set_preprocessed_blurred_path()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image.set_restored"><code class="docutils literal notranslate"><span class="pre">Image.set_restored()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.calculate_metrics"><code class="docutils literal notranslate"><span class="pre">calculate_metrics()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.float_img_to_int"><code class="docutils literal notranslate"><span class="pre">float_img_to_int()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.generate_unique_file_path"><code class="docutils literal notranslate"><span class="pre">generate_unique_file_path()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.imread"><code class="docutils literal notranslate"><span class="pre">imread()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.prepare_image_for_metric"><code class="docutils literal notranslate"><span class="pre">prepare_image_for_metric()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section id="module-blinddeconv.processing">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-blinddeconv.processing" title="Ссылка на этот заголовок"></a></h2>
+<p>Фреймворк слепой деконволюции изображений.</p>
+<dl class="simple">
+<dt>Модули:</dt><dd><p>core: Интерфейс фреймворка
+applyfilter: Применение фильтров
+clear: Удаление изображений
+display: Вывод изобажений на экран
+metrics: Метрики
+preprovessing: Предобработка, выравнивание гистограмм
+reader: Загрузка изображений из директорий
+restore: Применение алгоритмов деконволюции
+restorepipeline: Конвейер применения фильтров, восстановления и анализа
+tables: Работа с метаданными
+utils: Вспомогательные методы и классы</p>
+</dd>
+</dl>
+<p>Автор: Юров П.И.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="blinddeconv.processing.Processing">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">blinddeconv.processing.</span></span><span class="sig-name descname"><span class="pre">Processing</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">images_folder</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'images'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">blurred_folder</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'blurred'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">restored_folder</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'restored'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'data'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(в Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kernel_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'kernels'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">preprocess_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'preprocess'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dataset_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'dataset'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#Processing"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.Processing" title="Ссылка на это определение"></a></dt>
+<dd><p>Базовые классы: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(в Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>Фреймворк для обработки изображений.</p>
+<p>Предоставляет полный конвейер для работы с изображениями:
+загрузка, применение фильтров, восстановление, анализ метрик.</p>
+<section id="id1">
+<h3>Атрибуты<a class="headerlink" href="#id1" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>color<span class="classifier">bool</span></dt><dd><p>Тип загрузки изображений (цветное/черно-белое).</p>
+</dd>
+<dt>folder_path<span class="classifier">Path</span></dt><dd><p>Директория с исходными изображениями.</p>
+</dd>
+<dt>folder_path_blurred<span class="classifier">Path</span></dt><dd><p>Директория со смазанными изображениями.</p>
+</dd>
+<dt>folder_path_restored<span class="classifier">Path</span></dt><dd><p>Директория с восстановленными изображениями.</p>
+</dd>
+<dt>data_path<span class="classifier">Path</span></dt><dd><p>Директория для сохранения анализа данных.</p>
+</dd>
+<dt>images<span class="classifier">np.ndarray</span></dt><dd><p>Массив связей изображений.</p>
+</dd>
+<dt>kernel_dir<span class="classifier">Path</span></dt><dd><p>Директория для ядер.</p>
+</dd>
+<dt>dataset_path<span class="classifier">Path</span></dt><dd><p>Директория для метаданных датасетов.</p>
+</dd>
+<dt>preprocess_dir: str</dt><dd><p>Директория для обработанных смазанных изображений.</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.Processing.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">images_folder</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'images'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">blurred_folder</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'blurred'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">restored_folder</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'restored'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'data'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(в Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kernel_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'kernels'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">preprocess_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'preprocess'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dataset_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'dataset'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#Processing.__init__"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.Processing.__init__" title="Ссылка на это определение"></a></dt>
+<dd><p>Инициализация фреймворка.</p>
+<section id="id2">
+<h4>Параметры<a class="headerlink" href="#id2" title="Ссылка на этот заголовок"></a></h4>
+<dl class="simple">
+<dt>images_folder<span class="classifier">str</span></dt><dd><p>Директория с исходными изображениями.</p>
+</dd>
+<dt>blurred_folder<span class="classifier">str</span></dt><dd><p>Директория со смазанными изображениями.</p>
+</dd>
+<dt>restored_folder<span class="classifier">str</span></dt><dd><p>Директория с восстановленными изображениями.</p>
+</dd>
+<dt>data_path<span class="classifier">str</span></dt><dd><p>Директория для сохранения анализа данных.</p>
+</dd>
+<dt>color<span class="classifier">bool</span></dt><dd><p>Тип загрузки изображений (True - цветное, False - ч/б).</p>
+</dd>
+<dt>kernel_dir<span class="classifier">str</span></dt><dd><p>Директория для ядер.</p>
+</dd>
+<dt>dataset_path<span class="classifier">str</span></dt><dd><p>Директория для метаданных датасетов.</p>
+</dd>
+<dt>preprocess_dir: str</dt><dd><p>Директория для обработанных смазанных изображений.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.Processing.bind">
+<span class="sig-name descname"><span class="pre">bind</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">original_image_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(в Python v3.14)"><span class="pre">Path</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">blurred_image_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(в Python v3.14)"><span class="pre">Path</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">original_kernel_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(в Python v3.14)"><span class="pre">Path</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filter_description</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'unknown'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(в Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="blinddeconv.processing.utils.html#blinddeconv.processing.utils.Image" title="blinddeconv.processing.utils.Image"><span class="pre">Image</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#Processing.bind"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.Processing.bind" title="Ссылка на это определение"></a></dt>
+<dd><p>Связывает оригинальное изображение с искаженной версией.</p>
+<section id="id3">
+<h4>Параметры<a class="headerlink" href="#id3" title="Ссылка на этот заголовок"></a></h4>
+<dl class="simple">
+<dt>original_image_path<span class="classifier">Path</span></dt><dd><p>Путь к оригинальному изображению.</p>
+</dd>
+<dt>blurred_image_path<span class="classifier">Path</span></dt><dd><p>Путь к смазанному изображению.</p>
+</dd>
+<dt>original_kernel_path<span class="classifier">Optional[Path]</span></dt><dd><p>Путь к ядру размытия.</p>
+</dd>
+<dt>filter_description<span class="classifier">str</span></dt><dd><p>Описание примененного фильтра.</p>
+</dd>
+<dt>color<span class="classifier">bool</span></dt><dd><p>Способ загрузки (True - цветное, False - ч/б).</p>
+</dd>
+</dl>
+</section>
+<section id="id4">
+<h4>Возвращает<a class="headerlink" href="#id4" title="Ссылка на этот заголовок"></a></h4>
+<dl class="simple">
+<dt>Image</dt><dd><p>Объект связи изображений.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.Processing.changescale">
+<span class="sig-name descname"><span class="pre">changescale</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(в Python v3.14)"><span class="pre">bool</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#Processing.changescale"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.Processing.changescale" title="Ссылка на это определение"></a></dt>
+<dd><p>Изменение способа загрузки изображений.</p>
+<section id="id5">
+<h4>Параметры<a class="headerlink" href="#id5" title="Ссылка на этот заголовок"></a></h4>
+<dl class="simple">
+<dt>color<span class="classifier">bool</span></dt><dd><p>True - цветное, False - черно-белое.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.Processing.clear_all">
+<span class="sig-name descname"><span class="pre">clear_all</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#Processing.clear_all"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.Processing.clear_all" title="Ссылка на это определение"></a></dt>
+<dd><p>Полная очистка: файлы + состояния + загруженные изображения.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.Processing.clear_input">
+<span class="sig-name descname"><span class="pre">clear_input</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#Processing.clear_input"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.Processing.clear_input" title="Ссылка на это определение"></a></dt>
+<dd><p>Убирает привязку ко всем загруженным изображениям.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.Processing.clear_output">
+<span class="sig-name descname"><span class="pre">clear_output</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#Processing.clear_output"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.Processing.clear_output" title="Ссылка на это определение"></a></dt>
+<dd><p>Удаление всех сгенерированных файлов.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.Processing.clear_output_directory">
+<span class="sig-name descname"><span class="pre">clear_output_directory</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">warning</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'IT</span> <span class="pre">WILL</span> <span class="pre">DELETE</span> <span class="pre">EVERYTHING!'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#Processing.clear_output_directory"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.Processing.clear_output_directory" title="Ссылка на это определение"></a></dt>
+<dd><p>Полная очистка выходных директорий.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.Processing.clear_restored">
+<span class="sig-name descname"><span class="pre">clear_restored</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#Processing.clear_restored"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.Processing.clear_restored" title="Ссылка на это определение"></a></dt>
+<dd><p>Удаляет восстановленные изображения из каждой связи.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.Processing.custom_filter">
+<span class="sig-name descname"><span class="pre">custom_filter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">kernel_image_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(в Python v3.14)"><span class="pre">Path</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">kernel_npy_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(в Python v3.14)"><span class="pre">Path</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#Processing.custom_filter"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.Processing.custom_filter" title="Ссылка на это определение"></a></dt>
+<dd><p>Применение созданного фильтра ко всем оригинальным изображениям.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.Processing.filter">
+<span class="sig-name descname"><span class="pre">filter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filter_processor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="blinddeconv.filters.base.html#blinddeconv.filters.base.FilterBase" title="blinddeconv.filters.base.FilterBase"><span class="pre">FilterBase</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#Processing.filter"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.Processing.filter" title="Ссылка на это определение"></a></dt>
+<dd><p>Применение фильтра ко всем изображениям.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.Processing.full_process">
+<span class="sig-name descname"><span class="pre">full_process</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filters</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(в Python v3.14)"><span class="pre">list</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">methods</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(в Python v3.14)"><span class="pre">list</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.75</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kernel_intencity_scale</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10.0</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#Processing.full_process"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.Processing.full_process" title="Ссылка на это определение"></a></dt>
+<dd><p>Пайплайн применения фильтров с последующим восстановлением.</p>
+<section id="id6">
+<h4>Параметры<a class="headerlink" href="#id6" title="Ссылка на этот заголовок"></a></h4>
+<dl class="simple">
+<dt>filters<span class="classifier">list</span></dt><dd><p>Массив массивов объектов FilterBase [[],[]].</p>
+</dd>
+<dt>methods<span class="classifier">list</span></dt><dd><p>Массив объектов DeconvolutionAlgorithm.</p>
+</dd>
+<dt>size<span class="classifier">float</span></dt><dd><p>Размер таблицы.</p>
+</dd>
+<dt>kernel_intencity_scale<span class="classifier">float</span></dt><dd><p>Цвет пикселей PSF при выводе.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.Processing.get_table">
+<span class="sig-name descname"><span class="pre">get_table</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">table_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(в Python v3.14)"><span class="pre">Path</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">display_table</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(в Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#Processing.get_table"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.Processing.get_table" title="Ссылка на это определение"></a></dt>
+<dd><p>Получение метрик в структурированном виде.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.Processing.histogram_equalization">
+<span class="sig-name descname"><span class="pre">histogram_equalization</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">view_histogram</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(в Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#Processing.histogram_equalization"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.Processing.histogram_equalization" title="Ссылка на это определение"></a></dt>
+<dd><p>Выполняет выравнивание гистограмм.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.Processing.histogram_equalization_CLAHE">
+<span class="sig-name descname"><span class="pre">histogram_equalization_CLAHE</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">view_histogram</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(в Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">clip_limit</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.01</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#Processing.histogram_equalization_CLAHE"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.Processing.histogram_equalization_CLAHE" title="Ссылка на это определение"></a></dt>
+<dd><p>Выполняет адаптивное выравнивание гистограмм с ограничением контрастности.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.Processing.inverse_histogram_equalization">
+<span class="sig-name descname"><span class="pre">inverse_histogram_equalization</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">view_histogram</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(в Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#Processing.inverse_histogram_equalization"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.Processing.inverse_histogram_equalization" title="Ссылка на это определение"></a></dt>
+<dd><p>Обращает выравнивание гистограмм.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.Processing.len_blur">
+<span class="sig-name descname"><span class="pre">len_blur</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(в Python v3.14)"><span class="pre">int</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#Processing.len_blur"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.Processing.len_blur" title="Ссылка на это определение"></a></dt>
+<dd><p>Количество вариантов размытия.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.Processing.load_bind_state">
+<span class="sig-name descname"><span class="pre">load_bind_state</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bind_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(в Python v3.14)"><span class="pre">Path</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#Processing.load_bind_state"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.Processing.load_bind_state" title="Ссылка на это определение"></a></dt>
+<dd><p>Загружает состояние связей из JSON файла.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.Processing.load_filter">
+<span class="sig-name descname"><span class="pre">load_filter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">index</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(в Python v3.14)"><span class="pre">int</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#Processing.load_filter"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.Processing.load_filter" title="Ссылка на это определение"></a></dt>
+<dd><p>Загрузка состояния фильтров из списка.</p>
+<section id="id7">
+<h4>Параметры<a class="headerlink" href="#id7" title="Ссылка на этот заголовок"></a></h4>
+<dl class="simple">
+<dt>index<span class="classifier">int</span></dt><dd><p>Индекс доставаемого изображения.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.Processing.pareto">
+<span class="sig-name descname"><span class="pre">pareto</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(в Python v3.14)"><span class="pre">Any</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#Processing.pareto"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.Processing.pareto" title="Ссылка на это определение"></a></dt>
+<dd><p>Построение фронта Парето.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.Processing.process">
+<span class="sig-name descname"><span class="pre">process</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">algorithm_processor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="blinddeconv.algorithms.base.html#blinddeconv.algorithms.base.DeconvolutionAlgorithm" title="blinddeconv.algorithms.base.DeconvolutionAlgorithm"><span class="pre">DeconvolutionAlgorithm</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">metadata</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(в Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unique_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(в Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#Processing.process"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.Processing.process" title="Ссылка на это определение"></a></dt>
+<dd><p>Восстановление всех изображений.</p>
+<section id="id8">
+<h4>Параметры<a class="headerlink" href="#id8" title="Ссылка на этот заголовок"></a></h4>
+<dl class="simple">
+<dt>algorithm_processor<span class="classifier">DeconvolutionAlgorithm</span></dt><dd><p>Метод восстановления изображения.</p>
+</dd>
+<dt>metadata<span class="classifier">bool</span></dt><dd><p>Сохранять метаданные или нет.</p>
+</dd>
+<dt>unique_path<span class="classifier">bool</span></dt><dd><p>Генерировать уникальные пути.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.Processing.process_hyperparameter_optimization">
+<span class="sig-name descname"><span class="pre">process_hyperparameter_optimization</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(в Python v3.14)"><span class="pre">Any</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#Processing.process_hyperparameter_optimization"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.Processing.process_hyperparameter_optimization" title="Ссылка на это определение"></a></dt>
+<dd><p>Запуск оптимизации гиперпараметров.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.Processing.read_all">
+<span class="sig-name descname"><span class="pre">read_all</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#Processing.read_all"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.Processing.read_all" title="Ссылка на это определение"></a></dt>
+<dd><p>Загрузка всех изображений из директории.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.Processing.read_one">
+<span class="sig-name descname"><span class="pre">read_one</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(в Python v3.14)"><span class="pre">Path</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#Processing.read_one"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.Processing.read_one" title="Ссылка на это определение"></a></dt>
+<dd><p>Загрузка одного изображения.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.Processing.reset">
+<span class="sig-name descname"><span class="pre">reset</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#Processing.reset"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.Processing.reset" title="Ссылка на это определение"></a></dt>
+<dd><p>Сброс состояний всех изображений до исходного.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.Processing.save_bind_state">
+<span class="sig-name descname"><span class="pre">save_bind_state</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(в Python v3.14)"><span class="pre">Path</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#Processing.save_bind_state"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.Processing.save_bind_state" title="Ссылка на это определение"></a></dt>
+<dd><p>Сохраняет состояние связей в JSON файл.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.Processing.save_filter">
+<span class="sig-name descname"><span class="pre">save_filter</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#Processing.save_filter"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.Processing.save_filter" title="Ссылка на это определение"></a></dt>
+<dd><p>Сохранение текущего состояния фильтров в список.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.Processing.show">
+<span class="sig-name descname"><span class="pre">show</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kernel_intencity_scale</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kernel_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#Processing.show"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.Processing.show" title="Ссылка на это определение"></a></dt>
+<dd><p>Вывод всех изображений: оригинал, размытые, восстановленные + метрики.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.Processing.show_line">
+<span class="sig-name descname"><span class="pre">show_line</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">window_scale</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fontsize</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(в Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">8</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#Processing.show_line"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.Processing.show_line" title="Ссылка на это определение"></a></dt>
+<dd><p>Вывод изображений в строчку.</p>
+<section id="id9">
+<h4>Параметры<a class="headerlink" href="#id9" title="Ссылка на этот заголовок"></a></h4>
+<dl class="simple">
+<dt>window_scale<span class="classifier">float</span></dt><dd><p>Регулирует размер окна.</p>
+</dd>
+<dt>fontsize<span class="classifier">int</span></dt><dd><p>Размер шрифта.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="blinddeconv.processing.Processing.unbind_restored">
+<span class="sig-name descname"><span class="pre">unbind_restored</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#Processing.unbind_restored"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.Processing.unbind_restored" title="Ссылка на это определение"></a></dt>
+<dd><p>Разрывает связь, убирая все восстановленные.</p>
+</dd></dl>
+
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="blinddeconv.processing.merge">
+<span class="sig-prename descclassname"><span class="pre">blinddeconv.processing.</span></span><span class="sig-name descname"><span class="pre">merge</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">frame1</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing" title="blinddeconv.processing.core.Processing"><span class="pre">Processing</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">frame2</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing" title="blinddeconv.processing.core.Processing"><span class="pre">Processing</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="blinddeconv.processing.core.html#blinddeconv.processing.core.Processing" title="blinddeconv.processing.core.Processing"><span class="pre">Processing</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#merge"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.merge" title="Ссылка на это определение"></a></dt>
+<dd><p>Объединяет массивы обработанных изображений.</p>
+<section id="id10">
+<h3>Параметры<a class="headerlink" href="#id10" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>frame1<span class="classifier">Processing</span></dt><dd><p>Первый фреймворк.</p>
+</dd>
+<dt>frame2<span class="classifier">Processing</span></dt><dd><p>Второй фреймворк.</p>
+</dd>
+</dl>
+</section>
+<section id="id11">
+<h3>Возвращает<a class="headerlink" href="#id11" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>Processing</dt><dd><p>Объединённый фреймворк.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="blinddeconv.processing.show_from_table">
+<span class="sig-prename descclassname"><span class="pre">blinddeconv.processing.</span></span><span class="sig-name descname"><span class="pre">show_from_table</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">table_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(в Python v3.14)"><span class="pre">Path</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">alg_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(в Python v3.14)"><span class="pre">str</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">window_scale</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(в Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(в Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/blinddeconv/processing/core.html#show_from_table"><span class="viewcode-link"><span class="pre">[исходный</span> <span class="pre">код]</span></span></a><a class="headerlink" href="#blinddeconv.processing.show_from_table" title="Ссылка на это определение"></a></dt>
+<dd><p>Выводит сетку из смазанных и восстановленных изображений.</p>
+<section id="id12">
+<h3>Параметры<a class="headerlink" href="#id12" title="Ссылка на этот заголовок"></a></h3>
+<dl class="simple">
+<dt>table_path<span class="classifier">str</span></dt><dd><p>Путь к .csv файлу.</p>
+</dd>
+<dt>alg_name<span class="classifier">str</span></dt><dd><p>Имя алгоритма для визуализации.</p>
+</dd>
+<dt>window_scale<span class="classifier">float</span></dt><dd><p>Регулирует размер окна.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Нижняя область">
+        <a href="blinddeconv.output.visuals.html" class="btn btn-neutral float-left" title="blinddeconv.output.visuals module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Предыдущая</a>
+        <a href="blinddeconv.processing.extensions.html" class="btn btn-neutral float-right" title="blinddeconv.processing.extensions package" accesskey="n" rel="next">Следующая <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Авторские права 2024-2026, Юров П.И., Беззаборов А.А., Куропатов К.Л., Малыш Я.В.. </p>
+  </div>
+
+  Собрано при помощи <a href="https://www.sphinx-doc.org/">Sphinx</a> с использованием
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">темы,</a>
+    предоставленной <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

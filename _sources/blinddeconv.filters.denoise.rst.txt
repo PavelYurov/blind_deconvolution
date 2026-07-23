@@ -1,0 +1,7 @@
+blinddeconv.filters.denoise module
+==================================
+
+.. automodule:: blinddeconv.filters.denoise
+   :members:
+   :undoc-members:
+   :show-inheritance:

@@ -1,0 +1,7 @@
+blinddeconv.processing.tables module
+====================================
+
+.. automodule:: blinddeconv.processing.tables
+   :members:
+   :undoc-members:
+   :show-inheritance:
